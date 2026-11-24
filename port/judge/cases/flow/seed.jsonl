@@ -1,0 +1,1 @@
+{"id": "flow.seed.empty_graph", "group": "judge_seed_empty", "steps": [{"call": "build_indices_and_constraints"}, {"call": "retrieve_episodes", "kwargs": {"reference_time": {"$dt": "2026-03-01T00:00:00+00:00"}, "last_n": 3, "group_ids": ["judge_seed_empty"]}}, {"call": "search", "kwargs": {"query": "Who is Kendra?", "group_ids": ["judge_seed_empty"]}}]}

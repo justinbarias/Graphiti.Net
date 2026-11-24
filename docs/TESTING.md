@@ -36,7 +36,7 @@ The judge compares three things for the same input:
 The judge prints its case count. If the count is lower than `port/judge/count.txt`, the judge fails.
 `port/judge/expected-failures.txt` starts with every case and must be empty at M1.
 After gate 2, `port/judge/` is read-only, and `.claude/settings.json` denies edits to it from that point.
-The [judge design document](design-docs/judge-design.md) holds the details.
+The [judge design document](design-docs/judge-design.md) gives the reasons, and [the judge README](../port/judge/README.md) is the contract.
 
 ### End-to-end
 

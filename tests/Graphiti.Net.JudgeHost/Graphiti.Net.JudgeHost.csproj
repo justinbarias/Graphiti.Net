@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <RootNamespace>Graphiti.JudgeHost</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Graphiti.Net/Graphiti.Net.csproj" />
+    <ProjectReference Include="../../src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
+  </ItemGroup>
+</Project>

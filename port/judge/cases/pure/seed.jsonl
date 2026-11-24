@@ -1,0 +1,5 @@
+{"id": "pure.seed.lucene_sanitize.escapes", "fn": "graphiti_core.helpers:lucene_sanitize", "args": ["This has every escape character + - && || ! ( ) { } [ ] ^ \" ~ * ? : \\ /"]}
+{"id": "pure.seed.lucene_sanitize.emoji", "fn": "graphiti_core.helpers:lucene_sanitize", "args": ["caf\u00e9 \ud83d\ude00 e\u0301"]}
+{"id": "pure.seed.lucene_sanitize.wrong_type", "fn": "graphiti_core.helpers:lucene_sanitize", "args": [42]}
+{"id": "pure.seed.schema_text.extracted_entities", "fn": "judge:schema_text", "args": ["graphiti_core.prompts.extract_nodes:ExtractedEntities"]}
+{"id": "pure.seed.embed.hello", "fn": "judge:embed", "args": ["Hello, World"]}

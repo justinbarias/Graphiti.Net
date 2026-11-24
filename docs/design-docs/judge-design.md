@@ -27,12 +27,13 @@ port/judge/
   run.py                  the runner. Python standard library only
   count.txt               the lowest allowed case count
   expected-failures.txt   .NET cases that still fail. Empty at M1
-  cases/<layer>/*.json    inputs
-  golden/<layer>/*.json   outputs recorded from Python
+  cases/<layer>/*.jsonl   inputs
+  golden/<layer>/*.jsonl  outputs recorded from Python
   replies/*.jsonl         scripted model replies
   embedder-vectors.json   shared check values for the judge embedder
   host-python/            the Python host. Only the recorder needs it
-  host-dotnet/            the .NET host. A console project in the solution
+
+tests/Graphiti.Net.JudgeHost/   the .NET host. Outside port/judge, because each ported unit adds a binding
 ```
 
 A host is a thin command. It reads cases as JSON lines on standard input and prints one JSON result for each case.
@@ -112,7 +113,7 @@ A request with no matching key fails the case, and the report shows the closest 
 The judge embedder is a pure function from text to 1024 values, seeded by a SHA-256 hash of the text and normalized to unit length.
 It exists once in Python and once in C#. Both must reproduce `embedder-vectors.json`.
 
-The cross-encoder gets scripted scores in the same way as the LLM gets scripted replies.
+The judge cross-encoder computes each score from the judge embeddings, so it needs no reply file.
 
 ### Scenario sources
 
@@ -128,7 +129,7 @@ The runner applies these rules to both sides before it compares. The list is clo
 
 | Noise | Rule |
 | --- | --- |
-| UUIDs | Sort each unordered collection by its content without UUIDs. Then rename each distinct UUID to `<uuid:n>` in order of first appearance. A renamed UUID must map the same way everywhere in the case. |
+| UUIDs | Each UUID gets a name from its content, refined until no name splits further. The first rule (names by order of first appearance) gave different results between runs, because two edges that differ only in their UUIDs have no stable order. Changed on 2026-11-24 during task 3. |
 | Clock values | A timestamp that falls between the start and the end of the run becomes `<now>`. A timestamp that comes from the input stays exact. |
 | Order of concurrent requests | LLM and embedding requests of one step are compared as a sorted multiset. Queries inside one transaction keep their order. |
 | Floats | Embedding values and scores match within 1e-6. |
