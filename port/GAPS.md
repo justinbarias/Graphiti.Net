@@ -51,6 +51,53 @@ Each item needs expected values from Python, recorded by a script in `port/tools
 | J10 | Rate limit behavior and `SEMAPHORE_LIMIT` under load | The judge compares results, not timing. | One end-to-end test that counts the highest number of calls in flight. |
 | J11 | Data written by Python and read by .NET, and the reverse | Each judge run uses one build. | One end-to-end test that loads a graph dump recorded from Python and searches it with .NET. |
 
+## Upstream defects that the judge found
+
+The golden files record each of these as upstream behaves. Before M1 the port reproduces them. Report each one upstream.
+
+| # | Defect | Where | Case that pins it |
+| --- | --- | --- | --- |
+| U1 | A batched delete (`CALL ... IN TRANSACTIONS`) runs inside an explicit transaction, so Neo4j rejects it. `delete_by_uuids` and `delete_by_group_id` raise `DatabaseError` for entity, episode, and community nodes, and delete nothing. | `driver/neo4j/operations/*_node_ops.py` | `flow.direct.namespaces_entity_nodes` |
+| U2 | A saga save never passes five parameters that its query needs. Every saga save raises `ClientError`. | `driver/neo4j/operations/saga_node_ops.py` | `flow.direct.namespaces_community_saga_nodes` |
+| U3 | `retrieve_episodes` with `group_ids` and `source` builds `$group_idsAND e.source`, with no space. Neo4j raises a syntax error. | `driver/neo4j/operations/episode_node_ops.py` | `flow.direct.namespaces_episode_nodes` |
+| U4 | With two or more group ids, the full-text query is `group_id:"a" OR group_id:"b" AND (q)`. Lucene returns matches of the last group only. The public `search` has the same defect. | `search/search_utils.py` (`fulltext_query`), `search_ops.py` | `flow.direct.isolation_ops_methods` |
+| U5 | `get_community_clusters` returns nodes in an order that changes between processes. | `driver/neo4j/operations/graph_ops.py` | No case with data. |
+| U6 | Several queries have no `ORDER BY`, so the row order changes between runs: `get_by_uuids`, `get_by_node_uuid`, `get_mentioned_nodes`, and both BFS searches. | `driver/neo4j/operations/` | Cases use one result for each call. |
+| U7 | A save of a node or edge with no embedding raises `ClientError`, although the models allow a null embedding. | `entity_node_ops.py`, `entity_edge_ops.py` | `flow.direct.ops_nodes_edges_direct` |
+| U8 | `Graphiti.search` writes `num_results` into a shared module-level recipe object. One call changes later calls in the same process. | `graphiti.py` (`search`) | `flow.direct.isolation_public_search`. The runner gives each flow case a fresh process for this reason. |
+| U9 | If `group_ids` is `None`, `edge_similarity_search` skips its source and target filters. | `search_ops.py`, `search_utils.py` | Read from the code. No case. |
+| U10 | Date filters in different OR groups bind the same parameter name, so one value replaces the other. | `search/search_filters.py` | `flow.direct.ops_search_edges` |
+| U11 | `label_propagation` never ends for some inputs. | `utils/maintenance/community_operations.py:92` | No case. See F6. |
+| U12 | `Edge.__eq__` tests `isinstance(other, Node)`. | `edges.py:99` | See F14. |
+| U13 | `tests/test_add_triplet.py` fails on Neo4j, 11 of 13 tests. Upstream CI never runs it with a database. | Upstream tests | `port/tools/upstream-tests.sh`, configuration C |
+
+Four reranker and lookup methods take UUIDs and apply no group filter: `node_distance_reranker`, `episode_mentions_reranker`, `get_mentioned_nodes`, `get_communities_by_nodes`. That is upstream's design. A multi-tenant caller must check the UUIDs itself.
+
 ## Findings from the case writers
 
-Plan 0002, tasks 5 to 7. Filled in after the agents report.
+Plan 0002, tasks 5 to 7. Each finding names a case id that pins it.
+
+| # | Finding | Case that pins it | Effect on the port |
+| --- | --- | --- | --- |
+| F1 | A `repr` of a datetime inside a list reaches a prompt as `datetime.datetime(2025, 1, 3, 0, 0, tzinfo=datetime.timezone.utc)`. | `pure.prompts.dedupe_edges.resolve_edge.datetime_in_list` | `PyCompat.Repr` must cover datetimes and time zones. Part of G1. |
+| F2 | `str(datetime)` in a prompt uses a space, not `T`: `2025-01-03 00:00:00+00:00`. | `pure.prompts.extract_edges.edge.reference_time_offset_micro` | Part of G4. |
+| F3 | `to_prompt_json` writes floats as Python does: `1e+21`, `1e-07`, `-0.0`. It writes `NaN` and `Infinity` as bare tokens. It turns the dict keys `1`, `None`, and `2.5` into `"1"`, `"null"`, and `"2.5"`. | `pure.prompts.prompt_helpers.to_prompt_json.floats`, `.nan_inf`, `.non_string_keys_dict` | `PyCompat.JsonDumps` must write floats with Python's shortest-repr rules. Part of G2. |
+| F4 | Episode text, facts, and custom instructions go into prompts with no escaping. | The `unicode_format_chars` cases in `pure.prompts.*` | Use plain string concatenation. Never format these values. |
+| F5 | `decision_prompts.parse_list` falls back from `json.loads` to `ast.literal_eval`, then to a regex. | `pure.prompts.decision_prompts.parse_list.python_literal` | The port needs a parser for Python literal syntax: single-quoted strings, `True`, `False`, `None`, tuples. |
+| F6 | `label_propagation` never ends for some inputs, for example two nodes joined by one edge of weight 3. This is an upstream defect. | No case. A case that hangs cannot be recorded. | Port the function as it is. Report the defect upstream. Add a note to the debt tracker. |
+| F7 | `validate_node_labels` accepts a label with a trailing newline, because the pattern ends in `$`. | `pure.filters.search_filters_validation.node_label_trailing_newline_ok_check` | In .NET, `$` also matches before a final newline, so the same pattern gives the same result. Do not change it to `\z`. |
+| F8 | `parse_db_date` depends on `datetime.fromisoformat` of Python 3.12, which accepts more formats than Python 3.10. | `pure.datetime.parse_db_date.*` | The judge records on Python 3.12 ([UPSTREAM_PIN](UPSTREAM_PIN)). The port matches 3.12. |
+| F9 | `generate_covering_chunks` samples at random for large inputs. | No case for that path. | That path cannot be judged. Port it with an injectable random source, and cover it in the evaluation tests with a fixed seed and a property: every element is covered. |
+| F10 | `normalize_l2` with `inf` or `nan` gives `nan` values and a numpy warning. | `pure.text.normalize_l2.*` | `TensorPrimitives` must give `NaN` in the same positions. |
+| F11 | Wrong-type inputs raise Python-specific classes: `AttributeError` for a method call on `None`, `TypeError` for `len(None)`. | Cases with `wrong_type` in the id | C# rejects most of these at compile time. The binding for such a case maps `NullReferenceException` and `ArgumentNullException` to the recorded class, or the lead moves the case to an approved-difference list. Decide in the rulebook (plan 0003). |
+| F12 | Constants cannot be read through a function call, so the judge reaches a constant only through `builtins:str` or `builtins:repr` with `$ref`. | `pure.prompts.prompt_helpers.*` constants | Query string constants in `graph_queries.py` and the two `*_db_queries.py` files are pinned only through the functions that return them. |
+| F13 | Node labels are built from a set: `list({'Entity', name})`. The order of the two labels differs between processes. | `node_operations.py:354`. No pure case can pin it. | The port writes `Entity` first. Flow results that carry labels must sort them before comparison. This needs one more noise rule for `labels`. The maintainer decides on it at gate 2. |
+| F14 | `Edge.__eq__` tests `isinstance(other, Node)`, so two edges with the same UUID are not equal. | `pure.models.EntityEdge.__eq__.edge_vs_edge_same_uuid_is_false` | An upstream defect. Port it as it is, and report it upstream. |
+| F15 | MinHash signature values use the full range up to 2^64 - 1. | `pure.dedupe.minhash_signature.*` | Use `ulong`. The judge codec writes them as JSON numbers, so the .NET codec must not pass them through `double`. |
+| F16 | `str.lower()` maps one code point to two for `İ`, and maps `Σ` at the end of a word to the final sigma. | `pure.dedupe.normalize_string_exact.dotted_I`, `.final_sigma` | `PyCompat.Lower` must use full Unicode case mapping, not `ToLowerInvariant`. Part of G15. |
+| F17 | Python `\s` matches the control characters `\x1c` to `\x1f`. .NET `\s` does not. | `pure.dedupe.normalize_string_exact.fs_ctrl_1c` | Translate `\s` to an explicit character class. Part of G16. |
+| F18 | `calculate_cosine_similarity` returns the integer `0` for a zero vector, and a float in other cases. | `pure.ranking.calculate_cosine_similarity.*` | The .NET method returns `double`. The judge treats `0` and `0.0` as equal, so no special handling is needed. |
+| F19 | `rrf` and `maximal_marginal_relevance` break ties through stable sort and dict insertion order. | `pure.ranking.rrf.*`, `pure.ranking.maximal_marginal_relevance.*` | Part of G13 and G14. |
+| F20 | Functions that only change their arguments return `None`, so a pure case cannot observe them: `_resolve_with_similarity`, `_commit_resolution`, `apply_extracted_timestamps`, the `ResolutionTrace` methods. | No pure case. | The flow layer observes their effects. The break tests check that claim for edge invalidation. |
+| F21 | `driver/neo4j/operations/search_ops.py` is not on the path of the public `search` calls, which use inline queries in `search/search_utils.py`. | The first break-test run missed a break in that file. | The scenarios in `flow/direct.jsonl` call the driver operations directly. |
+| F22 | If related facts exist, a fact that arrives with an end date gets `expired_at`. The first such fact between two entities keeps `expired_at` empty. | `flow.hand.historical_fact` | Upstream behavior. Port it as it is. |

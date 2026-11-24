@@ -53,9 +53,12 @@ def encode(value: Any) -> Any:
     if value is None or isinstance(value, (bool, int, str)):
         return value
     if isinstance(value, float):
-        if math.isnan(value) or math.isinf(value):
-            return {'$float': repr(value)}
-        return value
+        # float(value) also turns a numpy scalar into a plain float.
+        if math.isnan(value):
+            return {'$float': 'nan'}
+        if math.isinf(value):
+            return {'$float': 'inf' if value > 0 else '-inf'}
+        return float(value)
     if isinstance(value, enum.Enum):
         return encode(value.value)
     if isinstance(value, datetime):

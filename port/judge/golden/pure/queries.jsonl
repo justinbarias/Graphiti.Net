@@ -11,8 +11,8 @@
 {"id": "pure.queries.get_nodes_query.edge_name_and_fact", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"edge_name_and_fact\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_nodes_query.quote", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"x\"y\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_nodes_query.inject", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"a`b'c\", $query, {limit: $limit})"}}
-{"id": "pure.queries.get_nodes_query.unicode", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"café 😀 é\", $query, {limit: $limit})"}}
-{"id": "pure.queries.get_nodes_query.cjk", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"漢字\", $query, {limit: $limit})"}}
+{"id": "pure.queries.get_nodes_query.unicode", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"caf\u00e9 \ud83d\ude00 e\u0301\", $query, {limit: $limit})"}}
+{"id": "pure.queries.get_nodes_query.cjk", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"\u6f22\u5b57\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_nodes_query.empty", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_nodes_query.literal_query", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"node_name_and_summary\", \"abc\", {limit: $limit})"}}
 {"id": "pure.queries.get_nodes_query.neg_limit", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"node_name_and_summary\", $query, {limit: $limit})"}}
@@ -21,16 +21,16 @@
 {"id": "pure.queries.get_nodes_query.neptune", "result": {"ok": "CALL db.index.fulltext.queryNodes(\"node_name_and_summary\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_relationships_query.edge", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"edge_name_and_fact\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_relationships_query.quote", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"a\"b\", $query, {limit: $limit})"}}
-{"id": "pure.queries.get_relationships_query.cjk", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"漢字\", $query, {limit: $limit})"}}
+{"id": "pure.queries.get_relationships_query.cjk", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"\u6f22\u5b57\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_relationships_query.empty", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"\", $query, {limit: $limit})"}}
-{"id": "pure.queries.get_relationships_query.unicode", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"é😀\", $query, {limit: $limit})"}}
+{"id": "pure.queries.get_relationships_query.unicode", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"e\u0301\ud83d\ude00\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_relationships_query.relate", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"edge_name_and_fact\", $query)\n"}}
 {"id": "pure.queries.get_relationships_query.neptune", "result": {"ok": "CALL db.index.fulltext.queryRelationships(\"edge_name_and_fact\", $query, {limit: $limit})"}}
 {"id": "pure.queries.get_vector_cosine_func_query.names", "result": {"ok": "vector.similarity.cosine(n.name_embedding, $search_vector)"}}
 {"id": "pure.queries.get_vector_cosine_func_query.empty", "result": {"ok": "vector.similarity.cosine(, )"}}
 {"id": "pure.queries.get_vector_cosine_func_query.non_str", "result": {"ok": "vector.similarity.cosine(1, [2, 3])"}}
 {"id": "pure.queries.get_vector_cosine_func_query.falkordb", "result": {"ok": "(2 - vec.cosineDistance(a, vecf32(b)))/2"}}
-{"id": "pure.queries.get_vector_cosine_func_query.unicode", "result": {"ok": "vector.similarity.cosine(é😀, 漢)"}}
+{"id": "pure.queries.get_vector_cosine_func_query.unicode", "result": {"ok": "vector.similarity.cosine(\u00e9\ud83d\ude00, \u6f22)"}}
 {"id": "pure.queries.get_episode_node_save_query.neo4j", "result": {"ok": "\n                MERGE (n:Episodic {uuid: $uuid})\n                SET n = {uuid: $uuid, name: $name, group_id: $group_id, source_description: $source_description, source: $source, content: $content,\n                entity_edges: $entity_edges, created_at: $created_at, valid_at: $valid_at}\n                RETURN n.uuid AS uuid\n            "}}
 {"id": "pure.queries.get_episode_node_save_query.falkordb", "result": {"ok": "\n                MERGE (n:Episodic {uuid: $uuid})\n                SET n = {uuid: $uuid, name: $name, group_id: $group_id, source_description: $source_description, source: $source, content: $content,\n                entity_edges: $entity_edges, created_at: $created_at, valid_at: $valid_at}\n                RETURN n.uuid AS uuid\n            "}}
 {"id": "pure.queries.get_episode_node_save_bulk_query.neo4j", "result": {"ok": "\n                UNWIND $episodes AS episode\n                MERGE (n:Episodic {uuid: episode.uuid})\n                SET n = {uuid: episode.uuid, name: episode.name, group_id: episode.group_id, source_description: episode.source_description, source: episode.source, content: episode.content, \n                entity_edges: episode.entity_edges, created_at: episode.created_at, valid_at: episode.valid_at}\n                RETURN n.uuid AS uuid\n            "}}
@@ -131,7 +131,7 @@
 {"id": "pure.queries.build_neo4j_fulltext_query.multi_groups", "result": {"ok": "group_id:\"a\" OR group_id:\"b-c\" OR group_id:\"d_e\" AND (hello)"}}
 {"id": "pure.queries.build_neo4j_fulltext_query.special", "result": {"ok": "group_id:\"g\" AND (a \\+ b \\&\\& c \\|\\| \\(d\\) \\{e\\} \\[f\\] \\^\\\"g\\\" \\~h \\*i \\?j \\:k \\\\l \\/m)"}}
 {"id": "pure.queries.build_neo4j_fulltext_query.empty_query", "result": {"ok": "group_id:\"g\" AND ()"}}
-{"id": "pure.queries.build_neo4j_fulltext_query.unicode", "result": {"ok": "group_id:\"g\" AND (café 😀 é 漢字)"}}
+{"id": "pure.queries.build_neo4j_fulltext_query.unicode", "result": {"ok": "group_id:\"g\" AND (caf\u00e9 \ud83d\ude00 e\u0301 \u6f22\u5b57)"}}
 {"id": "pure.queries.build_neo4j_fulltext_query.quote_group", "result": {"error": "GroupIdValidationError"}}
 {"id": "pure.queries.build_neo4j_fulltext_query.unicode_group", "result": {"error": "GroupIdValidationError"}}
 {"id": "pure.queries.build_neo4j_fulltext_query.space_group", "result": {"error": "GroupIdValidationError"}}
@@ -155,7 +155,7 @@
 {"id": "pure.queries.fulltext_query.neo4j_multi_groups", "result": {"ok": "group_id:\"a\" OR group_id:\"b-c\" OR group_id:\"d_e\" AND (hello)"}}
 {"id": "pure.queries.fulltext_query.neo4j_special", "result": {"ok": "group_id:\"g\" AND (a \\+ b \\&\\& c \\|\\| \\(d\\) \\{e\\} \\[f\\] \\^\\\"g\\\" \\~h \\*i \\?j \\:k \\\\l \\/m)"}}
 {"id": "pure.queries.fulltext_query.neo4j_empty_query", "result": {"ok": "group_id:\"g\" AND ()"}}
-{"id": "pure.queries.fulltext_query.neo4j_unicode", "result": {"ok": "group_id:\"g\" AND (café 😀 é 漢字)"}}
+{"id": "pure.queries.fulltext_query.neo4j_unicode", "result": {"ok": "group_id:\"g\" AND (caf\u00e9 \ud83d\ude00 e\u0301 \u6f22\u5b57)"}}
 {"id": "pure.queries.fulltext_query.neo4j_quote_group", "result": {"error": "GroupIdValidationError"}}
 {"id": "pure.queries.fulltext_query.neo4j_unicode_group", "result": {"error": "GroupIdValidationError"}}
 {"id": "pure.queries.fulltext_query.neo4j_space_group", "result": {"error": "GroupIdValidationError"}}

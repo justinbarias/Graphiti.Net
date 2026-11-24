@@ -23,13 +23,13 @@ def main() -> int:
     name, key = sys.argv[1], sys.argv[2]
     reply = json.load(sys.stdin)
     path = JUDGE / "replies" / f"{name}.jsonl"
-    rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()] if path.exists() else []
+    rows = [json.loads(l) for l in path.read_text(encoding="utf-8").split("\n") if l.strip()] if path.exists() else []
     if any(row["key"] == key for row in rows):
         print(f"add_reply: {name} already has a reply for {key[:12]}", file=sys.stderr)
         return 1
     rows.append({"key": key, "reply": reply, "recorded_with": "hand"})
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    path.write_text("".join(json.dumps(r, ensure_ascii=True) + "\n" for r in rows), encoding="utf-8")
     print(f"add_reply: {name} now has {len(rows)} replies")
     return 0
 

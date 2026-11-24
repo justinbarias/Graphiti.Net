@@ -43,6 +43,7 @@ Requirements:
 | `count.txt` | The lowest allowed case count. |
 | `expected-failures.txt` | The .NET cases that still fail. Empty at M1. |
 | `host-python/` | The Python host. |
+| `pending/` | Scenarios that wait for replies from a real model. The runner does not load this folder. |
 
 The .NET host is `tests/Graphiti.Net.JudgeHost`. It is outside this folder because each ported unit adds a binding to it.
 Its `Core/` folder holds the protocol loop, the codec, and the judge embedder.
@@ -51,6 +52,7 @@ Its `Core/` folder holds the protocol loop, the codec, and the judge embedder.
 
 The runner starts one host process. It writes each case as one JSON line to the host's standard input.
 The host prints one JSON line for each case. Logs go to standard error.
+Every line on this channel and every line of a golden file is ASCII-escaped JSON. A Unicode line separator or a lone surrogate inside a string then cannot break a line.
 
 ### Pure case
 
@@ -77,7 +79,9 @@ Two judge functions exist:
 ```
 
 - `group` is the group id of the scenario. It must start with `judge_` and be unique among cases. The host deletes that group before and after the run.
+- `extra_groups` lists more group ids that the scenario writes to. The host deletes them too, and the graph dump includes them.
 - `replies` names a file in `replies/`. Leave it out for a scenario that makes no model call.
+- A step can hold `parallel`, a list of calls that start together, in place of `call`.
 - `graphiti` holds extra keyword arguments for the `Graphiti` constructor.
 - `call` is an attribute path on the `Graphiti` object, for example `add_episode` or `nodes.entity.get_by_uuid`.
 
@@ -100,7 +104,7 @@ Arguments and results are JSON. These tags carry the values that JSON lacks.
 | `{"$dt": "2026-03-01T00:00:00+00:00"}` | A datetime, written as Python `isoformat()` writes it | Yes | Yes |
 | `{"$ref": "module:attr"}` | The Python object at that path: a class, a constant, a function | Yes | No |
 | `{"$enum": "module:Class", "value": v}` | An enum member | Yes | No. Results carry the member's value. |
-| `{"$model": "module:Class", "data": {}}` | An instance, built as `Class(**data)` | Yes | No |
+| `{"$model": "module:name", "data": {}}` | The result of a call to the object at that path, with `data` as keyword arguments. For a class, that is an instance. | Yes | No |
 | `{"$type": "Class", ...fields}` | A pydantic model or a dataclass | No | Yes |
 | `{"$tuple": []}` | A tuple | Yes | No. Results carry a list. |
 | `{"$set": []}` | A set. Results are sorted. | Yes | Yes |
@@ -108,6 +112,8 @@ Arguments and results are JSON. These tags carry the values that JSON lacks.
 | `{"$bytes": "hex"}` | Bytes | Yes | Yes |
 | `{"$float": "nan"}` | `nan`, `inf`, or `-inf` | Yes | Yes |
 | `{"$step": [index, "path"]}` | Flow cases only: a value from the return of an earlier step | Yes | No |
+| `{"$graphiti": "path"}` | Flow cases only: an object on the `Graphiti` instance, for example `driver` | Yes | No |
+| `{"$embed": "text"}` | Flow cases only: the judge embedding of the text | Yes | No |
 | `{"$class": "Name"}`, `{"$exc": "Name"}` | A class or an exception that a function returned | No | Yes |
 | `{"$vec": {"n", "head", "sum"}}` | A list of 64 or more numbers, compacted by the runner | No | Yes |
 | `{"$unknown": "TypeName"}` | The codec does not know this type. Treat it as a defect in the case or in the codec. | No | Yes |
@@ -166,7 +172,24 @@ A case with no binding fails with `JudgeNotBound`, which keeps it in `expected-f
 
 | Upstream pytest file | Case file | Cases |
 | --- | --- | --- |
-| (filled in by plan 0002, task 6) | | |
+| `tests/test_text_utils.py` | `pure/text.jsonl` | 11 |
+| `tests/utils/test_concatenate_episodes.py` | `pure/text.jsonl` | 9 |
+| `tests/helpers_test.py` | `pure/text.jsonl` | 2 |
+| `tests/utils/test_content_chunking.py` | `pure/chunking.jsonl` | About 35 |
+| `tests/test_edge_db_queries.py` | `pure/queries.jsonl` | 24 |
+| `tests/test_node_label_security.py` | `pure/queries.jsonl` | 30 |
+| `tests/utils/search/test_search_security.py` | `pure/filters.jsonl`, `pure/queries.jsonl` | 62 |
+| `tests/utils/search/test_edge_bfs_query_shape.py` | `pure/filters.jsonl` | 2 |
+| `tests/ingestion/test_update_queries.py` | `pure/queries.jsonl` | 13 |
+| `tests/prompts/test_legacy_prompt_compatibility.py` | `pure/prompts.jsonl` | 32 |
+| `tests/prompts/test_complete_prompt.py` | `pure/prompts.jsonl` | 4 |
+| `tests/prompts/test_configurable_prompt_library.py` | `pure/prompts.jsonl` | 5 |
+| `tests/prompts/test_prompt_exports.py` | `pure/prompts.jsonl` | 1 |
+| `tests/prompts/test_prompt_names.py` | `pure/prompts.jsonl` | 3 |
+| `tests/test_graphiti_configurable_prompts.py` | `pure/prompts.jsonl` | 3 |
+
+The case writers reported these counts. Some are approximate, because one case can serve two pytest files.
+Pytest files that need a mocked driver or a mocked model gave no pure case. The flow layer covers their behavior through real calls.
 
 ## Rule for changes after gate 2
 

@@ -23,7 +23,8 @@ HERE = Path(__file__).resolve().parent
 JUDGE = HERE.parent
 ROOT = JUDGE.parent.parent
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(ROOT / '.upstream' / 'graphiti'))
+# The break tests point the host at a modified copy of upstream. Nothing else sets this variable.
+sys.path.insert(0, os.environ.get('JUDGE_UPSTREAM_DIR') or str(ROOT / '.upstream' / 'graphiti'))
 
 os.environ.setdefault('GRAPHITI_TELEMETRY_ENABLED', 'false')
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
@@ -101,27 +102,39 @@ def _lookup(value: Any, path: str) -> Any:
     return value
 
 
-def _decode_with_steps(value: Any, returns: list[Any]) -> Any:
-    """Like decode, plus {"$step": [index, "path"]}: a value from an earlier step's return."""
+def _decode_with_steps(value: Any, returns: list[Any], graphiti: Any = None) -> Any:
+    """Like decode, plus three tags that only flow cases use.
+
+    {"$step": [index, "path"]}  a value from the return of an earlier step
+    {"$graphiti": "path"}       an object on the Graphiti instance, for example "driver"
+    {"$embed": "text"}          the judge embedding of the text
+    """
     if isinstance(value, dict) and '$step' in value:
         index, path = value['$step']
         return _lookup(returns[index], path)
+    if isinstance(value, dict) and '$graphiti' in value:
+        return _lookup(graphiti, value['$graphiti'])
+    if isinstance(value, dict) and '$embed' in value:
+        return _embed(value['$embed'])
+    if isinstance(value, dict) and '$model' in value:
+        data = _decode_with_steps(value.get('data', {}), returns, graphiti)
+        return resolve(value['$model'])(**data)
     if isinstance(value, dict) and not any(k.startswith('$') for k in value):
-        return {k: _decode_with_steps(v, returns) for k, v in value.items()}
+        return {k: _decode_with_steps(v, returns, graphiti) for k, v in value.items()}
     if isinstance(value, list):
-        return [_decode_with_steps(v, returns) for v in value]
+        return [_decode_with_steps(v, returns, graphiti) for v in value]
     return decode(value)
 
 
-async def _dump_graph(client: Any, group: str) -> dict:
+async def _dump_graph(client: Any, groups: list[str]) -> dict:
     nodes, _, _ = await client.execute_query(
-        'MATCH (n) WHERE n.group_id = $group RETURN labels(n) AS labels, properties(n) AS props',
-        parameters_={'group': group},
+        'MATCH (n) WHERE n.group_id IN $groups RETURN labels(n) AS labels, properties(n) AS props',
+        parameters_={'groups': groups},
     )
     edges, _, _ = await client.execute_query(
-        'MATCH (a)-[r]->(b) WHERE r.group_id = $group OR a.group_id = $group '
+        'MATCH (a)-[r]->(b) WHERE r.group_id IN $groups OR a.group_id IN $groups '
         'RETURN type(r) AS type, a.uuid AS source, b.uuid AS target, properties(r) AS props',
-        parameters_={'group': group},
+        parameters_={'groups': groups},
     )
     return {
         'nodes': [{'labels': sorted(r['labels']), 'props': encode(dict(r['props']))} for r in nodes],
@@ -132,8 +145,8 @@ async def _dump_graph(client: Any, group: str) -> dict:
     }
 
 
-async def _delete_group(client: Any, group: str) -> None:
-    await client.execute_query('MATCH (n) WHERE n.group_id = $group DETACH DELETE n', parameters_={'group': group})
+async def _delete_groups(client: Any, groups: list[str]) -> None:
+    await client.execute_query('MATCH (n) WHERE n.group_id IN $groups DETACH DELETE n', parameters_={'groups': groups})
 
 
 async def run_flow(case: dict) -> dict:
@@ -143,7 +156,7 @@ async def run_flow(case: dict) -> dict:
     from graphiti_core.driver.neo4j_driver import Neo4jDriver
 
     recorder = Recorder()
-    group = case['group']
+    groups = [case['group'], *case.get('extra_groups', [])]
     replies_path = JUDGE / 'replies' / f"{case['replies']}.jsonl" if case.get('replies') else None
 
     inner = None
@@ -171,7 +184,7 @@ async def run_flow(case: dict) -> dict:
     # build_indices_and_constraints as an explicit step.
     if driver._init_task is not None:
         await driver._init_task
-    await _delete_group(raw_client, group)
+    await _delete_groups(raw_client, groups)
     driver.client = RecordingNeo4jClient(raw_client, recorder)
 
     graphiti = Graphiti(
@@ -195,8 +208,8 @@ async def run_flow(case: dict) -> dict:
                     calls = [
                         _finish(
                             _lookup(graphiti, part['call'])(
-                                *_decode_with_steps(part.get('args', []), returns),
-                                **_decode_with_steps(part.get('kwargs', {}), returns),
+                                *_decode_with_steps(part.get('args', []), returns, graphiti),
+                                **_decode_with_steps(part.get('kwargs', {}), returns, graphiti),
                             )
                         )
                         for part in step['parallel']
@@ -204,8 +217,8 @@ async def run_flow(case: dict) -> dict:
                     value = await asyncio.gather(*calls)
                 else:
                     target = _lookup(graphiti, step['call'])
-                    args = _decode_with_steps(step.get('args', []), returns)
-                    kwargs = _decode_with_steps(step.get('kwargs', {}), returns)
+                    args = _decode_with_steps(step.get('args', []), returns, graphiti)
+                    kwargs = _decode_with_steps(step.get('kwargs', {}), returns, graphiti)
                     value = await _finish(target(*args, **kwargs))
                 returns.append(value)
                 entry['ret'] = encode(value)
@@ -217,9 +230,9 @@ async def run_flow(case: dict) -> dict:
             entry.update(recorder.take())
             missing.extend(recorder.missing)
             steps.append(entry)
-        graph = await _dump_graph(raw_client, group)
+        graph = await _dump_graph(raw_client, groups)
     finally:
-        await _delete_group(raw_client, group)
+        await _delete_groups(raw_client, groups)
         await raw_client.close()
 
     result: dict = {
@@ -229,6 +242,8 @@ async def run_flow(case: dict) -> dict:
     }
     if missing:
         result['missing_replies'] = missing
+    if recorder.recording_failed:
+        result['recording_failed'] = sorted(set(recorder.recording_failed))
     return result
 
 
@@ -248,7 +263,7 @@ async def main() -> None:
         except Exception as error:  # noqa: BLE001
             traceback.print_exc(file=sys.stderr)
             result = {'host_error': type(error).__name__}
-        out.write(json.dumps(result, ensure_ascii=False) + '\n')
+        out.write(json.dumps(result, ensure_ascii=True) + '\n')
         out.flush()
 
 

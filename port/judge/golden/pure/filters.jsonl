@@ -16,7 +16,7 @@
 {"id": "pure.filters.date_filter_query_constructor.IS_NOT_NULL", "result": {"ok": "(e.valid_at IS NOT NULL)"}}
 {"id": "pure.filters.date_filter_query_constructor.empty_names", "result": {"ok": "( = )"}}
 {"id": "pure.filters.date_filter_query_constructor.injection_value_name", "result": {"ok": "(e.x) OR (1=1 <> $p)"}}
-{"id": "pure.filters.date_filter_query_constructor.unicode", "result": {"ok": "(e.café >= $😀)"}}
+{"id": "pure.filters.date_filter_query_constructor.unicode", "result": {"ok": "(e.caf\u00e9 >= $\ud83d\ude00)"}}
 {"id": "pure.filters.node_search_filter_query_constructor.empty_neo4j", "result": {"ok": [[], {}]}}
 {"id": "pure.filters.node_search_filter_query_constructor.empty_falkordb", "result": {"ok": [[], {}]}}
 {"id": "pure.filters.node_search_filter_query_constructor.single_label", "result": {"ok": [["n:Person"], {}]}}
@@ -57,7 +57,7 @@
 {"id": "pure.filters.edge_search_filter_query_constructor.empty_falkordb", "result": {"ok": [[], {}]}}
 {"id": "pure.filters.edge_search_filter_query_constructor.edge_types", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["WORKS_AT", "KNOWS"]}]}}
 {"id": "pure.filters.edge_search_filter_query_constructor.edge_types_empty", "result": {"ok": [["e.name in $edge_types"], {"edge_types": []}]}}
-{"id": "pure.filters.edge_search_filter_query_constructor.edge_types_unicode", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["café", "😀", "読む", "é"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_types_unicode", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["caf\u00e9", "\ud83d\ude00", "\u8aad\u3080", "e\u0301"]}]}}
 {"id": "pure.filters.edge_search_filter_query_constructor.edge_types_injection", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["X` ) DETACH DELETE n //", "a\"b", "a'b"]}]}}
 {"id": "pure.filters.edge_search_filter_query_constructor.edge_uuids", "result": {"ok": [["e.uuid in $edge_uuids"], {"edge_uuids": ["u1", "u2"]}]}}
 {"id": "pure.filters.edge_search_filter_query_constructor.edge_uuids_empty", "result": {"ok": [["e.uuid in $edge_uuids"], {"edge_uuids": []}]}}
@@ -120,7 +120,7 @@
 {"id": "pure.filters.search_filters.construct_wrong_type_labels", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters.construct_empty_labels", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": null, "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": [], "property_filters": null, "valid_at": null}}}
 {"id": "pure.filters.search_filters.construct_unicode_labels", "result": {"error": "ValidationError"}}
-{"id": "pure.filters.search_filters.construct_unicode_edge_types", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": ["Café", "😀", "é"], "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": null, "property_filters": null, "valid_at": null}}}
+{"id": "pure.filters.search_filters.construct_unicode_edge_types", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": ["Caf\u00e9", "\ud83d\ude00", "e\u0301"], "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": null, "property_filters": null, "valid_at": null}}}
 {"id": "pure.filters.date_filter.construct_missing_operator", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.date_filter.construct_string_date", "result": {"ok": {"$type": "DateFilter", "comparison_operator": "=", "date": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
 {"id": "pure.filters.date_filter.construct_bad_operator", "result": {"error": "ValidationError"}}
@@ -129,7 +129,7 @@
 {"id": "pure.filters.property_filter.construct_float", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "<=", "property_name": "s", "property_value": 1.5}}}
 {"id": "pure.filters.property_filter.construct_null_value", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "IS NOT NULL", "property_name": "s", "property_value": null}}}
 {"id": "pure.filters.property_filter.construct_injection_name", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "a` OR 1=1 //", "property_value": "x'y"}}}
-{"id": "pure.filters.property_filter.construct_unicode", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "café😀", "property_value": "漢字"}}}
+{"id": "pure.filters.property_filter.construct_unicode", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "caf\u00e9\ud83d\ude00", "property_value": "\u6f22\u5b57"}}}
 {"id": "pure.filters.property_filter.construct_bool_value", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "b", "property_value": 1}}}
 {"id": "pure.filters.property_filter.construct_list_value", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.property_filter.construct_missing_name", "result": {"error": "ValidationError"}}

@@ -54,7 +54,7 @@ def load_cases(layer: str | None, text_filter: str | None) -> list[dict]:
         if layer and layer_dir.name != layer:
             continue
         for path in sorted(layer_dir.glob("*.jsonl")):
-            for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for line_no, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
                 if not line.strip():
                     continue
                 case = json.loads(line)
@@ -78,7 +78,7 @@ def load_golden() -> dict[str, object]:
     if not GOLDEN.exists():
         return golden
     for path in sorted(GOLDEN.glob("*/*.jsonl")):
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8").split("\n"):
             if line.strip():
                 row = json.loads(line)
                 golden[row["id"]] = row["result"]
@@ -320,13 +320,17 @@ class Host:
         env["GRAPHITI_TELEMETRY_ENABLED"] = "false"
         if record_replies:
             env["JUDGE_RECORD_REPLIES"] = "1"
+        # Upstream logs every failed query. Scenarios include expected failures, so the host's
+        # log output is shown only on request.
+        quiet = None if os.environ.get("JUDGE_VERBOSE") else subprocess.DEVNULL
         self.process = subprocess.Popen(
-            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8", env=env, cwd=ROOT
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=quiet,
+            text=True, encoding="utf-8", env=env, cwd=ROOT,
         )
 
     def ask(self, case: dict) -> object:
         assert self.process.stdin and self.process.stdout
-        self.process.stdin.write(json.dumps(case, ensure_ascii=False) + "\n")
+        self.process.stdin.write(json.dumps(case, ensure_ascii=True) + "\n")
         self.process.stdin.flush()
         line = self.process.stdout.readline()
         if not line:
@@ -363,9 +367,15 @@ def main() -> int:
     host = Host(args.build, args.record_replies)
 
     results: dict[str, object] = {}
+    refused: list[str] = []
     failed: dict[str, list[str]] = {}
     try:
         for entry in cases:
+            if entry["layer"] == "flow":
+                # A flow case gets a fresh host process. Upstream keeps state in module-level
+                # objects (for example search recipes), and one scenario must not change another.
+                host.close()
+                host = Host(args.build, args.record_replies)
             raw = host.ask(entry["case"])
             if args.show_missing and isinstance(raw, dict):
                 for item in raw.get("missing_replies", []):
@@ -375,6 +385,12 @@ def main() -> int:
             actual = normalize(raw)
             results[entry["id"]] = actual
             if args.record:
+                # Never turn an incomplete run into expected behavior.
+                blocked = [k for k in ("missing_replies", "recording_failed", "host_error") if isinstance(raw, dict) and raw.get(k)]
+                if blocked:
+                    print(f"judge: NOT recorded {entry['id']}: {', '.join(blocked)}")
+                    del results[entry["id"]]
+                    refused.append(entry["id"])
                 continue
             if entry["id"] not in golden:
                 failed[entry["id"]] = ["no golden result. Record it from the Python build."]
@@ -388,27 +404,28 @@ def main() -> int:
     if args.record:
         by_file: dict[tuple[str, str], list[dict]] = {}
         for entry in cases:
-            by_file.setdefault((entry["layer"], entry["file"]), []).append(entry)
+            if entry["id"] in results:
+                by_file.setdefault((entry["layer"], entry["file"]), []).append(entry)
         for (layer, name), entries in by_file.items():
             path = GOLDEN / layer / f"{name}.jsonl"
             path.parent.mkdir(parents=True, exist_ok=True)
             # Keep the rows of cases that this run did not select, in case-file order.
             rows = dict(results)
             if path.exists():
-                for line in path.read_text(encoding="utf-8").splitlines():
+                for line in path.read_text(encoding="utf-8").split("\n"):
                     if line.strip():
                         row = json.loads(line)
                         rows.setdefault(row["id"], row["result"])
             order = [c["id"] for c in load_cases(layer, None) if c["file"] == name and c["id"] in rows]
-            lines = [json.dumps({"id": i, "result": rows[i]}, ensure_ascii=False, sort_keys=True) for i in order]
+            lines = [json.dumps({"id": i, "result": rows[i]}, ensure_ascii=True, sort_keys=True) for i in order]
             path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"judge: recorded {len(cases)} cases into {len(by_file)} golden files")
+        print(f"judge: recorded {len(results)} cases into {len(by_file)} golden files, refused {len(refused)}")
         # A recorded error becomes the expected behavior. A person must read this list.
         for entry in cases:
-            found = _errors_in(results[entry["id"]])
+            found = _errors_in(results.get(entry["id"]))
             if found:
                 print(f"judge: review {entry['id']}: {', '.join(found)}")
-        return 0
+        return 1 if refused else 0
 
     if args.list_failures:
         print("\n".join(sorted(failed)))
@@ -432,7 +449,7 @@ def main() -> int:
     else:
         expected = set()
         if EXPECTED_FAILURES.exists():
-            expected = {l.strip() for l in EXPECTED_FAILURES.read_text().splitlines() if l.strip() and not l.startswith("#")}
+            expected = {l.strip() for l in EXPECTED_FAILURES.read_text().split("\n") if l.strip() and not l.startswith("#")}
         if partial:
             expected &= {c["id"] for c in cases}
         surprise = sorted(set(failed) - expected)

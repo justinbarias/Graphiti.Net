@@ -3,3 +3,5 @@
 {"id": "pure.seed.lucene_sanitize.wrong_type", "fn": "graphiti_core.helpers:lucene_sanitize", "args": [42]}
 {"id": "pure.seed.schema_text.extracted_entities", "fn": "judge:schema_text", "args": ["graphiti_core.prompts.extract_nodes:ExtractedEntities"]}
 {"id": "pure.seed.embed.hello", "fn": "judge:embed", "args": ["Hello, World"]}
+{"id": "pure.seed.lucene_sanitize.line_separators", "fn": "graphiti_core.helpers:lucene_sanitize", "args": ["a b c\u0085d\u000be\u000cf"]}
+{"id": "pure.seed.lucene_sanitize.lone_surrogate", "fn": "graphiti_core.helpers:lucene_sanitize", "args": ["x \ud800 y"]}

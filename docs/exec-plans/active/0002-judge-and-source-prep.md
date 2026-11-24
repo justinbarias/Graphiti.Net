@@ -49,4 +49,19 @@ One adversarial review of the judge diff before the gate. The maintainer picks C
 | B. Database tests on Neo4j only | 40 passed |
 | C. `tests/test_add_triplet.py` on Neo4j only | 11 failed, 2 passed |
 
+- 2026-11-24, tasks 3 to 9, 11, 12: done, except the 10 real-model scenarios of task 4.
+
+| Task | Result |
+| --- | --- |
+| 3. Hosts | Python host and `tests/Graphiti.Net.JudgeHost`. The C# judge embedder matches 9 Python vectors bit for bit. |
+| 4. Flow layer | 21 scenarios recorded: 8 with hand-written replies, 13 with no model call. 10 real-model scenarios wait in `port/judge/pending/`, because the OpenAI account has no credits. |
+| 5 to 7. Pure layer | 1,971 cases from four Sonnet 5.5 agents: text and chunking 404, queries and filters 410, prompts and schemas 323, dedupe, ranking, and models 827, plus 7 seed cases. The agents wrote more cases than the brief asked for. |
+| 8. Runner | `port/judge/run.py`. 1,992 cases pass on Python three times in a row. |
+| 9. Break tests | `port/tools/break_tests.py`: 1 control and 12 breaks, all caught. The first run missed 2, which exposed two gaps in the flow layer. The table is in `port/STATE.md`. |
+| 10. Type hints | Replaced: `port/TYPE_HINTS.md` holds the 127 signatures that pyright infers. Upstream is not changed. |
+| 11. Gaps | `port/GAPS.md`: 22 language gaps, 11 surfaces outside the judge, 13 upstream defects, 22 findings. |
+| 12. Gate wiring | `scripts/check.sh --test` runs the embedder self-check and the judge against the .NET build. The deny rules for `port/judge/` go back at gate 2. |
+
+Open before gate 2: the 10 pending scenarios, the adversarial review, and the three open questions in `port/STATE.md`.
+
 - Finding from task 2: upstream CI never runs `tests/test_add_triplet.py` with a database, and 11 of its 13 tests fail on Neo4j at the pinned commit. The first error is `ValueError: embedder returned 0 vectors for 1 queries`, which points at the test's mock embedder. Task 6 must not treat this file as a passing oracle. The judge covers `add_triplet` through layer 3 scenarios.

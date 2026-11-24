@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 2. Build the judge |
-| Gate | Gate 1 passed on 2026-11-24. Gate 2 is next: the maintainer reviews the judge and the break tests. |
-| Last action | 2026-11-24: the maintainer approved the judge design. Built the upstream Python environment and recorded the test baseline (plan 0002, tasks 1 and 2). |
-| Next action | [Plan 0002](../docs/exec-plans/active/0002-judge-and-source-prep.md), task 3. The maintainer approved the split: the lead builds the hosts and the runner, and Sonnet 5.5 agents write cases. |
+| Phase | 2 and 3. The judge and the gap list are built. Gate 2 is open. |
+| Gate | Gate 1 passed on 2026-11-24. Gate 2 waits for the maintainer: review the judge, the break tests, and the three design changes below. |
+| Last action | 2026-11-24: built the judge, recorded 1,992 cases, ran the break tests, wrote the gap list. |
+| Next action | Record the 10 scenarios in `port/judge/pending/` after the OpenAI account has credits. Then the adversarial review, then gate 2. |
 
 ## Queue counts
 
@@ -19,7 +19,40 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 ## Judge
 
 The runner, both hosts, and the noise rules work. [The judge README](judge/README.md) is the contract, and [judge-design.md](../docs/design-docs/judge-design.md) gives the reasons.
-The case set is not complete, and the break tests have not run.
+
+| Layer | Cases | Source |
+| --- | --- | --- |
+| Pure | 1,971 | Four Sonnet 5.5 agents, checked by the lead |
+| Flow, hand-written replies | 8 | The lead |
+| Flow, no model call | 13 | One Sonnet 5.5 agent, checked by the lead |
+| Flow, real-model replies | 0 of 10 | Waiting in `port/judge/pending/`. The OpenAI account has no credits. |
+
+Results on 2026-11-24:
+
+- `python3 port/judge/run.py --build python`: 1,992 cases, 1,992 passed, three runs in a row, 18 seconds each.
+- `python3 port/judge/run.py --build dotnet`: 1 passed (`judge:embed`), 1,991 expected failures.
+- The .NET judge embedder reproduces the 9 Python vectors bit for bit.
+
+## Break tests
+
+`python3 port/tools/break_tests.py` changes one piece of text in a copy of upstream and runs the judge. The pinned checkout is never changed.
+The first run missed breaks 7 and 10. Those misses showed two gaps, and new scenarios closed them. The table is the final run.
+
+| # | Break | Judge result | First failing case |
+| --- | --- | --- | --- |
+| Control | An unchanged copy of upstream | Passed | |
+| 1 | One word changed in the text extraction prompt (`prompts/extract_nodes.py`) | Caught: 7 flow, 4 pure | `flow.hand.kendra_adidas` |
+| 2 | RRF rank constant off by one (`search/search_utils.py`) | Caught: 2 flow, 21 pure | `flow.direct.isolation_search_recipes` |
+| 3 | The `~` escape removed from the full-text sanitizer (`helpers.py`) | Caught: 5 flow, 4 pure | `flow.direct.ops_search_nodes` |
+| 4 | Fuzzy dedupe threshold lowered from 0.9 to 0.5 (`utils/maintenance/dedup_helpers.py`) | Caught: 1 pure | `pure.dedupe.Delta.match_nodes.fuzzy_typo` |
+| 5 | A node query returns the name in place of the summary (`models/nodes/node_db_queries.py`) | Caught: 12 flow, 2 pure | `flow.direct.namespaces_entity_nodes` |
+| 6 | A naive datetime is no longer set to UTC (`utils/datetime_utils.py`) | Caught: 12 pure | `pure.datetime.ensure_utc.naive` |
+| 7 | The group filter dropped from one edge search query (`driver/neo4j/operations/search_ops.py`) | Caught: 2 flow | `flow.direct.ops_search_edges` |
+| 8 | A contradicted fact keeps an open validity window (`utils/maintenance/edge_operations.py`) | Caught: 1 flow, 4 pure | `flow.hand.contradiction` |
+| 9 | Similarity search needs a score of 0.99 (`search/search_utils.py`) | Caught: 7 flow, 30 pure | `flow.direct.isolation_search_recipes` |
+| 10 | An invalidated fact gets no expiry time (`utils/maintenance/edge_operations.py`) | Caught: 1 flow | `flow.hand.historical_fact` |
+| 11 | The group filter dropped from the inline edge full-text search (`search/search_utils.py`) | Caught: 7 flow | `flow.direct.isolation_search_recipes` |
+| 12 | Control for the script: an import error must also fail the judge (`nodes.py`) | Caught: 21 flow, 207 pure | `flow.direct.namespaces_entity_nodes` |
 
 ## Upstream test baseline
 
@@ -46,7 +79,11 @@ None. `port/RULES.md` does not exist yet. Phase 4 writes it.
 
 ## Open questions
 
-None.
+For the maintainer at gate 2:
+
+1. Accept the three changes to the approved judge design: UUID names from content, the .NET host outside `port/judge/`, and a fresh host process for each flow case.
+2. Decide on one more noise rule: sort `labels` lists. Upstream builds node labels from a set, so their order changes between processes (finding F13 in GAPS.md). Until then, no scenario stores a node with a second label.
+3. Decide how the 10 pending scenarios get their replies: credits for the OpenAI account, or hand-written replies.
 
 ## Checks not run
 

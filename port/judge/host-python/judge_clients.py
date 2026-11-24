@@ -5,6 +5,7 @@ code: they record what crosses the seam and return scripted or computed values.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import math
@@ -35,6 +36,7 @@ class Recorder:
 
     def __init__(self) -> None:
         self.started = datetime.now(timezone.utc)
+        self.recording_failed: list[str] = []
         self.reset()
 
     def reset(self) -> dict[str, list]:
@@ -177,8 +179,9 @@ class JudgeLLMClient(LLMClient):
         self.replies_path = replies_path
         self.inner = inner
         self.replies: dict[str, dict] = {}
+        self._pending: dict[str, asyncio.Future] = {}
         if replies_path is not None and replies_path.exists():
-            for line in replies_path.read_text(encoding='utf-8').splitlines():
+            for line in replies_path.read_text(encoding='utf-8').split('\n'):
                 if line.strip():
                     row = json.loads(line)
                     self.replies[row['key']] = row
@@ -218,8 +221,22 @@ class JudgeLLMClient(LLMClient):
             )
             raise JudgeMissingReply(f'no stored reply for request {key[:12]}')
 
+        # Two identical requests that are in flight together share one model call and one reply.
+        pending = self._pending.get(key)
+        if pending is not None:
+            return json.loads(json.dumps(await pending))
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        self._pending[key] = future
         started = time.monotonic()
-        reply = await self.inner._generate_response(messages, response_model, max_tokens, model_size)
+        try:
+            reply = await self.inner._generate_response(messages, response_model, max_tokens, model_size)
+        except BaseException as error:
+            # The runner refuses to write a golden result for a scenario with a failed recording.
+            self.recorder.recording_failed.append(type(error).__name__)
+            future.set_exception(error)
+            del self._pending[key]
+            raise
+        future.set_result(reply)
         row = {
             'key': key,
             'response_model': response_model.__name__ if response_model else None,
@@ -231,7 +248,7 @@ class JudgeLLMClient(LLMClient):
         self.replies[key] = row
         self.replies_path.parent.mkdir(parents=True, exist_ok=True)
         with self.replies_path.open('a', encoding='utf-8') as handle:
-            handle.write(json.dumps(row, ensure_ascii=False) + '\n')
+            handle.write(json.dumps(row, ensure_ascii=True) + '\n')
         return json.loads(json.dumps(reply))
 
 
