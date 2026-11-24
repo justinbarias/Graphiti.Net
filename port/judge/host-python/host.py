@@ -149,6 +149,33 @@ async def _delete_groups(client: Any, groups: list[str]) -> None:
     await client.execute_query('MATCH (n) WHERE n.group_id IN $groups DETACH DELETE n', parameters_={'groups': groups})
 
 
+class JudgeDatabaseNotEmpty(Exception):
+    pass
+
+
+async def _prepare_database(driver: Any, client: Any, groups: list[str]) -> None:
+    """Gives the case an empty database with new full-text indexes.
+
+    A full-text score depends on every entry of the index, also on entries of deleted nodes
+    that Neo4j did not remove from the index yet. With an index that other cases used, the
+    order of search results changes between runs. The .NET host does the same steps.
+    """
+    await _delete_groups(client, groups)
+    rows, _, _ = await client.execute_query('MATCH (n) RETURN count(n) AS count')
+    if rows[0]['count']:
+        print(
+            f"judge: the database holds {rows[0]['count']} nodes outside the groups of this case. "
+            'The judge needs a database of its own: no other test or tool can use it at the same time.',
+            file=sys.stderr,
+        )
+        raise JudgeDatabaseNotEmpty()
+    names, _, _ = await client.execute_query('SHOW FULLTEXT INDEXES YIELD name RETURN name')
+    for row in names:
+        await client.execute_query(f"DROP INDEX `{row['name']}` IF EXISTS")
+    await driver.build_indices_and_constraints()
+    await client.execute_query('CALL db.awaitIndexes(120)')
+
+
 async def run_flow(case: dict) -> dict:
     from judge_clients import JudgeCrossEncoder, JudgeEmbedder, JudgeLLMClient, Recorder, RecordingNeo4jClient
 
@@ -184,7 +211,7 @@ async def run_flow(case: dict) -> dict:
     # build_indices_and_constraints as an explicit step.
     if driver._init_task is not None:
         await driver._init_task
-    await _delete_groups(raw_client, groups)
+    await _prepare_database(driver, raw_client, groups)
     driver.client = RecordingNeo4jClient(raw_client, recorder)
 
     graphiti = Graphiti(

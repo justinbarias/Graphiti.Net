@@ -73,6 +73,20 @@ One adversarial review of the judge diff before the gate. The maintainer picks C
 | Break tests | 1 control and 16 breaks, all caught. Breaks 12 to 15 are the reviewer's. The judge missed all four before the fixes. |
 | Open | I5, the contract choice for the LLM path. I6, the calls that no scenario reaches. Both are in `port/STATE.md` and `port/GAPS.md`. |
 
-Open before gate 2: the 10 pending scenarios, which the maintainer left pending on 2026-11-25, and the open questions in `port/STATE.md`.
+- 2026-11-25, gate 2 decisions and the real-model recording. The maintainer approved D17 (the base LLM path), D18 (label order is noise), and D19 (seven judge design changes), and supplied a working key.
+
+| Item | Result |
+| --- | --- |
+| Label rule | The runner sorts label lists in values, in prompt text, and in Cypher text. The Python host sorts them in reply keys. |
+| Real-model scenarios | 11 recorded: 10 with `gpt-4.1-mini`, 1 with `gpt-4.1`. 136 stored replies. |
+| Hand-written scenario | `flow.hand.communities` covers `build_communities` and a community update. |
+| Database preparation | Each host gives each flow case an empty database with new full-text indexes. Without it, the order of search rows changed between runs. |
+| New tools | `port/tools/find_score_ties.py` and `port/tools/prune_replies.py`. |
+| Totals | 1,999 cases: 1,965 pure and 34 flow. Two full runs and 10 flow runs pass on Python, each with a different hash seed. |
+| .NET build | 1 passed, 1,998 expected failures, 0 unexpected, 0 bound and wrong. |
+| Break tests | 1 control and 20 breaks, all caught. One more break, on the merge of duplicate facts in a bulk call, was missed and removed, because upstream leaves that behavior open (U18). |
+| Upstream defects | 5 more: U14 to U18 in `port/GAPS.md`. |
+
+Open before gate 2 closes: the maintainer reads the results in `port/STATE.md`. No second adversarial review ran on the changes after the first review.
 
 - Finding from task 2: upstream CI never runs `tests/test_add_triplet.py` with a database, and 11 of its 13 tests fail on Neo4j at the pinned commit. The first error is `ValueError: embedder returned 0 vectors for 1 queries`, which points at the test's mock embedder. Task 6 must not treat this file as a passing oracle. The judge covers `add_triplet` through layer 3 scenarios.

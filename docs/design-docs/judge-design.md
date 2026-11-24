@@ -190,7 +190,21 @@ An Opus 5.5 subagent at high effort reviewed the judge on 2026-11-25, with a bri
 | I3 | An integer and a float matched within the float tolerance. | A golden integer needs the same integral value. |
 | I4 | A case in `expected-failures.txt` was free to fail for any reason. A bound but wrong case stayed hidden. | A listed case can fail only with `JudgeNotBound`. |
 | I5 | The evidence table said that every provider implements only `_generate_response`. | Corrected above. The contract choice is open for gate 2. |
-| I6 | No recorded scenario reaches `add_episode_bulk`, `build_communities`, `add_triplet`, `remove_episode`, `summarize_saga`, the scheduler, the decisions client, or the tracer. | Listed as J13 and J14 in `port/GAPS.md`. The 10 pending scenarios close a part of this list. `flow.hand.guard_invisible_chars` now covers input cleaning. |
+| I6 | No recorded scenario reached `add_episode_bulk`, `build_communities`, `add_triplet`, `remove_episode`, `summarize_saga`, the scheduler, the decisions client, or the tracer. | The real-model scenarios now reach the first six. `flow.hand.guard_invisible_chars` covers input cleaning. The decisions client, the tracer, a custom prompt library, and the attribute merge of `add_triplet` stay open as J13 in `port/GAPS.md`. |
+
+## Changes at gate 2
+
+The maintainer decided these points on 2026-11-25. `port/DECISIONS.md` holds them as D17 to D19.
+
+| Point | Result |
+| --- | --- |
+| LLM contract | The base client path stays the contract. |
+| Node labels | Their order is noise. The rule covers label values, label lists inside prompt text, label chains inside Cypher text, and reply keys. A rule for the values alone is not enough, because a reply key is a hash of the prompt text. |
+| Real-model scenarios | 11 scenarios are recorded: 10 with `gpt-4.1-mini` and 1 with `gpt-4.1`. |
+
+The recording showed the limits of a differential judge on this code. Upstream leaves four behaviors open. The first is the order of search rows with equal scores. The second is the pair order in `build_communities`. The third is the commit order of episodes that run at the same time. The fourth is the fact that stays after a merge in a bulk call. The judge cannot compare an open behavior, so the cases stay away from each one. `port/judge/README.md` gives the rule for each. `port/GAPS.md` lists them as U15 to U18 and J14.
+
+The recording also showed that a full-text score depends on the history of the index. Each host now gives each flow case an empty database with new full-text indexes.
 
 Six pure cases were removed, because each one recorded an error of the case itself and not upstream behavior: five `edge_label_*` cases and `pure.queries.fulltext_query.no_driver_attr`.
 

@@ -26,3 +26,13 @@
 {"key": "88d5f6b938dad8c2873dd7caf193818aa1bc9118620384440f3fb88b2a3c065c", "reply": {"extracted_entities": [{"name": "Zed Corp", "entity_type_id": 0, "episode_indices": [0]}, {"name": "Ana", "entity_type_id": 0, "episode_indices": [0]}]}, "recorded_with": "hand"}
 {"key": "402f1f8df2261d167fbbf9bb1815196cdb51561fd246565b47501fc1e2a34dc3", "reply": {"edges": [{"source_entity_name": "Zed Corp", "target_entity_name": "Ana", "relation_type": "HIRED", "fact": "Zed Corp hired Ana as a pilot.", "valid_at": null, "invalid_at": null}]}, "recorded_with": "hand"}
 {"key": "7daa0790c06abe7ef394a9db5fd39207e338fbc12ec1945d8be2a90d1e461ca1", "reply": {"valid_at": null, "invalid_at": null}, "recorded_with": "hand"}
+{"key": "41805de733d318b5c09880dbc014522faf57fbf167f658e8e1c91bbc76f3a90d", "reply": {"summary": "Two members belong to a physics department in Lagos."}, "recorded_with": "hand"}
+{"key": "d8457dd067286ed93880627b75cbfba8db7bb4452025608a6c0d43b5ae6c8b79", "reply": {"summary": "Two members work for a bakery in Turin."}, "recorded_with": "hand"}
+{"key": "a86134125c43c5de9b273a2f60524a45130b0f3e3d7cfedd20309078e2b70bbf", "reply": {"summary": "Three members belong to the same physics department in Lagos."}, "recorded_with": "hand"}
+{"key": "b364663ff5d38f88afd3b815ee7c0840b0bc9443a33dfb4233d8eb02c3da16ca", "reply": {"summary": "Three members work for the same bakery in Turin."}, "recorded_with": "hand"}
+{"key": "5e30423876bc6a24d48630ef639a0c36098e57f10055ad4dabb17954b1039d76", "reply": {"description": "Lagos physics department"}, "recorded_with": "hand"}
+{"key": "172574f8e645cdba38570bc84dbca1694e93bd9960519499b8e48333417641c4", "reply": {"description": "Turin bakery staff"}, "recorded_with": "hand"}
+{"key": "3091da3bb7378e2178fc79010a409bb31246d5049e97a7e8ef510ebb5e4f2cbf", "reply": {"extracted_entities": [{"name": "Lena", "entity_type_id": 0, "episode_indices": [0]}]}, "recorded_with": "hand"}
+{"key": "87a178b11e6ad43bb2b77156cd17aeeaac486476ce8c3710b6e76ff0ac2fba9f", "reply": {"edges": []}, "recorded_with": "hand"}
+{"key": "198cd2025206a3261897ce41f3d35177592cd3681d50d82de35a6141195c3e97", "reply": {"summary": "Three members, one of them Lena, work for the same bakery in Turin."}, "recorded_with": "hand"}
+{"key": "d0fbfd4f8cb9061a209f5a27e0be3f791d9f7b504fd514919b280e6f8edd08ff", "reply": {"description": "Turin bakery staff with Lena"}, "recorded_with": "hand"}

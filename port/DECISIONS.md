@@ -33,6 +33,9 @@ The section "Lead choices accepted at gate 1" lists the choices that the lead ma
 | D13 | End-to-end tests use one Neo4j sidecar from `docker-compose.yml`. Each test isolates its data with a unique group id. |
 | D14 | One setup script serves the devcontainer, Claude cloud sessions, and CI. |
 | D16 | The judge follows [the judge design](../docs/design-docs/judge-design.md): capture at the provider contract, exact schema and Cypher text, replies recorded from a real model, clock values normalized, concurrent requests compared as a multiset. Approved 2026-11-24. |
+| D17 | Gate 2, 2026-11-25. The LLM contract of the port is upstream's base client path: the adapter implements `_generate_response`, and the shared code appends the response schema text to the prompt. The port does not follow the `responses.parse` path of upstream's default `OpenAIClient`. Native structured output can come later as a .NET extension, covered by end-to-end tests only. |
+| D18 | Gate 2, 2026-11-25. The order of node labels is noise. The judge compares label lists without their order in flow results, in prompt text, in Cypher text, and in reply keys. The port writes `Entity` first. |
+| D19 | Gate 2, 2026-11-25. The maintainer accepted seven changes to the judge design. Three are from the build: UUID names from content, the .NET host outside `port/judge/`, and a fresh host process for each flow case. Four are from the review: bags in place of sorted names, clock rank and shape, the number rule, and the `bound_wrong` rule. |
 | D15 | M1 includes publishing `0.1.0-preview` to nuget.org. The publish step itself still needs the maintainer's approval at that time. |
 
 ## Scope by module
@@ -88,3 +91,4 @@ The lead made these choices alone. The maintainer accepted all seven at gate 1.
 | Gate | Date | Result |
 | --- | --- | --- |
 | 1. Decisions | 2026-11-24 | Approved by the maintainer, with all seven lead choices |
+| 2. Judge | 2026-11-25 | The maintainer approved D17, D18, and D19, and asked for the real-model scenarios before the gate closes. The scenarios are recorded. The gate closes after the maintainer reads the final results in `port/STATE.md`. |

@@ -40,6 +40,10 @@ BREAKS = [
     ("flow", "graphiti.py", "                    nodes=hydrated_nodes,", "                    nodes=hydrated_nodes[::-1],", "add_episode returns its nodes in reverse order"),
     ("flow", "utils/maintenance/edge_operations.py", "resolved_edge.expired_at = now", "resolved_edge.expired_at = resolved_edge.created_at", "An expiry time copies the creation time in place of a new clock reading"),
     ("flow", "utils/maintenance/edge_operations.py", "edge.expired_at if edge.expired_at is not None else utc_now()", "edge.expired_at if edge.expired_at is not None else edge.created_at", "A contradicted fact's expiry time copies its creation time"),
+    ("flow", "graphiti.py", "edge.episodes = [uuid for uuid in edge.episodes if uuid != episode.uuid]", "edge.episodes = list(edge.episodes)", "remove_episode keeps the removed episode on the facts that it supported"),
+    ("flow", "utils/maintenance/community_operations.py", "        name=name,\n        group_id=community_cluster[0].group_id,", "        name=summary,\n        group_id=community_cluster[0].group_id,", "A new community gets its summary as its name"),
+    ("flow", "utils/maintenance/node_operations.py", "labels: list[str] = list({'Entity', str(entity_type_name)})", "labels: list[str] = ['Entity']", "A custom entity type is not written as a node label"),
+    ("flow", "utils/bulk_utils.py", "edge.source_node_uuid = uuid_map.get(source_uuid, source_uuid)", "edge.source_node_uuid = source_uuid", "Bulk ingestion leaves a fact on a node that dedupe removed"),
     ("flow", "nodes.py", "class EpisodeType(Enum):", "class EpisodeType(Enum):\n    pass\n\n\nclass _Unused(Enum):", "Control for the script: an import error must also fail the judge"),
 ]
 

@@ -28,7 +28,7 @@ Requirements:
 | Command | Needs |
 | --- | --- |
 | Any run | `python3`. The runner uses the standard library only. |
-| `--build python` | `scripts/fetch-upstream.sh`, then `port/tools/upstream-tests.sh` one time to create the upstream virtual environment. The Neo4j sidecar for flow cases. |
+| `--build python` | `scripts/fetch-upstream.sh`, then `port/tools/upstream-tests.sh` one time to create the upstream virtual environment. The Neo4j sidecar for flow cases. The flow layer needs the database for itself: do not run another test or tool on it at the same time. |
 | `--build dotnet` | `dotnet build Graphiti.Net.slnx`. The Neo4j sidecar for flow cases. |
 
 ## Files
@@ -38,13 +38,12 @@ Requirements:
 | `run.py` | The runner and the noise rules. |
 | `cases/<layer>/<file>.jsonl` | Inputs. One case for each line. A case id starts with `<layer>.<file>.`. |
 | `golden/<layer>/<file>.jsonl` | Results recorded from Python, after the noise rules. Never edit these by hand. |
-| `replies/<name>.jsonl` | Scripted model replies for flow cases. |
+| `replies/<name>.jsonl` | Scripted model replies for flow cases. `handwritten` holds replies that a person wrote. `recorded` holds replies from `gpt-4.1-mini`, and `recorded_strong` holds replies from `gpt-4.1`. |
 | `add_reply.py` | Adds one hand-written reply to a reply file. |
 | `embedder-vectors.json` | Vectors from the Python judge embedder. The .NET host must reproduce them bit for bit. |
 | `count.txt` | The lowest allowed case count. |
 | `expected-failures.txt` | The .NET cases that still fail. Empty at M1. |
 | `host-python/` | The Python host. |
-| `pending/` | Scenarios that wait for replies from a real model. The runner does not load this folder. |
 
 The .NET host is `tests/Graphiti.Net.JudgeHost`. It is outside this folder because each ported unit adds a binding to it.
 Its `Core/` folder holds the protocol loop, the codec, and the judge embedder.
@@ -80,6 +79,7 @@ Two judge functions exist:
 ```
 
 - `group` is the group id of the scenario. It must start with `judge_` and be unique among cases. The host deletes that group before and after the run.
+- Before the first step, the host prepares the database. It deletes the groups of the case and makes sure that no other node exists. Then it drops the full-text indexes, builds all indexes again, and waits until they are online. If another node exists, the case fails with `JudgeDatabaseNotEmpty`. The preparation is not captured.
 - `extra_groups` lists more group ids that the scenario writes to. The host deletes them too, and the graph dump includes them.
 - `replies` names a file in `replies/`. Leave it out for a scenario that makes no model call.
 - A step can hold `parallel`, a list of calls that start together, in place of `call`.
@@ -135,7 +135,7 @@ One entry in `queries` is one `execute_query` call, or one session with its oper
 
 The judge embedder is a bag of words. Each token gets a vector from SHA-256, the vectors are added, and the sum is scaled to unit length.
 The judge cross-encoder scores a passage as `(cosine + 1) / 2` of the judge embeddings, and breaks ties by input position.
-Reply keys are SHA-256 hashes of the response model name and the messages, after UUIDs and this run's clock values are masked.
+Reply keys are SHA-256 hashes of the response model name and the messages. Before the hash, UUIDs and this run's clock values are masked, and each label list is sorted (see the noise rules).
 A reply that a person wrote with `add_reply.py` stores the key and the reply, but not the messages. The golden `llm` capture of the scenario holds the full request.
 
 ## Noise rules
@@ -150,11 +150,24 @@ The runner applies these rules to the host output before it records or compares.
 | Clock shape | `separator\|fraction\|zone`. The separator is `T` or a space. The fraction is `us` for no digits or 6 digits, which is what Python writes, and `<n>digits` for any other count. The zone is the zone text, or `naive`. |
 | UUIDs | Each UUID gets a name from its content: `<uuid:` and 10 hex digits. The name is a hash of every place where the UUID appears, with other UUIDs shown as their names, refined until no name splits further. Two UUIDs that no content tells apart get the same name. |
 | Order of concurrent work | Four kinds of list are compared without their order. The first kind is the capture lists of a step: `llm`, `embed`, `rerank`, and `queries`. The second kind is the `nodes` and `edges` lists of the graph dump. The third kind is each `$set`. The fourth kind is each list that a step declares in `unordered`. The runner wraps each one in `$bag` and sorts it by its JSON text after the UUID rule. Operations inside one session keep their order. A `nodes` or `edges` list inside a return value keeps its order. |
+| Order of node labels | Flow results only. Upstream builds the labels of a node from a set, so their order differs between processes. A label list is a list of two or more strings that holds `Entity`. As a value, it is compared without its order. Inside a text, the runner sorts it: a JSON or `repr` array in a prompt, and a chain such as `:Entity:Person` in a Cypher query. Pure cases keep label order exact. |
 | Vectors | A list of 64 or more numbers becomes `$vec` with its length, its first 8 values, its sum, and its sum weighted by position. If two values swap places, the weighted sum changes. |
 | Numbers | If the golden value is an integer, the other value must have the same integral value. Above 2^53 it must also be written as an integer, because a double cannot hold it. If the golden value is a float, the other value must match within 1e-6, relative or absolute. |
 | Index build in the driver constructor | Not captured. A scenario calls `build_indices_and_constraints` as a step. |
+| State of the full-text index | Not a rule of the runner, but a duty of each host. A full-text score depends on every entry of the index, also on entries of deleted nodes that Neo4j did not remove yet. Each host thus gives each flow case an empty database with new full-text indexes. Without that step, the order of search rows changes between runs. |
 
 Everything else is compared exactly: prompt text, schema text, Cypher text, parameter names, property names, and result order.
+
+## What a flow case must avoid
+
+The judge can compare only what upstream does the same way in each run. Upstream leaves these three things open, so a case must stay away from them.
+
+| Source | Why it is not stable | What to do |
+| --- | --- | --- |
+| Two search rows with the same full-text score | Upstream sorts by score only. Neo4j returns equal scores in an order that can change. The order reaches results and prompts. | Run `port/tools/find_score_ties.py` on the case. Change the text until it prints no `TIE` line. |
+| Two facts in one `add_episode_bulk` call that upstream merges as duplicates | Upstream keeps the fact with the smallest UUID, and UUIDs are random. | Give each pair of entities one fact in a bulk call. |
+| `build_communities` on nodes with different summaries | Upstream pairs the summaries in an order that comes from a query with no `ORDER BY`. The prompts then differ between runs. | Give all nodes of one community the same summary, as `flow.hand.communities` does. |
+| Calls in one `parallel` step that write to the same group | The result depends on which call commits first. | Use a different group for each call in a `parallel` step. Test same-group ingestion with calls in sequence. |
 
 ## How to add cases
 
@@ -163,6 +176,14 @@ Everything else is compared exactly: prompt text, schema text, Cypher text, para
 3. Read every `judge: review` line. A recorded error becomes the expected behavior. Run the case with `JUDGE_VERBOSE=1` and read the traceback. If upstream itself raises that error for that input, keep the case. If the case called the function in the wrong way, fix the case.
 4. Run `python3 port/judge/run.py --build python` two times. Both runs must pass.
 5. Add the new ids to `expected-failures.txt`, and raise `count.txt`.
+
+For a flow case that needs replies from a real model:
+
+1. Put `OPENAI_API_KEY` into `.env`. The host reads it and never prints it.
+2. `python3 port/judge/run.py --build python --record --record-replies --filter <id>` asks the model for each request with no stored reply, and stores the reply. `JUDGE_RECORD_MODEL` selects the model. The default is `gpt-4.1-mini`.
+3. Run the same command again until the reply file does not grow. A replay can ask for a request that the first run did not make.
+4. Run `port/tools/find_score_ties.py` on the case. If it prints a `TIE` line, change the case text and go back to step 2.
+5. After a case text changes, run `port/tools/prune_replies.py --write` to remove the replies that no case requests.
 
 For a flow case that needs hand-written replies:
 

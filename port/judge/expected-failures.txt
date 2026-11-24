@@ -11,6 +11,7 @@ flow.direct.ops_nodes_edges_direct
 flow.direct.ops_search_edges
 flow.direct.ops_search_nodes
 flow.direct.ops_search_other
+flow.hand.communities
 flow.hand.contradiction
 flow.hand.guard_bad_edges
 flow.hand.guard_emoji_only
@@ -19,6 +20,17 @@ flow.hand.guard_invisible_chars
 flow.hand.guard_no_entities
 flow.hand.historical_fact
 flow.hand.kendra_adidas
+flow.recorded.bulk
+flow.recorded.communities
+flow.recorded.concurrent
+flow.recorded.custom_types
+flow.recorded.custom_types_strong
+flow.recorded.lifecycle
+flow.recorded.messages
+flow.recorded.quickstart
+flow.recorded.saga
+flow.recorded.search_recipes
+flow.recorded.unicode
 flow.seed.empty_graph
 pure.chunking._chunk_by_lines.basic
 pure.chunking._chunk_by_lines.overlap_splits_into_lines

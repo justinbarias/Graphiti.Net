@@ -187,6 +187,55 @@ def _mask(value: object, window: tuple[datetime, datetime] | None) -> object:
     return value
 
 
+LABEL_ROOT = "Entity"
+_JSON_STRING = r'"(?:[^"\\]|\\.)*"'
+_REPR_STRING = r"'(?:[^'\\]|\\.)*'"
+LABEL_ARRAY_RE = re.compile(
+    rf"\[\s*(?:{_JSON_STRING}(?:\s*,\s*{_JSON_STRING})+|{_REPR_STRING}(?:\s*,\s*{_REPR_STRING})+)\s*\]"
+)
+LABEL_ITEM_RE = re.compile(rf"{_JSON_STRING}|{_REPR_STRING}")
+LABEL_CHAIN_RE = re.compile(r"(?::[A-Za-z_][A-Za-z0-9_]*){2,}")
+
+
+def _label_text_order(text: str) -> str:
+    """Sorts each label list inside a text: a prompt or a Cypher query.
+
+    Upstream builds node labels from a set, so their order differs between processes. A label
+    list in text is a JSON or `repr` array of strings that holds `Entity`, or a chain such as
+    `:Entity:Person`. The same function is in host-python/judge_clients.py for reply keys.
+    """
+    if LABEL_ROOT not in text:
+        return text
+
+    def array(match: re.Match) -> str:
+        items = LABEL_ITEM_RE.findall(match.group(0))
+        if not any(item[1:-1] == LABEL_ROOT for item in items):
+            return match.group(0)
+        ordered = iter(sorted(items))
+        return LABEL_ITEM_RE.sub(lambda _: next(ordered), match.group(0))
+
+    def chain(match: re.Match) -> str:
+        parts = match.group(0)[1:].split(":")
+        if LABEL_ROOT not in parts:
+            return match.group(0)
+        return ":" + ":".join(sorted(parts))
+
+    return LABEL_CHAIN_RE.sub(chain, LABEL_ARRAY_RE.sub(array, text))
+
+
+def _mark_labels(value: object) -> object:
+    """Flow results only: marks each label list as a bag and sorts label lists inside text."""
+    if isinstance(value, str):
+        return _label_text_order(value)
+    if isinstance(value, list):
+        if len(value) > 1 and LABEL_ROOT in value and all(isinstance(v, str) for v in value):
+            return {BAG: list(value)}
+        return [_mark_labels(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _mark_labels(v) for k, v in value.items()}
+    return value
+
+
 def _wrap_at(value: object, path: list[str]) -> object:
     """Wraps the list at a dotted path inside a return value as a bag."""
     if not path:
@@ -324,6 +373,8 @@ def normalize(result: object, case: dict | None = None) -> object:
             window = (start - timedelta(seconds=2), end + timedelta(seconds=2))
         result = {k: v for k, v in result.items() if k != "meta"}
 
+    if isinstance(result, dict) and "steps" in result:
+        result = _mark_labels(result)
     masked = _mark_bags(_mask(result, window), case)
     names = _uuid_names(masked)
 

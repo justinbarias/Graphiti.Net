@@ -30,6 +30,40 @@ UUID_RE = re.compile(
 )
 ISO_RE = re.compile(r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?')
 
+LABEL_ROOT = 'Entity'
+_JSON_STRING = r'"(?:[^"\\]|\\.)*"'
+_REPR_STRING = r"'(?:[^'\\]|\\.)*'"
+LABEL_ARRAY_RE = re.compile(
+    rf'\[\s*(?:{_JSON_STRING}(?:\s*,\s*{_JSON_STRING})+|{_REPR_STRING}(?:\s*,\s*{_REPR_STRING})+)\s*\]'
+)
+LABEL_ITEM_RE = re.compile(rf'{_JSON_STRING}|{_REPR_STRING}')
+LABEL_CHAIN_RE = re.compile(r'(?::[A-Za-z_][A-Za-z0-9_]*){2,}')
+
+
+def label_text_order(text: str) -> str:
+    """Sorts each label list inside a text. The same function is in run.py (`_label_text_order`).
+
+    Upstream builds node labels from a set, so their order in a prompt differs between
+    processes. A reply key must not depend on that order.
+    """
+    if LABEL_ROOT not in text:
+        return text
+
+    def array(match: re.Match) -> str:
+        items = LABEL_ITEM_RE.findall(match.group(0))
+        if not any(item[1:-1] == LABEL_ROOT for item in items):
+            return match.group(0)
+        ordered = iter(sorted(items))
+        return LABEL_ITEM_RE.sub(lambda _: next(ordered), match.group(0))
+
+    def chain(match: re.Match) -> str:
+        parts = match.group(0)[1:].split(':')
+        if LABEL_ROOT not in parts:
+            return match.group(0)
+        return ':' + ':'.join(sorted(parts))
+
+    return LABEL_CHAIN_RE.sub(chain, LABEL_ARRAY_RE.sub(array, text))
+
 
 class Recorder:
     """Holds what one step sent across the seams."""
@@ -56,7 +90,7 @@ class Recorder:
         }
 
     def mask(self, text: str) -> str:
-        """Masks the noise that reply keys must ignore: UUIDs and clock values of this run."""
+        """Masks the noise that reply keys must ignore: UUIDs, clock values of this run, label order."""
         low = self.started - timedelta(seconds=2)
 
         def swap(match: re.Match) -> str:
@@ -68,7 +102,7 @@ class Recorder:
                 value = value.replace(tzinfo=timezone.utc)
             return '<now>' if value >= low else match.group(0)
 
-        return ISO_RE.sub(swap, UUID_RE.sub('<uuid>', text))
+        return label_text_order(ISO_RE.sub(swap, UUID_RE.sub('<uuid>', text)))
 
 
 # --------------------------------------------------------------------------- embedder

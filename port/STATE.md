@@ -8,9 +8,9 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 | Item | Value |
 | --- | --- |
 | Phase | 2 and 3. The judge and the gap list are built. Gate 2 is open. |
-| Gate | Gate 1 passed on 2026-11-24. Gate 2 waits for the maintainer: review the judge, the break tests, the review result, and the open questions below. |
-| Last action | 2026-11-25: an Opus 5.5 subagent reviewed the judge with a brief to refute it. The lead fixed findings I1 to I4, removed 6 defective cases, added 1 scenario and 4 break tests, and recorded all golden files again. |
-| Next action | Gate 2. After approval: put the `port/judge/**` deny rules back into `.claude/settings.json`, then start plan 0003. The 10 scenarios in `port/judge/pending/` stay pending by the maintainer's decision. |
+| Gate | Gate 1 passed on 2026-11-24. At gate 2 the maintainer approved the design changes, the label rule, and the LLM contract on 2026-11-25 (D17 to D19). The gate closes after the maintainer reads the results below. |
+| Last action | 2026-11-25: added the label rule and the database preparation. Recorded 11 real-model scenarios and one hand-written communities scenario. Removed score ties from the cases, added 4 break tests, and recorded all flow golden files again. |
+| Next action | The maintainer closes gate 2. Then put the `port/judge/**` deny rules back into `.claude/settings.json`, and start plan 0003. |
 
 ## Queue counts
 
@@ -23,15 +23,32 @@ The runner, both hosts, and the noise rules work. [The judge README](judge/READM
 | Layer | Cases | Source |
 | --- | --- | --- |
 | Pure | 1,965 | Four Sonnet 5.5 agents, checked by the lead. The review removed 6 cases. |
-| Flow, hand-written replies | 8 | The lead |
+| Flow, hand-written replies | 9 | The lead |
 | Flow, no model call | 14 | One Sonnet 5.5 agent wrote 13. The lead wrote 1 seed case. |
-| Flow, real-model replies | 0 of 10 | Waiting in `port/judge/pending/`. The OpenAI account has no credits. |
+| Flow, real-model replies | 11 | 10 with `gpt-4.1-mini` and 1 with `gpt-4.1`. 136 stored replies. |
 
-Results on 2026-11-25, after the review changes:
+The real-model scenarios reach `add_episode_bulk`, `remove_episode`, `add_triplet`, `summarize_saga`, custom entity and edge types, sagas, and ingestion with `concurrent_ingestion` on.
+`flow.hand.communities` reaches `build_communities` and a community update.
 
-- `python3 port/judge/run.py --build python`: 1,987 cases, 1,987 passed, in three full runs with `PYTHONHASHSEED` 1, 2, and 3. The flow layer passed 8 more runs in a row.
-- `python3 port/judge/run.py --build dotnet`: 1 passed (`judge:embed`), 1,986 expected failures, 0 unexpected, 0 bound and wrong.
+Results on 2026-11-25:
+
+- `python3 port/judge/run.py --build python`: 1,999 cases, 1,999 passed, in two full runs. The flow layer passed 10 more runs. Each of the 12 runs had a different `PYTHONHASHSEED`.
+- `python3 port/judge/run.py --build dotnet`: 1 passed (`judge:embed`), 1,998 expected failures, 0 unexpected, 0 bound and wrong.
 - The .NET judge embedder reproduces the 9 Python vectors bit for bit.
+- `port/tools/find_score_ties.py` on all flow cases: 0 ties.
+
+## What the recording found
+
+| Finding | Effect |
+| --- | --- |
+| Label order reaches prompt text and Cypher text, not only the `labels` values. | The label rule covers all three places and the reply keys. GAPS F13, decision D18. |
+| Upstream sorts full-text rows by score only. Rows with equal scores change order between runs. | One old case was unstable in about 1 run of 60. Five case texts were changed. The new tool `port/tools/find_score_ties.py` finds ties. GAPS U15. |
+| A full-text score depends on the history of the index. Entries of deleted nodes stay in its statistics for some time, so the order of two rows that match different words changed between runs. | Each host now gives each flow case an empty database with new full-text indexes. Scores are then the same in each run. The judge needs the database for itself. |
+| `add_episode_bulk` keeps the duplicate fact with the smallest UUID, which is random. | `flow.recorded.bulk` has one fact for each pair of entities. A break test on the merge branch was missed for that reason. GAPS U18. |
+| `build_communities` builds its prompts in an order that changes between runs. | The call moved from the real-model scenario to `flow.hand.communities`, where all nodes of a community have one summary. GAPS U16. |
+| Three episodes that ran at the same time on one group gave different graphs in 2 of 6 runs. | `flow.recorded.concurrent` now runs same-group episodes in sequence, and runs a parallel step on two other groups. GAPS J14. |
+| `add_episode` with `update_communities=True` raises `ValueError` for any node count other than two. | An upstream defect. The cases pin it. GAPS U14. |
+| With the base LLM path, `gpt-4.1-mini` answered 4 attribute requests with a copy of the JSON schema, and `add_episode` failed. | `flow.recorded.custom_types` pins the failure, and `flow.recorded.custom_types_strong` pins the success with `gpt-4.1`. This is a known cost of decision D17. GAPS F23. |
 
 ## Adversarial review
 
@@ -44,34 +61,39 @@ One Opus 5.5 subagent at high effort, 2026-11-25. It reported 6 important findin
 | I2. `<now>` hid the source and the format of a timestamp | Fixed. Break tests 14 and 15. |
 | I3. An integer matched a near float | Fixed. |
 | I4. A listed case was free to fail for any reason | Fixed. The runner reports `bound_wrong`. |
-| I5. The capture seam is not the path of the default client | Open. Question 3 below. |
-| I6. Public calls that no scenario reaches | Open in part. GAPS.md J13 and J14, debt T9 and T12. |
+| I5. The capture seam is not the path of the default client | Decided: D17 keeps the base path. |
+| I6. Public calls that no scenario reaches | Closed for six calls. Open for the surfaces in GAPS.md J13 and J14, debt T12 and T16. |
 
 ## Break tests
 
 `python3 port/tools/break_tests.py` changes one piece of text in a copy of upstream and runs the judge. The pinned checkout is never changed.
 The first run missed breaks 7 and 10. Those misses showed two gaps, and new scenarios closed them.
-Breaks 12 to 15 come from the adversarial review. Break 16 is the control for the script. Before the review changes, the judge missed all four. The table is the run on 2026-11-25.
+Breaks 12 to 15 come from the adversarial review. Before the review changes, the judge missed all four.
+Breaks 16 to 19 target the calls that the real-model scenarios added. Break 20 is the control for the script. The table is the run on 2026-11-25.
 
 | # | Break | Judge result | First failing case |
 | --- | --- | --- | --- |
 | Control | An unchanged copy of upstream | Passed | |
-| 1 | One word changed in the text extraction prompt (`prompts/extract_nodes.py`) | Caught: 8 flow, 4 pure | `flow.hand.kendra_adidas` |
-| 2 | RRF rank constant off by one (`search/search_utils.py`) | Caught: 3 flow, 21 pure | `flow.direct.ops_search_nodes` |
-| 3 | The `~` escape removed from the full-text sanitizer (`helpers.py`) | Caught: 5 flow, 4 pure | `flow.direct.ops_search_nodes` |
-| 4 | Fuzzy dedupe threshold lowered from 0.9 to 0.5 (`utils/maintenance/dedup_helpers.py`) | Caught: 1 flow, 1 pure | `flow.direct.ops_search_nodes` |
-| 5 | A node query returns the name in place of the summary (`models/nodes/node_db_queries.py`) | Caught: 13 flow, 2 pure | `flow.direct.namespaces_entity_nodes` |
-| 6 | A naive datetime is no longer set to UTC (`utils/datetime_utils.py`) | Caught: 1 flow, 12 pure | `flow.direct.ops_search_nodes` |
+| 1 | One word changed in the text extraction prompt (`prompts/extract_nodes.py`) | Caught: 18 flow, 4 pure | `flow.hand.kendra_adidas` |
+| 2 | RRF rank constant off by one (`search/search_utils.py`) | Caught: 8 flow, 21 pure | `flow.direct.isolation_search_recipes` |
+| 3 | The `~` escape removed from the full-text sanitizer (`helpers.py`) | Caught: 6 flow, 4 pure | `flow.direct.ops_search_nodes` |
+| 4 | Fuzzy dedupe threshold lowered from 0.9 to 0.5 (`utils/maintenance/dedup_helpers.py`) | Caught: 2 flow, 1 pure | `flow.recorded.bulk` |
+| 5 | A node query returns the name in place of the summary (`models/nodes/node_db_queries.py`) | Caught: 25 flow, 2 pure | `flow.direct.namespaces_entity_nodes` |
+| 6 | A naive datetime is no longer set to UTC (`utils/datetime_utils.py`) | Caught: 12 pure | `pure.datetime.ensure_utc.naive` |
 | 7 | The group filter dropped from one edge search query (`driver/neo4j/operations/search_ops.py`) | Caught: 2 flow | `flow.direct.ops_search_edges` |
-| 8 | A contradicted fact keeps an open validity window (`utils/maintenance/edge_operations.py`) | Caught: 1 flow, 4 pure | `flow.hand.contradiction` |
-| 9 | Similarity search needs a score of 0.99 (`search/search_utils.py`) | Caught: 8 flow, 30 pure | `flow.direct.isolation_search_recipes` |
+| 8 | A contradicted fact keeps an open validity window (`utils/maintenance/edge_operations.py`) | Caught: 4 flow, 4 pure | `flow.hand.contradiction` |
+| 9 | Similarity search needs a score of 0.99 (`search/search_utils.py`) | Caught: 20 flow, 30 pure | `flow.direct.isolation_search_recipes` |
 | 10 | An invalidated fact gets no expiry time (`utils/maintenance/edge_operations.py`) | Caught: 1 flow | `flow.hand.historical_fact` |
-| 11 | The group filter dropped from the inline edge full-text search (`search/search_utils.py`) | Caught: 8 flow | `flow.direct.isolation_search_recipes` |
-| 12 | Search results return their nodes in reverse order (`search/search.py`) | Caught: 2 flow | `flow.direct.isolation_search_recipes` |
-| 13 | add_episode returns its nodes in reverse order (`graphiti.py`) | Caught: 5 flow | `flow.hand.kendra_adidas` |
+| 11 | The group filter dropped from the inline edge full-text search (`search/search_utils.py`) | Caught: 19 flow | `flow.direct.isolation_search_recipes` |
+| 12 | Search results return their nodes in reverse order (`search/search.py`) | Caught: 4 flow | `flow.direct.isolation_search_recipes` |
+| 13 | add_episode returns its nodes in reverse order (`graphiti.py`) | Caught: 14 flow | `flow.hand.kendra_adidas` |
 | 14 | An expiry time copies the creation time in place of a new clock reading (`utils/maintenance/edge_operations.py`) | Caught: 1 flow | `flow.hand.historical_fact` |
-| 15 | A contradicted fact's expiry time copies its creation time (`utils/maintenance/edge_operations.py`) | Caught: 1 flow | `flow.hand.contradiction` |
-| 16 | Control for the script: an import error must also fail the judge (`nodes.py`) | Caught: 22 flow, 207 pure | `flow.direct.namespaces_entity_nodes` |
+| 15 | A contradicted fact's expiry time copies its creation time (`utils/maintenance/edge_operations.py`) | Caught: 4 flow | `flow.hand.contradiction` |
+| 16 | remove_episode keeps the removed episode on the facts that it supported (`graphiti.py`) | Caught: 1 flow | `flow.recorded.lifecycle` |
+| 17 | A new community gets its summary as its name (`utils/maintenance/community_operations.py`) | Caught: 1 flow | `flow.hand.communities` |
+| 18 | A custom entity type is not written as a node label (`utils/maintenance/node_operations.py`) | Caught: 2 flow | `flow.recorded.custom_types` |
+| 19 | Bulk ingestion leaves a fact on a node that dedupe removed (`utils/bulk_utils.py`) | Caught: 10 flow, 4 pure | `flow.hand.contradiction` |
+| 20 | Control for the script: an import error must also fail the judge (`nodes.py`) | Caught: 34 flow, 207 pure | `flow.direct.namespaces_entity_nodes` |
 
 ## Upstream test baseline
 
@@ -84,7 +106,7 @@ None.
 ## Rule changes
 
 None. `port/RULES.md` does not exist yet. Phase 4 writes it.
-[GAPS.md](GAPS.md) holds 22 language gaps and 15 surfaces that the judge cannot reach. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
+[GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
 ## Deviations from the porting skill
 
@@ -98,17 +120,17 @@ None. `port/RULES.md` does not exist yet. Phase 4 writes it.
 
 ## Open questions
 
-For the maintainer at gate 2:
+For the maintainer:
 
-1. Accept the changes to the approved judge design. Three are from the build: UUID names from content, the .NET host outside `port/judge/`, and a fresh host process for each flow case. Four are from the review: bags in place of sorted names, clock rank and shape, the number rule, and the `bound_wrong` rule.
-2. Decide on one more noise rule: sort `labels` lists. Upstream builds node labels from a set, so their order changes between processes (finding F13 in GAPS.md). Until then, no scenario stores a node with a second label.
-3. Decide which upstream LLM path is the contract for the `Microsoft.Extensions.AI` adapter. The judge pins the base path: the schema text is appended to the prompt, and the adapter implements `_generate_response`. The default upstream client, `OpenAIClient`, sends the schema through `responses.parse` and adds no schema text. The lead recommends the base path, because it works with every provider behind `IChatClient`. With that choice, a prompt from Graphiti.Net differs from a prompt of upstream's default client by the schema text. Record the choice in DECISIONS.md.
-4. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
-5. Decided on 2026-11-25: the 10 pending scenarios stay pending. They are recorded after the OpenAI account has credits.
+1. Close gate 2. The judge changed after the approval on 2026-11-25. The label rule now also covers text, and each host prepares the database for each flow case. Five case texts changed to remove score ties, two scenarios were restructured, and 12 cases were added. The table "What the recording found" gives the reason for each change.
+2. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
+
+Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes).
 
 ## Checks not run
 
-- The judge did not run against upstream's default `OpenAIClient` path. See question 3.
+- The judge did not run against upstream's default `OpenAIClient` path. Decision D17 puts that path outside the contract.
 - CI does not run the judge against the Python build. Debt T13.
+- No second adversarial review ran on the changes after the first review.
 - No mutation score. Stryker loaded its configuration and found 0 mutants, because the product projects contain no code yet.
 - The devcontainer and the Claude cloud session hook were not started. See [docs/RELIABILITY.md](../docs/RELIABILITY.md).
