@@ -28,7 +28,7 @@ A differential judge that runs from outside both builds, proved to catch breakag
 - Golden files come only from the recorder. Never write expected output by hand.
 - The noise list is fixed in the judge README. Typical noise: UUIDs, timestamps, durations.
 - The recorder needs a Neo4j sidecar. Replies are recorded one time from a real model (choice 3 in the design document), so one recording run needs the maintainer's LLM key.
-- The deny rules for `port/judge/` are out of `.claude/settings.json` during this plan, with the maintainer's approval. Task 12 puts them back at gate 2.
+- The deny rules for `port/judge/` were out of `.claude/settings.json` during this plan, with the maintainer's approval. Task 12 put them back at gate 2.
 
 ## Gate 2
 
@@ -87,6 +87,6 @@ One adversarial review of the judge diff before the gate. The maintainer picks C
 | Break tests | 1 control and 20 breaks, all caught. One more break, on the merge of duplicate facts in a bulk call, was missed and removed, because upstream leaves that behavior open (U18). |
 | Upstream defects | 5 more: U14 to U18 in `port/GAPS.md`. |
 
-Open before gate 2 closes: the maintainer reads the results in `port/STATE.md`. No second adversarial review ran on the changes after the first review.
+- 2026-11-25, gate 2: the maintainer closed the gate. The deny rules for `port/judge/` are back in `.claude/settings.json`. No second adversarial review ran on the changes after the first review. Work that this plan leaves open is in the debt tracker: T10, T12, T13, T14, T15, T16.
 
 - Finding from task 2: upstream CI never runs `tests/test_add_triplet.py` with a database, and 11 of its 13 tests fail on Neo4j at the pinned commit. The first error is `ValueError: embedder returned 0 vectors for 1 queries`, which points at the test's mock embedder. Task 6 must not treat this file as a passing oracle. The judge covers `add_triplet` through layer 3 scenarios.

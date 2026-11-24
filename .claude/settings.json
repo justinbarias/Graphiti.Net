@@ -31,7 +31,9 @@
     ],
     "deny": [
       "Edit(.upstream/**)",
-      "Write(.upstream/**)"
+      "Write(.upstream/**)",
+      "Edit(port/judge/**)",
+      "Write(port/judge/**)"
     ]
   }
 }

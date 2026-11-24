@@ -13,7 +13,7 @@ Evidence by area. A cell says what was run and when. "Not verified" means that n
 | Differential judge, .NET build | `python3 port/judge/run.py --build dotnet` | 1 passed, 1,998 expected failures, 0 unexpected, 0 bound and wrong | 2026-11-25 |
 | Break tests of the judge | `python3 port/tools/break_tests.py` | Control passed. 20 of 20 breaks caught. | 2026-11-25 |
 | Score ties in flow cases | `port/tools/find_score_ties.py - port/judge/cases/flow/*.jsonl` | 0 ties in 34 cases | 2026-11-25 |
-| Adversarial review of the judge | One Opus 5.5 subagent, high effort | 6 important findings: 4 fixed, 2 open for gate 2. See [port/STATE.md](../port/STATE.md). | 2026-11-25 |
+| Adversarial review of the judge | One Opus 5.5 subagent, high effort | 6 important findings: 4 fixed, 1 decided at gate 2 (D17), 1 closed in part (debt T12 and T16). See [port/STATE.md](../port/STATE.md). | 2026-11-25 |
 | Upstream test baseline | `port/tools/upstream-tests.sh` | 1026 passed without a database, 40 passed on Neo4j | 2026-11-24 |
 | Property tests | None | Not verified. The project does not exist. | |
 | Mutation score | `dotnet stryker --config-file stryker-config.json` | The configuration loads with the `mtp` runner. Stryker found 0 mutants, so no score exists. | 2026-11-24 |

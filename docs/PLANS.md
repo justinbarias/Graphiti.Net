@@ -14,8 +14,7 @@ An execution plan is a file in `exec-plans/`. It holds scope, tasks, acceptance 
 
 | Plan | Port phases | Depends on |
 | --- | --- | --- |
-| [0002 Judge and source preparation](exec-plans/active/0002-judge-and-source-prep.md) | 2, 3 | Gate 1 |
-| [0003 Rulebook, PyCompat, and pilot](exec-plans/active/0003-rulebook-and-pilot.md) | 4, 5 | 0002 |
+| [0003 Rulebook, PyCompat, and pilot](exec-plans/active/0003-rulebook-and-pilot.md) | 4, 5 | Gate 2 |
 | [0004 Translate the core](exec-plans/active/0004-translate-core.md) | 6 | 0003 |
 | [0005 Parity, cutover, and release](exec-plans/active/0005-parity-and-release.md) | 7, 8 | 0004 |
 
@@ -24,3 +23,4 @@ An execution plan is a file in `exec-plans/`. It holds scope, tasks, acceptance 
 | Plan | Result |
 | --- | --- |
 | [0001 Bootstrap](exec-plans/completed/0001-bootstrap.md) | Repository, guidance, environments, tooling, port phase 1 |
+| [0002 Judge and source preparation](exec-plans/completed/0002-judge-and-source-prep.md) | The differential judge with 1,999 cases, 20 break tests, the gap list, gate 2 |

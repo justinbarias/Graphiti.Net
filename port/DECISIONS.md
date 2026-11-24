@@ -91,4 +91,4 @@ The lead made these choices alone. The maintainer accepted all seven at gate 1.
 | Gate | Date | Result |
 | --- | --- | --- |
 | 1. Decisions | 2026-11-24 | Approved by the maintainer, with all seven lead choices |
-| 2. Judge | 2026-11-25 | The maintainer approved D17, D18, and D19, and asked for the real-model scenarios before the gate closes. The scenarios are recorded. The gate closes after the maintainer reads the final results in `port/STATE.md`. |
+| 2. Judge | 2026-11-25 | Approved by the maintainer, with D17, D18, and D19. The maintainer asked for the real-model scenarios first, read the final results, and closed the gate. `port/judge/` is read-only from commit `c052323`. |

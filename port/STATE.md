@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 2 and 3. The judge and the gap list are built. Gate 2 is open. |
-| Gate | Gate 1 passed on 2026-11-24. At gate 2 the maintainer approved the design changes, the label rule, and the LLM contract on 2026-11-25 (D17 to D19). The gate closes after the maintainer reads the results below. |
+| Phase | 4. The judge and the gap list are done. Plan 0003 is next: the rulebook, `PyCompat`, and the pilot. |
+| Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md`. |
 | Last action | 2026-11-25: added the label rule and the database preparation. Recorded 11 real-model scenarios and one hand-written communities scenario. Removed score ties from the cases, added 4 break tests, and recorded all flow golden files again. |
-| Next action | The maintainer closes gate 2. Then put the `port/judge/**` deny rules back into `.claude/settings.json`, and start plan 0003. |
+| Next action | Start plan 0003: copy the rulebook to `port/RULES.md`, extend it with the answers from GAPS.md, and build `PyCompat` with its tests. |
 
 ## Queue counts
 
@@ -120,17 +120,16 @@ None. `port/RULES.md` does not exist yet. Phase 4 writes it.
 
 ## Open questions
 
-For the maintainer:
+For the maintainer, before gate 4:
 
-1. Close gate 2. The judge changed after the approval on 2026-11-25. The label rule now also covers text, and each host prepares the database for each flow case. Five case texts changed to remove score ties, two scenarios were restructured, and 12 cases were added. The table "What the recording found" gives the reason for each change.
-2. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
+1. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
 
-Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes).
+Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.
 
 ## Checks not run
 
 - The judge did not run against upstream's default `OpenAIClient` path. Decision D17 puts that path outside the contract.
 - CI does not run the judge against the Python build. Debt T13.
-- No second adversarial review ran on the changes after the first review.
+- No second adversarial review ran on the changes after the first review. The maintainer closed gate 2 without one.
 - No mutation score. Stryker loaded its configuration and found 0 mutants, because the product projects contain no code yet.
 - The devcontainer and the Claude cloud session hook were not started. See [docs/RELIABILITY.md](../docs/RELIABILITY.md).

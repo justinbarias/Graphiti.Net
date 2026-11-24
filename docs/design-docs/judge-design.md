@@ -2,7 +2,7 @@
 
 Status: approved by the maintainer on 2026-11-24 (plan 0002, task 1). The judge is built, and [the judge README](../../port/judge/README.md) is the contract.
 The maintainer accepted the recommendation for each of the six choices under "Decisions for the maintainer".
-The section "Changes after the adversarial review" lists what changed on 2026-11-25. Those changes wait for the maintainer at gate 2.
+The section "Changes after the adversarial review" lists what changed on 2026-11-25. The maintainer accepted them and closed gate 2 on 2026-11-25.
 
 The judge decides whether the .NET build behaves like upstream Python at the pinned commit.
 It works from outside both builds, and it is built before any C# is ported.
@@ -189,7 +189,7 @@ An Opus 5.5 subagent at high effort reviewed the judge on 2026-11-25, with a bri
 | I2 | Every clock value became `<now>`. A port that wrote a naive timestamp, or copied `created_at` into `expired_at`, passed. | Clock tokens carry a rank and a shape. Break tests 14 and 15 prove it. |
 | I3 | An integer and a float matched within the float tolerance. | A golden integer needs the same integral value. |
 | I4 | A case in `expected-failures.txt` was free to fail for any reason. A bound but wrong case stayed hidden. | A listed case can fail only with `JudgeNotBound`. |
-| I5 | The evidence table said that every provider implements only `_generate_response`. | Corrected above. The contract choice is open for gate 2. |
+| I5 | The evidence table said that every provider implements only `_generate_response`. | Corrected above. Decision D17 keeps the base path. |
 | I6 | No recorded scenario reached `add_episode_bulk`, `build_communities`, `add_triplet`, `remove_episode`, `summarize_saga`, the scheduler, the decisions client, or the tracer. | The real-model scenarios now reach the first six. `flow.hand.guard_invisible_chars` covers input cleaning. The decisions client, the tracer, a custom prompt library, and the attribute merge of `add_triplet` stay open as J13 in `port/GAPS.md`. |
 
 ## Changes at gate 2
@@ -211,4 +211,4 @@ Six pure cases were removed, because each one recorded an error of the case itse
 ## Changes to plan 0002
 
 - Task 3 builds the two judge hosts and the reply lookup. The HTTP stub moves to the end-to-end work in plan 0004.
-- The bootstrap added deny rules for `port/judge/` to `.claude/settings.json` too early. The maintainer approved their removal on 2026-11-24 for phase 2. Task 12 puts them back at gate 2.
+- The bootstrap added deny rules for `port/judge/` to `.claude/settings.json` too early. The maintainer approved their removal on 2026-11-24 for phase 2. Task 12 put them back at gate 2, on 2026-11-25.
