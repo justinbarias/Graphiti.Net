@@ -1,7 +1,8 @@
 # Judge design
 
-Status: approved by the maintainer on 2026-11-24 (plan 0002, task 1). Nothing in this document is built.
+Status: approved by the maintainer on 2026-11-24 (plan 0002, task 1). The judge is built, and [the judge README](../../port/judge/README.md) is the contract.
 The maintainer accepted the recommendation for each of the six choices under "Decisions for the maintainer".
+The section "Changes after the adversarial review" lists what changed on 2026-11-25. The maintainer accepted them and closed gate 2 on 2026-11-25.
 
 The judge decides whether the .NET build behaves like upstream Python at the pinned commit.
 It works from outside both builds, and it is built before any C# is ported.
@@ -12,7 +13,8 @@ These facts come from the checkout in `.upstream/graphiti`. They shape the desig
 
 | Fact | Source | Effect on the judge |
 | --- | --- | --- |
-| `LLMClient.generate_response` does the shared work: the attribute preamble, the schema text, the language instruction, input cleaning, and the cache. Each provider implements only `_generate_response(messages, response_model, max_tokens, model_size, model)`. | `llm_client/client.py`, lines 152 and 207 | `_generate_response` is the capture seam. It is the same place where the `Microsoft.Extensions.AI` adapter sits in .NET. |
+| The base `LLMClient.generate_response` does the shared work: the attribute preamble, the schema text, the language instruction, input cleaning, and the cache. A provider that keeps the base method implements only `_generate_response(messages, response_model, max_tokens, model_size, model)`. | `llm_client/client.py`, lines 152 and 207 | `_generate_response` is the capture seam. It is the same place where the `Microsoft.Extensions.AI` adapter sits in .NET. |
+| Seven provider clients replace `generate_response`: Anthropic, Gemini, Jev, GLiNER2, the OpenAI base client, the generic OpenAI client, and the decisions client. The default `OpenAIClient` sends the schema through `responses.parse` and adds no schema text to the prompt. The first version of this table said that every provider implements only `_generate_response`. That was wrong. | `llm_client/openai_base_client.py`, `llm_client/openai_client.py`, line 105 | The judge pins the base path. The prompt that the default client sends differs from it. The maintainer decides at gate 2 which path the .NET adapter follows. |
 | The base client appends `json.dumps(response_model.model_json_schema())` to the last message. | `llm_client/client.py`, line 227 | The pydantic schema text is part of the prompt. The .NET build must produce the same text. |
 | All Neo4j traffic goes through `execute_query`, a session `run`, or a transaction `run`. | `driver/neo4j_driver.py`, `driver/neo4j/operations/` | The Neo4j library boundary is the capture seam for queries. |
 | 47 call sites use `semaphore_gather` and 5 use `asyncio.gather`. | `helpers.py`, line 132 | The order of concurrent LLM calls is not a contract. |
@@ -27,12 +29,13 @@ port/judge/
   run.py                  the runner. Python standard library only
   count.txt               the lowest allowed case count
   expected-failures.txt   .NET cases that still fail. Empty at M1
-  cases/<layer>/*.json    inputs
-  golden/<layer>/*.json   outputs recorded from Python
+  cases/<layer>/*.jsonl   inputs
+  golden/<layer>/*.jsonl  outputs recorded from Python
   replies/*.jsonl         scripted model replies
   embedder-vectors.json   shared check values for the judge embedder
   host-python/            the Python host. Only the recorder needs it
-  host-dotnet/            the .NET host. A console project in the solution
+
+tests/Graphiti.Net.JudgeHost/   the .NET host. Outside port/judge, because each ported unit adds a binding
 ```
 
 A host is a thin command. It reads cases as JSON lines on standard input and prints one JSON result for each case.
@@ -74,6 +77,7 @@ Targets:
 ## Layer 3: flows
 
 A case is a scenario: a list of public calls on one `Graphiti` instance, against a real Neo4j, with scripted model replies.
+A step can also hold a `parallel` list of calls that start together. The concurrent ingestion scenario uses it.
 
 ```json
 {"group": "g1", "replies": "quickstart", "steps": [
@@ -112,7 +116,7 @@ A request with no matching key fails the case, and the report shows the closest 
 The judge embedder is a pure function from text to 1024 values, seeded by a SHA-256 hash of the text and normalized to unit length.
 It exists once in Python and once in C#. Both must reproduce `embedder-vectors.json`.
 
-The cross-encoder gets scripted scores in the same way as the LLM gets scripted replies.
+The judge cross-encoder computes each score from the judge embeddings, so it needs no reply file.
 
 ### Scenario sources
 
@@ -128,11 +132,11 @@ The runner applies these rules to both sides before it compares. The list is clo
 
 | Noise | Rule |
 | --- | --- |
-| UUIDs | Sort each unordered collection by its content without UUIDs. Then rename each distinct UUID to `<uuid:n>` in order of first appearance. A renamed UUID must map the same way everywhere in the case. |
-| Clock values | A timestamp that falls between the start and the end of the run becomes `<now>`. A timestamp that comes from the input stays exact. |
-| Order of concurrent requests | LLM and embedding requests of one step are compared as a sorted multiset. Queries inside one transaction keep their order. |
-| Floats | Embedding values and scores match within 1e-6. |
-| Durations, ports, absolute paths | Removed. |
+| UUIDs | Each UUID gets a name from its content, refined until no name splits further. The first rule gave names by order of first appearance. It gave different results between runs, because two edges that differ only in their UUIDs have no stable order. Changed on 2026-11-24 during task 3. |
+| Clock values | The instant of a timestamp that falls between the start and the end of the run is noise. Its format, and its order among the clock values next to it, are compared. A timestamp that comes from the input stays exact. Changed on 2026-11-25. |
+| Order of concurrent requests | The capture lists of one step and the node and edge lists of the graph dump are compared as sorted multisets. Queries inside one transaction keep their order. Lists inside a return value keep their order, unless the case declares one as `unordered`. Changed on 2026-11-25. |
+| Numbers | A golden float matches within 1e-6. A golden integer needs the same integral value. Changed on 2026-11-25. |
+| Vectors | A list of 64 or more numbers is compared by its length, its first 8 values, its sum, and its sum weighted by position. |
 
 Everything else is compared exactly. That includes prompt text, schema text, Cypher text, parameter names, property names, and the order of search results.
 
@@ -175,7 +179,36 @@ The stub is a C# project next to the end-to-end tests. Only the end-to-end tests
 | 5 | Order of concurrent requests | Compare as a multiset. | Force `SEMAPHORE_LIMIT=1` in both builds and compare in order. Stricter, but it tests a configuration that users do not run. |
 | 6 | Cypher text | Compare exactly. | Normalize whitespace. Not needed for a strict port. |
 
+## Changes after the adversarial review
+
+An Opus 5.5 subagent at high effort reviewed the judge on 2026-11-25, with a brief to refute it. It reported 6 important findings and 14 smaller ones.
+
+| Finding | What was wrong | Answer |
+| --- | --- | --- |
+| I1 | The runner sorted every list named `nodes` or `edges`, also inside return values. A port that returned search results in the wrong order passed. | Only the capture lists, the graph dump, `$set`, and declared `unordered` paths are sorted. Break tests 12 and 13 prove it. |
+| I2 | Every clock value became `<now>`. A port that wrote a naive timestamp, or copied `created_at` into `expired_at`, passed. | Clock tokens carry a rank and a shape. Break tests 14 and 15 prove it. |
+| I3 | An integer and a float matched within the float tolerance. | A golden integer needs the same integral value. |
+| I4 | A case in `expected-failures.txt` was free to fail for any reason. A bound but wrong case stayed hidden. | A listed case can fail only with `JudgeNotBound`. |
+| I5 | The evidence table said that every provider implements only `_generate_response`. | Corrected above. Decision D17 keeps the base path. |
+| I6 | No recorded scenario reached `add_episode_bulk`, `build_communities`, `add_triplet`, `remove_episode`, `summarize_saga`, the scheduler, the decisions client, or the tracer. | The real-model scenarios now reach the first six. `flow.hand.guard_invisible_chars` covers input cleaning. The decisions client, the tracer, a custom prompt library, and the attribute merge of `add_triplet` stay open as J13 in `port/GAPS.md`. |
+
+## Changes at gate 2
+
+The maintainer decided these points on 2026-11-25. `port/DECISIONS.md` holds them as D17 to D19.
+
+| Point | Result |
+| --- | --- |
+| LLM contract | The base client path stays the contract. |
+| Node labels | Their order is noise. The rule covers label values, label lists inside prompt text, label chains inside Cypher text, and reply keys. A rule for the values alone is not enough, because a reply key is a hash of the prompt text. |
+| Real-model scenarios | 11 scenarios are recorded: 10 with `gpt-4.1-mini` and 1 with `gpt-4.1`. |
+
+The recording showed the limits of a differential judge on this code. Upstream leaves four behaviors open. The first is the order of search rows with equal scores. The second is the pair order in `build_communities`. The third is the commit order of episodes that run at the same time. The fourth is the fact that stays after a merge in a bulk call. The judge cannot compare an open behavior, so the cases stay away from each one. `port/judge/README.md` gives the rule for each. `port/GAPS.md` lists them as U15 to U18 and J14.
+
+The recording also showed that a full-text score depends on the history of the index. Each host now gives each flow case an empty database with new full-text indexes.
+
+Six pure cases were removed, because each one recorded an error of the case itself and not upstream behavior: five `edge_label_*` cases and `pure.queries.fulltext_query.no_driver_attr`.
+
 ## Changes to plan 0002
 
 - Task 3 builds the two judge hosts and the reply lookup. The HTTP stub moves to the end-to-end work in plan 0004.
-- The bootstrap added deny rules for `port/judge/` to `.claude/settings.json` too early. The maintainer approved their removal on 2026-11-24 for phase 2. Task 12 puts them back at gate 2.
+- The bootstrap added deny rules for `port/judge/` to `.claude/settings.json` too early. The maintainer approved their removal on 2026-11-24 for phase 2. Task 12 put them back at gate 2, on 2026-11-25.

@@ -1,0 +1,187 @@
+{"id": "pure.models.EpisodeType.from_str.valid_message", "result": {"ok": "message"}}
+{"id": "pure.models.EpisodeType.by_value_message", "result": {"ok": "message"}}
+{"id": "pure.models.EpisodeType.from_str.valid_json", "result": {"ok": "json"}}
+{"id": "pure.models.EpisodeType.by_value_json", "result": {"ok": "json"}}
+{"id": "pure.models.EpisodeType.from_str.valid_text", "result": {"ok": "text"}}
+{"id": "pure.models.EpisodeType.by_value_text", "result": {"ok": "text"}}
+{"id": "pure.models.EpisodeType.from_str.valid_fact_triple", "result": {"ok": "fact_triple"}}
+{"id": "pure.models.EpisodeType.by_value_fact_triple", "result": {"ok": "fact_triple"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_empty", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_upper_case", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_enum_name_like", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_trailing_space", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_none", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_int", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_unknown", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.from_str.invalid_cjk", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.EpisodeType.invalid_value", "result": {"error": "ValueError"}}
+{"id": "pure.models.EpisodeType.upper_value_invalid", "result": {"error": "ValueError"}}
+{"id": "pure.models.EntityNode.defaults", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": [], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:10bc65f7af>"}}}
+{"id": "pure.models.EntityNode.full", "result": {"ok": {"$type": "EntityNode", "attributes": {"age": 30, "nested": {"k": null}, "tags": ["a", "b"]}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": ["Entity", "Person"], "name": "Alice", "name_embedding": [0.1, 0.2, 0.3], "summary": "An engineer", "uuid": "<uuid:2d6e78ebbc>"}}}
+{"id": "pure.models.EntityNode.random_uuid_when_omitted", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "labels": [], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:a1afbbfe69>"}}}
+{"id": "pure.models.EntityNode.missing_name", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.missing_group_id", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.group_id_none", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.empty_group_id_ok", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "", "labels": [], "name": "n", "name_embedding": null, "summary": "", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.group_id_not_validated_chars", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "bad group!", "labels": [], "name": "n", "name_embedding": null, "summary": "", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.name_int_not_coerced", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.uuid_int_not_coerced", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.created_at_iso_string_parsed", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-03-01T12:00:00+02:00"}, "group_id": "g", "labels": [], "name": "n", "name_embedding": null, "summary": "", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.created_at_naive_kept_naive", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-03-01T12:00:00"}, "group_id": "g", "labels": [], "name": "n", "name_embedding": null, "summary": "", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.created_at_z_suffix", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-03-01T12:00:00+00:00"}, "group_id": "g", "labels": [], "name": "n", "name_embedding": null, "summary": "", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.created_at_invalid_string", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.created_at_none", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.created_at_epoch_int", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "1970-01-01T00:00:00+00:00"}, "group_id": "g", "labels": [], "name": "n", "name_embedding": null, "summary": "", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.extra_field_ignored", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": [], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:10bc65f7af>"}}}
+{"id": "pure.models.EntityNode.unicode_fields", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "labels": [], "name": "\u6771\u4eac \ud83d\ude00 cafe\u0301", "name_embedding": null, "summary": "\u00c9mile", "uuid": "u"}}}
+{"id": "pure.models.EntityNode.embedding_ints_coerced", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": [], "name": "Alice", "name_embedding": [1.0, 2.0, 3.0], "summary": "", "uuid": "<uuid:65ba1d1d43>"}}}
+{"id": "pure.models.EntityNode.embedding_bad_item", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.embedding_nan", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": [], "name": "Alice", "name_embedding": [{"$float": "nan"}, {"$float": "inf"}], "summary": "", "uuid": "<uuid:c611825da9>"}}}
+{"id": "pure.models.EntityNode.summary_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.attributes_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.attributes_non_str_key_coercion", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_valid_simple", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": ["Person"], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:3b66848538>"}}}
+{"id": "pure.models.EntityNode.labels_valid_underscore_digits", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": ["_Entity_2", "A1"], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:698e3741d2>"}}}
+{"id": "pure.models.EntityNode.labels_empty_list", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": [], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:10bc65f7af>"}}}
+{"id": "pure.models.EntityNode.labels_duplicate_labels_kept", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": ["A", "A"], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:edd6359fe2>"}}}
+{"id": "pure.models.EntityNode.labels_space", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_leading_digit", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_hyphen", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_empty_string", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_cypher_injection", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_unicode_letter", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_cjk", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_emoji", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_one_bad_of_many", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_colon", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_trailing_newline", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": ["Abc\n"], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:7ae1ec6902>"}}}
+{"id": "pure.models.EntityNode.labels_very_long_valid", "result": {"ok": {"$type": "EntityNode", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g1", "labels": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"], "name": "Alice", "name_embedding": null, "summary": "", "uuid": "<uuid:175589826c>"}}}
+{"id": "pure.models.EntityNode.labels_non_str_item", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_combining", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_not_list", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.labels_none", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityNode.__eq__.same_uuid_other_fields", "result": {"ok": true}}
+{"id": "pure.models.EntityNode.__eq__.different_uuid_same_fields", "result": {"ok": false}}
+{"id": "pure.models.EntityNode.__eq__.other_is_not_node", "result": {"ok": false}}
+{"id": "pure.models.EntityNode.__eq__.other_is_none", "result": {"ok": false}}
+{"id": "pure.models.EntityNode.__eq__.cross_class_same_uuid", "result": {"ok": true}}
+{"id": "pure.models.EntityEdge.__eq__.edge_vs_edge_same_uuid_is_false", "result": {"ok": false}}
+{"id": "pure.models.EntityEdge.__eq__.edge_vs_node_same_uuid_is_true", "result": {"ok": true}}
+{"id": "pure.models.EntityEdge.__eq__.edge_vs_node_other_uuid", "result": {"ok": false}}
+{"id": "pure.models.EpisodicNode.defaults", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.full", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": ["e1", "e2"], "episode_metadata": {"k": "v", "n": 1}, "group_id": "g", "labels": [], "name": "episode", "source": "json", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.source_string_coerced", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "message", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.source_fact_triple", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "fact_triple", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.source_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicNode.source_missing", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicNode.valid_at_missing", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicNode.content_missing", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicNode.content_empty_ok", "result": {"ok": {"$type": "EpisodicNode", "content": "", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.metadata_none_default", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.metadata_empty_dict", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": {}, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.entity_edges_not_list", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicNode.labels_validator_applies", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicNode.unicode_content", "result": {"ok": {"$type": "EpisodicNode", "content": "user: \u4f60\u597d \ud83d\ude00", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "desc", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EpisodicNode.random_uuid_when_omitted", "result": {"ok": {"$type": "EpisodicNode", "content": "hello", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": [], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "desc", "uuid": "<uuid:bbd256e34e>", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.CommunityNode.defaults", "result": {"ok": {"$type": "CommunityNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "labels": [], "name": "Comm", "name_embedding": null, "summary": "", "uuid": "c1"}}}
+{"id": "pure.models.CommunityNode.full", "result": {"ok": {"$type": "CommunityNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "labels": ["Community"], "name": "Comm", "name_embedding": [0.5, -0.5], "summary": "s", "uuid": "c1"}}}
+{"id": "pure.models.CommunityNode.bad_label", "result": {"error": "ValidationError"}}
+{"id": "pure.models.CommunityNode.missing_name", "result": {"error": "ValidationError"}}
+{"id": "pure.models.SagaNode.defaults", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": null, "group_id": "g", "labels": [], "last_episode_uuid": null, "last_summarized_at": null, "last_summarized_episode_valid_at": null, "name": "Comm", "summary": "", "uuid": "c1"}}}
+{"id": "pure.models.SagaNode.full", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": "e1", "group_id": "g", "labels": [], "last_episode_uuid": "e2", "last_summarized_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "last_summarized_episode_valid_at": {"$dt": "2026-02-01T00:00:00+00:00"}, "name": "Comm", "summary": "s", "uuid": "c1"}}}
+{"id": "pure.models.SagaNode.null_optionals_explicit", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": null, "group_id": "g", "labels": [], "last_episode_uuid": null, "last_summarized_at": null, "last_summarized_episode_valid_at": null, "name": "Comm", "summary": "", "uuid": "c1"}}}
+{"id": "pure.models.SagaNode.bad_datetime", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_episodic_node_from_record.valid", "result": {"ok": {"$type": "EpisodicNode", "content": "c", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": ["e1"], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "sd", "uuid": "ep1", "valid_at": {"$dt": "2025-12-31T23:00:00+00:00"}}}}
+{"id": "pure.models.get_episodic_node_from_record.dates_as_datetime_objects", "result": {"ok": {"$type": "EpisodicNode", "content": "c", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": ["e1"], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "sd", "uuid": "ep1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.get_episodic_node_from_record.created_at_none", "result": {"error": "ValueError"}}
+{"id": "pure.models.get_episodic_node_from_record.valid_at_none", "result": {"error": "ValueError"}}
+{"id": "pure.models.get_episodic_node_from_record.source_unknown", "result": {"error": "NotImplementedError"}}
+{"id": "pure.models.get_episodic_node_from_record.source_fact_triple", "result": {"ok": {"$type": "EpisodicNode", "content": "c", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": ["e1"], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "fact_triple", "source_description": "sd", "uuid": "ep1", "valid_at": {"$dt": "2025-12-31T23:00:00+00:00"}}}}
+{"id": "pure.models.get_episodic_node_from_record.date_string_invalid", "result": {"error": "ValueError"}}
+{"id": "pure.models.get_episodic_node_from_record.missing_key_content", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_episodic_node_from_record.entity_edges_none", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_episodic_node_from_record.date_naive_string", "result": {"ok": {"$type": "EpisodicNode", "content": "c", "created_at": {"$dt": "2026-01-01T00:00:00"}, "entity_edges": ["e1"], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "sd", "uuid": "ep1", "valid_at": {"$dt": "2025-12-31T23:00:00+00:00"}}}}
+{"id": "pure.models.get_episodic_node_from_record.date_space_separator", "result": {"ok": {"$type": "EpisodicNode", "content": "c", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": ["e1"], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "sd", "uuid": "ep1", "valid_at": {"$dt": "2025-12-31T23:00:00+00:00"}}}}
+{"id": "pure.models.get_episodic_node_from_record.date_z_suffix_not_py311_issue", "result": {"ok": {"$type": "EpisodicNode", "content": "c", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "entity_edges": ["e1"], "episode_metadata": null, "group_id": "g", "labels": [], "name": "episode", "source": "text", "source_description": "sd", "uuid": "ep1", "valid_at": {"$dt": "2025-12-31T23:00:00+00:00"}}}}
+{"id": "pure.models.get_entity_node_from_record.strips_reserved_attributes_and_group_label", "result": {"ok": {"$type": "EntityNode", "attributes": {"age": 3, "city": "\u6771\u4eac"}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g-1", "labels": ["Entity", "Person"], "name": "Alice", "name_embedding": [0.1, 0.2], "summary": "s", "uuid": "n1"}}}
+{"id": "pure.models.get_entity_node_from_record.group_label_absent", "result": {"ok": {"$type": "EntityNode", "attributes": {"age": 3, "city": "\u6771\u4eac"}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g-1", "labels": ["Entity"], "name": "Alice", "name_embedding": [0.1, 0.2], "summary": "s", "uuid": "n1"}}}
+{"id": "pure.models.get_entity_node_from_record.labels_missing_defaults_empty", "result": {"ok": {"$type": "EntityNode", "attributes": {"age": 3, "city": "\u6771\u4eac"}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g-1", "labels": [], "name": "Alice", "name_embedding": [0.1, 0.2], "summary": "s", "uuid": "n1"}}}
+{"id": "pure.models.get_entity_node_from_record.group_id_missing_raises", "result": {"error": "AttributeError"}}
+{"id": "pure.models.get_entity_node_from_record.embedding_missing_ok", "result": {"ok": {"$type": "EntityNode", "attributes": {"age": 3, "city": "\u6771\u4eac"}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g-1", "labels": ["Entity", "Person"], "name": "Alice", "name_embedding": null, "summary": "s", "uuid": "n1"}}}
+{"id": "pure.models.get_entity_node_from_record.attributes_missing_raises", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_entity_node_from_record.summary_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_entity_node_from_record.created_at_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_entity_node_from_record.group_label_dashes_removed_for_match", "result": {"ok": {"$type": "EntityNode", "attributes": {"age": 3, "city": "\u6771\u4eac"}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "a-b-c", "labels": ["Entity", "Entity_a_b_c"], "name": "Alice", "name_embedding": [0.1, 0.2], "summary": "s", "uuid": "n1"}}}
+{"id": "pure.models.get_entity_node_from_record.invalid_label_rejected", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_community_node_from_record.valid", "result": {"ok": {"$type": "CommunityNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "labels": [], "name": "C", "name_embedding": [1.0], "summary": "s", "uuid": "c1"}}}
+{"id": "pure.models.get_community_node_from_record.embedding_none", "result": {"ok": {"$type": "CommunityNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "labels": [], "name": "C", "name_embedding": null, "summary": "s", "uuid": "c1"}}}
+{"id": "pure.models.get_community_node_from_record.missing_embedding_key", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_saga_node_from_record.minimal", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": null, "group_id": "g", "labels": [], "last_episode_uuid": null, "last_summarized_at": null, "last_summarized_episode_valid_at": null, "name": "saga", "summary": "", "uuid": "s1"}}}
+{"id": "pure.models.get_saga_node_from_record.full", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": "a", "group_id": "g", "labels": [], "last_episode_uuid": "b", "last_summarized_at": {"$dt": "2026-02-01T00:00:00+00:00"}, "last_summarized_episode_valid_at": {"$dt": "2026-01-15T00:00:00+00:00"}, "name": "saga", "summary": "sum", "uuid": "s1"}}}
+{"id": "pure.models.get_saga_node_from_record.summary_none_becomes_empty", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": null, "group_id": "g", "labels": [], "last_episode_uuid": null, "last_summarized_at": null, "last_summarized_episode_valid_at": null, "name": "saga", "summary": "", "uuid": "s1"}}}
+{"id": "pure.models.get_saga_node_from_record.summarized_empty_string_is_none", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": null, "group_id": "g", "labels": [], "last_episode_uuid": null, "last_summarized_at": null, "last_summarized_episode_valid_at": null, "name": "saga", "summary": "", "uuid": "s1"}}}
+{"id": "pure.models.get_saga_node_from_record.datetime_objects", "result": {"ok": {"$type": "SagaNode", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "first_episode_uuid": null, "group_id": "g", "labels": [], "last_episode_uuid": null, "last_summarized_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "last_summarized_episode_valid_at": null, "name": "saga", "summary": "", "uuid": "s1"}}}
+{"id": "pure.models.get_saga_node_from_record.bad_date", "result": {"error": "ValueError"}}
+{"id": "pure.models.EpisodicEdge.defaults", "result": {"ok": {"$type": "EpisodicEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.EpisodicEdge.missing_target", "result": {"error": "ValidationError"}}
+{"id": "pure.models.CommunityEdge.defaults", "result": {"ok": {"$type": "CommunityEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.CommunityEdge.missing_target", "result": {"error": "ValidationError"}}
+{"id": "pure.models.HasEpisodeEdge.defaults", "result": {"ok": {"$type": "HasEpisodeEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.HasEpisodeEdge.missing_target", "result": {"error": "ValidationError"}}
+{"id": "pure.models.NextEpisodeEdge.defaults", "result": {"ok": {"$type": "NextEpisodeEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.NextEpisodeEdge.missing_target", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicEdge.random_uuid_when_omitted", "result": {"ok": {"$type": "EpisodicEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "<uuid:9fd93345d8>"}}}
+{"id": "pure.models.EpisodicEdge.created_at_missing", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EpisodicEdge.created_at_string", "result": {"ok": {"$type": "EpisodicEdge", "created_at": {"$dt": "2026-03-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.EpisodicEdge.extra_field_ignored", "result": {"ok": {"$type": "EpisodicEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.EpisodicEdge.empty_uuids_ok", "result": {"ok": {"$type": "EpisodicEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "", "source_node_uuid": "", "target_node_uuid": "", "uuid": ""}}}
+{"id": "pure.models.EntityEdge.defaults", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "Ana works at Acme", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "WORKS_AT", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": null}}}
+{"id": "pure.models.EntityEdge.full", "result": {"ok": {"$type": "EntityEdge", "attributes": {"n": [1, 2], "role": "eng"}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": ["ep1"], "expired_at": {"$dt": "2026-02-01T00:00:00+00:00"}, "fact": "Ana works at Acme", "fact_embedding": [0.1, 0.2], "group_id": "g", "invalid_at": {"$dt": "2026-01-15T00:00:00+00:00"}, "name": "WORKS_AT", "reference_time": {"$dt": "2026-01-01T00:00:00+00:00"}, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EntityEdge.missing_fact", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityEdge.missing_name", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityEdge.optional_dates_none_explicit", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "Ana works at Acme", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "WORKS_AT", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": null}}}
+{"id": "pure.models.EntityEdge.dates_as_strings", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "Ana works at Acme", "fact_embedding": null, "group_id": "g", "invalid_at": {"$dt": "2026-01-02T00:00:00"}, "name": "WORKS_AT", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.EntityEdge.date_only_string_midnight", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "Ana works at Acme", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "WORKS_AT", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-02T00:00:00"}}}}
+{"id": "pure.models.EntityEdge.invalid_date_string", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityEdge.episodes_not_list", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityEdge.unicode_fact", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "\u6771\u4eac \ud83d\ude00 caf\u00e9", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "WORKS_AT", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": null}}}
+{"id": "pure.models.EntityEdge.embedding_none_explicit", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "Ana works at Acme", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "WORKS_AT", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": null}}}
+{"id": "pure.models.EntityEdge.attributes_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.EntityEdge.no_label_validation_on_name", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "Ana works at Acme", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "bad name!", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": null}}}
+{"id": "pure.models.get_episodic_edge_from_record.valid", "result": {"ok": {"$type": "EpisodicEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_episodic_edge_from_record.created_at_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_episodic_edge_from_record.missing_key", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_community_edge_from_record.valid", "result": {"ok": {"$type": "CommunityEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_community_edge_from_record.date_datetime_object", "result": {"ok": {"$type": "CommunityEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_has_episode_edge_from_record.valid", "result": {"ok": {"$type": "HasEpisodeEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_has_episode_edge_from_record.date_datetime_object", "result": {"ok": {"$type": "HasEpisodeEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_next_episode_edge_from_record.valid", "result": {"ok": {"$type": "NextEpisodeEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_next_episode_edge_from_record.date_datetime_object", "result": {"ok": {"$type": "NextEpisodeEdge", "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1"}}}
+{"id": "pure.models.get_entity_edge_from_record.strips_reserved_attributes", "result": {"ok": {"$type": "EntityEdge", "attributes": {"custom": 1}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": ["ep1"], "expired_at": null, "fact": "f", "fact_embedding": [0.1], "group_id": "g", "invalid_at": null, "name": "R", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.get_entity_edge_from_record.all_dates_present", "result": {"ok": {"$type": "EntityEdge", "attributes": {"custom": 1}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": ["ep1"], "expired_at": {"$dt": "2026-03-01T00:00:00+00:00"}, "fact": "f", "fact_embedding": [0.1], "group_id": "g", "invalid_at": {"$dt": "2026-02-01T00:00:00+00:00"}, "name": "R", "reference_time": {"$dt": "2026-01-01T00:00:00+00:00"}, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.get_entity_edge_from_record.missing_expired_at_key", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_entity_edge_from_record.missing_reference_time_key_ok", "result": {"ok": {"$type": "EntityEdge", "attributes": {"custom": 1}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": ["ep1"], "expired_at": null, "fact": "f", "fact_embedding": [0.1], "group_id": "g", "invalid_at": null, "name": "R", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.get_entity_edge_from_record.missing_embedding_key_ok", "result": {"ok": {"$type": "EntityEdge", "attributes": {"custom": 1}, "created_at": {"$dt": "2026-01-01T00:00:00+00:00"}, "episodes": ["ep1"], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "R", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "ed1", "valid_at": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.models.get_entity_edge_from_record.episodes_none_invalid", "result": {"error": "ValidationError"}}
+{"id": "pure.models.get_entity_edge_from_record.episodes_missing_key", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_entity_edge_from_record.attributes_missing_key", "result": {"error": "KeyError"}}
+{"id": "pure.models.get_entity_edge_from_record.bad_valid_at", "result": {"error": "ValueError"}}
+{"id": "pure.models.GraphitiError.no_message", "result": {"ok": {"$exc": "GraphitiError"}}}
+{"id": "pure.models.GraphitiError.with_message", "result": {"ok": {"$exc": "GraphitiError"}}}
+{"id": "pure.models.EdgeNotFoundError.args", "result": {"ok": {"$exc": "EdgeNotFoundError"}}}
+{"id": "pure.models.EdgesNotFoundError.args", "result": {"ok": {"$exc": "EdgesNotFoundError"}}}
+{"id": "pure.models.GroupsEdgesNotFoundError.args", "result": {"ok": {"$exc": "GroupsEdgesNotFoundError"}}}
+{"id": "pure.models.GroupsNodesNotFoundError.args", "result": {"ok": {"$exc": "GroupsNodesNotFoundError"}}}
+{"id": "pure.models.NodeNotFoundError.args", "result": {"ok": {"$exc": "NodeNotFoundError"}}}
+{"id": "pure.models.SearchRerankerError.args", "result": {"ok": {"$exc": "SearchRerankerError"}}}
+{"id": "pure.models.EntityTypeValidationError.args", "result": {"ok": {"$exc": "EntityTypeValidationError"}}}
+{"id": "pure.models.IdentityPropertyValidationError.args", "result": {"ok": {"$exc": "IdentityPropertyValidationError"}}}
+{"id": "pure.models.GroupIdValidationError.args", "result": {"ok": {"$exc": "GroupIdValidationError"}}}
+{"id": "pure.models.NodeLabelValidationError.args", "result": {"ok": {"$exc": "NodeLabelValidationError"}}}
+{"id": "pure.models.UnitExpiredError.args", "result": {"ok": {"$exc": "UnitExpiredError"}}}
+{"id": "pure.models.UnitInProgressError.args", "result": {"ok": {"$exc": "UnitInProgressError"}}}
+{"id": "pure.models.StaleCommitError.args", "result": {"ok": {"$exc": "StaleCommitError"}}}
+{"id": "pure.models.ChangeSetRejected.default_reason", "result": {"ok": {"$exc": "ChangeSetRejected"}}}
+{"id": "pure.models.ChangeSetRejected.custom_reason", "result": {"ok": {"$exc": "ChangeSetRejected"}}}
+{"id": "pure.models.NodeLabelValidationError.unicode_labels", "result": {"ok": {"$exc": "NodeLabelValidationError"}}}
+{"id": "pure.models.GroupIdValidationError.empty_group", "result": {"ok": {"$exc": "GroupIdValidationError"}}}

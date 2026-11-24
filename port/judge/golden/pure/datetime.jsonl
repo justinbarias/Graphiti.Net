@@ -1,0 +1,42 @@
+{"id": "pure.datetime.parse_db_date.none", "result": {"ok": null}}
+{"id": "pure.datetime.parse_db_date.iso_date", "result": {"ok": {"$dt": "2025-01-15T00:00:00"}}}
+{"id": "pure.datetime.parse_db_date.iso_datetime_naive", "result": {"ok": {"$dt": "2025-01-15T10:30:00"}}}
+{"id": "pure.datetime.parse_db_date.iso_datetime_utc_offset", "result": {"ok": {"$dt": "2025-01-15T10:30:00+00:00"}}}
+{"id": "pure.datetime.parse_db_date.iso_datetime_z", "result": {"ok": {"$dt": "2025-01-15T10:30:00+00:00"}}}
+{"id": "pure.datetime.parse_db_date.iso_offset_nonutc", "result": {"ok": {"$dt": "2025-01-15T10:30:00+05:30"}}}
+{"id": "pure.datetime.parse_db_date.iso_nanos_too_long", "result": {"ok": {"$dt": "2025-01-15T10:30:00.123456+00:00"}}}
+{"id": "pure.datetime.parse_db_date.iso_space_sep", "result": {"ok": {"$dt": "2025-01-15T10:30:00"}}}
+{"id": "pure.datetime.parse_db_date.basic_format", "result": {"ok": {"$dt": "2025-01-15T10:30:00"}}}
+{"id": "pure.datetime.parse_db_date.empty", "result": {"error": "ValueError"}}
+{"id": "pure.datetime.parse_db_date.garbage", "result": {"error": "ValueError"}}
+{"id": "pure.datetime.parse_db_date.invalid_month", "result": {"error": "ValueError"}}
+{"id": "pure.datetime.parse_db_date.week_date", "result": {"ok": {"$dt": "2025-01-13T00:00:00"}}}
+{"id": "pure.datetime.parse_db_date.year_only", "result": {"error": "ValueError"}}
+{"id": "pure.datetime.parse_db_date.datetime_passthrough", "result": {"ok": {"$dt": "2025-01-15T10:30:00+00:00"}}}
+{"id": "pure.datetime.parse_db_date.neo4j_datetime_naive", "result": {"ok": {"$dt": "2025-01-15T10:30:00.123456"}}}
+{"id": "pure.datetime.parse_db_date.wrong_type_int", "result": {"ok": 42}}
+{"id": "pure.datetime.ensure_utc.none", "result": {"ok": null}}
+{"id": "pure.datetime.ensure_utc.naive", "result": {"ok": {"$dt": "2025-01-15T10:30:00+00:00"}}}
+{"id": "pure.datetime.ensure_utc.already_utc", "result": {"ok": {"$dt": "2025-01-15T10:30:00+00:00"}}}
+{"id": "pure.datetime.ensure_utc.positive_offset", "result": {"ok": {"$dt": "2025-01-15T05:00:00+00:00"}}}
+{"id": "pure.datetime.ensure_utc.negative_offset", "result": {"ok": {"$dt": "2025-01-15T18:30:00+00:00"}}}
+{"id": "pure.datetime.ensure_utc.day_rollover_forward", "result": {"ok": {"$dt": "2025-01-16T04:30:00+00:00"}}}
+{"id": "pure.datetime.ensure_utc.microseconds_naive", "result": {"ok": {"$dt": "2025-01-15T10:30:00.123456+00:00"}}}
+{"id": "pure.datetime.ensure_utc.max_datetime_naive", "result": {"ok": {"$dt": "9999-12-31T23:59:59.999999+00:00"}}}
+{"id": "pure.datetime.ensure_utc.min_datetime_positive_offset_overflow", "result": {"error": "OverflowError"}}
+{"id": "pure.datetime.ensure_utc.max_datetime_negative_offset_overflow", "result": {"error": "OverflowError"}}
+{"id": "pure.datetime.ensure_utc.wrong_type_str", "result": {"error": "AttributeError"}}
+{"id": "pure.datetime.ensure_utc.wrong_type_date_only", "result": {"error": "AttributeError"}}
+{"id": "pure.datetime.convert_datetimes_to_strings.none", "result": {"ok": null}}
+{"id": "pure.datetime.convert_datetimes_to_strings.str", "result": {"ok": "hello"}}
+{"id": "pure.datetime.convert_datetimes_to_strings.naive_dt", "result": {"ok": "2025-01-15T10:30:00+00:00"}}
+{"id": "pure.datetime.convert_datetimes_to_strings.utc_dt", "result": {"ok": "2025-01-15T10:30:00+00:00"}}
+{"id": "pure.datetime.convert_datetimes_to_strings.offset_dt", "result": {"ok": "2025-01-15T05:00:00+00:00"}}
+{"id": "pure.datetime.convert_datetimes_to_strings.dict_with_dt", "result": {"ok": {"a": "2025-01-15T08:30:00+00:00", "b": 1}}}
+{"id": "pure.datetime.convert_datetimes_to_strings.list_with_dt", "result": {"ok": ["2025-01-15T10:30:00+00:00", "x", 2]}}
+{"id": "pure.datetime.convert_datetimes_to_strings.tuple_with_dt", "result": {"ok": ["2025-01-15T09:30:00+00:00", "x"]}}
+{"id": "pure.datetime.convert_datetimes_to_strings.nested", "result": {"ok": {"a": [{"b": "2025-01-15T14:30:00+00:00"}, ["2025-01-15T10:30:00+00:00"]], "c": {"d": {"e": "2025-01-15T01:30:00+00:00"}}}}}
+{"id": "pure.datetime.convert_datetimes_to_strings.empty_dict", "result": {"ok": {}}}
+{"id": "pure.datetime.convert_datetimes_to_strings.dict_non_string_keys", "result": {"ok": {"$dict": [[1, "2025-01-15T10:30:00+00:00"], [[1, 2], "v"]]}}}
+{"id": "pure.datetime.convert_datetimes_to_strings.max_dt_overflow", "result": {"error": "OverflowError"}}
+{"id": "pure.datetime.convert_datetimes_to_strings.model_untouched", "result": {"ok": {"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "e1", "valid_at": null}}}

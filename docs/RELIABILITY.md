@@ -11,7 +11,7 @@ All four environments run `scripts/setup-env.sh` and use `docker-compose.yml` fo
 | Local machine | Run `scripts/setup-env.sh` by hand. | Yes, macOS arm64, 2026-11-24. The SDK install step was skipped because SDK 10.0.203 was present. |
 | Devcontainer | `postCreateCommand` runs `scripts/setup-env.sh --python`. The `dev` container shares the network namespace of the `neo4j` service. | No. Debt T1. |
 | Claude cloud session | The SessionStart hook in `.claude/settings.json` runs `scripts/session-start.sh`. | No. Debt T2. |
-| CI | `.github/workflows/ci.yml` runs `scripts/setup-env.sh`, then `scripts/check.sh --test`. | No. Debt T3. |
+| CI | `.github/workflows/ci.yml` runs `scripts/setup-env.sh`, then `scripts/check.sh --test`. | Yes, 2026-11-25, on a push to `main`. |
 
 ## Claude cloud sessions
 

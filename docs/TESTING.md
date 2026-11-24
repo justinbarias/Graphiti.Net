@@ -17,7 +17,7 @@ This is the canonical home of the test strategy. It follows
 
 | Layer | Question it answers | Location | State |
 | --- | --- | --- | --- |
-| Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/` | Not built. Port phase 2. |
+| Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,999 cases: 1,965 pure and 34 flow. 11 flow scenarios use replies from a real model. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
 | Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | Not created. Port phase 4. |
 | Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. No product code to mutate yet. |
@@ -36,7 +36,7 @@ The judge compares three things for the same input:
 The judge prints its case count. If the count is lower than `port/judge/count.txt`, the judge fails.
 `port/judge/expected-failures.txt` starts with every case and must be empty at M1.
 After gate 2, `port/judge/` is read-only, and `.claude/settings.json` denies edits to it from that point.
-The [judge design document](design-docs/judge-design.md) holds the details.
+The [judge design document](design-docs/judge-design.md) gives the reasons, and [the judge README](../port/judge/README.md) is the contract.
 
 ### End-to-end
 

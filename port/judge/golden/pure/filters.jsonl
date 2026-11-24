@@ -1,0 +1,133 @@
+{"id": "pure.filters.cypher_to_opensearch_operator.eq", "result": {"ok": "="}}
+{"id": "pure.filters.cypher_to_opensearch_operator.ltgt", "result": {"ok": "<>"}}
+{"id": "pure.filters.cypher_to_opensearch_operator.gt", "result": {"ok": "gt"}}
+{"id": "pure.filters.cypher_to_opensearch_operator.lt", "result": {"ok": "lt"}}
+{"id": "pure.filters.cypher_to_opensearch_operator.gteq", "result": {"ok": "gte"}}
+{"id": "pure.filters.cypher_to_opensearch_operator.lteq", "result": {"ok": "lte"}}
+{"id": "pure.filters.cypher_to_opensearch_operator.IS_NULL", "result": {"ok": "IS NULL"}}
+{"id": "pure.filters.cypher_to_opensearch_operator.IS_NOT_NULL", "result": {"ok": "IS NOT NULL"}}
+{"id": "pure.filters.date_filter_query_constructor.eq", "result": {"ok": "(e.valid_at = $valid_at_0)"}}
+{"id": "pure.filters.date_filter_query_constructor.ltgt", "result": {"ok": "(e.valid_at <> $valid_at_0)"}}
+{"id": "pure.filters.date_filter_query_constructor.gt", "result": {"ok": "(e.valid_at > $valid_at_0)"}}
+{"id": "pure.filters.date_filter_query_constructor.lt", "result": {"ok": "(e.valid_at < $valid_at_0)"}}
+{"id": "pure.filters.date_filter_query_constructor.gteq", "result": {"ok": "(e.valid_at >= $valid_at_0)"}}
+{"id": "pure.filters.date_filter_query_constructor.lteq", "result": {"ok": "(e.valid_at <= $valid_at_0)"}}
+{"id": "pure.filters.date_filter_query_constructor.IS_NULL", "result": {"ok": "(e.valid_at IS NULL)"}}
+{"id": "pure.filters.date_filter_query_constructor.IS_NOT_NULL", "result": {"ok": "(e.valid_at IS NOT NULL)"}}
+{"id": "pure.filters.date_filter_query_constructor.empty_names", "result": {"ok": "( = )"}}
+{"id": "pure.filters.date_filter_query_constructor.injection_value_name", "result": {"ok": "(e.x) OR (1=1 <> $p)"}}
+{"id": "pure.filters.date_filter_query_constructor.unicode", "result": {"ok": "(e.caf\u00e9 >= $\ud83d\ude00)"}}
+{"id": "pure.filters.node_search_filter_query_constructor.empty_neo4j", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.empty_falkordb", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.single_label", "result": {"ok": [["n:Person"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.two_labels", "result": {"ok": [["n:Person|Organization"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.empty_list", "result": {"ok": [["n:"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.underscore_label", "result": {"ok": [["n:_a1|B_2"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.all_fields_ignored", "result": {"ok": [["n:A"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.edge_only_fields", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.falkordb_labels", "result": {"ok": [["n:Person"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.provider_none", "result": {"ok": [["n:Person"], {}]}}
+{"id": "pure.filters.search_filters_validation.node_label_backtick", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_space", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_digit", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_hyphen", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_pipe", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_colon", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_quote", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_empty_label", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_unicode_e", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_combining", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_emoji", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_cjk", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_newline", "result": {"ok": [["n:Ok|A\n"], {}]}}
+{"id": "pure.filters.search_filters_validation.node_label_trailing_newline_ok_check", "result": {"ok": [["n:Ok|Person\n"], {}]}}
+{"id": "pure.filters.search_filters_validation.edge_label_trailing_newline_ok_check", "result": {"ok": [["n:Person\n AND m:Person\n"], {}]}}
+{"id": "pure.filters.search_filters_validation.node_label_paren", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_semicolon", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters_validation.node_label_dollar", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.node_search_filter_query_constructor.label_list_with_empty_string_value", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.node_search_filter_query_constructor.duplicate_labels", "result": {"ok": [["n:A|A"], {}]}}
+{"id": "pure.filters.node_search_filter_query_constructor.long_label", "result": {"ok": [["n:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.empty", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.empty_falkordb", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_types", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["WORKS_AT", "KNOWS"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_types_empty", "result": {"ok": [["e.name in $edge_types"], {"edge_types": []}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_types_unicode", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["caf\u00e9", "\ud83d\ude00", "\u8aad\u3080", "e\u0301"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_types_injection", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["X` ) DETACH DELETE n //", "a\"b", "a'b"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_uuids", "result": {"ok": [["e.uuid in $edge_uuids"], {"edge_uuids": ["u1", "u2"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.edge_uuids_empty", "result": {"ok": [["e.uuid in $edge_uuids"], {"edge_uuids": []}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.source_uuids", "result": {"ok": [["n.uuid IN $edge_source_node_uuids"], {"edge_source_node_uuids": ["s1"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.source_uuids_empty", "result": {"ok": [["n.uuid IN $edge_source_node_uuids"], {"edge_source_node_uuids": []}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.target_uuids", "result": {"ok": [["m.uuid IN $edge_target_node_uuids"], {"edge_target_node_uuids": ["t1", "t2"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.target_uuids_empty", "result": {"ok": [["m.uuid IN $edge_target_node_uuids"], {"edge_target_node_uuids": []}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.source_and_target", "result": {"ok": [["n.uuid IN $edge_source_node_uuids", "m.uuid IN $edge_target_node_uuids"], {"edge_source_node_uuids": ["s"], "edge_target_node_uuids": ["t"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.node_labels", "result": {"ok": [["n:Person|Org AND m:Person|Org"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.node_labels_empty", "result": {"ok": [["n: AND m:"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.node_labels_single", "result": {"ok": [["n:Person AND m:Person"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.property_filters_ignored", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.property_filters_empty", "result": {"ok": [[], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_eq", "result": {"ok": [["((e.valid_at = $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_ltgt", "result": {"ok": [["((e.valid_at <> $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_gt", "result": {"ok": [["((e.valid_at > $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_lt", "result": {"ok": [["((e.valid_at < $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_gteq", "result": {"ok": [["((e.valid_at >= $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_lteq", "result": {"ok": [["((e.valid_at <= $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_IS_NULL", "result": {"ok": [["((e.valid_at IS NULL))"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_single_IS_NOT_NULL", "result": {"ok": [["((e.valid_at IS NOT NULL))"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_and_group", "result": {"ok": [["((e.valid_at >= $valid_at_0) AND (e.valid_at < $valid_at_1))"], {"valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}, "valid_at_1": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_or_groups", "result": {"ok": [["((e.valid_at > $valid_at_0) OR (e.valid_at <= $valid_at_0) OR (e.valid_at IS NULL))"], {"valid_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_empty_outer", "result": {"ok": [["("], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_empty_inner", "result": {"ok": [["()"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.invalid_at_single_eq", "result": {"ok": [["((e.invalid_at = $invalid_at_0))"], {"invalid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.invalid_at_single_IS_NULL", "result": {"ok": [["((e.invalid_at IS NULL))"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.invalid_at_and_group", "result": {"ok": [["((e.invalid_at >= $invalid_at_0) AND (e.invalid_at < $invalid_at_1))"], {"invalid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}, "invalid_at_1": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.invalid_at_or_groups", "result": {"ok": [["((e.invalid_at > $invalid_at_0) OR (e.invalid_at <= $invalid_at_0) OR (e.invalid_at IS NULL))"], {"invalid_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.invalid_at_empty_outer", "result": {"ok": [["("], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.invalid_at_empty_inner", "result": {"ok": [["()"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.created_at_single_eq", "result": {"ok": [["((e.created_at = $created_at_0))"], {"created_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.created_at_single_IS_NULL", "result": {"ok": [["((e.created_at IS NULL))"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.created_at_and_group", "result": {"ok": [["((e.created_at >= $created_at_0) AND (e.created_at < $created_at_1))"], {"created_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}, "created_at_1": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.created_at_or_groups", "result": {"ok": [["((e.created_at > $created_at_0) OR (e.created_at <= $created_at_0) OR (e.created_at IS NULL))"], {"created_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.created_at_empty_outer", "result": {"ok": [["("], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.created_at_empty_inner", "result": {"ok": [["()"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.expired_at_single_eq", "result": {"ok": [["((e.expired_at = $expired_at_0))"], {"expired_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.expired_at_single_IS_NULL", "result": {"ok": [["((e.expired_at IS NULL))"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.expired_at_and_group", "result": {"ok": [["((e.expired_at >= $expired_at_0) AND (e.expired_at < $expired_at_1))"], {"expired_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}, "expired_at_1": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.expired_at_or_groups", "result": {"ok": [["((e.expired_at > $expired_at_0) OR (e.expired_at <= $expired_at_0) OR (e.expired_at IS NULL))"], {"expired_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.expired_at_empty_outer", "result": {"ok": [["("], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.expired_at_empty_inner", "result": {"ok": [["()"], {}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_nested_and_or", "result": {"ok": [["((e.valid_at >= $valid_at_0) AND (e.valid_at < $valid_at_1) AND (e.valid_at IS NOT NULL) OR (e.valid_at = $valid_at_0) OR (e.valid_at IS NULL) AND (e.valid_at <> $valid_at_1))"], {"valid_at_0": {"$dt": "2026-03-01T00:00:00+00:00"}, "valid_at_1": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_null_then_value_index", "result": {"ok": [["((e.valid_at IS NULL) AND (e.valid_at > $valid_at_1))"], {"valid_at_1": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_param_overwrite_across_or", "result": {"ok": [["((e.valid_at > $valid_at_0) OR (e.valid_at < $valid_at_0))"], {"valid_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_date_none_with_operator", "result": {"ok": [["((e.valid_at > $valid_at_0))"], {"valid_at_0": null}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.valid_at_naive_date", "result": {"ok": [["((e.valid_at = $valid_at_0))"], {"valid_at_0": {"$dt": "2026-01-01T00:00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.all_dates_all_fields", "result": {"ok": [["((e.valid_at > $valid_at_0))", "((e.invalid_at < $invalid_at_0))", "((e.created_at >= $created_at_0))", "((e.expired_at IS NULL))"], {"created_at_0": {"$dt": "2026-03-01T00:00:00+00:00"}, "invalid_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}, "valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.dates_param_collision", "result": {"ok": [["((e.valid_at > $valid_at_0) AND (e.valid_at < $valid_at_1))", "((e.invalid_at > $invalid_at_0) AND (e.invalid_at < $invalid_at_1))"], {"invalid_at_0": {"$dt": "2026-03-01T00:00:00+00:00"}, "invalid_at_1": {"$dt": "2026-01-02T03:04:05+00:00"}, "valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}, "valid_at_1": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.everything", "result": {"ok": [["e.name in $edge_types", "e.uuid in $edge_uuids", "n.uuid IN $edge_source_node_uuids", "m.uuid IN $edge_target_node_uuids", "n:Person|Org AND m:Person|Org", "((e.valid_at >= $valid_at_0) OR (e.valid_at IS NULL))", "((e.invalid_at < $invalid_at_0))", "((e.created_at > $created_at_0))", "((e.expired_at IS NULL))"], {"created_at_0": {"$dt": "2026-03-01T00:00:00+00:00"}, "edge_source_node_uuids": ["s1"], "edge_target_node_uuids": ["t1"], "edge_types": ["KNOWS"], "edge_uuids": ["e1"], "invalid_at_0": {"$dt": "2025-12-31T23:59:59.123456+00:00"}, "valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.everything_falkordb", "result": {"ok": [["e.name in $edge_types", "n:Person AND m:Person", "((e.valid_at >= $valid_at_0))"], {"edge_types": ["KNOWS"], "valid_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.provider_none", "result": {"ok": [["e.name in $edge_types"], {"edge_types": ["A"]}]}}
+{"id": "pure.filters.edge_search_filter_query_constructor.limit_ordering_labels_before_dates", "result": {"ok": [["e.name in $edge_types", "n:A AND m:A", "((e.created_at > $created_at_0))"], {"created_at_0": {"$dt": "2026-01-02T03:04:05+00:00"}, "edge_types": ["X"]}]}}
+{"id": "pure.filters.search_filters.model_construct_empty", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": null, "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": null, "property_filters": null, "valid_at": null}}}
+{"id": "pure.filters.search_filters.construct_default", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": null, "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": null, "property_filters": null, "valid_at": null}}}
+{"id": "pure.filters.search_filters.construct_all_fields", "result": {"ok": {"$type": "SearchFilters", "created_at": [[{"$type": "DateFilter", "comparison_operator": "=", "date": {"$dt": "2026-03-01T00:00:00+00:00"}}]], "edge_source_node_uuids": ["s"], "edge_target_node_uuids": ["t"], "edge_types": ["X"], "edge_uuids": ["u"], "expired_at": [[{"$type": "DateFilter", "comparison_operator": "IS NULL", "date": null}]], "invalid_at": [[{"$type": "DateFilter", "comparison_operator": "<", "date": {"$dt": "2025-12-31T23:59:59.123456+00:00"}}]], "node_labels": ["A"], "property_filters": [{"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "a", "property_value": 1}, {"$type": "PropertyFilter", "comparison_operator": ">=", "property_name": "b", "property_value": 1.5}, {"$type": "PropertyFilter", "comparison_operator": "IS NULL", "property_name": "c", "property_value": null}, {"$type": "PropertyFilter", "comparison_operator": "<>", "property_name": "d", "property_value": "x"}], "valid_at": [[{"$type": "DateFilter", "comparison_operator": ">", "date": {"$dt": "2026-01-02T03:04:05+00:00"}}]]}}}
+{"id": "pure.filters.search_filters.construct_bad_label", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters.construct_unknown_kwarg", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": null, "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": null, "property_filters": null, "valid_at": null}}}
+{"id": "pure.filters.search_filters.construct_wrong_type_labels", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters.construct_empty_labels", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": null, "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": [], "property_filters": null, "valid_at": null}}}
+{"id": "pure.filters.search_filters.construct_unicode_labels", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.search_filters.construct_unicode_edge_types", "result": {"ok": {"$type": "SearchFilters", "created_at": null, "edge_source_node_uuids": null, "edge_target_node_uuids": null, "edge_types": ["Caf\u00e9", "\ud83d\ude00", "e\u0301"], "edge_uuids": null, "expired_at": null, "invalid_at": null, "node_labels": null, "property_filters": null, "valid_at": null}}}
+{"id": "pure.filters.date_filter.construct_missing_operator", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.date_filter.construct_string_date", "result": {"ok": {"$type": "DateFilter", "comparison_operator": "=", "date": {"$dt": "2026-01-01T00:00:00+00:00"}}}}
+{"id": "pure.filters.date_filter.construct_bad_operator", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.date_filter.construct_valid_string_operator", "result": {"ok": {"$type": "DateFilter", "comparison_operator": ">=", "date": null}}}
+{"id": "pure.filters.property_filter.construct_int", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": ">", "property_name": "age", "property_value": 3}}}
+{"id": "pure.filters.property_filter.construct_float", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "<=", "property_name": "s", "property_value": 1.5}}}
+{"id": "pure.filters.property_filter.construct_null_value", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "IS NOT NULL", "property_name": "s", "property_value": null}}}
+{"id": "pure.filters.property_filter.construct_injection_name", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "a` OR 1=1 //", "property_value": "x'y"}}}
+{"id": "pure.filters.property_filter.construct_unicode", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "caf\u00e9\ud83d\ude00", "property_value": "\u6f22\u5b57"}}}
+{"id": "pure.filters.property_filter.construct_bool_value", "result": {"ok": {"$type": "PropertyFilter", "comparison_operator": "=", "property_name": "b", "property_value": 1}}}
+{"id": "pure.filters.property_filter.construct_list_value", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.property_filter.construct_missing_name", "result": {"error": "ValidationError"}}
+{"id": "pure.filters.comparison_operator.lookup_valid", "result": {"ok": "IS NOT NULL"}}
+{"id": "pure.filters.comparison_operator.lookup_invalid", "result": {"error": "ValueError"}}
+{"id": "pure.filters.comparison_operator.lookup_name_not_value", "result": {"error": "ValueError"}}

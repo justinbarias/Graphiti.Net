@@ -28,7 +28,7 @@ A differential judge that runs from outside both builds, proved to catch breakag
 - Golden files come only from the recorder. Never write expected output by hand.
 - The noise list is fixed in the judge README. Typical noise: UUIDs, timestamps, durations.
 - The recorder needs a Neo4j sidecar. Replies are recorded one time from a real model (choice 3 in the design document), so one recording run needs the maintainer's LLM key.
-- The deny rules for `port/judge/` are out of `.claude/settings.json` during this plan, with the maintainer's approval. Task 12 puts them back at gate 2.
+- The deny rules for `port/judge/` were out of `.claude/settings.json` during this plan, with the maintainer's approval. Task 12 put them back at gate 2.
 
 ## Gate 2
 
@@ -48,5 +48,45 @@ One adversarial review of the judge diff before the gate. The maintainer picks C
 | A. Unit tests, no database (upstream CI job 1) | 1026 passed, 14 skipped, 5 deselected |
 | B. Database tests on Neo4j only | 40 passed |
 | C. `tests/test_add_triplet.py` on Neo4j only | 11 failed, 2 passed |
+
+- 2026-11-24, tasks 3 to 9, 11, 12: done, except the 10 real-model scenarios of task 4.
+
+| Task | Result |
+| --- | --- |
+| 3. Hosts | Python host and `tests/Graphiti.Net.JudgeHost`. The C# judge embedder matches 9 Python vectors bit for bit. |
+| 4. Flow layer | 21 scenarios recorded: 8 with hand-written replies, 13 with no model call. 10 real-model scenarios wait in `port/judge/pending/`, because the OpenAI account has no credits. |
+| 5 to 7. Pure layer | 1,971 cases from four Sonnet 5.5 agents: text and chunking 404, queries and filters 410, prompts and schemas 323, dedupe, ranking, and models 827, plus 7 seed cases. The agents wrote more cases than the brief asked for. |
+| 8. Runner | `port/judge/run.py`. 1,992 cases pass on Python three times in a row. |
+| 9. Break tests | `port/tools/break_tests.py`: 1 control and 12 breaks, all caught. The first run missed 2, which exposed two gaps in the flow layer. The table is in `port/STATE.md`. |
+| 10. Type hints | Replaced: `port/TYPE_HINTS.md` holds the 127 signatures that pyright infers. Upstream is not changed. |
+| 11. Gaps | `port/GAPS.md`: 22 language gaps, 15 surfaces outside the judge, 13 upstream defects, 22 findings. |
+| 12. Gate wiring | `scripts/check.sh --test` runs the embedder self-check and the judge against the .NET build. The deny rules for `port/judge/` go back at gate 2. |
+
+- 2026-11-25, review: one Opus 5.5 subagent at high effort reviewed the judge, with a brief to refute it. It reported 6 important findings and 14 smaller ones.
+
+| Item | Result |
+| --- | --- |
+| Fixed in `run.py` | I1 order of results, I2 clock rank and shape, I3 number rule, I4 `bound_wrong`. |
+| Cases | 6 defective pure cases removed. `flow.hand.guard_invisible_chars` added. 5 steps declare `unordered`. |
+| Totals | 1,987 cases: 1,965 pure and 22 flow. They pass on Python in three full runs with `PYTHONHASHSEED` 1, 2, and 3. |
+| .NET build | 1 passed, 1,986 expected failures, 0 unexpected, 0 bound and wrong. |
+| Break tests | 1 control and 16 breaks, all caught. Breaks 12 to 15 are the reviewer's. The judge missed all four before the fixes. |
+| Open | I5, the contract choice for the LLM path. I6, the calls that no scenario reaches. Both are in `port/STATE.md` and `port/GAPS.md`. |
+
+- 2026-11-25, gate 2 decisions and the real-model recording. The maintainer approved D17 (the base LLM path), D18 (label order is noise), and D19 (seven judge design changes), and supplied a working key.
+
+| Item | Result |
+| --- | --- |
+| Label rule | The runner sorts label lists in values, in prompt text, and in Cypher text. The Python host sorts them in reply keys. |
+| Real-model scenarios | 11 recorded: 10 with `gpt-4.1-mini`, 1 with `gpt-4.1`. 136 stored replies. |
+| Hand-written scenario | `flow.hand.communities` covers `build_communities` and a community update. |
+| Database preparation | Each host gives each flow case an empty database with new full-text indexes. Without it, the order of search rows changed between runs. |
+| New tools | `port/tools/find_score_ties.py` and `port/tools/prune_replies.py`. |
+| Totals | 1,999 cases: 1,965 pure and 34 flow. Two full runs and 10 flow runs pass on Python, each with a different hash seed. |
+| .NET build | 1 passed, 1,998 expected failures, 0 unexpected, 0 bound and wrong. |
+| Break tests | 1 control and 20 breaks, all caught. One more break, on the merge of duplicate facts in a bulk call, was missed and removed, because upstream leaves that behavior open (U18). |
+| Upstream defects | 5 more: U14 to U18 in `port/GAPS.md`. |
+
+- 2026-11-25, gate 2: the maintainer closed the gate. The deny rules for `port/judge/` are back in `.claude/settings.json`. No second adversarial review ran on the changes after the first review. Work that this plan leaves open is in the debt tracker: T10, T12, T13, T14, T15, T16.
 
 - Finding from task 2: upstream CI never runs `tests/test_add_triplet.py` with a database, and 11 of its 13 tests fail on Neo4j at the pinned commit. The first error is `ValueError: embedder returned 0 vectors for 1 queries`, which points at the test's mock embedder. Task 6 must not treat this file as a passing oracle. The judge covers `add_triplet` through layer 3 scenarios.

@@ -1,0 +1,42 @@
+{"id": "pure.datetime.parse_db_date.none", "fn": "graphiti_core.helpers:parse_db_date", "args": [null]}
+{"id": "pure.datetime.parse_db_date.iso_date", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15"]}
+{"id": "pure.datetime.parse_db_date.iso_datetime_naive", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15T10:30:00"]}
+{"id": "pure.datetime.parse_db_date.iso_datetime_utc_offset", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15T10:30:00+00:00"]}
+{"id": "pure.datetime.parse_db_date.iso_datetime_z", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15T10:30:00Z"]}
+{"id": "pure.datetime.parse_db_date.iso_offset_nonutc", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15T10:30:00+05:30"]}
+{"id": "pure.datetime.parse_db_date.iso_nanos_too_long", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15T10:30:00.123456789+00:00"]}
+{"id": "pure.datetime.parse_db_date.iso_space_sep", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-01-15 10:30:00"]}
+{"id": "pure.datetime.parse_db_date.basic_format", "fn": "graphiti_core.helpers:parse_db_date", "args": ["20250115T103000"]}
+{"id": "pure.datetime.parse_db_date.empty", "fn": "graphiti_core.helpers:parse_db_date", "args": [""]}
+{"id": "pure.datetime.parse_db_date.garbage", "fn": "graphiti_core.helpers:parse_db_date", "args": ["not a date"]}
+{"id": "pure.datetime.parse_db_date.invalid_month", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-13-01"]}
+{"id": "pure.datetime.parse_db_date.week_date", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025-W03-1"]}
+{"id": "pure.datetime.parse_db_date.year_only", "fn": "graphiti_core.helpers:parse_db_date", "args": ["2025"]}
+{"id": "pure.datetime.parse_db_date.datetime_passthrough", "fn": "graphiti_core.helpers:parse_db_date", "args": [{"$dt": "2025-01-15T10:30:00+00:00"}]}
+{"id": "pure.datetime.parse_db_date.neo4j_datetime_naive", "fn": "graphiti_core.helpers:parse_db_date", "args": [{"$model": "neo4j.time:DateTime", "data": {"year": 2025, "month": 1, "day": 15, "hour": 10, "minute": 30, "second": 0, "nanosecond": 123456000}}]}
+{"id": "pure.datetime.parse_db_date.wrong_type_int", "fn": "graphiti_core.helpers:parse_db_date", "args": [42]}
+{"id": "pure.datetime.ensure_utc.none", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [null]}
+{"id": "pure.datetime.ensure_utc.naive", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "2025-01-15T10:30:00"}]}
+{"id": "pure.datetime.ensure_utc.already_utc", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "2025-01-15T10:30:00+00:00"}]}
+{"id": "pure.datetime.ensure_utc.positive_offset", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "2025-01-15T10:30:00+05:30"}]}
+{"id": "pure.datetime.ensure_utc.negative_offset", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "2025-01-15T10:30:00-08:00"}]}
+{"id": "pure.datetime.ensure_utc.day_rollover_forward", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "2025-01-15T23:30:00-05:00"}]}
+{"id": "pure.datetime.ensure_utc.microseconds_naive", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "2025-01-15T10:30:00.123456"}]}
+{"id": "pure.datetime.ensure_utc.max_datetime_naive", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "9999-12-31T23:59:59.999999"}]}
+{"id": "pure.datetime.ensure_utc.min_datetime_positive_offset_overflow", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "0001-01-01T00:00:00+05:00"}]}
+{"id": "pure.datetime.ensure_utc.max_datetime_negative_offset_overflow", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$dt": "9999-12-31T23:59:59-05:00"}]}
+{"id": "pure.datetime.ensure_utc.wrong_type_str", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": ["2025-01-15T10:30:00"]}
+{"id": "pure.datetime.ensure_utc.wrong_type_date_only", "fn": "graphiti_core.utils.datetime_utils:ensure_utc", "args": [{"$ref": "datetime:date"}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.none", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [null]}
+{"id": "pure.datetime.convert_datetimes_to_strings.str", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": ["hello"]}
+{"id": "pure.datetime.convert_datetimes_to_strings.naive_dt", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$dt": "2025-01-15T10:30:00"}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.utc_dt", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$dt": "2025-01-15T10:30:00+00:00"}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.offset_dt", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$dt": "2025-01-15T10:30:00+05:30"}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.dict_with_dt", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"a": {"$dt": "2025-01-15T10:30:00+02:00"}, "b": 1}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.list_with_dt", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [[{"$dt": "2025-01-15T10:30:00"}, "x", 2]]}
+{"id": "pure.datetime.convert_datetimes_to_strings.tuple_with_dt", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$tuple": [{"$dt": "2025-01-15T10:30:00+01:00"}, "x"]}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.nested", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"a": [{"b": {"$dt": "2025-01-15T10:30:00-04:00"}}, {"$tuple": [{"$dt": "2025-01-15T10:30:00"}]}], "c": {"d": {"e": {"$dt": "2025-01-15T10:30:00+09:00"}}}}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.empty_dict", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.dict_non_string_keys", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$dict": [[1, {"$dt": "2025-01-15T10:30:00"}], [{"$tuple": [1, 2]}, "v"]]}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.max_dt_overflow", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$dt": "9999-12-31T23:59:59-05:00"}]}
+{"id": "pure.datetime.convert_datetimes_to_strings.model_untouched", "fn": "graphiti_core.utils.datetime_utils:convert_datetimes_to_strings", "args": [{"$model": "graphiti_core.edges:EntityEdge", "data": {"uuid": "e1", "group_id": "g", "source_node_uuid": "a", "target_node_uuid": "b", "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "name": "KNOWS", "fact": "f"}}]}
