@@ -17,7 +17,7 @@ Evidence by area. A cell says what was run and when. "Not verified" means that n
 | Mutation score | `dotnet stryker --config-file stryker-config.json` | The configuration loads with the `mtp` runner. Stryker found 0 mutants, so no score exists. | 2026-11-24 |
 | Devcontainer | None | Not verified. Debt T1. | |
 | Claude cloud session | None | Not verified. Debt T2. | |
-| CI | None | Not verified. Debt T3. | |
+| CI | `.github/workflows/ci.yml` on GitHub, push to `main` | `check` and `mutation` jobs passed | 2026-11-25 |
 | Product code | None | No ported code. 0 of 114 MVP units done. | |
 
 Open gaps are in the [debt tracker](exec-plans/tech-debt-tracker.md).

@@ -2,7 +2,7 @@
 
 Graphiti.Net is a .NET 10 port of [Graphiti](https://github.com/getzep/graphiti), the temporal context graph library by Zep.
 The port is pinned to upstream 0.32.0 ([port/UPSTREAM_PIN](port/UPSTREAM_PIN)).
-The repository is in port phase 1. The product projects contain no ported code yet.
+The judge is built and gate 2 is open. The product projects contain no ported code yet.
 
 ## Read first
 
@@ -11,6 +11,8 @@ The repository is in port phase 1. The product projects contain no ported code y
 | What to build, roadmap, MVP goal | [docs/product-specs/spec.md](docs/product-specs/spec.md) |
 | Where the port stands now | [port/STATE.md](port/STATE.md) |
 | Port scope and library choices | [port/DECISIONS.md](port/DECISIONS.md) |
+| Python constructs with no direct C# form, and upstream defects | [port/GAPS.md](port/GAPS.md) |
+| The judge: commands, protocol, noise rules | [port/judge/README.md](port/judge/README.md) |
 | Current work | [docs/PLANS.md](docs/PLANS.md) |
 | System layout and boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Test layers and the mutation rule | [docs/TESTING.md](docs/TESTING.md) |
@@ -32,6 +34,7 @@ docker compose up -d --wait neo4j # start the graph database
 scripts/check.sh                  # docs, build, format
 scripts/check.sh --test           # the same, then the tests against Neo4j
 scripts/mutate.sh                 # mutation run in observe mode
+python3 port/judge/run.py --build dotnet   # the judge against the .NET build
 ```
 
 ## Invariants

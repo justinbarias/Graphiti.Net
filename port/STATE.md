@@ -10,7 +10,7 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 | Phase | 2 and 3. The judge and the gap list are built. Gate 2 is open. |
 | Gate | Gate 1 passed on 2026-11-24. Gate 2 waits for the maintainer: review the judge, the break tests, and the three design changes below. |
 | Last action | 2026-11-24: built the judge, recorded 1,992 cases, ran the break tests, wrote the gap list. |
-| Next action | Record the 10 scenarios in `port/judge/pending/` after the OpenAI account has credits. Then the adversarial review, then gate 2. |
+| Next action | The adversarial review by an Opus 5.5 subagent, then gate 2. The 10 scenarios in `port/judge/pending/` stay pending by the maintainer's decision, and are recorded later under the rule for cases added after the gate. |
 
 ## Queue counts
 
@@ -83,7 +83,7 @@ For the maintainer at gate 2:
 
 1. Accept the three changes to the approved judge design: UUID names from content, the .NET host outside `port/judge/`, and a fresh host process for each flow case.
 2. Decide on one more noise rule: sort `labels` lists. Upstream builds node labels from a set, so their order changes between processes (finding F13 in GAPS.md). Until then, no scenario stores a node with a second label.
-3. Decide how the 10 pending scenarios get their replies: credits for the OpenAI account, or hand-written replies.
+3. Decided on 2026-11-25: the 10 pending scenarios stay pending. They are recorded after the OpenAI account has credits.
 
 ## Checks not run
 
