@@ -188,12 +188,25 @@ async def run_flow(case: dict) -> dict:
     try:
         for step in case['steps']:
             recorder.reset()
-            entry: dict = {'call': step['call']}
+            entry: dict = {'call': step.get('call', 'parallel')}
             try:
-                target = _lookup(graphiti, step['call'])
-                args = _decode_with_steps(step.get('args', []), returns)
-                kwargs = _decode_with_steps(step.get('kwargs', {}), returns)
-                value = await _finish(target(*args, **kwargs))
+                if 'parallel' in step:
+                    # Calls that start together. The result keeps the order of the list.
+                    calls = [
+                        _finish(
+                            _lookup(graphiti, part['call'])(
+                                *_decode_with_steps(part.get('args', []), returns),
+                                **_decode_with_steps(part.get('kwargs', {}), returns),
+                            )
+                        )
+                        for part in step['parallel']
+                    ]
+                    value = await asyncio.gather(*calls)
+                else:
+                    target = _lookup(graphiti, step['call'])
+                    args = _decode_with_steps(step.get('args', []), returns)
+                    kwargs = _decode_with_steps(step.get('kwargs', {}), returns)
+                    value = await _finish(target(*args, **kwargs))
                 returns.append(value)
                 entry['ret'] = encode(value)
             except Exception as error:  # noqa: BLE001

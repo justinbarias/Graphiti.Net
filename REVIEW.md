@@ -24,6 +24,7 @@ Compare the C# file with its Python original in `.upstream/`. Report every diffe
 - Check retry counts, wait times, and concurrency limits (`SEMAPHORE_LIMIT` upstream).
 - Probe the paths that `port/GAPS.md` lists as outside the judge. Challenge the gap list itself.
 - Flag any stub, any simplified logic, and any `TODO(port)` marker that `port/STATE.md` does not list.
+- Read each new binding in `tests/Graphiti.Net.JudgeHost/Bindings.cs`. A binding can do three things only: decode the arguments, call the product code, and encode the result. Flag a binding that branches on the case, fills in a default, or repairs output.
 
 ## For a test change
 
@@ -42,7 +43,7 @@ If the diff matches the trigger of an item, check that item. Skip the other item
 | A Cypher query changes | Does the query still filter by `group_id`? A missing filter leaks data across tenants. |
 | A label or property name comes from user input | Does the code reject unsafe characters before the name enters a query string? Upstream has `test_node_label_security.py` for this. |
 | A public type or method changes | Is the change in `port/DECISIONS.md` or approved by the maintainer? |
-| `port/judge/`, `REVIEW.md`, or `scripts/check.sh` changes | Is it alone in its pull request? Does the judge case count stay the same or go up? |
+| `port/judge/`, `tests/Graphiti.Net.JudgeHost/Core/`, `REVIEW.md`, or `scripts/check.sh` changes | Is it alone in its pull request? Does the judge case count stay the same or go up? |
 | A package is added | Is it in the library table of `port/DECISIONS.md`? |
 | Logging or tracing code changes | Does any episode content, prompt, or credential reach a log or a span attribute by default? |
 

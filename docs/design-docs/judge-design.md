@@ -75,6 +75,7 @@ Targets:
 ## Layer 3: flows
 
 A case is a scenario: a list of public calls on one `Graphiti` instance, against a real Neo4j, with scripted model replies.
+A step can also hold a `parallel` list of calls that start together. The concurrent ingestion scenario uses it.
 
 ```json
 {"group": "g1", "replies": "quickstart", "steps": [

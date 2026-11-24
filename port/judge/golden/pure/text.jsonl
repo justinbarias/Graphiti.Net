@@ -1,0 +1,183 @@
+{"id": "pure.text.lucene_sanitize.empty", "result": {"ok": ""}}
+{"id": "pure.text.lucene_sanitize.plain", "result": {"ok": "this has no escape characters"}}
+{"id": "pure.text.lucene_sanitize.every_escape", "result": {"ok": "\\This has every escape character \\+ \\- \\&\\& \\|\\| \\! \\( \\) \\{ \\} \\[ \\] \\^ \\\" \\~ \\* \\? \\: \\\\ \\/"}}
+{"id": "pure.text.lucene_sanitize.letters_ORNTAD", "result": {"ok": "\\O\\R\\N\\T\\A\\D or and not"}}
+{"id": "pure.text.lucene_sanitize.lowercase_not_escaped", "result": {"ok": "orntad"}}
+{"id": "pure.text.lucene_sanitize.backslash_only", "result": {"ok": "\\\\"}}
+{"id": "pure.text.lucene_sanitize.double_backslash", "result": {"ok": "C\\:\\\\path\\\\to"}}
+{"id": "pure.text.lucene_sanitize.cjk", "result": {"ok": "東京 タワー\\: 高さ\\(333m\\)"}}
+{"id": "pure.text.lucene_sanitize.emoji", "result": {"ok": "hello 😀 world\\! 🎉"}}
+{"id": "pure.text.lucene_sanitize.combining_mark", "result": {"ok": "café café \\Á"}}
+{"id": "pure.text.lucene_sanitize.fullwidth_not_escaped", "result": {"ok": "（ＡＢＣ）＋"}}
+{"id": "pure.text.lucene_sanitize.wrong_type_int", "result": {"error": "AttributeError"}}
+{"id": "pure.text.lucene_sanitize.wrong_type_none", "result": {"error": "AttributeError"}}
+{"id": "pure.text.normalize_l2.three_four", "result": {"ok": [0.6, 0.8]}}
+{"id": "pure.text.normalize_l2.ints", "result": {"ok": [0.6, 0.8]}}
+{"id": "pure.text.normalize_l2.zeros", "result": {"ok": [0.0, 0.0, 0.0]}}
+{"id": "pure.text.normalize_l2.empty", "result": {"ok": []}}
+{"id": "pure.text.normalize_l2.single", "result": {"ok": [1.0]}}
+{"id": "pure.text.normalize_l2.negative", "result": {"ok": [-0.6, 0.8]}}
+{"id": "pure.text.normalize_l2.tiny", "result": {"ok": [1e-200, 1e-200]}}
+{"id": "pure.text.normalize_l2.huge_overflow", "result": {"ok": [0.0, 0.0]}}
+{"id": "pure.text.normalize_l2.with_nan", "result": {"ok": [{"$float": "nan"}, {"$float": "nan"}]}}
+{"id": "pure.text.normalize_l2.with_inf", "result": {"ok": [0.0, {"$float": "nan"}]}}
+{"id": "pure.text.normalize_l2.nested_2d", "result": {"ok": [[0.31622776601683794, 0.4472135954999579], [0.9486832980505138, 0.8944271909999159]]}}
+{"id": "pure.text.normalize_l2.wrong_type_str_elems", "result": {"error": "ValueError"}}
+{"id": "pure.text.normalize_l2.wrong_type_none", "result": {"error": "TypeError"}}
+{"id": "pure.text.normalize_l2.wrong_type_scalar", "result": {"error": "AxisError"}}
+{"id": "pure.text.validate_group_id.none", "result": {"ok": true}}
+{"id": "pure.text.validate_group_id.empty", "result": {"ok": true}}
+{"id": "pure.text.validate_group_id.simple", "result": {"ok": true}}
+{"id": "pure.text.validate_group_id.dash_underscore", "result": {"ok": true}}
+{"id": "pure.text.validate_group_id.space", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_id.dot", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_id.trailing_newline", "result": {"ok": true}}
+{"id": "pure.text.validate_group_id.accent", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_id.cjk", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_id.emoji", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_id.digits_unicode", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_id.wrong_type_int", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_group_id.wrong_type_zero", "result": {"ok": true}}
+{"id": "pure.text.validate_group_id.wrong_type_false", "result": {"ok": true}}
+{"id": "pure.text.validate_group_ids.none", "result": {"ok": true}}
+{"id": "pure.text.validate_group_ids.empty", "result": {"ok": true}}
+{"id": "pure.text.validate_group_ids.valid", "result": {"ok": true}}
+{"id": "pure.text.validate_group_ids.second_invalid", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_ids.contains_none", "result": {"ok": true}}
+{"id": "pure.text.validate_group_ids.wrong_type_str", "result": {"ok": true}}
+{"id": "pure.text.validate_group_ids.wrong_type_str_invalid", "result": {"error": "GroupIdValidationError"}}
+{"id": "pure.text.validate_group_ids.wrong_type_int", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_node_labels.none", "result": {"ok": true}}
+{"id": "pure.text.validate_node_labels.empty", "result": {"ok": true}}
+{"id": "pure.text.validate_node_labels.valid", "result": {"ok": true}}
+{"id": "pure.text.validate_node_labels.leading_digit", "result": {"error": "NodeLabelValidationError"}}
+{"id": "pure.text.validate_node_labels.hyphen", "result": {"error": "NodeLabelValidationError"}}
+{"id": "pure.text.validate_node_labels.empty_label", "result": {"error": "NodeLabelValidationError"}}
+{"id": "pure.text.validate_node_labels.trailing_newline", "result": {"ok": true}}
+{"id": "pure.text.validate_node_labels.unicode", "result": {"error": "NodeLabelValidationError"}}
+{"id": "pure.text.validate_node_labels.backtick_injection", "result": {"error": "NodeLabelValidationError"}}
+{"id": "pure.text.validate_node_labels.mixed_valid_invalid", "result": {"error": "NodeLabelValidationError"}}
+{"id": "pure.text.validate_node_labels.wrong_type_str", "result": {"ok": true}}
+{"id": "pure.text.validate_node_labels.wrong_type_int_element", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_node_labels.wrong_type_none_element", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_node_labels.wrong_type_int", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_excluded_entity_types.none", "result": {"ok": true}}
+{"id": "pure.text.validate_excluded_entity_types.empty", "result": {"ok": true}}
+{"id": "pure.text.validate_excluded_entity_types.entity_default", "result": {"ok": true}}
+{"id": "pure.text.validate_excluded_entity_types.unknown_no_types", "result": {"error": "ValueError"}}
+{"id": "pure.text.validate_excluded_entity_types.known_custom", "result": {"ok": true}}
+{"id": "pure.text.validate_excluded_entity_types.unknown_with_types", "result": {"error": "ValueError"}}
+{"id": "pure.text.validate_excluded_entity_types.multiple_invalid_sorted", "result": {"error": "ValueError"}}
+{"id": "pure.text.validate_excluded_entity_types.case_sensitive", "result": {"error": "ValueError"}}
+{"id": "pure.text.validate_excluded_entity_types.wrong_type_str", "result": {"error": "ValueError"}}
+{"id": "pure.text.validate_excluded_entity_types.wrong_type_unhashable_item", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_excluded_entity_types.wrong_type_entity_types_list", "result": {"error": "AttributeError"}}
+{"id": "pure.text.get_default_group_id.neo4j", "result": {"ok": ""}}
+{"id": "pure.text.get_default_group_id.falkordb", "result": {"ok": "_"}}
+{"id": "pure.text.get_default_group_id.wrong_type_str", "result": {"ok": ""}}
+{"id": "pure.text.get_default_group_id.wrong_type_none", "result": {"ok": ""}}
+{"id": "pure.text.truncate_utf8_to_bytes.ascii_fits", "result": {"ok": "abc"}}
+{"id": "pure.text.truncate_utf8_to_bytes.ascii_cut", "result": {"ok": "abcd"}}
+{"id": "pure.text.truncate_utf8_to_bytes.zero", "result": {"ok": ""}}
+{"id": "pure.text.truncate_utf8_to_bytes.negative", "result": {"ok": ""}}
+{"id": "pure.text.truncate_utf8_to_bytes.empty_text", "result": {"ok": ""}}
+{"id": "pure.text.truncate_utf8_to_bytes.two_byte_split", "result": {"ok": "ééé"}}
+{"id": "pure.text.truncate_utf8_to_bytes.two_byte_boundary", "result": {"ok": "ééé"}}
+{"id": "pure.text.truncate_utf8_to_bytes.cjk_split", "result": {"ok": "東京"}}
+{"id": "pure.text.truncate_utf8_to_bytes.emoji_split", "result": {"ok": "a"}}
+{"id": "pure.text.truncate_utf8_to_bytes.emoji_all_cut", "result": {"ok": ""}}
+{"id": "pure.text.truncate_utf8_to_bytes.combining_split", "result": {"ok": "e"}}
+{"id": "pure.text.truncate_utf8_to_bytes.combining_cut_mark", "result": {"ok": "é"}}
+{"id": "pure.text.truncate_utf8_to_bytes.huge_budget", "result": {"ok": "abc"}}
+{"id": "pure.text.truncate_utf8_to_bytes.wrong_type_none_text", "result": {"error": "AttributeError"}}
+{"id": "pure.text.truncate_utf8_to_bytes.wrong_type_str_budget", "result": {"error": "TypeError"}}
+{"id": "pure.text.truncate_utf8_to_bytes.wrong_type_none_budget", "result": {"error": "TypeError"}}
+{"id": "pure.text.truncate_at_sentence.short", "result": {"ok": "This is a short sentence."}}
+{"id": "pure.text.truncate_at_sentence.empty", "result": {"ok": ""}}
+{"id": "pure.text.truncate_at_sentence.none", "result": {"ok": null}}
+{"id": "pure.text.truncate_at_sentence.exact_length", "result": {"ok": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}
+{"id": "pure.text.truncate_at_sentence.period", "result": {"ok": "First sentence. Second sentence."}}
+{"id": "pure.text.truncate_at_sentence.question", "result": {"ok": "What is this? This is a test."}}
+{"id": "pure.text.truncate_at_sentence.exclamation", "result": {"ok": "Hello world! This is exciting."}}
+{"id": "pure.text.truncate_at_sentence.no_boundary", "result": {"ok": "This is a very long sentence w"}}
+{"id": "pure.text.truncate_at_sentence.multiple_periods", "result": {"ok": "A. B. C."}}
+{"id": "pure.text.truncate_at_sentence.strips_trailing_ws", "result": {"ok": "First sentence."}}
+{"id": "pure.text.truncate_at_sentence.boundary_at_cut_end", "result": {"ok": "Hello world."}}
+{"id": "pure.text.truncate_at_sentence.boundary_just_after_cut", "result": {"ok": "Hello world"}}
+{"id": "pure.text.truncate_at_sentence.period_without_space_not_boundary", "result": {"ok": "3.14159 is"}}
+{"id": "pure.text.truncate_at_sentence.zero_max", "result": {"ok": ""}}
+{"id": "pure.text.truncate_at_sentence.negative_max", "result": {"ok": "Hello."}}
+{"id": "pure.text.truncate_at_sentence.huge_max", "result": {"ok": "Hello. World."}}
+{"id": "pure.text.truncate_at_sentence.whitespace_text", "result": {"ok": ""}}
+{"id": "pure.text.truncate_at_sentence.cut_leaves_trailing_ws", "result": {"ok": "abc def"}}
+{"id": "pure.text.truncate_at_sentence.cjk_period_not_boundary", "result": {"ok": "東京は大きい。大"}}
+{"id": "pure.text.truncate_at_sentence.emoji", "result": {"ok": "Hi 😀!"}}
+{"id": "pure.text.truncate_at_sentence.ellipsis", "result": {"ok": "Wait..."}}
+{"id": "pure.text.truncate_at_sentence.newline_after_period", "result": {"ok": "One.\nTwo."}}
+{"id": "pure.text.truncate_at_sentence.wrong_type_int_text", "result": {"error": "TypeError"}}
+{"id": "pure.text.truncate_at_sentence.wrong_type_none_max", "result": {"error": "TypeError"}}
+{"id": "pure.text.concatenate_episodes.single", "result": {"ok": "Hello world"}}
+{"id": "pure.text.concatenate_episodes.single_empty_content", "result": {"ok": ""}}
+{"id": "pure.text.concatenate_episodes.two", "result": {"ok": "[Episode 0] (timestamp: 2025-06-15T08:00:00+00:00)\nA\n\n[Episode 1] (timestamp: 2025-06-15T08:00:00+00:00)\nB"}}
+{"id": "pure.text.concatenate_episodes.three", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00+00:00)\nFirst\n\n[Episode 1] (timestamp: 2025-01-01T10:05:00+00:00)\nSecond\n\n[Episode 2] (timestamp: 2025-01-01T10:10:00+00:00)\nThird"}}
+{"id": "pure.text.concatenate_episodes.naive_valid_at", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00)\nA\n\n[Episode 1] (timestamp: 2025-01-01T10:00:00)\nB"}}
+{"id": "pure.text.concatenate_episodes.non_utc_offset", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00+05:30)\nA\n\n[Episode 1] (timestamp: 2025-01-01T10:00:00-08:00)\nB"}}
+{"id": "pure.text.concatenate_episodes.microseconds", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00.123456+00:00)\nA\n\n[Episode 1] (timestamp: 2025-01-01T10:00:00.500000+00:00)\nB"}}
+{"id": "pure.text.concatenate_episodes.unicode_content", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00+00:00)\ncafé 😀\n\n[Episode 1] (timestamp: 2025-01-01T10:00:00+00:00)\n東京 é"}}
+{"id": "pure.text.concatenate_episodes.empty_list", "result": {"ok": ""}}
+{"id": "pure.text.concatenate_episodes.wrong_type_none", "result": {"error": "TypeError"}}
+{"id": "pure.text.concatenate_episodes.single_wrong_type_element", "result": {"error": "AttributeError"}}
+{"id": "pure.text.concatenate_timeline.context_between", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00+00:00)\nFirst\n\n[CONTEXT EPISODE] (timestamp: 2025-01-01T10:05:00+00:00)\nSecond\n\n[Episode 1] (timestamp: 2025-01-01T10:10:00+00:00)\nThird"}}
+{"id": "pure.text.concatenate_timeline.all_targets", "result": {"ok": "[Episode 0] (timestamp: 2025-01-01T10:00:00+00:00)\nFirst\n\n[Episode 1] (timestamp: 2025-01-01T10:05:00+00:00)\nSecond"}}
+{"id": "pure.text.concatenate_timeline.no_targets", "result": {"ok": "[CONTEXT EPISODE] (timestamp: 2025-01-01T10:00:00+00:00)\nFirst\n\n[CONTEXT EPISODE] (timestamp: 2025-01-01T10:05:00+00:00)\nSecond"}}
+{"id": "pure.text.concatenate_timeline.empty_timeline", "result": {"ok": ""}}
+{"id": "pure.text.concatenate_timeline.timeline_order_independent_of_episodes_order", "result": {"ok": "[Episode 1] (timestamp: 2025-01-01T10:00:00+00:00)\nFirst\n\n[CONTEXT EPISODE] (timestamp: 2025-01-01T10:05:00+00:00)\nSecond\n\n[Episode 0] (timestamp: 2025-01-01T10:10:00+00:00)\nThird"}}
+{"id": "pure.text.concatenate_timeline.episode_not_in_timeline", "result": {"ok": "[CONTEXT EPISODE] (timestamp: 2025-01-01T10:00:00+00:00)\nFirst"}}
+{"id": "pure.text.concatenate_timeline.wrong_type_none_timeline", "result": {"error": "TypeError"}}
+{"id": "pure.text.concatenate_timeline.wrong_type_none_episodes", "result": {"error": "TypeError"}}
+{"id": "pure.text._build_directed_uuid_map.empty", "result": {"ok": {}}}
+{"id": "pure.text._build_directed_uuid_map.single_pair", "result": {"ok": {"a": "b", "b": "b"}}}
+{"id": "pure.text._build_directed_uuid_map.chain", "result": {"ok": {"a": "c", "b": "c", "c": "c"}}}
+{"id": "pure.text._build_directed_uuid_map.chain_reverse_order", "result": {"ok": {"a": "c", "b": "c", "c": "c"}}}
+{"id": "pure.text._build_directed_uuid_map.alias_lexicographically_smaller_than_canonical", "result": {"ok": {"a": "z", "z": "z"}}}
+{"id": "pure.text._build_directed_uuid_map.self_pair", "result": {"ok": {"a": "a"}}}
+{"id": "pure.text._build_directed_uuid_map.two_roots_merge", "result": {"ok": {"a": "d", "b": "d", "c": "d", "d": "d"}}}
+{"id": "pure.text._build_directed_uuid_map.cycle", "result": {"ok": {"a": "b", "b": "b"}}}
+{"id": "pure.text._build_directed_uuid_map.wrong_type_none", "result": {"error": "TypeError"}}
+{"id": "pure.text._build_directed_uuid_map.wrong_type_short_pair", "result": {"error": "ValueError"}}
+{"id": "pure.text.compress_uuid_map.empty", "result": {"ok": {}}}
+{"id": "pure.text.compress_uuid_map.single_pair", "result": {"ok": {"a": "a", "b": "a"}}}
+{"id": "pure.text.compress_uuid_map.chain", "result": {"ok": {"a": "a", "b": "a", "c": "a"}}}
+{"id": "pure.text.compress_uuid_map.picks_lexicographic_min", "result": {"ok": {"b": "b", "c": "b", "d": "b"}}}
+{"id": "pure.text.compress_uuid_map.two_groups", "result": {"ok": {"a": "a", "b": "a", "x": "x", "y": "x"}}}
+{"id": "pure.text.compress_uuid_map.merge_groups", "result": {"ok": {"a": "a", "b": "a", "c": "a", "d": "a"}}}
+{"id": "pure.text.compress_uuid_map.self_pair", "result": {"ok": {"a": "a"}}}
+{"id": "pure.text.compress_uuid_map.wrong_type_none", "result": {"error": "TypeError"}}
+{"id": "pure.text.compress_uuid_map.wrong_type_short_pair", "result": {"error": "IndexError"}}
+{"id": "pure.text.compress_uuid_map.wrong_type_mixed_types", "result": {"error": "TypeError"}}
+{"id": "pure.text.resolve_edge_pointers.empty", "result": {"ok": []}}
+{"id": "pure.text.resolve_edge_pointers.no_mapping", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "b", "uuid": "e1", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.maps_source", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "c", "target_node_uuid": "b", "uuid": "e1", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.maps_both", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "x", "target_node_uuid": "y", "uuid": "e1", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.collapse_dropped", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "c", "uuid": "e2", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.preexisting_self_edge_kept", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "a", "target_node_uuid": "a", "uuid": "e1", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.self_edge_remapped_kept", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "z", "target_node_uuid": "z", "uuid": "e1", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.swap_not_dropped", "result": {"ok": [{"$type": "EntityEdge", "attributes": {}, "created_at": {"$dt": "2025-01-01T00:00:00+00:00"}, "episodes": [], "expired_at": null, "fact": "f", "fact_embedding": null, "group_id": "g", "invalid_at": null, "name": "KNOWS", "reference_time": null, "source_node_uuid": "b", "target_node_uuid": "a", "uuid": "e1", "valid_at": null}]}}
+{"id": "pure.text.resolve_edge_pointers.wrong_type_none_map", "result": {"error": "AttributeError"}}
+{"id": "pure.text.resolve_edge_pointers.wrong_type_none_edges", "result": {"error": "TypeError"}}
+{"id": "pure.text.validate_entity_types.none", "result": {"ok": true}}
+{"id": "pure.text.validate_entity_types.empty", "result": {"ok": true}}
+{"id": "pure.text.validate_entity_types.clean_model", "result": {"ok": true}}
+{"id": "pure.text.validate_entity_types.conflicting_model", "result": {"error": "EntityTypeValidationError"}}
+{"id": "pure.text.validate_entity_types.first_ok_second_conflict", "result": {"error": "EntityTypeValidationError"}}
+{"id": "pure.text.validate_entity_types.wrong_type_list", "result": {"error": "AttributeError"}}
+{"id": "pure.text.validate_identity_properties.none_props", "result": {"ok": true}}
+{"id": "pure.text.validate_identity_properties.none_both", "result": {"ok": true}}
+{"id": "pure.text.validate_identity_properties.empty_props", "result": {"ok": true}}
+{"id": "pure.text.validate_identity_properties.valid", "result": {"ok": true}}
+{"id": "pure.text.validate_identity_properties.type_not_defined", "result": {"error": "IdentityPropertyValidationError"}}
+{"id": "pure.text.validate_identity_properties.entity_types_none", "result": {"error": "IdentityPropertyValidationError"}}
+{"id": "pure.text.validate_identity_properties.empty_property_list", "result": {"error": "IdentityPropertyValidationError"}}
+{"id": "pure.text.validate_identity_properties.property_not_list_tuple", "result": {"error": "IdentityPropertyValidationError"}}
+{"id": "pure.text.validate_identity_properties.property_not_list_str", "result": {"error": "IdentityPropertyValidationError"}}
+{"id": "pure.text.validate_identity_properties.unknown_property", "result": {"error": "IdentityPropertyValidationError"}}

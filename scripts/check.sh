@@ -2,7 +2,7 @@
 # The gate that every change must pass. Cheap checks run first.
 #
 #   scripts/check.sh          docs, build, format
-#   scripts/check.sh --test   the same, then the test suite against the Neo4j sidecar
+#   scripts/check.sh --test   the same, then the tests and the judge against the Neo4j sidecar
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,6 +26,10 @@ if [ "${1:-}" = "--test" ]; then
 
   step "test"
   dotnet test --solution Graphiti.Net.slnx --no-build
+
+  step "judge (.NET build against the golden files)"
+  dotnet tests/Graphiti.Net.JudgeHost/bin/Debug/net10.0/Graphiti.Net.JudgeHost.dll --selfcheck port/judge/embedder-vectors.json
+  python3 port/judge/run.py --build dotnet
 fi
 
 printf '\ncheck: passed\n'

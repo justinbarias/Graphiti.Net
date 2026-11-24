@@ -18,8 +18,8 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 ## Judge
 
-Not built. `port/judge/` does not exist yet. No break tests ran.
-The design is approved: [judge-design.md](../docs/design-docs/judge-design.md).
+The runner, both hosts, and the noise rules work. [The judge README](judge/README.md) is the contract, and [judge-design.md](../docs/design-docs/judge-design.md) gives the reasons.
+The case set is not complete, and the break tests have not run.
 
 ## Upstream test baseline
 
@@ -31,7 +31,8 @@ None.
 
 ## Rule changes
 
-None. `port/RULES.md` and `port/GAPS.md` do not exist yet. Phase 3 writes `GAPS.md` and phase 4 writes `RULES.md`.
+None. `port/RULES.md` does not exist yet. Phase 4 writes it.
+[GAPS.md](GAPS.md) holds 22 language gaps and 11 surfaces that the judge cannot reach. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
 ## Deviations from the porting skill
 
@@ -40,6 +41,8 @@ None. `port/RULES.md` and `port/GAPS.md` do not exist yet. Phase 3 writes `GAPS.
 | Scaffold in phase 4 | The solution, the Neo4j sidecar test, and the tooling exist from the bootstrap. `PyCompat` still waits for phase 4. | The maintainer asked for the development tooling first. |
 | Port the unit tests with each module | pytest ports live in `tests/Port.Evaluation` and are temporary. | Decision D6. |
 | Lead model is Opus | The lead session ran on Fable 5.2. | The maintainer's global rules name Fable as orchestrator. |
+| Phase 3 completes type hints in the Python source | The source is not changed. `port/tools/infer_type_hints.py` writes the signatures that pyright infers into `TYPE_HINTS.md`. | The oracle stays identical to the pinned commit. |
+| The .NET host is in `port/judge/` | It is `tests/Graphiti.Net.JudgeHost`. | Each ported unit adds a binding, and `port/judge/` is read-only after gate 2. |
 
 ## Open questions
 
