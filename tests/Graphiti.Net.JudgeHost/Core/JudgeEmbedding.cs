@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -12,7 +13,7 @@ public static class JudgeEmbedding
 {
     public const int Dimension = 1024;
 
-    private static readonly Dictionary<string, double[]> Cache = [];
+    private static readonly ConcurrentDictionary<string, double[]> Cache = new(StringComparer.Ordinal);
 
     public static double[] Embed(string text)
     {

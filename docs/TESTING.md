@@ -17,7 +17,7 @@ This is the canonical home of the test strategy. It follows
 
 | Layer | Question it answers | Location | State |
 | --- | --- | --- | --- |
-| Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,992 cases. 10 real-model scenarios wait for recording. |
+| Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,987 cases. 10 real-model scenarios wait for recording. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
 | Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | Not created. Port phase 4. |
 | Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. No product code to mutate yet. |

@@ -28,19 +28,14 @@
 {"id": "pure.filters.node_search_filter_query_constructor.falkordb_labels", "result": {"ok": [["n:Person"], {}]}}
 {"id": "pure.filters.node_search_filter_query_constructor.provider_none", "result": {"ok": [["n:Person"], {}]}}
 {"id": "pure.filters.search_filters_validation.node_label_backtick", "result": {"error": "ValidationError"}}
-{"id": "pure.filters.search_filters_validation.edge_label_backtick", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_space", "result": {"error": "ValidationError"}}
-{"id": "pure.filters.search_filters_validation.edge_label_space", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_digit", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_hyphen", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_pipe", "result": {"error": "ValidationError"}}
-{"id": "pure.filters.search_filters_validation.edge_label_pipe", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_colon", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_quote", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_empty_label", "result": {"error": "ValidationError"}}
-{"id": "pure.filters.search_filters_validation.edge_label_empty_label", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_unicode_e", "result": {"error": "ValidationError"}}
-{"id": "pure.filters.search_filters_validation.edge_label_unicode_e", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_combining", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_emoji", "result": {"error": "ValidationError"}}
 {"id": "pure.filters.search_filters_validation.node_label_cjk", "result": {"error": "ValidationError"}}

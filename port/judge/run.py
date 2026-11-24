@@ -40,8 +40,6 @@ FLOAT_TOLERANCE = 1e-6
 VECTOR_MIN_LENGTH = 64
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])")
 ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?")
-# Keys whose list values are unordered. The runner sorts them before it compares.
-UNORDERED_KEYS = {"llm", "embed", "rerank", "queries", "nodes", "edges", "$set"}
 
 
 # --------------------------------------------------------------------------- cases
@@ -87,6 +85,10 @@ def load_golden() -> dict[str, object]:
 
 # --------------------------------------------------------------------------- noise rules
 
+BAG = "$bag"  # a list whose order is not a contract. The runner sorts it.
+STEP_BAGS = ("llm", "embed", "rerank", "queries")
+GRAPH_BAGS = ("nodes", "edges")
+
 
 def _parse_iso(text: str) -> datetime | None:
     try:
@@ -98,22 +100,54 @@ def _parse_iso(text: str) -> datetime | None:
     return value
 
 
-def _mask_clock(text: str, window: tuple[datetime, datetime] | None) -> str:
+def _clock_shape(text: str) -> str:
+    """The format of a timestamp: separator, fraction digits, and zone text.
+
+    The value of a clock timestamp is noise. Its format is not: a naive value, a `Z` suffix, or
+    millisecond precision in place of what Python writes is a real difference.
+    Python leaves the fraction out for a whole second, so no fraction and 6 digits are one class.
+    """
+    match = re.fullmatch(r"\d{4}-\d{2}-\d{2}([T ])\d{2}:\d{2}:\d{2}(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})?", text)
+    assert match is not None
+    digits = len(match.group(2) or "")
+    fraction = "us" if digits in (0, 6) else f"{digits}digits"
+    return f"{match.group(1)}|{fraction}|{match.group(3) or 'naive'}"
+
+
+def _in_window(text: str, window: tuple[datetime, datetime] | None) -> datetime | None:
+    if window is None or not ISO_RE.fullmatch(text):
+        return None
+    value = _parse_iso(text)
+    return value if value is not None and window[0] <= value <= window[1] else None
+
+
+def _mask_text(text: str, window: tuple[datetime, datetime] | None) -> str:
+    """Masks clock timestamps inside a longer text, for example inside a prompt."""
     if window is None:
         return text
 
     def swap(match: re.Match) -> str:
-        value = _parse_iso(match.group(0))
-        if value is not None and window[0] <= value <= window[1]:
-            return "<now>"
-        return match.group(0)
+        return f"<now:{_clock_shape(match.group(0))}>" if _in_window(match.group(0), window) else match.group(0)
 
     return ISO_RE.sub(swap, text)
 
 
+def _clock_of(value: object, window: tuple[datetime, datetime] | None) -> tuple[datetime, str] | None:
+    """Returns (instant, text) if the value is a clock timestamp: a bare string or a `$dt` object."""
+    text = value
+    if isinstance(value, dict) and set(value) == {"$dt"}:
+        text = value["$dt"]
+    if isinstance(text, str):
+        instant = _in_window(text, window)
+        if instant is not None:
+            return instant, text
+    return None
+
+
 def _compact_vector(values: list) -> dict:
     floats = [float(v) for v in values]
-    return {"$vec": {"n": len(floats), "head": floats[:8], "sum": math.fsum(floats)}}
+    weighted = math.fsum((index + 1) * v for index, v in enumerate(floats))
+    return {"$vec": {"n": len(floats), "head": floats[:8], "sum": math.fsum(floats), "wsum": weighted}}
 
 
 def _is_vector(value: object) -> bool:
@@ -124,17 +158,72 @@ def _is_vector(value: object) -> bool:
     )
 
 
-def _walk(value: object, on_string) -> object:
-    """Copies a JSON value. Compacts vectors and passes every string through on_string."""
+def _mask(value: object, window: tuple[datetime, datetime] | None) -> object:
+    """Copies a JSON value, compacts vectors, and masks clock timestamps.
+
+    Clock timestamps that sit side by side in one dict or one list are ranked by their instant:
+    `<now#1:...>` is the earliest. Two fields that hold the same instant get the same rank, so
+    a field that copies another clock field in place of a new clock reading is a difference.
+    """
     if isinstance(value, str):
-        return on_string(value)
+        return _mask_text(value, window)
     if _is_vector(value):
         return _compact_vector(value)  # type: ignore[arg-type]
-    if isinstance(value, list):
-        return [_walk(v, on_string) for v in value]
-    if isinstance(value, dict):
-        return {on_string(k): _walk(v, on_string) for k, v in value.items()}
+    if isinstance(value, (list, dict)):
+        children = list(value.values()) if isinstance(value, dict) else value
+        clocks = [c for c in (_clock_of(child, window) for child in children) if c is not None]
+        ranks = {instant: rank for rank, instant in enumerate(sorted({c[0] for c in clocks}), 1)}
+
+        def convert(child: object) -> object:
+            clock = _clock_of(child, window)
+            if clock is None:
+                return _mask(child, window)
+            token = f"<now#{ranks[clock[0]]}:{_clock_shape(clock[1])}>"
+            return {"$dt": token} if isinstance(child, dict) else token
+
+        if isinstance(value, dict):
+            return {_mask_text(k, window): convert(v) for k, v in value.items()}
+        return [convert(child) for child in value]
     return value
+
+
+def _wrap_at(value: object, path: list[str]) -> object:
+    """Wraps the list at a dotted path inside a return value as a bag."""
+    if not path:
+        return {BAG: value} if isinstance(value, list) else value
+    if isinstance(value, dict) and path[0] in value:
+        return {k: (_wrap_at(v, path[1:]) if k == path[0] else v) for k, v in value.items()}
+    if isinstance(value, list) and path[0].isdigit() and int(path[0]) < len(value):
+        return [(_wrap_at(v, path[1:]) if i == int(path[0]) else v) for i, v in enumerate(value)]
+    return value
+
+
+def _mark_bags(result: object, case: dict | None = None) -> object:
+    """Wraps the lists whose order is not a contract. Every other list keeps its order.
+
+    Only these are bags: the four capture lists of a step, the node and edge lists of the graph
+    dump, and a list in a return value that the case itself declares as `unordered`.
+    """
+    if not isinstance(result, dict):
+        return result
+    out = dict(result)
+    if isinstance(out.get("steps"), list):
+        steps = []
+        declared = (case or {}).get("steps", [])
+        for index, step in enumerate(out["steps"]):
+            if isinstance(step, dict):
+                step = {k: ({BAG: v} if k in STEP_BAGS and isinstance(v, list) else v) for k, v in step.items()}
+                # A case can declare that a list inside one step's return value has no order,
+                # for a call whose upstream query has no ORDER BY: "unordered": ["nodes"].
+                unordered = declared[index].get("unordered", []) if index < len(declared) else []
+                for path in unordered:
+                    if "ret" in step:
+                        step["ret"] = _wrap_at(step["ret"], [part for part in path.split(".") if part])
+            steps.append(step)
+        out["steps"] = steps
+    if isinstance(out.get("graph"), dict):
+        out["graph"] = {k: ({BAG: v} if k in GRAPH_BAGS and isinstance(v, list) else v) for k, v in out["graph"].items()}
+    return out
 
 
 def _label_text(value: object, labels: dict[str, str]) -> str:
@@ -149,13 +238,12 @@ def _label_text(value: object, labels: dict[str, str]) -> str:
         if isinstance(item, float):
             return "<float>"
         if isinstance(item, list):
-            parts = [strip(v) for v in item]
-            return parts
+            return [strip(v) for v in item]
         if isinstance(item, dict):
             out = {}
             for key in item:
                 part = strip(item[key])
-                if key in UNORDERED_KEYS and isinstance(part, list):
+                if key in (BAG, "$set") and isinstance(part, list):
                     part = sorted(part, key=lambda v: json.dumps(v, sort_keys=True, ensure_ascii=False))
                 out[UUID_RE.sub(swap, key)] = part
             return out
@@ -212,21 +300,21 @@ def _uuid_names(value: object) -> dict[str, str]:
     return labels
 
 
-def _sort_unordered(value: object) -> object:
+def _sort_bags(value: object) -> object:
     if isinstance(value, list):
-        return [_sort_unordered(v) for v in value]
+        return [_sort_bags(v) for v in value]
     if isinstance(value, dict):
         out = {}
         for key, item in value.items():
-            item = _sort_unordered(item)
-            if key in UNORDERED_KEYS and isinstance(item, list):
+            item = _sort_bags(item)
+            if key in (BAG, "$set") and isinstance(item, list):
                 item = sorted(item, key=lambda v: json.dumps(v, sort_keys=True, ensure_ascii=False))
             out[key] = item
         return out
     return value
 
 
-def normalize(result: object) -> object:
+def normalize(result: object, case: dict | None = None) -> object:
     """Applies the noise rules. The same function runs on golden recording and on comparison."""
     window = None
     if isinstance(result, dict) and isinstance(result.get("meta"), dict):
@@ -236,7 +324,7 @@ def normalize(result: object) -> object:
             window = (start - timedelta(seconds=2), end + timedelta(seconds=2))
         result = {k: v for k, v in result.items() if k != "meta"}
 
-    masked = _walk(result, lambda s: _mask_clock(s, window))
+    masked = _mark_bags(_mask(result, window), case)
     names = _uuid_names(masked)
 
     def rename(text: str) -> str:
@@ -251,20 +339,38 @@ def normalize(result: object) -> object:
             return {rename(k): rename_all(v) for k, v in value.items()}
         return value
 
-    # Sort after the rename, so that the order of an unordered list depends on content only.
-    return _sort_unordered(rename_all(masked))
+    # Sort after the rename, so that the order of a bag depends on content only.
+    return _sort_bags(rename_all(masked))
+
+
+EXACT_INTEGER_LIMIT = 2**53
+
+
+def _number_difference(expected: object, actual: object, path: str) -> list[str]:
+    """Compares two JSON numbers.
+
+    An expected integer needs an equal integral value. Over 2**53 the actual value must also
+    be written as an integer, because a double cannot hold it. An expected float matches
+    within FLOAT_TOLERANCE.
+    """
+    wrong = [f"{path}: expected {expected!r}, got {actual!r}"]
+    if isinstance(expected, int):
+        if isinstance(actual, int):
+            return [] if expected == actual else wrong
+        if abs(expected) > EXACT_INTEGER_LIMIT or not actual.is_integer():  # type: ignore[union-attr]
+            return wrong
+        return [] if int(actual) == expected else wrong  # type: ignore[arg-type]
+    if math.isclose(expected, actual, rel_tol=FLOAT_TOLERANCE, abs_tol=FLOAT_TOLERANCE):  # type: ignore[arg-type]
+        return []
+    return wrong
 
 
 def differences(expected: object, actual: object, path: str = "$") -> list[str]:
-    """Deep comparison. Numbers match within FLOAT_TOLERANCE. Everything else is exact."""
+    """Deep comparison. Numbers follow _number_difference. Everything else is exact."""
     if isinstance(expected, bool) or isinstance(actual, bool):
         return [] if expected is actual else [f"{path}: expected {expected!r}, got {actual!r}"]
     if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
-        if isinstance(expected, int) and isinstance(actual, int):
-            return [] if expected == actual else [f"{path}: expected {expected}, got {actual}"]
-        if math.isclose(expected, actual, rel_tol=FLOAT_TOLERANCE, abs_tol=FLOAT_TOLERANCE):
-            return []
-        return [f"{path}: expected {expected}, got {actual}"]
+        return _number_difference(expected, actual, path)
     if type(expected) is not type(actual):
         return [f"{path}: expected {type(expected).__name__} {_short(expected)}, got {type(actual).__name__} {_short(actual)}"]
     if isinstance(expected, dict):
@@ -285,6 +391,13 @@ def differences(expected: object, actual: object, path: str = "$") -> list[str]:
             out.extend(differences(left, right, f"{path}[{index}]"))
         return out
     return [] if expected == actual else [f"{path}: expected {_short(expected)}, got {_short(actual)}"]
+
+
+NOT_BOUND = "JudgeNotBound"
+
+
+def _not_bound(raw: object) -> bool:
+    return isinstance(raw, dict) and (raw.get("error") == NOT_BOUND or raw.get("host_error") == NOT_BOUND) and len(raw) == 1
 
 
 def _errors_in(result: object) -> list[str]:
@@ -362,12 +475,15 @@ def main() -> int:
         raise SystemExit("only the Python build can record")
 
     cases = load_cases(args.layer, args.filter)
+    if not cases:
+        raise SystemExit("judge: no case matches. Check --layer and --filter.")
     partial = bool(args.layer or args.filter)
     golden = load_golden()
     host = Host(args.build, args.record_replies)
 
     results: dict[str, object] = {}
     refused: list[str] = []
+    raws: dict[str, object] = {}
     failed: dict[str, list[str]] = {}
     try:
         for entry in cases:
@@ -377,12 +493,13 @@ def main() -> int:
                 host.close()
                 host = Host(args.build, args.record_replies)
             raw = host.ask(entry["case"])
+            raws[entry["id"]] = raw
             if args.show_missing and isinstance(raw, dict):
                 for item in raw.get("missing_replies", []):
                     print(f"--- missing reply in {entry['id']}: key={item['key']} response_model={item['response_model']}")
                     for role, content in item["messages"]:
                         print(f"[{role}]\n{content}")
-            actual = normalize(raw)
+            actual = normalize(raw, entry["case"])
             results[entry["id"]] = actual
             if args.record:
                 # Never turn an incomplete run into expected behavior.
@@ -454,6 +571,15 @@ def main() -> int:
             expected &= {c["id"] for c in cases}
         surprise = sorted(set(failed) - expected)
         fixed = sorted(expected - set(failed))
+        # A listed case can fail for one reason only: its unit is not bound yet. A case that is
+        # bound and gives a wrong result is never an expected failure.
+        bound_wrong = sorted(i for i in set(failed) & expected if not _not_bound(raws.get(i)))
+        for case_id in bound_wrong:
+            print(f"FAIL {case_id} is bound and wrong. A listed case can fail only with {NOT_BOUND}.", file=sys.stderr)
+            for line in failed[case_id][: 20 if args.verbose else 3]:
+                print(f"     {line}", file=sys.stderr)
+        if bound_wrong:
+            status = 1
         for case_id in surprise:
             print(f"FAIL {case_id} (not in expected-failures.txt)", file=sys.stderr)
             for line in failed[case_id][: 20 if args.verbose else 3]:
@@ -462,7 +588,7 @@ def main() -> int:
             print(f"FAIL {case_id} passes now. Remove it from expected-failures.txt.", file=sys.stderr)
         if surprise or fixed:
             status = 1
-        print(f"judge: expected failures={len(expected)} unexpected={len(surprise)} fixed={len(fixed)}")
+        print(f"judge: expected failures={len(expected)} unexpected={len(surprise)} fixed={len(fixed)} bound_wrong={len(bound_wrong)}")
 
     print("judge: passed" if status == 0 else "judge: FAILED")
     return status

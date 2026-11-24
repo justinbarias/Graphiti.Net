@@ -21,6 +21,7 @@ python3 port/judge/run.py --build python --record   # write golden files
 
 Useful options: `--layer pure`, `--filter <text in the case id>`, `--verbose`, `--show-missing`, `--list-failures`.
 With `--filter`, a recording replaces only the selected cases and keeps the other rows of each golden file.
+If a filter selects no case, the runner stops with an error.
 
 Requirements:
 
@@ -84,6 +85,7 @@ Two judge functions exist:
 - A step can hold `parallel`, a list of calls that start together, in place of `call`.
 - `graphiti` holds extra keyword arguments for the `Graphiti` constructor.
 - `call` is an attribute path on the `Graphiti` object, for example `add_episode` or `nodes.entity.get_by_uuid`.
+- A step can hold `unordered`, a list of dotted paths into its return value, for example `["nodes", "edges"]`. The runner compares the list at each path without its order. Use it only for a call whose upstream query has no `ORDER BY`.
 
 The result has one entry for each step, then the graph of the group:
 
@@ -102,6 +104,7 @@ Arguments and results are JSON. These tags carry the values that JSON lacks.
 | Tag | Meaning | In arguments | In results |
 | --- | --- | --- | --- |
 | `{"$dt": "2026-03-01T00:00:00+00:00"}` | A datetime, written as Python `isoformat()` writes it | Yes | Yes |
+| `{"$date": "2026-03-01"}` | A date with no time | No | Yes |
 | `{"$ref": "module:attr"}` | The Python object at that path: a class, a constant, a function | Yes | No |
 | `{"$enum": "module:Class", "value": v}` | An enum member | Yes | No. Results carry the member's value. |
 | `{"$model": "module:name", "data": {}}` | The result of a call to the object at that path, with `data` as keyword arguments. For a class, that is an instance. | Yes | No |
@@ -115,7 +118,8 @@ Arguments and results are JSON. These tags carry the values that JSON lacks.
 | `{"$graphiti": "path"}` | Flow cases only: an object on the `Graphiti` instance, for example `driver` | Yes | No |
 | `{"$embed": "text"}` | Flow cases only: the judge embedding of the text | Yes | No |
 | `{"$class": "Name"}`, `{"$exc": "Name"}` | A class or an exception that a function returned | No | Yes |
-| `{"$vec": {"n", "head", "sum"}}` | A list of 64 or more numbers, compacted by the runner | No | Yes |
+| `{"$vec": {"n", "head", "sum", "wsum"}}` | A list of 64 or more numbers, compacted by the runner | No | Yes |
+| `{"$bag": []}` | A list whose order is not a contract. The runner adds this tag and sorts the list. A host never writes it. | No | Golden files only |
 | `{"$unknown": "TypeName"}` | The codec does not know this type. Treat it as a defect in the case or in the codec. | No | Yes |
 
 ## Capture seams for flow cases
@@ -132,6 +136,7 @@ One entry in `queries` is one `execute_query` call, or one session with its oper
 The judge embedder is a bag of words. Each token gets a vector from SHA-256, the vectors are added, and the sum is scaled to unit length.
 The judge cross-encoder scores a passage as `(cosine + 1) / 2` of the judge embeddings, and breaks ties by input position.
 Reply keys are SHA-256 hashes of the response model name and the messages, after UUIDs and this run's clock values are masked.
+A reply that a person wrote with `add_reply.py` stores the key and the reply, but not the messages. The golden `llm` capture of the scenario holds the full request.
 
 ## Noise rules
 
@@ -139,11 +144,14 @@ The runner applies these rules to the host output before it records or compares.
 
 | Noise | Rule |
 | --- | --- |
-| Clock values | An ISO timestamp between the start and the end of the run, with 2 seconds of margin, becomes `<now>`. Other timestamps stay exact. |
+| Clock values | An ISO timestamp between the start and the end of the run, with 2 seconds of margin, is a clock value. Its instant is noise. Its format and its relation to the clock values next to it are not. Other timestamps stay exact. |
+| Clock values as fields | Clock values that are side by side in one object or one list become `<now#rank:shape>`. The rank is 1 for the earliest instant, and equal instants get the same rank. A field that copies another clock field in place of a new clock reading then shows as a difference. |
+| Clock values inside text | A clock value inside a longer text, for example a prompt, becomes `<now:shape>`. |
+| Clock shape | `separator\|fraction\|zone`. The separator is `T` or a space. The fraction is `us` for no digits or 6 digits, which is what Python writes, and `<n>digits` for any other count. The zone is the zone text, or `naive`. |
 | UUIDs | Each UUID gets a name from its content: `<uuid:` and 10 hex digits. The name is a hash of every place where the UUID appears, with other UUIDs shown as their names, refined until no name splits further. Two UUIDs that no content tells apart get the same name. |
-| Order of concurrent work | These lists are sorted by their JSON text after the UUID rule: `llm`, `embed`, `rerank`, `queries`, `nodes`, `edges`, `$set`. Operations inside one session keep their order. |
-| Vectors | A list of 64 or more numbers becomes `$vec` with its length, its first 8 values, and its sum. |
-| Numbers | Two floats match within 1e-6, relative or absolute. Integers match exactly. |
+| Order of concurrent work | Four kinds of list are compared without their order. The first kind is the capture lists of a step: `llm`, `embed`, `rerank`, and `queries`. The second kind is the `nodes` and `edges` lists of the graph dump. The third kind is each `$set`. The fourth kind is each list that a step declares in `unordered`. The runner wraps each one in `$bag` and sorts it by its JSON text after the UUID rule. Operations inside one session keep their order. A `nodes` or `edges` list inside a return value keeps its order. |
+| Vectors | A list of 64 or more numbers becomes `$vec` with its length, its first 8 values, its sum, and its sum weighted by position. If two values swap places, the weighted sum changes. |
+| Numbers | If the golden value is an integer, the other value must have the same integral value. Above 2^53 it must also be written as an integer, because a double cannot hold it. If the golden value is a float, the other value must match within 1e-6, relative or absolute. |
 | Index build in the driver constructor | Not captured. A scenario calls `build_indices_and_constraints` as a step. |
 
 Everything else is compared exactly: prompt text, schema text, Cypher text, parameter names, property names, and result order.
@@ -167,6 +175,7 @@ For a flow case that needs hand-written replies:
 `tests/Graphiti.Net.JudgeHost/Bindings.cs` maps each `fn` name to the ported method.
 A binding can do three things only: decode the arguments, call the product code, and encode the result.
 A case with no binding fails with `JudgeNotBound`, which keeps it in `expected-failures.txt`.
+A case in `expected-failures.txt` can fail only with `JudgeNotBound`. If a bound case gives a wrong result, the runner reports it as `bound_wrong` and fails, even though the case is in the list.
 
 ## Cases mined from upstream pytest files
 

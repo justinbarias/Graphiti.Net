@@ -9,9 +9,10 @@ Evidence by area. A cell says what was run and when. "Not verified" means that n
 | End-to-end | `dotnet test --solution Graphiti.Net.slnx` against Neo4j 5.26.2 | 1 passed, 0 failed | 2026-11-24 |
 | Failure message | The same test with `NEO4J_URI=bolt://localhost:7999` | Failed with the "Neo4j is not usable" message and the start command | 2026-11-24 |
 | Documents | `python3 scripts/check_docs.py` | See [plan 0001](exec-plans/completed/0001-bootstrap.md) | 2026-11-24 |
-| Differential judge, Python build | `python3 port/judge/run.py --build python` | 1,992 cases, 1,992 passed, three runs in a row | 2026-11-24 |
-| Differential judge, .NET build | `python3 port/judge/run.py --build dotnet` | 1 passed, 1,991 expected failures, 0 unexpected | 2026-11-24 |
-| Break tests of the judge | `python3 port/tools/break_tests.py` | Control passed. 12 of 12 breaks caught. | 2026-11-24 |
+| Differential judge, Python build | `python3 port/judge/run.py --build python` | 1,987 cases, 1,987 passed, in three full runs with different hash seeds | 2026-11-25 |
+| Differential judge, .NET build | `python3 port/judge/run.py --build dotnet` | 1 passed, 1,986 expected failures, 0 unexpected, 0 bound and wrong | 2026-11-25 |
+| Break tests of the judge | `python3 port/tools/break_tests.py` | Control passed. 16 of 16 breaks caught. | 2026-11-25 |
+| Adversarial review of the judge | One Opus 5.5 subagent, high effort | 6 important findings: 4 fixed, 2 open for gate 2. See [port/STATE.md](../port/STATE.md). | 2026-11-25 |
 | Upstream test baseline | `port/tools/upstream-tests.sh` | 1026 passed without a database, 40 passed on Neo4j | 2026-11-24 |
 | Property tests | None | Not verified. The project does not exist. | |
 | Mutation score | `dotnet stryker --config-file stryker-config.json` | The configuration loads with the `mtp` runner. Stryker found 0 mutants, so no score exists. | 2026-11-24 |

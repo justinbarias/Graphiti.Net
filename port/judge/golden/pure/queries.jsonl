@@ -167,7 +167,6 @@
 {"id": "pure.queries.fulltext_query.syntax_no_groups", "result": {"ok": "(hello)"}}
 {"id": "pure.queries.fulltext_query.neptune_provider", "result": {"ok": "group_id:\"g1\" AND (hello)"}}
 {"id": "pure.queries.fulltext_query.too_long", "result": {"ok": ""}}
-{"id": "pure.queries.fulltext_query.no_driver_attr", "result": {"error": "AttributeError"}}
 {"id": "pure.queries.fulltext_query.group_ids_before_driver", "result": {"error": "GroupIdValidationError"}}
 {"id": "pure.queries.rrf.basic", "result": {"ok": [["b", "a", "c", "d"], [1.5, 1.0, 0.8333333333333333, 0.3333333333333333]]}}
 {"id": "pure.queries.rrf.min_score", "result": {"ok": [["a", "b"], [0.8333333333333333, 0.8333333333333333]]}}

@@ -59,9 +59,20 @@ One adversarial review of the judge diff before the gate. The maintainer picks C
 | 8. Runner | `port/judge/run.py`. 1,992 cases pass on Python three times in a row. |
 | 9. Break tests | `port/tools/break_tests.py`: 1 control and 12 breaks, all caught. The first run missed 2, which exposed two gaps in the flow layer. The table is in `port/STATE.md`. |
 | 10. Type hints | Replaced: `port/TYPE_HINTS.md` holds the 127 signatures that pyright infers. Upstream is not changed. |
-| 11. Gaps | `port/GAPS.md`: 22 language gaps, 11 surfaces outside the judge, 13 upstream defects, 22 findings. |
+| 11. Gaps | `port/GAPS.md`: 22 language gaps, 15 surfaces outside the judge, 13 upstream defects, 22 findings. |
 | 12. Gate wiring | `scripts/check.sh --test` runs the embedder self-check and the judge against the .NET build. The deny rules for `port/judge/` go back at gate 2. |
 
-Open before gate 2: the 10 pending scenarios, the adversarial review, and the three open questions in `port/STATE.md`.
+- 2026-11-25, review: one Opus 5.5 subagent at high effort reviewed the judge, with a brief to refute it. It reported 6 important findings and 14 smaller ones.
+
+| Item | Result |
+| --- | --- |
+| Fixed in `run.py` | I1 order of results, I2 clock rank and shape, I3 number rule, I4 `bound_wrong`. |
+| Cases | 6 defective pure cases removed. `flow.hand.guard_invisible_chars` added. 5 steps declare `unordered`. |
+| Totals | 1,987 cases: 1,965 pure and 22 flow. They pass on Python in three full runs with `PYTHONHASHSEED` 1, 2, and 3. |
+| .NET build | 1 passed, 1,986 expected failures, 0 unexpected, 0 bound and wrong. |
+| Break tests | 1 control and 16 breaks, all caught. Breaks 12 to 15 are the reviewer's. The judge missed all four before the fixes. |
+| Open | I5, the contract choice for the LLM path. I6, the calls that no scenario reaches. Both are in `port/STATE.md` and `port/GAPS.md`. |
+
+Open before gate 2: the 10 pending scenarios, which the maintainer left pending on 2026-11-25, and the open questions in `port/STATE.md`.
 
 - Finding from task 2: upstream CI never runs `tests/test_add_triplet.py` with a database, and 11 of its 13 tests fail on Neo4j at the pinned commit. The first error is `ValueError: embedder returned 0 vectors for 1 queries`, which points at the test's mock embedder. Task 6 must not treat this file as a passing oracle. The judge covers `add_triplet` through layer 3 scenarios.

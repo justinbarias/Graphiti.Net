@@ -36,6 +36,10 @@ BREAKS = [
     ("flow", "search/search_utils.py", "DEFAULT_MIN_SCORE = 0.6", "DEFAULT_MIN_SCORE = 0.99", "Similarity search needs a score of 0.99"),
     ("flow", "utils/maintenance/edge_operations.py", "resolved_edge.expired_at = now", "resolved_edge.expired_at = None", "An invalidated fact gets no expiry time"),
     ("flow", "search/search_utils.py", "filter_queries.append('e.group_id IN $group_ids')", "pass", "The group filter dropped from the inline edge full-text search"),
+    ("flow", "search/search.py", "        nodes=nodes,", "        nodes=nodes[::-1],", "Search results return their nodes in reverse order"),
+    ("flow", "graphiti.py", "                    nodes=hydrated_nodes,", "                    nodes=hydrated_nodes[::-1],", "add_episode returns its nodes in reverse order"),
+    ("flow", "utils/maintenance/edge_operations.py", "resolved_edge.expired_at = now", "resolved_edge.expired_at = resolved_edge.created_at", "An expiry time copies the creation time in place of a new clock reading"),
+    ("flow", "utils/maintenance/edge_operations.py", "edge.expired_at if edge.expired_at is not None else utc_now()", "edge.expired_at if edge.expired_at is not None else edge.created_at", "A contradicted fact's expiry time copies its creation time"),
     ("flow", "nodes.py", "class EpisodeType(Enum):", "class EpisodeType(Enum):\n    pass\n\n\nclass _Unused(Enum):", "Control for the script: an import error must also fail the judge"),
 ]
 
