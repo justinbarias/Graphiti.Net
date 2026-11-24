@@ -1,0 +1,4183 @@
+{
+  "package": "graphiti_core",
+  "statuses": [
+    "todo",
+    "in_progress",
+    "built",
+    "tests_pass",
+    "parity_pass",
+    "reviewed",
+    "blocked"
+  ],
+  "external_packages": [
+    "__future__",
+    "abc",
+    "anthropic",
+    "ast",
+    "asyncio",
+    "boto3",
+    "collections",
+    "concurrent",
+    "contextlib",
+    "copy",
+    "dataclasses",
+    "datetime",
+    "dotenv",
+    "enum",
+    "falkordb",
+    "functools",
+    "gliner2",
+    "google",
+    "groq",
+    "hashlib",
+    "httpx",
+    "importlib",
+    "inspect",
+    "itertools",
+    "json",
+    "langchain_aws",
+    "logging",
+    "math",
+    "neo4j",
+    "numpy",
+    "openai",
+    "opensearchpy",
+    "opentelemetry",
+    "operator",
+    "os",
+    "pathlib",
+    "platform",
+    "posthog",
+    "pydantic",
+    "random",
+    "re",
+    "relate",
+    "sentence_transformers",
+    "sqlite3",
+    "sys",
+    "tenacity",
+    "threading",
+    "time",
+    "types",
+    "typing",
+    "typing_extensions",
+    "uuid",
+    "voyageai",
+    "zlib"
+  ],
+  "units": [
+    {
+      "order": 1,
+      "group": 1,
+      "cycle": false,
+      "module": "graphiti_core.cross_encoder.client",
+      "source": ".upstream/graphiti/graphiti_core/cross_encoder/client.py",
+      "lines": 41,
+      "imports": [],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 2,
+      "group": 2,
+      "cycle": false,
+      "module": "graphiti_core.driver.graph_operations.graph_operations",
+      "source": ".upstream/graphiti/graphiti_core/driver/graph_operations/graph_operations.py",
+      "lines": 941,
+      "imports": [],
+      "external": [
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 3,
+      "group": 3,
+      "cycle": false,
+      "module": "graphiti_core.driver.query_executor",
+      "source": ".upstream/graphiti/graphiti_core/driver/query_executor.py",
+      "lines": 58,
+      "imports": [],
+      "external": [
+        "abc",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 4,
+      "group": 4,
+      "cycle": false,
+      "module": "graphiti_core.embedder.client",
+      "source": ".upstream/graphiti/graphiti_core/embedder/client.py",
+      "lines": 39,
+      "imports": [],
+      "external": [
+        "abc",
+        "collections",
+        "os",
+        "pydantic"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 5,
+      "group": 5,
+      "cycle": false,
+      "module": "graphiti_core.embedder.openai",
+      "source": ".upstream/graphiti/graphiti_core/embedder/openai.py",
+      "lines": 67,
+      "imports": [
+        "graphiti_core.embedder.client"
+      ],
+      "external": [
+        "collections",
+        "openai"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: IEmbeddingGenerator adapter covers provider embedders (DECISIONS D3)"
+    },
+    {
+      "order": 6,
+      "group": 6,
+      "cycle": false,
+      "module": "graphiti_core.embedder",
+      "source": ".upstream/graphiti/graphiti_core/embedder/__init__.py",
+      "lines": 9,
+      "imports": [
+        "graphiti_core.embedder.client",
+        "graphiti_core.embedder.openai"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 7,
+      "group": 7,
+      "cycle": false,
+      "module": "graphiti_core.errors",
+      "source": ".upstream/graphiti/graphiti_core/errors.py",
+      "lines": 144,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 8,
+      "group": 8,
+      "cycle": false,
+      "module": "graphiti_core.utils.datetime_utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/datetime_utils.py",
+      "lines": 61,
+      "imports": [],
+      "external": [
+        "datetime"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 9,
+      "group": 9,
+      "cycle": false,
+      "module": "graphiti_core.driver.search_interface.search_interface",
+      "source": ".upstream/graphiti/graphiti_core/driver/search_interface/search_interface.py",
+      "lines": 352,
+      "imports": [],
+      "external": [
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 10,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.driver",
+      "source": ".upstream/graphiti/graphiti_core/driver/driver.py",
+      "lines": 222,
+      "imports": [
+        "graphiti_core.driver.graph_operations.graph_operations",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.search_interface.search_interface"
+      ],
+      "external": [
+        "__future__",
+        "abc",
+        "collections",
+        "contextlib",
+        "copy",
+        "dotenv",
+        "enum",
+        "logging",
+        "os",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 11,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.community_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/community_edge_ops.py",
+      "lines": 70,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 12,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.community_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/community_node_ops.py",
+      "lines": 96,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 13,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.entity_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/entity_edge_ops.py",
+      "lines": 109,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 14,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.entity_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/entity_node_ops.py",
+      "lines": 104,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 15,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.episode_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/episode_node_ops.py",
+      "lines": 108,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "abc",
+        "datetime"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 16,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.episodic_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/episodic_edge_ops.py",
+      "lines": 79,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 17,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.graph_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/graph_ops.py",
+      "lines": 95,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "abc",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 18,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.has_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/has_episode_edge_ops.py",
+      "lines": 79,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 19,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.next_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/next_episode_edge_ops.py",
+      "lines": 79,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 20,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.saga_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/saga_node_ops.py",
+      "lines": 89,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "abc"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 21,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.driver.operations.search_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/search_ops.py",
+      "lines": 166,
+      "imports": [
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_filters"
+      ],
+      "external": [
+        "abc",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 22,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.edges",
+      "source": ".upstream/graphiti/graphiti_core/edges.py",
+      "lines": 1027,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.embedder",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "abc",
+        "datetime",
+        "logging",
+        "pydantic",
+        "time",
+        "typing",
+        "typing_extensions",
+        "uuid"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 23,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.helpers",
+      "source": ".upstream/graphiti/graphiti_core/helpers.py",
+      "lines": 230,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.errors"
+      ],
+      "external": [
+        "asyncio",
+        "collections",
+        "datetime",
+        "dotenv",
+        "neo4j",
+        "numpy",
+        "os",
+        "pydantic",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 24,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.models.edges.edge_db_queries",
+      "source": ".upstream/graphiti/graphiti_core/models/edges/edge_db_queries.py",
+      "lines": 285,
+      "imports": [
+        "graphiti_core.driver.driver"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 25,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.models.nodes.node_db_queries",
+      "source": ".upstream/graphiti/graphiti_core/models/nodes/node_db_queries.py",
+      "lines": 355,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.helpers"
+      ],
+      "external": [
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 26,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.nodes",
+      "source": ".upstream/graphiti/graphiti_core/nodes.py",
+      "lines": 1224,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.embedder",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.utils.datetime_utils"
+      ],
+      "external": [
+        "abc",
+        "datetime",
+        "enum",
+        "logging",
+        "pydantic",
+        "time",
+        "typing",
+        "typing_extensions",
+        "uuid"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 27,
+      "group": 10,
+      "cycle": true,
+      "module": "graphiti_core.search.search_filters",
+      "source": ".upstream/graphiti/graphiti_core/search/search_filters.py",
+      "lines": 281,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.helpers"
+      ],
+      "external": [
+        "datetime",
+        "enum",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 28,
+      "group": 11,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.cache",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/cache.py",
+      "lines": 69,
+      "imports": [],
+      "external": [
+        "contextlib",
+        "json",
+        "logging",
+        "os",
+        "sqlite3",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 29,
+      "group": 12,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.config",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/config.py",
+      "lines": 69,
+      "imports": [],
+      "external": [
+        "enum"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 30,
+      "group": 13,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.errors",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/errors.py",
+      "lines": 40,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 31,
+      "group": 14,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.token_tracker",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/token_tracker.py",
+      "lines": 153,
+      "imports": [],
+      "external": [
+        "dataclasses",
+        "threading"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 32,
+      "group": 15,
+      "cycle": false,
+      "module": "graphiti_core.prompts.prompt_helpers",
+      "source": ".upstream/graphiti/graphiti_core/prompts/prompt_helpers.py",
+      "lines": 41,
+      "imports": [],
+      "external": [
+        "json",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 33,
+      "group": 16,
+      "cycle": false,
+      "module": "graphiti_core.prompts.models",
+      "source": ".upstream/graphiti/graphiti_core/prompts/models.py",
+      "lines": 95,
+      "imports": [
+        "graphiti_core.prompts.prompt_helpers"
+      ],
+      "external": [
+        "collections",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 34,
+      "group": 17,
+      "cycle": false,
+      "module": "graphiti_core.tracer",
+      "source": ".upstream/graphiti/graphiti_core/tracer.py",
+      "lines": 194,
+      "imports": [],
+      "external": [
+        "abc",
+        "collections",
+        "contextlib",
+        "opentelemetry",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 35,
+      "group": 18,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/client.py",
+      "lines": 311,
+      "imports": [
+        "graphiti_core.llm_client.cache",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.llm_client.token_tracker",
+        "graphiti_core.prompts.models",
+        "graphiti_core.tracer"
+      ],
+      "external": [
+        "abc",
+        "hashlib",
+        "httpx",
+        "json",
+        "logging",
+        "pydantic",
+        "tenacity",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 36,
+      "group": 19,
+      "cycle": false,
+      "module": "graphiti_core.prompts.dedupe_edges",
+      "source": ".upstream/graphiti/graphiti_core/prompts/dedupe_edges.py",
+      "lines": 128,
+      "imports": [
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 37,
+      "group": 20,
+      "cycle": false,
+      "module": "graphiti_core.prompts.dedupe_nodes",
+      "source": ".upstream/graphiti/graphiti_core/prompts/dedupe_nodes.py",
+      "lines": 249,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 38,
+      "group": 21,
+      "cycle": false,
+      "module": "graphiti_core.prompts.eval",
+      "source": ".upstream/graphiti/graphiti_core/prompts/eval.py",
+      "lines": 194,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 39,
+      "group": 22,
+      "cycle": false,
+      "module": "graphiti_core.prompts.extract_edges",
+      "source": ".upstream/graphiti/graphiti_core/prompts/extract_edges.py",
+      "lines": 369,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 40,
+      "group": 23,
+      "cycle": false,
+      "module": "graphiti_core.utils.text_utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/text_utils.py",
+      "lines": 105,
+      "imports": [
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "__future__",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 41,
+      "group": 24,
+      "cycle": false,
+      "module": "graphiti_core.prompts.snippets",
+      "source": ".upstream/graphiti/graphiti_core/prompts/snippets.py",
+      "lines": 35,
+      "imports": [
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 42,
+      "group": 25,
+      "cycle": false,
+      "module": "graphiti_core.prompts.extract_nodes",
+      "source": ".upstream/graphiti/graphiti_core/prompts/extract_nodes.py",
+      "lines": 711,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers",
+        "graphiti_core.prompts.snippets",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 43,
+      "group": 26,
+      "cycle": false,
+      "module": "graphiti_core.prompts.extract_nodes_and_edges",
+      "source": ".upstream/graphiti/graphiti_core/prompts/extract_nodes_and_edges.py",
+      "lines": 193,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 44,
+      "group": 27,
+      "cycle": false,
+      "module": "graphiti_core.prompts.summarize_nodes",
+      "source": ".upstream/graphiti/graphiti_core/prompts/summarize_nodes.py",
+      "lines": 166,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers",
+        "graphiti_core.prompts.snippets",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 45,
+      "group": 28,
+      "cycle": false,
+      "module": "graphiti_core.prompts.summarize_sagas",
+      "source": ".upstream/graphiti/graphiti_core/prompts/summarize_sagas.py",
+      "lines": 151,
+      "imports": [
+        "graphiti_core.prompts.models",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "abc",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 46,
+      "group": 29,
+      "cycle": false,
+      "module": "graphiti_core.prompts.lib",
+      "source": ".upstream/graphiti/graphiti_core/prompts/lib.py",
+      "lines": 621,
+      "imports": [
+        "graphiti_core.prompts.dedupe_edges",
+        "graphiti_core.prompts.dedupe_nodes",
+        "graphiti_core.prompts.eval",
+        "graphiti_core.prompts.extract_edges",
+        "graphiti_core.prompts.extract_nodes",
+        "graphiti_core.prompts.extract_nodes_and_edges",
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.prompt_helpers",
+        "graphiti_core.prompts.summarize_nodes",
+        "graphiti_core.prompts.summarize_sagas"
+      ],
+      "external": [
+        "__future__",
+        "abc",
+        "collections",
+        "pydantic",
+        "types",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 47,
+      "group": 30,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.prompt_config",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/prompt_config.py",
+      "lines": 322,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "types",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 48,
+      "group": 31,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.decision_prompts",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/decision_prompts.py",
+      "lines": 323,
+      "imports": [
+        "graphiti_core.llm_client.prompt_config",
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "ast",
+        "json",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 49,
+      "group": 32,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.jev_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/jev_client.py",
+      "lines": 285,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.decision_prompts",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "asyncio",
+        "httpx",
+        "json",
+        "os",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: no .NET package, deferred to M5"
+    },
+    {
+      "order": 50,
+      "group": 33,
+      "cycle": false,
+      "module": "graphiti_core.prompts.names",
+      "source": ".upstream/graphiti/graphiti_core/prompts/names.py",
+      "lines": 58,
+      "imports": [],
+      "external": [
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 51,
+      "group": 34,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.llm_runtime",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/llm_runtime.py",
+      "lines": 194,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.prompt_config",
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.names",
+        "graphiti_core.tracer"
+      ],
+      "external": [
+        "__future__",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 52,
+      "group": 35,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.openai_base_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/openai_base_client.py",
+      "lines": 357,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "abc",
+        "json",
+        "logging",
+        "openai",
+        "pydantic",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 53,
+      "group": 36,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.openai_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/openai_client.py",
+      "lines": 141,
+      "imports": [
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.openai_base_client"
+      ],
+      "external": [
+        "openai",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 54,
+      "group": 37,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.openai_decisions_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/openai_decisions_client.py",
+      "lines": 427,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.decision_prompts",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.llm_client.prompt_config",
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "asyncio",
+        "httpx",
+        "json",
+        "os",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 55,
+      "group": 38,
+      "cycle": false,
+      "module": "graphiti_core.llm_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/__init__.py",
+      "lines": 50,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.llm_client.jev_client",
+        "graphiti_core.llm_client.llm_runtime",
+        "graphiti_core.llm_client.openai_client",
+        "graphiti_core.llm_client.openai_decisions_client",
+        "graphiti_core.llm_client.prompt_config",
+        "graphiti_core.llm_client.token_tracker"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 56,
+      "group": 39,
+      "cycle": false,
+      "module": "graphiti_core.prompts",
+      "source": ".upstream/graphiti/graphiti_core/prompts/__init__.py",
+      "lines": 41,
+      "imports": [
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.names"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 57,
+      "group": 40,
+      "cycle": false,
+      "module": "graphiti_core.cross_encoder.openai_reranker_client",
+      "source": ".upstream/graphiti/graphiti_core/cross_encoder/openai_reranker_client.py",
+      "lines": 125,
+      "imports": [
+        "graphiti_core.cross_encoder.client",
+        "graphiti_core.helpers",
+        "graphiti_core.llm_client",
+        "graphiti_core.prompts"
+      ],
+      "external": [
+        "logging",
+        "numpy",
+        "openai",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 58,
+      "group": 41,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/__init__.py",
+      "lines": 52,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 59,
+      "group": 42,
+      "cycle": false,
+      "module": "graphiti_core.graph_queries",
+      "source": ".upstream/graphiti/graphiti_core/graph_queries.py",
+      "lines": 139,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.falkordb"
+      ],
+      "external": [
+        "typing",
+        "typing_extensions"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 60,
+      "group": 43,
+      "cycle": false,
+      "module": "graphiti_core.search.search_utils",
+      "source": ".upstream/graphiti/graphiti_core/search/search_utils.py",
+      "lines": 1824,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.edges",
+        "graphiti_core.graph_queries",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_filters"
+      ],
+      "external": [
+        "collections",
+        "logging",
+        "numpy",
+        "time",
+        "typing",
+        "typing_extensions"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 61,
+      "group": 44,
+      "cycle": false,
+      "module": "graphiti_core.search.search_config",
+      "source": ".upstream/graphiti/graphiti_core/search/search_config.py",
+      "lines": 161,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_utils"
+      ],
+      "external": [
+        "enum",
+        "pydantic"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 62,
+      "group": 45,
+      "cycle": false,
+      "module": "graphiti_core.decorators",
+      "source": ".upstream/graphiti/graphiti_core/decorators.py",
+      "lines": 134,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.helpers",
+        "graphiti_core.search.search_config"
+      ],
+      "external": [
+        "collections",
+        "functools",
+        "inspect",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 63,
+      "group": 46,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.community_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/community_edge_ops.py",
+      "lines": 165,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 64,
+      "group": 47,
+      "cycle": false,
+      "module": "graphiti_core.driver.record_parsers",
+      "source": ".upstream/graphiti/graphiti_core/driver/record_parsers.py",
+      "lines": 121,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.helpers",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 65,
+      "group": 48,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.community_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/community_node_ops.py",
+      "lines": 206,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 66,
+      "group": 49,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.entity_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/entity_edge_ops.py",
+      "lines": 255,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 67,
+      "group": 50,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.entity_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/entity_node_ops.py",
+      "lines": 240,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 68,
+      "group": 51,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.episode_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/episode_node_ops.py",
+      "lines": 288,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 69,
+      "group": 52,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.episodic_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/episodic_edge_ops.py",
+      "lines": 179,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 70,
+      "group": 53,
+      "cycle": false,
+      "module": "graphiti_core.driver.operations.graph_utils",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/graph_utils.py",
+      "lines": 66,
+      "imports": [],
+      "external": [
+        "collections",
+        "pydantic"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 71,
+      "group": 54,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.graph_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/graph_ops.py",
+      "lines": 215,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.graph_utils",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.graph_queries",
+        "graphiti_core.helpers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 72,
+      "group": 55,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.has_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/has_episode_edge_ops.py",
+      "lines": 173,
+      "imports": [
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 73,
+      "group": 56,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.next_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/next_episode_edge_ops.py",
+      "lines": 173,
+      "imports": [
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 74,
+      "group": 57,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.saga_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/saga_node_ops.py",
+      "lines": 191,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 75,
+      "group": 58,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations.search_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/search_ops.py",
+      "lines": 655,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.graph_queries",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_filters"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 76,
+      "group": 59,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j_driver",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j_driver.py",
+      "lines": 245,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.neo4j.operations.community_edge_ops",
+        "graphiti_core.driver.neo4j.operations.community_node_ops",
+        "graphiti_core.driver.neo4j.operations.entity_edge_ops",
+        "graphiti_core.driver.neo4j.operations.entity_node_ops",
+        "graphiti_core.driver.neo4j.operations.episode_node_ops",
+        "graphiti_core.driver.neo4j.operations.episodic_edge_ops",
+        "graphiti_core.driver.neo4j.operations.graph_ops",
+        "graphiti_core.driver.neo4j.operations.has_episode_edge_ops",
+        "graphiti_core.driver.neo4j.operations.next_episode_edge_ops",
+        "graphiti_core.driver.neo4j.operations.saga_node_ops",
+        "graphiti_core.driver.neo4j.operations.search_ops",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.graph_queries",
+        "graphiti_core.helpers"
+      ],
+      "external": [
+        "asyncio",
+        "collections",
+        "contextlib",
+        "logging",
+        "neo4j",
+        "typing",
+        "typing_extensions"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 77,
+      "group": 60,
+      "cycle": false,
+      "module": "graphiti_core.cross_encoder",
+      "source": ".upstream/graphiti/graphiti_core/cross_encoder/__init__.py",
+      "lines": 21,
+      "imports": [
+        "graphiti_core.cross_encoder.client",
+        "graphiti_core.cross_encoder.openai_reranker_client"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 78,
+      "group": 61,
+      "cycle": false,
+      "module": "graphiti_core.graphiti_types",
+      "source": ".upstream/graphiti/graphiti_core/graphiti_types.py",
+      "lines": 163,
+      "imports": [
+        "graphiti_core.cross_encoder",
+        "graphiti_core.driver.driver",
+        "graphiti_core.embedder",
+        "graphiti_core.llm_client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.llm_runtime",
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.models",
+        "graphiti_core.prompts.names",
+        "graphiti_core.tracer"
+      ],
+      "external": [
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 79,
+      "group": 62,
+      "cycle": false,
+      "module": "graphiti_core.ingestion.change_set",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/change_set.py",
+      "lines": 327,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.nodes",
+        "graphiti_core.utils.datetime_utils"
+      ],
+      "external": [
+        "copy",
+        "dataclasses",
+        "datetime",
+        "pydantic",
+        "typing",
+        "zlib"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 80,
+      "group": 63,
+      "cycle": false,
+      "module": "graphiti_core.ingestion.state_store",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/state_store.py",
+      "lines": 486,
+      "imports": [
+        "graphiti_core.errors"
+      ],
+      "external": [
+        "abc",
+        "collections",
+        "dataclasses",
+        "time"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 81,
+      "group": 64,
+      "cycle": false,
+      "module": "graphiti_core.ingestion.config",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/config.py",
+      "lines": 95,
+      "imports": [
+        "graphiti_core.ingestion.state_store"
+      ],
+      "external": [
+        "collections",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 82,
+      "group": 65,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.dedup_helpers",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/dedup_helpers.py",
+      "lines": 401,
+      "imports": [
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "functools",
+        "hashlib",
+        "math",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 83,
+      "group": 66,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.attribute_utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/attribute_utils.py",
+      "lines": 262,
+      "imports": [],
+      "external": [
+        "__future__",
+        "logging",
+        "os",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 84,
+      "group": 67,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.node_operations",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/node_operations.py",
+      "lines": 1374,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.llm_client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.nodes",
+        "graphiti_core.prompts",
+        "graphiti_core.prompts.dedupe_nodes",
+        "graphiti_core.prompts.extract_nodes",
+        "graphiti_core.search.search_filters",
+        "graphiti_core.search.search_utils",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.attribute_utils",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "collections",
+        "logging",
+        "pydantic",
+        "time",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 85,
+      "group": 68,
+      "cycle": false,
+      "module": "graphiti_core.ingestion.delta",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/delta.py",
+      "lines": 354,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.ingestion.state_store",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_config",
+        "graphiti_core.search.search_utils",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.maintenance.node_operations"
+      ],
+      "external": [
+        "collections",
+        "dataclasses",
+        "numpy"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 86,
+      "group": 69,
+      "cycle": false,
+      "module": "graphiti_core.search.search",
+      "source": ".upstream/graphiti/graphiti_core/search/search.py",
+      "lines": 892,
+      "imports": [
+        "graphiti_core.cross_encoder.client",
+        "graphiti_core.driver.driver",
+        "graphiti_core.edges",
+        "graphiti_core.embedder.client",
+        "graphiti_core.errors",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_config",
+        "graphiti_core.search.search_filters",
+        "graphiti_core.search.search_utils",
+        "graphiti_core.tracer"
+      ],
+      "external": [
+        "collections",
+        "contextlib",
+        "logging",
+        "time",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 87,
+      "group": 70,
+      "cycle": false,
+      "module": "graphiti_core.search.search_config_recipes",
+      "source": ".upstream/graphiti/graphiti_core/search/search_config_recipes.py",
+      "lines": 224,
+      "imports": [
+        "graphiti_core.search.search_config"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 88,
+      "group": 71,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.dangling_endpoints",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/dangling_endpoints.py",
+      "lines": 75,
+      "imports": [
+        "graphiti_core.nodes",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.dedup_helpers"
+      ],
+      "external": [
+        "logging"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 89,
+      "group": 72,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.temporal_edge_utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/temporal_edge_utils.py",
+      "lines": 97,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.utils.datetime_utils"
+      ],
+      "external": [
+        "datetime",
+        "logging",
+        "re"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 90,
+      "group": 73,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.edge_operations",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/edge_operations.py",
+      "lines": 1238,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.edges",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.llm_client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.nodes",
+        "graphiti_core.prompts",
+        "graphiti_core.prompts.dedupe_edges",
+        "graphiti_core.prompts.extract_edges",
+        "graphiti_core.search.search",
+        "graphiti_core.search.search_config",
+        "graphiti_core.search.search_config_recipes",
+        "graphiti_core.search.search_filters",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.attribute_utils",
+        "graphiti_core.utils.maintenance.dangling_endpoints",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.maintenance.temporal_edge_utils",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "dataclasses",
+        "datetime",
+        "logging",
+        "pydantic",
+        "time",
+        "typing",
+        "typing_extensions"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 91,
+      "group": 74,
+      "cycle": false,
+      "module": "graphiti_core.ingestion.graph_reader",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/graph_reader.py",
+      "lines": 117,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search",
+        "graphiti_core.search.search_config_recipes",
+        "graphiti_core.search.search_filters",
+        "graphiti_core.utils.maintenance.edge_operations",
+        "graphiti_core.utils.maintenance.node_operations"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 92,
+      "group": 75,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.combined_extraction",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/combined_extraction.py",
+      "lines": 406,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.nodes",
+        "graphiti_core.prompts",
+        "graphiti_core.prompts.extract_edges",
+        "graphiti_core.prompts.extract_nodes_and_edges",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.dangling_endpoints",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.maintenance.node_operations",
+        "graphiti_core.utils.maintenance.temporal_edge_utils",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "itertools",
+        "logging",
+        "pydantic",
+        "time"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 93,
+      "group": 76,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.graph_data_operations",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/graph_data_operations.py",
+      "lines": 166,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime",
+        "logging",
+        "typing_extensions"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 94,
+      "group": 77,
+      "cycle": false,
+      "module": "graphiti_core.utils.bulk_utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/bulk_utils.py",
+      "lines": 832,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.graph_operations.graph_operations",
+        "graphiti_core.edges",
+        "graphiti_core.embedder",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.utils.maintenance.combined_extraction",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.maintenance.edge_operations",
+        "graphiti_core.utils.maintenance.graph_data_operations",
+        "graphiti_core.utils.maintenance.node_operations"
+      ],
+      "external": [
+        "asyncio",
+        "datetime",
+        "logging",
+        "neo4j",
+        "numpy",
+        "pydantic",
+        "typing",
+        "typing_extensions"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 95,
+      "group": 78,
+      "cycle": false,
+      "module": "graphiti_core.namespaces.edges",
+      "source": ".upstream/graphiti/graphiti_core/namespaces/edges.py",
+      "lines": 356,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.embedder"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 96,
+      "group": 79,
+      "cycle": false,
+      "module": "graphiti_core.namespaces.nodes",
+      "source": ".upstream/graphiti/graphiti_core/namespaces/nodes.py",
+      "lines": 356,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.embedder",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 97,
+      "group": 80,
+      "cycle": false,
+      "module": "graphiti_core.namespaces",
+      "source": ".upstream/graphiti/graphiti_core/namespaces/__init__.py",
+      "lines": 24,
+      "imports": [
+        "graphiti_core.namespaces.edges",
+        "graphiti_core.namespaces.nodes"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 98,
+      "group": 81,
+      "cycle": false,
+      "module": "graphiti_core.telemetry.telemetry",
+      "source": ".upstream/graphiti/graphiti_core/telemetry/telemetry.py",
+      "lines": 118,
+      "imports": [],
+      "external": [
+        "contextlib",
+        "importlib",
+        "os",
+        "pathlib",
+        "platform",
+        "posthog",
+        "sys",
+        "typing",
+        "uuid"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "not-ported: PostHog telemetry is an approved deviation (DECISIONS D9)"
+    },
+    {
+      "order": 99,
+      "group": 82,
+      "cycle": false,
+      "module": "graphiti_core.telemetry",
+      "source": ".upstream/graphiti/graphiti_core/telemetry/__init__.py",
+      "lines": 10,
+      "imports": [
+        "graphiti_core.telemetry.telemetry"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "not-ported: PostHog telemetry is an approved deviation (DECISIONS D9)"
+    },
+    {
+      "order": 100,
+      "group": 83,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance.community_operations",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/community_operations.py",
+      "lines": 427,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.edges",
+        "graphiti_core.embedder",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.llm_client",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.prompts",
+        "graphiti_core.prompts.summarize_nodes",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.edge_operations",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "collections",
+        "logging",
+        "pydantic"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 101,
+      "group": 84,
+      "cycle": false,
+      "module": "graphiti_core.utils.ontology_utils.entity_types_utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/ontology_utils/entity_types_utils.py",
+      "lines": 68,
+      "imports": [
+        "graphiti_core.errors",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "pydantic"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 102,
+      "group": 85,
+      "cycle": true,
+      "module": "graphiti_core.graphiti",
+      "source": ".upstream/graphiti/graphiti_core/graphiti.py",
+      "lines": 2782,
+      "imports": [
+        "graphiti_core.cross_encoder.client",
+        "graphiti_core.cross_encoder.openai_reranker_client",
+        "graphiti_core.decorators",
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.neo4j_driver",
+        "graphiti_core.edges",
+        "graphiti_core.embedder",
+        "graphiti_core.errors",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.ingestion.config",
+        "graphiti_core.ingestion.scheduler",
+        "graphiti_core.llm_client",
+        "graphiti_core.namespaces",
+        "graphiti_core.nodes",
+        "graphiti_core.prompts",
+        "graphiti_core.prompts.lib",
+        "graphiti_core.prompts.summarize_sagas",
+        "graphiti_core.search.search",
+        "graphiti_core.search.search_config",
+        "graphiti_core.search.search_config_recipes",
+        "graphiti_core.search.search_filters",
+        "graphiti_core.search.search_utils",
+        "graphiti_core.telemetry",
+        "graphiti_core.tracer",
+        "graphiti_core.utils.bulk_utils",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.community_operations",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.maintenance.edge_operations",
+        "graphiti_core.utils.maintenance.graph_data_operations",
+        "graphiti_core.utils.maintenance.node_operations",
+        "graphiti_core.utils.ontology_utils.entity_types_utils",
+        "graphiti_core.utils.text_utils"
+      ],
+      "external": [
+        "datetime",
+        "dotenv",
+        "json",
+        "logging",
+        "pydantic",
+        "time",
+        "typing",
+        "typing_extensions",
+        "uuid"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 103,
+      "group": 85,
+      "cycle": true,
+      "module": "graphiti_core.ingestion.phases",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/phases.py",
+      "lines": 1849,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.graphiti",
+        "graphiti_core.graphiti_types",
+        "graphiti_core.helpers",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.ingestion.config",
+        "graphiti_core.ingestion.delta",
+        "graphiti_core.ingestion.graph_reader",
+        "graphiti_core.ingestion.state_store",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_utils",
+        "graphiti_core.utils.bulk_utils",
+        "graphiti_core.utils.datetime_utils",
+        "graphiti_core.utils.maintenance.dedup_helpers",
+        "graphiti_core.utils.maintenance.edge_operations",
+        "graphiti_core.utils.maintenance.node_operations"
+      ],
+      "external": [
+        "asyncio",
+        "collections",
+        "contextlib",
+        "datetime",
+        "logging",
+        "pydantic",
+        "time",
+        "typing",
+        "uuid"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 104,
+      "group": 85,
+      "cycle": true,
+      "module": "graphiti_core.ingestion.scheduler",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/scheduler.py",
+      "lines": 347,
+      "imports": [
+        "graphiti_core.errors",
+        "graphiti_core.graphiti",
+        "graphiti_core.ingestion.config",
+        "graphiti_core.ingestion.phases",
+        "graphiti_core.ingestion.state_store",
+        "graphiti_core.nodes",
+        "graphiti_core.utils.bulk_utils"
+      ],
+      "external": [
+        "asyncio",
+        "contextlib",
+        "dataclasses",
+        "datetime",
+        "logging",
+        "pydantic",
+        "typing",
+        "uuid"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 105,
+      "group": 86,
+      "cycle": false,
+      "module": "graphiti_core",
+      "source": ".upstream/graphiti/graphiti_core/__init__.py",
+      "lines": 4,
+      "imports": [
+        "graphiti_core.graphiti"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 106,
+      "group": 87,
+      "cycle": false,
+      "module": "graphiti_core.cross_encoder.bge_reranker_client",
+      "source": ".upstream/graphiti/graphiti_core/cross_encoder/bge_reranker_client.py",
+      "lines": 55,
+      "imports": [
+        "graphiti_core.cross_encoder.client"
+      ],
+      "external": [
+        "asyncio",
+        "sentence_transformers",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: reranker deferred to M5"
+    },
+    {
+      "order": 107,
+      "group": 88,
+      "cycle": false,
+      "module": "graphiti_core.cross_encoder.gemini_reranker_client",
+      "source": ".upstream/graphiti/graphiti_core/cross_encoder/gemini_reranker_client.py",
+      "lines": 162,
+      "imports": [
+        "graphiti_core.cross_encoder.client",
+        "graphiti_core.helpers",
+        "graphiti_core.llm_client"
+      ],
+      "external": [
+        "google",
+        "logging",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: reranker deferred to M5"
+    },
+    {
+      "order": 108,
+      "group": 89,
+      "cycle": false,
+      "module": "graphiti_core.driver",
+      "source": ".upstream/graphiti/graphiti_core/driver/__init__.py",
+      "lines": 20,
+      "imports": [],
+      "external": [
+        "neo4j"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 109,
+      "group": 90,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.fulltext",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/fulltext.py",
+      "lines": 84,
+      "imports": [
+        "graphiti_core.driver.falkordb",
+        "graphiti_core.helpers"
+      ],
+      "external": [
+        "re"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 110,
+      "group": 91,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.community_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/community_edge_ops.py",
+      "lines": 187,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 111,
+      "group": 92,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.community_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/community_node_ops.py",
+      "lines": 223,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 112,
+      "group": 93,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.entity_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/entity_edge_ops.py",
+      "lines": 276,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 113,
+      "group": 94,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.entity_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/entity_node_ops.py",
+      "lines": 262,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 114,
+      "group": 95,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.episode_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/episode_node_ops.py",
+      "lines": 302,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 115,
+      "group": 96,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.episodic_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/episodic_edge_ops.py",
+      "lines": 201,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 116,
+      "group": 97,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.graph_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/graph_ops.py",
+      "lines": 244,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.graph_utils",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.graph_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "asyncio",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 117,
+      "group": 98,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.has_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/has_episode_edge_ops.py",
+      "lines": 196,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 118,
+      "group": 99,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.next_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/next_episode_edge_ops.py",
+      "lines": 196,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 119,
+      "group": 100,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.saga_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/saga_node_ops.py",
+      "lines": 209,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 120,
+      "group": 101,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations.search_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/search_ops.py",
+      "lines": 638,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.falkordb.fulltext",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.graph_queries",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_filters"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 121,
+      "group": 102,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb.operations",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb/operations/__init__.py",
+      "lines": 50,
+      "imports": [
+        "graphiti_core.driver.falkordb.operations.community_edge_ops",
+        "graphiti_core.driver.falkordb.operations.community_node_ops",
+        "graphiti_core.driver.falkordb.operations.entity_edge_ops",
+        "graphiti_core.driver.falkordb.operations.entity_node_ops",
+        "graphiti_core.driver.falkordb.operations.episode_node_ops",
+        "graphiti_core.driver.falkordb.operations.episodic_edge_ops",
+        "graphiti_core.driver.falkordb.operations.graph_ops",
+        "graphiti_core.driver.falkordb.operations.has_episode_edge_ops",
+        "graphiti_core.driver.falkordb.operations.next_episode_edge_ops",
+        "graphiti_core.driver.falkordb.operations.saga_node_ops",
+        "graphiti_core.driver.falkordb.operations.search_ops"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 122,
+      "group": 103,
+      "cycle": false,
+      "module": "graphiti_core.driver.falkordb_driver",
+      "source": ".upstream/graphiti/graphiti_core/driver/falkordb_driver.py",
+      "lines": 387,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.falkordb.fulltext",
+        "graphiti_core.driver.falkordb.operations.community_edge_ops",
+        "graphiti_core.driver.falkordb.operations.community_node_ops",
+        "graphiti_core.driver.falkordb.operations.entity_edge_ops",
+        "graphiti_core.driver.falkordb.operations.entity_node_ops",
+        "graphiti_core.driver.falkordb.operations.episode_node_ops",
+        "graphiti_core.driver.falkordb.operations.episodic_edge_ops",
+        "graphiti_core.driver.falkordb.operations.graph_ops",
+        "graphiti_core.driver.falkordb.operations.has_episode_edge_ops",
+        "graphiti_core.driver.falkordb.operations.next_episode_edge_ops",
+        "graphiti_core.driver.falkordb.operations.saga_node_ops",
+        "graphiti_core.driver.falkordb.operations.search_ops",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.graph_queries",
+        "graphiti_core.utils.datetime_utils"
+      ],
+      "external": [
+        "asyncio",
+        "contextlib",
+        "datetime",
+        "falkordb",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 123,
+      "group": 104,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 124,
+      "group": 105,
+      "cycle": false,
+      "module": "graphiti_core.driver.neo4j.operations",
+      "source": ".upstream/graphiti/graphiti_core/driver/neo4j/operations/__init__.py",
+      "lines": 46,
+      "imports": [
+        "graphiti_core.driver.neo4j.operations.community_edge_ops",
+        "graphiti_core.driver.neo4j.operations.community_node_ops",
+        "graphiti_core.driver.neo4j.operations.entity_edge_ops",
+        "graphiti_core.driver.neo4j.operations.entity_node_ops",
+        "graphiti_core.driver.neo4j.operations.episode_node_ops",
+        "graphiti_core.driver.neo4j.operations.episodic_edge_ops",
+        "graphiti_core.driver.neo4j.operations.graph_ops",
+        "graphiti_core.driver.neo4j.operations.has_episode_edge_ops",
+        "graphiti_core.driver.neo4j.operations.next_episode_edge_ops",
+        "graphiti_core.driver.neo4j.operations.saga_node_ops",
+        "graphiti_core.driver.neo4j.operations.search_ops"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 125,
+      "group": 106,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 126,
+      "group": 107,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.community_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/community_edge_ops.py",
+      "lines": 164,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 127,
+      "group": 108,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.entity_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/entity_edge_ops.py",
+      "lines": 253,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 128,
+      "group": 109,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.entity_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/entity_node_ops.py",
+      "lines": 233,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 129,
+      "group": 110,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.episode_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/episode_node_ops.py",
+      "lines": 276,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 130,
+      "group": 111,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.episodic_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/episodic_edge_ops.py",
+      "lines": 178,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 131,
+      "group": 112,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.has_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/has_episode_edge_ops.py",
+      "lines": 172,
+      "imports": [
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 132,
+      "group": 113,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.next_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/next_episode_edge_ops.py",
+      "lines": 172,
+      "imports": [
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 133,
+      "group": 114,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations.saga_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/saga_node_ops.py",
+      "lines": 189,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 134,
+      "group": 115,
+      "cycle": true,
+      "module": "graphiti_core.driver.neptune.operations.community_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/community_node_ops.py",
+      "lines": 212,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.neptune_driver",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "__future__",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 135,
+      "group": 115,
+      "cycle": true,
+      "module": "graphiti_core.driver.neptune.operations.graph_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/graph_ops.py",
+      "lines": 220,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.neptune_driver",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.graph_utils",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "__future__",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 136,
+      "group": 115,
+      "cycle": true,
+      "module": "graphiti_core.driver.neptune.operations.search_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/search_ops.py",
+      "lines": 724,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.neptune_driver",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_filters",
+        "graphiti_core.search.search_utils"
+      ],
+      "external": [
+        "__future__",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 137,
+      "group": 115,
+      "cycle": true,
+      "module": "graphiti_core.driver.neptune_driver",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune_driver.py",
+      "lines": 393,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.neptune.operations.community_edge_ops",
+        "graphiti_core.driver.neptune.operations.community_node_ops",
+        "graphiti_core.driver.neptune.operations.entity_edge_ops",
+        "graphiti_core.driver.neptune.operations.entity_node_ops",
+        "graphiti_core.driver.neptune.operations.episode_node_ops",
+        "graphiti_core.driver.neptune.operations.episodic_edge_ops",
+        "graphiti_core.driver.neptune.operations.graph_ops",
+        "graphiti_core.driver.neptune.operations.has_episode_edge_ops",
+        "graphiti_core.driver.neptune.operations.next_episode_edge_ops",
+        "graphiti_core.driver.neptune.operations.saga_node_ops",
+        "graphiti_core.driver.neptune.operations.search_ops",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.operations.search_ops"
+      ],
+      "external": [
+        "asyncio",
+        "boto3",
+        "collections",
+        "datetime",
+        "langchain_aws",
+        "logging",
+        "opensearchpy",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 138,
+      "group": 116,
+      "cycle": false,
+      "module": "graphiti_core.driver.neptune.operations",
+      "source": ".upstream/graphiti/graphiti_core/driver/neptune/operations/__init__.py",
+      "lines": 50,
+      "imports": [
+        "graphiti_core.driver.neptune.operations.community_edge_ops",
+        "graphiti_core.driver.neptune.operations.community_node_ops",
+        "graphiti_core.driver.neptune.operations.entity_edge_ops",
+        "graphiti_core.driver.neptune.operations.entity_node_ops",
+        "graphiti_core.driver.neptune.operations.episode_node_ops",
+        "graphiti_core.driver.neptune.operations.episodic_edge_ops",
+        "graphiti_core.driver.neptune.operations.graph_ops",
+        "graphiti_core.driver.neptune.operations.has_episode_edge_ops",
+        "graphiti_core.driver.neptune.operations.next_episode_edge_ops",
+        "graphiti_core.driver.neptune.operations.saga_node_ops",
+        "graphiti_core.driver.neptune.operations.search_ops"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 139,
+      "group": 117,
+      "cycle": false,
+      "module": "graphiti_core.driver.operations",
+      "source": ".upstream/graphiti/graphiti_core/driver/operations/__init__.py",
+      "lines": 42,
+      "imports": [
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.operations.search_ops"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 140,
+      "group": 118,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate._session._errors",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/_session/_errors.py",
+      "lines": 48,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 141,
+      "group": 119,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate._session._results",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/_session/_results.py",
+      "lines": 327,
+      "imports": [
+        "graphiti_core.driver.relate._session._errors"
+      ],
+      "external": [
+        "__future__",
+        "collections",
+        "dataclasses",
+        "datetime",
+        "operator",
+        "relate",
+        "types",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 142,
+      "group": 120,
+      "cycle": true,
+      "module": "graphiti_core.driver.relate._session._store",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/_session/_store.py",
+      "lines": 341,
+      "imports": [
+        "graphiti_core.driver.relate._session._errors",
+        "graphiti_core.driver.relate._session._results",
+        "graphiti_core.driver.relate._session._transaction"
+      ],
+      "external": [
+        "__future__",
+        "asyncio",
+        "collections",
+        "concurrent",
+        "contextlib",
+        "dataclasses",
+        "enum",
+        "itertools",
+        "os",
+        "relate",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 143,
+      "group": 120,
+      "cycle": true,
+      "module": "graphiti_core.driver.relate._session._transaction",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/_session/_transaction.py",
+      "lines": 194,
+      "imports": [
+        "graphiti_core.driver.relate._session._errors",
+        "graphiti_core.driver.relate._session._results",
+        "graphiti_core.driver.relate._session._store"
+      ],
+      "external": [
+        "__future__",
+        "asyncio",
+        "collections",
+        "enum",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 144,
+      "group": 121,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate._session",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/_session/__init__.py",
+      "lines": 68,
+      "imports": [
+        "graphiti_core.driver.relate._session._errors",
+        "graphiti_core.driver.relate._session._results",
+        "graphiti_core.driver.relate._session._store",
+        "graphiti_core.driver.relate._session._transaction"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 145,
+      "group": 122,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/__init__.py",
+      "lines": 46,
+      "imports": [
+        "graphiti_core.driver.relate._session"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 146,
+      "group": 123,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.graph_operations_interface",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/graph_operations_interface.py",
+      "lines": 453,
+      "imports": [
+        "graphiti_core.driver.graph_operations.graph_operations",
+        "graphiti_core.edges",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 147,
+      "group": 124,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.community_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/community_edge_ops.py",
+      "lines": 168,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 148,
+      "group": 125,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.community_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/community_node_ops.py",
+      "lines": 204,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 149,
+      "group": 126,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.entity_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/entity_edge_ops.py",
+      "lines": 293,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 150,
+      "group": 127,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.entity_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/entity_node_ops.py",
+      "lines": 313,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 151,
+      "group": 128,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.episode_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/episode_node_ops.py",
+      "lines": 305,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "datetime",
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 152,
+      "group": 129,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.episodic_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/episodic_edge_ops.py",
+      "lines": 194,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 153,
+      "group": 130,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.graph_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/graph_ops.py",
+      "lines": 248,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.graph_utils",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.graph_queries",
+        "graphiti_core.helpers",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 154,
+      "group": 131,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.has_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/has_episode_edge_ops.py",
+      "lines": 176,
+      "imports": [
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 155,
+      "group": 132,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.next_episode_edge_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/next_episode_edge_ops.py",
+      "lines": 176,
+      "imports": [
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.edges",
+        "graphiti_core.errors",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 156,
+      "group": 133,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.saga_node_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/saga_node_ops.py",
+      "lines": 185,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.errors",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 157,
+      "group": 134,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.translation",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/translation.py",
+      "lines": 83,
+      "imports": [],
+      "external": [
+        "__future__",
+        "re"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 158,
+      "group": 135,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations.search_ops",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/search_ops.py",
+      "lines": 651,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.record_parsers",
+        "graphiti_core.driver.relate.translation",
+        "graphiti_core.edges",
+        "graphiti_core.graph_queries",
+        "graphiti_core.helpers",
+        "graphiti_core.models.edges.edge_db_queries",
+        "graphiti_core.models.nodes.node_db_queries",
+        "graphiti_core.nodes",
+        "graphiti_core.search.search_filters"
+      ],
+      "external": [
+        "logging",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 159,
+      "group": 136,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.operations",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/operations/__init__.py",
+      "lines": 46,
+      "imports": [
+        "graphiti_core.driver.relate.operations.community_edge_ops",
+        "graphiti_core.driver.relate.operations.community_node_ops",
+        "graphiti_core.driver.relate.operations.entity_edge_ops",
+        "graphiti_core.driver.relate.operations.entity_node_ops",
+        "graphiti_core.driver.relate.operations.episode_node_ops",
+        "graphiti_core.driver.relate.operations.episodic_edge_ops",
+        "graphiti_core.driver.relate.operations.graph_ops",
+        "graphiti_core.driver.relate.operations.has_episode_edge_ops",
+        "graphiti_core.driver.relate.operations.next_episode_edge_ops",
+        "graphiti_core.driver.relate.operations.saga_node_ops",
+        "graphiti_core.driver.relate.operations.search_ops"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 160,
+      "group": 137,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate.search_interface",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate/search_interface.py",
+      "lines": 151,
+      "imports": [
+        "graphiti_core.driver.search_interface.search_interface"
+      ],
+      "external": [
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 161,
+      "group": 138,
+      "cycle": false,
+      "module": "graphiti_core.driver.relate_driver",
+      "source": ".upstream/graphiti/graphiti_core/driver/relate_driver.py",
+      "lines": 408,
+      "imports": [
+        "graphiti_core.driver.driver",
+        "graphiti_core.driver.operations.community_edge_ops",
+        "graphiti_core.driver.operations.community_node_ops",
+        "graphiti_core.driver.operations.entity_edge_ops",
+        "graphiti_core.driver.operations.entity_node_ops",
+        "graphiti_core.driver.operations.episode_node_ops",
+        "graphiti_core.driver.operations.episodic_edge_ops",
+        "graphiti_core.driver.operations.graph_ops",
+        "graphiti_core.driver.operations.has_episode_edge_ops",
+        "graphiti_core.driver.operations.next_episode_edge_ops",
+        "graphiti_core.driver.operations.saga_node_ops",
+        "graphiti_core.driver.operations.search_ops",
+        "graphiti_core.driver.query_executor",
+        "graphiti_core.driver.relate",
+        "graphiti_core.driver.relate.graph_operations_interface",
+        "graphiti_core.driver.relate.operations",
+        "graphiti_core.driver.relate.search_interface",
+        "graphiti_core.driver.relate.translation",
+        "graphiti_core.utils.datetime_utils"
+      ],
+      "external": [
+        "__future__",
+        "asyncio",
+        "collections",
+        "contextlib",
+        "datetime",
+        "logging",
+        "os",
+        "relate",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+    },
+    {
+      "order": 162,
+      "group": 139,
+      "cycle": false,
+      "module": "graphiti_core.embedder.azure_openai",
+      "source": ".upstream/graphiti/graphiti_core/embedder/azure_openai.py",
+      "lines": 72,
+      "imports": [
+        "graphiti_core.embedder.client"
+      ],
+      "external": [
+        "logging",
+        "openai",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: IEmbeddingGenerator adapter covers provider embedders (DECISIONS D3)"
+    },
+    {
+      "order": 163,
+      "group": 140,
+      "cycle": false,
+      "module": "graphiti_core.embedder.gemini",
+      "source": ".upstream/graphiti/graphiti_core/embedder/gemini.py",
+      "lines": 184,
+      "imports": [
+        "graphiti_core.embedder.client"
+      ],
+      "external": [
+        "collections",
+        "google",
+        "logging",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: IEmbeddingGenerator adapter covers provider embedders (DECISIONS D3)"
+    },
+    {
+      "order": 164,
+      "group": 141,
+      "cycle": false,
+      "module": "graphiti_core.embedder.voyage",
+      "source": ".upstream/graphiti/graphiti_core/embedder/voyage.py",
+      "lines": 77,
+      "imports": [
+        "graphiti_core.embedder.client"
+      ],
+      "external": [
+        "collections",
+        "pydantic",
+        "typing",
+        "voyageai"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: IEmbeddingGenerator adapter covers provider embedders (DECISIONS D3)"
+    },
+    {
+      "order": 165,
+      "group": 142,
+      "cycle": false,
+      "module": "graphiti_core.ingestion.sqlite_state_store",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/sqlite_state_store.py",
+      "lines": 483,
+      "imports": [
+        "graphiti_core.errors",
+        "graphiti_core.ingestion.state_store"
+      ],
+      "external": [
+        "asyncio",
+        "collections",
+        "sqlite3",
+        "threading",
+        "time",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 166,
+      "group": 143,
+      "cycle": false,
+      "module": "graphiti_core.ingestion",
+      "source": ".upstream/graphiti/graphiti_core/ingestion/__init__.py",
+      "lines": 101,
+      "imports": [
+        "graphiti_core.errors",
+        "graphiti_core.ingestion.change_set",
+        "graphiti_core.ingestion.config",
+        "graphiti_core.ingestion.graph_reader",
+        "graphiti_core.ingestion.phases",
+        "graphiti_core.ingestion.scheduler",
+        "graphiti_core.ingestion.sqlite_state_store",
+        "graphiti_core.ingestion.state_store"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 167,
+      "group": 144,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.anthropic_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/anthropic_client.py",
+      "lines": 435,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "anthropic",
+        "json",
+        "logging",
+        "os",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 168,
+      "group": 145,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.azure_openai_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/azure_openai_client.py",
+      "lines": 168,
+      "imports": [
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.llm_client.openai_base_client"
+      ],
+      "external": [
+        "json",
+        "logging",
+        "openai",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 169,
+      "group": 146,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.gemini_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/gemini_client.py",
+      "lines": 472,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "google",
+        "json",
+        "logging",
+        "pydantic",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 170,
+      "group": 147,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.gliner2_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/gliner2_client.py",
+      "lines": 332,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "ast",
+        "asyncio",
+        "gliner2",
+        "json",
+        "logging",
+        "pydantic",
+        "re",
+        "time",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "out-of-mvp: no .NET package, deferred to M5"
+    },
+    {
+      "order": 171,
+      "group": 148,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.groq_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/groq_client.py",
+      "lines": 88,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "groq",
+        "json",
+        "logging",
+        "pydantic",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 172,
+      "group": 149,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.openai_generic_client",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/openai_generic_client.py",
+      "lines": 236,
+      "imports": [
+        "graphiti_core.llm_client.client",
+        "graphiti_core.llm_client.config",
+        "graphiti_core.llm_client.errors",
+        "graphiti_core.prompts.models"
+      ],
+      "external": [
+        "json",
+        "logging",
+        "openai",
+        "pydantic",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": "replaced: one Microsoft.Extensions.AI adapter covers provider clients (DECISIONS D3)"
+    },
+    {
+      "order": 173,
+      "group": 150,
+      "cycle": false,
+      "module": "graphiti_core.llm_client.utils",
+      "source": ".upstream/graphiti/graphiti_core/llm_client/utils.py",
+      "lines": 35,
+      "imports": [
+        "graphiti_core.embedder.client"
+      ],
+      "external": [
+        "logging",
+        "time"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 174,
+      "group": 151,
+      "cycle": false,
+      "module": "graphiti_core.migrations",
+      "source": ".upstream/graphiti/graphiti_core/migrations/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 175,
+      "group": 152,
+      "cycle": false,
+      "module": "graphiti_core.models",
+      "source": ".upstream/graphiti/graphiti_core/models/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 176,
+      "group": 153,
+      "cycle": false,
+      "module": "graphiti_core.models.edges",
+      "source": ".upstream/graphiti/graphiti_core/models/edges/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 177,
+      "group": 154,
+      "cycle": false,
+      "module": "graphiti_core.models.nodes",
+      "source": ".upstream/graphiti/graphiti_core/models/nodes/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 178,
+      "group": 155,
+      "cycle": false,
+      "module": "graphiti_core.search",
+      "source": ".upstream/graphiti/graphiti_core/search/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 179,
+      "group": 156,
+      "cycle": false,
+      "module": "graphiti_core.search.search_helpers",
+      "source": ".upstream/graphiti/graphiti_core/search/search_helpers.py",
+      "lines": 73,
+      "imports": [
+        "graphiti_core.edges",
+        "graphiti_core.prompts.prompt_helpers",
+        "graphiti_core.search.search_config"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 180,
+      "group": 157,
+      "cycle": false,
+      "module": "graphiti_core.utils",
+      "source": ".upstream/graphiti/graphiti_core/utils/__init__.py",
+      "lines": 1,
+      "imports": [],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 181,
+      "group": 158,
+      "cycle": false,
+      "module": "graphiti_core.utils.content_chunking",
+      "source": ".upstream/graphiti/graphiti_core/utils/content_chunking.py",
+      "lines": 827,
+      "imports": [
+        "graphiti_core.helpers",
+        "graphiti_core.nodes"
+      ],
+      "external": [
+        "itertools",
+        "json",
+        "logging",
+        "math",
+        "random",
+        "re",
+        "typing"
+      ],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    },
+    {
+      "order": 182,
+      "group": 159,
+      "cycle": false,
+      "module": "graphiti_core.utils.maintenance",
+      "source": ".upstream/graphiti/graphiti_core/utils/maintenance/__init__.py",
+      "lines": 12,
+      "imports": [
+        "graphiti_core.utils.maintenance.edge_operations",
+        "graphiti_core.utils.maintenance.graph_data_operations",
+        "graphiti_core.utils.maintenance.node_operations"
+      ],
+      "external": [],
+      "target": "",
+      "status": "todo",
+      "notes": ""
+    }
+  ]
+}

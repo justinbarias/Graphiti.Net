@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('Directory.Packages.props', 'dotnet-tools.json') }}
+      - name: Setup
+        run: scripts/setup-env.sh
+      - name: Gate (docs, build, format, tests)
+        run: scripts/check.sh --test
+
+  mutation:
+    # Observe mode: the job reports the score and never blocks a merge.
+    # docs/TESTING.md says when this becomes an enforced threshold.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs: check
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Setup
+        run: scripts/setup-env.sh
+      - name: Mutation run
+        run: scripts/mutate.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stryker-report
+          path: StrykerOutput/**/reports/
+          if-no-files-found: ignore

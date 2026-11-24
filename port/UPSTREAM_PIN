@@ -1,0 +1,4 @@
+repo=https://github.com/getzep/graphiti.git
+commit=a61333edfa14cc483365ed7dd1e287ae6096db6c
+version=0.32.0
+python=3.12

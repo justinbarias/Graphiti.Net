@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,csproj,props,slnx,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+dotnet_diagnostic.CA1305.severity = error   # pass an IFormatProvider
+dotnet_diagnostic.CA1307.severity = error   # pass a StringComparison
+dotnet_diagnostic.CA1310.severity = error   # pass a StringComparison for correctness
+dotnet_diagnostic.CA2016.severity = error   # forward the CancellationToken
+dotnet_diagnostic.CA2007.severity = none    # ConfigureAwait is not needed in app code
+dotnet_diagnostic.CS8600.severity = error   # null assigned to non-nullable
+dotnet_diagnostic.CS8602.severity = error   # possible null dereference
+dotnet_diagnostic.CS8604.severity = error   # possible null argument
+
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none    # test names use underscores
+
+[*.g.cs]
+generated_code = true

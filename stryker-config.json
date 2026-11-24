@@ -1,0 +1,9 @@
+{
+  "stryker-config": {
+    "solution": "Graphiti.Net.slnx",
+    "test-runner": "mtp",
+    "disable-bail": true,
+    "reporters": ["json", "html", "progress"],
+    "thresholds": { "high": 80, "low": 60, "break": 0 }
+  }
+}

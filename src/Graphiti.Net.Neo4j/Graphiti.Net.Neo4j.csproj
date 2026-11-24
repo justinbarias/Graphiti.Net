@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Graphiti.Neo4j</RootNamespace>
+    <PackageId>Graphiti.Net.Neo4j</PackageId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Neo4j.Driver" />
+    <ProjectReference Include="../Graphiti.Net/Graphiti.Net.csproj" />
+  </ItemGroup>
+</Project>

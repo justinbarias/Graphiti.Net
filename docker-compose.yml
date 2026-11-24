@@ -1,0 +1,21 @@
+# Neo4j sidecar for end-to-end tests. The same file serves local machines, the devcontainer,
+# Claude cloud sessions and CI. The image tag matches upstream Graphiti at the pinned commit.
+services:
+  neo4j:
+    image: neo4j:5.26.2
+    ports:
+      - "127.0.0.1:7474:7474" # HTTP
+      - "127.0.0.1:7687:7687" # Bolt
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 2s
+      timeout: 10s
+      retries: 30
+      start_period: 5s
+    volumes:
+      - neo4j_data:/data
+
+volumes:
+  neo4j_data:

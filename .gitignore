@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+artifacts/
+TestResults/
+
+# Mutation testing output
+StrykerOutput/
+
+# Pinned upstream checkout (scripts/fetch-upstream.sh)
+.upstream/
+
+# Local environment
+.env
+.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json

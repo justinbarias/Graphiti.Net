@@ -1,0 +1,12 @@
+# Adds the development container to the root docker-compose.yml.
+# The base image is Ubuntu 24.04, the same OS as a Claude cloud session VM.
+# The dev container shares the Neo4j network namespace, so bolt://localhost:7687 works
+# in the devcontainer exactly as it does in a cloud session and on a local machine.
+services:
+  dev:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+    command: sleep infinity
+    network_mode: service:neo4j
+    volumes:
+      # Compose resolves this path from the folder of the first file, which is the repository root.
+      - .:/workspaces/Graphiti.Net:cached

@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet format:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet tool restore:*)",
+      "Bash(dotnet stryker:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(scripts/check.sh:*)",
+      "Bash(scripts/mutate.sh:*)",
+      "Bash(scripts/setup-env.sh:*)",
+      "Bash(scripts/fetch-upstream.sh:*)",
+      "Bash(python3 scripts/check_docs.py:*)"
+    ],
+    "deny": [
+      "Edit(.upstream/**)",
+      "Write(.upstream/**)"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <RootNamespace>Graphiti.E2E.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Neo4j.Driver" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="../../src/Graphiti.Net/Graphiti.Net.csproj" />
+    <ProjectReference Include="../../src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
+  </ItemGroup>
+</Project>

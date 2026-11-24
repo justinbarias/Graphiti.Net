@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Full gate before code leaves the machine: cheap checks, then tests against Neo4j.
+exec "$(git rev-parse --show-toplevel)/scripts/check.sh" --test

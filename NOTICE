@@ -1,0 +1,10 @@
+Graphiti.Net
+Copyright 2026 Graphiti.Net contributors
+
+This product is a port of Graphiti (https://github.com/getzep/graphiti),
+Copyright Zep Software, Inc., licensed under the Apache License, Version 2.0.
+The port is based on Graphiti version 0.32.0, commit
+a61333edfa14cc483365ed7dd1e287ae6096db6c.
+
+Graphiti.Net is an independent project. Zep Software, Inc. does not
+maintain or endorse it.

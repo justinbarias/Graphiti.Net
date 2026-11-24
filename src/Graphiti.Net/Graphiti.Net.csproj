@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Graphiti</RootNamespace>
+    <PackageId>Graphiti.Net</PackageId>
+  </PropertyGroup>
+</Project>
