@@ -1,0 +1,121 @@
+# Extension file of the command center status board.
+# The generator of the agent-harness skill reads the plan files itself. This file adds what they do not record.
+# docs/FRONTEND.md describes the page. scripts/command_center.sh builds it.
+
+name = "Graphiti.Net"
+recent_days = 7
+data = "docs/generated/command-center.data.json"   # scripts/command_center_data.py writes this file
+
+[features]
+order = [
+  "Repository and tooling", "Judge", "Source preparation", "Rulebook", "Public surface", "PyCompat", "Test quality", "Pilot",
+  "Core skeleton", "Foundations", "Graph types", "Model boundary", "Prompts", "Neo4j driver", "Search", "Maintenance",
+  "Ingestion", "Facade", "Parity", "Release",
+]
+
+# A task key, or a pattern, to a feature. An exact key wins over a pattern. The first pattern that matches wins.
+# Plan 0004 has no rows here: the data file gives each layer its feature.
+[features.map]
+"0001-*" = "Repository and tooling"
+"0002-10" = "Source preparation"
+"0002-11" = "Source preparation"
+"0002-12" = "Repository and tooling"
+"0002-*" = "Judge"
+"0003-1" = "Rulebook"
+"0003-2" = "Public surface"
+"0003-3" = "PyCompat"
+"0003-4" = "Test quality"
+"0003-5" = "Test quality"
+"0003-6" = "Pilot"
+"0003-7" = "Pilot"
+"0003-8" = "Pilot"
+"0005-1" = "Parity"
+"0005-2" = "Parity"
+"0005-3" = "Parity"
+"0005-4" = "Release"
+"0005-5" = "Repository and tooling"
+"0005-6" = "Test quality"
+"0005-7" = "Release"
+"0005-8" = "Parity"
+
+# The gate log in port/DECISIONS.md holds the dates. The data file copies them from there.
+[[gates]]
+id = "1"
+name = "Decisions"
+after_plan = "0001"
+
+[[gates]]
+id = "2"
+name = "Judge"
+after_plan = "0002"
+
+[[gates]]
+id = "3"
+name = "Rulebook"
+after_plan = "0003"
+
+[[gates]]
+id = "4"
+name = "Parity"
+after_plan = "0005"
+
+[plans."0005"]
+after = ["0004"]
+
+# A task starts after the tasks that it uses. The plan files state this order in text only.
+# Plan 0003: the mutation tasks and the pilot need PyCompat. The pilot review and the pilot decision follow the pilot.
+[tasks."0003-4"]
+waits_for = ["0003-3"]
+[tasks."0003-5"]
+waits_for = ["0003-3", "0003-4"]
+[tasks."0003-6"]
+waits_for = ["0003-3"]
+[tasks."0003-7"]
+waits_for = ["0003-6"]
+[tasks."0003-8"]
+waits_for = ["0003-7"]
+
+# Plan 0004: each layer depends on the layers under it. An end-to-end test follows its layer.
+[tasks."0004-L1"]
+waits_for = ["0004-L0"]
+[tasks."0004-L2"]
+waits_for = ["0004-L1"]
+[tasks."0004-L3"]
+waits_for = ["0004-L2"]
+[tasks."0004-L4"]
+waits_for = ["0004-L3"]
+[tasks."0004-L5"]
+waits_for = ["0004-L4"]
+[tasks."0004-L6"]
+waits_for = ["0004-L5"]
+[tasks."0004-L7"]
+waits_for = ["0004-L6"]
+[tasks."0004-L8"]
+waits_for = ["0004-L7"]
+[tasks."0004-L9"]
+waits_for = ["0004-L8"]
+[tasks."0004-E5"]
+waits_for = ["0004-L5"]
+[tasks."0004-E6"]
+waits_for = ["0004-L6"]
+[tasks."0004-E8"]
+waits_for = ["0004-L8"]
+[tasks."0004-E9"]
+waits_for = ["0004-L9"]
+
+[handoff]
+read = ["port/STATE.md", "port/queue.json"]
+skills = [
+  "Load the port-python-to-dotnet skill and follow its standing rules for this phase.",
+  "Use the engineering:system-design skill for each design decision in this task: boundaries, public interfaces, and data shapes.",
+]
+rules = [
+  "Never edit port/judge/, its golden files, or .upstream/ to make a check pass. Each other change to the judge needs the maintainer.",
+  "Ask before you start a subagent.",
+]
+done = [
+  "Run scripts/check.sh --test, then the verify skill.",
+  "Mark the task with \"Done <date>.\" at the start of its Task cell. A row of plan 0004 has no Task cell: use its Upstream packages cell or its Flow cell.",
+  "Update port/STATE.md and port/queue.json.",
+  "Run scripts/command_center.sh, and tell the maintainer to publish the page again.",
+]

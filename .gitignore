@@ -21,3 +21,7 @@ StrykerOutput/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Command center output (scripts/command_center.sh)
+docs/generated/command-center.html
+docs/generated/command-center.data.json

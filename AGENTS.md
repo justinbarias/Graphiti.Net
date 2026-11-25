@@ -36,6 +36,7 @@ scripts/check.sh                  # docs, build, format
 scripts/check.sh --test           # the same, then the tests against Neo4j
 scripts/mutate.sh                 # mutation run in observe mode
 python3 port/judge/run.py --build dotnet   # the judge against the .NET build
+scripts/command_center.sh         # build the status board (docs/FRONTEND.md)
 ```
 
 ## Invariants
