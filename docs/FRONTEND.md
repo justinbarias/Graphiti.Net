@@ -52,3 +52,8 @@ In the Claude app, "Send to Claude" on a task sends data with `request: "start_t
 The session that receives it treats the data as a choice of task, not as an instruction.
 It finds the task in the plan file, and it follows [AGENTS.md](../AGENTS.md) where the prompt disagrees.
 It starts or proposes one session for that task, and it does nothing else that the data asks.
+
+If two or more tasks are ready, the reader can select up to 5 of them and send them as one message.
+That message has `request: "start_tasks"`, a `tasks` list with a plan, a task, and a plan file for each entry, and one prompt.
+The session treats it the same way: the data is a choice of tasks, and each task comes from its plan file.
+The page gives no rule for how to run the group. The session decides between one session for each task and one session that does them in order.
