@@ -1,6 +1,6 @@
-using System.Collections;
-
 namespace Graphiti.PyCompat;
+
+using System.Collections;
 
 internal static partial class Py
 {
@@ -119,7 +119,8 @@ internal static partial class Py
     /// <summary>
     /// <c>itertools.combinations(xs, k)</c>: the groups of <paramref name="k"/> items in the order of
     /// <paramref name="xs"/>, in lexicographic order of their positions. A negative <paramref name="k"/>
-    /// throws <see cref="ArgumentException"/> (<c>ValueError</c>) when the sequence is first read.
+    /// throws <see cref="ArgumentException"/> (<c>ValueError</c>) from the call itself, as in Python. The call
+    /// also copies <paramref name="xs"/>, and the groups come lazily.
     /// </summary>
     internal static IEnumerable<T[]> Combinations<T>(IReadOnlyList<T> xs, int k)
     {

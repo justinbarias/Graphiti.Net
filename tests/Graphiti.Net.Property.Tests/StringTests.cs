@@ -1,8 +1,9 @@
+namespace Graphiti.PyCompat.Tests;
+
+using System.Text.Json;
 using CsCheck;
 using Graphiti.PyCompat;
 using static Graphiti.PyCompat.Tests.PythonValues;
-
-namespace Graphiti.PyCompat.Tests;
 
 public class StringTests
 {
@@ -94,6 +95,17 @@ public class StringTests
         {
             Assert.Equal(c.GetProperty("space").GetBoolean(), PyText.IsSpaceCodePoint(c.GetProperty("c").GetInt32()));
             Assert.Equal(c.GetProperty("upper").GetBoolean(), PyText.IsUpper(s));
+            Assert.Equal(c.GetProperty("a_upper").GetBoolean(), PyText.IsUpper("A" + s));
+            Assert.Equal(c.GetProperty("printable").GetBoolean(), !PyText.IsNonPrintable(c.GetProperty("c").GetInt32()));
+            if (c.GetProperty("digit") is { ValueKind: JsonValueKind.Number } digit)
+            {
+                Assert.Equal(digit.GetInt64(), Py.Int(s));
+            }
+            else
+            {
+                Assert.Throws<ArgumentException>(() => Py.Int(s));
+            }
+
             Assert.Equal(Ints(c.GetProperty("lower_map")), PyText.ToCodePoints(PyText.Lower(s)));
             Assert.Equal(Ints(c.GetProperty("title_map")), PyText.ToCodePoints(PyText.Capitalize(s)));
         });

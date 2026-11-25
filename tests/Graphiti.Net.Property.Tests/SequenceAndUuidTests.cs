@@ -1,8 +1,8 @@
+namespace Graphiti.PyCompat.Tests;
+
 using CsCheck;
 using Graphiti.PyCompat;
 using static Graphiti.PyCompat.Tests.PythonValues;
-
-namespace Graphiti.PyCompat.Tests;
 
 public class SequenceAndUuidTests
 {

@@ -1,8 +1,8 @@
+namespace Graphiti.PyCompat;
+
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-
-namespace Graphiti.PyCompat;
 
 /// <summary>Python builtins that C# lacks. Numbers, here. Sequences and UUIDs are in the other parts.</summary>
 internal static partial class Py
@@ -122,6 +122,43 @@ internal static partial class Py
         }
 
         return r;
+    }
+
+    /// <summary>
+    /// <c>math.comb(n, k)</c>: the number of ways to choose <paramref name="k"/> items from
+    /// <paramref name="n"/>. It is 0 when <paramref name="k"/> is above <paramref name="n"/>. A negative
+    /// argument throws <see cref="ArgumentException"/> (<c>ValueError</c>). A result outside the range
+    /// of a long throws <see cref="OverflowException"/> (debt T25).
+    /// </summary>
+    internal static long Comb(long n, long k)
+    {
+        if (n < 0)
+        {
+            throw new ArgumentException("n must be a non-negative integer");
+        }
+
+        if (k < 0)
+        {
+            throw new ArgumentException("k must be a non-negative integer");
+        }
+
+        if (k > n)
+        {
+            return 0;
+        }
+
+        k = Math.Min(k, n - k);
+        BigInteger result = 1;
+        for (long i = 1; i <= k; i++)
+        {
+            result = result * (n - k + i) / i;
+            if (result > long.MaxValue)
+            {
+                throw new OverflowException("the value does not fit in a long");
+            }
+        }
+
+        return (long)result;
     }
 
     /// <summary>
@@ -256,7 +293,7 @@ internal static partial class Py
         var digits = ReadDigits(s, ref i);
         if (digits is null || i != s.Length)
         {
-            throw new ArgumentException($"invalid literal for int() with base 10: {ReprStr(text)}");
+            throw InvalidIntLiteral(text);
         }
 
         if (digits.Length > MaxIntStrDigits)
@@ -268,7 +305,7 @@ internal static partial class Py
 
         if (!BigInteger.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
         {
-            throw new ArgumentException($"invalid literal for int() with base 10: {ReprStr(text)}");
+            throw InvalidIntLiteral(text);
         }
 
         if (negative)
@@ -353,6 +390,17 @@ internal static partial class Py
 
         var value = double.Parse(sb.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture);
         return negative ? -value : value;
+    }
+
+    /// <summary>
+    /// CPython formats this message with <c>%.200R</c>: the repr is cut after 200 code points, with no
+    /// closing quote when it is longer. <c>float()</c> has no such cut.
+    /// </summary>
+    private static ArgumentException InvalidIntLiteral(string text)
+    {
+        var shown = PyText.ToCodePoints(ReprStr(text));
+        var cut = shown.Length > 200 ? shown[..200] : shown;
+        return new ArgumentException("invalid literal for int() with base 10: " + PyText.FromCodePoints(cut));
     }
 
     private static ArgumentException NotAFloat(string text) =>

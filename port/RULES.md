@@ -71,7 +71,7 @@ A member keeps the meaning of its Python name. Do not rename a member to make it
 
 - Every ported type and member is `internal`, or `private` by R2. One family is `public`: the exception classes of `errors.py` and `llm_client/errors.py` (R4), with their constructors and properties.
 - [The public surface design](../docs/design-docs/public-surface-design.md) names each other public type. Those types are lead code, not ported code. Never add `public` to another ported type.
-- No `InternalsVisibleTo` exists yet. The lead adds it to the core project for `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.Property.Tests` when each project first needs it. Only the lead changes that list.
+- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants none yet. The lead adds it to the core project for `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.Property.Tests` when each project first needs it. Only the lead changes that list.
 - `PyCompat` members are `internal` too. The `PyCompat` project grants `InternalsVisibleTo` to the two product projects and to the test projects.
 - The core project never references `Neo4j.Driver`. A type from `Neo4j.Driver` appears only in `src/Graphiti.Net.Neo4j`.
 - The public facade `IGraphiti` is lead code. It maps public records to ported types and calls `GraphitiCore`. A ported unit never refers to a public record or to `IGraphiti`.

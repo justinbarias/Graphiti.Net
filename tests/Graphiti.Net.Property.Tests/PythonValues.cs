@@ -1,9 +1,9 @@
+namespace Graphiti.PyCompat.Tests;
+
 using System.Text;
 using System.Text.Json;
 using CsCheck;
 using Graphiti.PyCompat;
-
-namespace Graphiti.PyCompat.Tests;
 
 /// <summary>
 /// The values that real Python gave for each helper, read from <c>python-values.json</c>.
@@ -111,7 +111,7 @@ internal static class PythonValues
             var ex = Record.Exception(() => call(c));
             Assert.True(ex is not null && ex.GetType() == expected,
                 $"expected {expected.Name} for {c}, got {ex?.GetType().Name ?? "no exception"}");
-            if (!error.GetString()!.StartsWith("Unicode", StringComparison.Ordinal))
+            if (error.GetString() != "UnicodeEncodeError")
             {
                 Assert.Equal(FromCodePoints(c.GetProperty("msg")), ex!.Message);
             }

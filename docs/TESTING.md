@@ -19,8 +19,8 @@ This is the canonical home of the test strategy. It follows
 | --- | --- | --- | --- |
 | Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,999 cases: 1,965 pure and 34 flow. 11 flow scenarios use replies from a real model. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
-| Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | 52 tests for `PyCompat`: each helper against the values that Python recorded, and laws that hold for any input. |
-| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. No product code to mutate yet. |
+| Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | 55 tests for `PyCompat`: each helper against the values that Python recorded, and laws that hold for any input. |
+| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. `PyCompat` is the first code to mutate. No mutation run has scored it yet (plan 0003, tasks 4 and 5). |
 
 ### Differential judge
 

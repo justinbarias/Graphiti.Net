@@ -133,7 +133,7 @@ Not done and not checked:
 
 - No code follows the design. Plan 0004 writes the facade, the records, and the adapters.
 - One adversarial review ran. The section below gives its results. No second review ran after the fixes.
-- The Learn pages of `Microsoft.Extensions.AI.Abstractions` show version 10.11.0. The review found each member in the 10.8.3 assemblies. Nobody inspected the 11.0.1 assembly (debt T23).
+- The Learn pages of `Microsoft.Extensions.AI.Abstractions` show version 10.11.0. The review found each member in the 10.8.3 assemblies. Nobody inspected the 11.0.1 assembly (debt T21).
 - Nobody tested what a provider adapter other than OpenAI's does with `ChatOptions.AdditionalProperties`. The design does not depend on it (lead choice L6).
 - The scheduler hop of D33 and the hook of D30 have no code and no test yet.
 - The 12 open questions of the design page. Three need the maintainer: the packaging of `PyCompat`, the library row for `IHttpClientFactory`, and the code fence step of the chat adapter.
@@ -180,13 +180,13 @@ The change holds documents only, so steps 3 and 4 of the `verify` skill do not a
 
 Workhorse session on Sonnet 5.5. No subagent.
 
-Scope. The task says to build only the helpers that the queue needs. A Python `ast` pass over the 114 MVP modules found the scalar and text operations that they use. The pass lists `//` and `%`, `/`, `int()`, `float()`, `len`, slices, `lower`, `capitalize`, `isupper`, `strip`, `lstrip`, `rstrip`, `split`, `splitlines`, `find`, `rfind`, `ord`, `encode`, `decode`, `combinations`, `zip_longest`, `uuid4`, and `uuid5`. These helpers are built. The Part 2 members that no module uses (`Round`, `Comb`, `Title`, `Upper`, `IsAlnum`, `RSplit`, `Index`, `Chr`, `TimeSeconds`) are not built.
+Scope. The task says to build only the helpers that the queue needs. A Python `ast` pass over the 114 MVP modules found the scalar and text operations that they use. The pass lists `//` and `%`, `/`, `int()`, `float()`, `len`, slices, `lower`, `capitalize`, `isupper`, `strip`, `lstrip`, `rstrip`, `split`, `splitlines`, `find`, `rfind`, `ord`, `encode`, `decode`, `combinations`, `zip_longest`, `uuid4`, and `uuid5`. These helpers are built. The first pass missed a call that names an imported function (`from math import comb`) and a call on a module (`time.time()`). The integrated review found both. The second pass reads each call form and found `comb` (1 call, in `content_chunking`), `time()` (26 calls in 9 modules), and `time.time()` (18 calls in 1 module). `Py.Comb` and `Py.TimeSeconds` are built. The Part 2 members that no module uses (`Round`, `Title`, `Upper`, `IsAlnum`, `RSplit`, `Index`, `Chr`) are not built. The second pass also found two operations that Part 2 does not name: `math.isnan` (1 call, `dedup_helpers.py`) and `str.count` with a substring (2 calls, the two `*_db_queries.py` files). Nobody built them, and the maintainer decides.
 
 Built, all `internal` in `src/Graphiti.Net.PyCompat`, namespace `Graphiti.PyCompat`:
 
 | Class | Members |
 | --- | --- |
-| `Py` | `TrueDiv` (long and double), `FloorDiv`, `Mod`, `Int` (double and text), `Float` (text), `ReprStr`, `Len`, `At`, `Slice` (string and list), `CompareStrings`, `StringComparer`, `Combinations`, `ZipLongest`, `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl` |
+| `Py` | `TrueDiv` (long and double), `FloorDiv`, `Mod`, `Int` (double and text), `Float` (text), `ReprStr`, `Len`, `At`, `Slice` (string and list), `CompareStrings`, `StringComparer`, `Combinations`, `ZipLongest`, `Comb`, `TimeSeconds`, `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl` |
 | `PyText` | `Lower`, `Capitalize`, `IsUpper`, `Strip`, `LStrip`, `RStrip`, `Split` (whitespace and separator), `SplitLines`, `Find`, `RFind`, `CodePoints`, `Ord`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates`, and the internal `ToCodePoints`, `FromCodePoints`, `IsSpaceCodePoint` |
 | `PyUnicodeData` (generated) | The Python 3.12 (Unicode 15.0) tables for case ranges, case mapping, and decimal digits |
 
@@ -199,15 +199,15 @@ Decisions that a reader must know:
 - `Uuid5` uses SHA-1, as RFC 4122 requires. Analyzer CA5350 is off for this one project in its `.csproj`, with a comment. RULES.md R24 forbids `#pragma` and `[SuppressMessage]` and names no project setting. The maintainer can accept this or ask for another form.
 - No Python string in the cases holds a high surrogate directly before a low surrogate, because a .NET string would join them.
 
-Python values: `port/tools/generate_pycompat_values.py` runs Python 3.12.13 and writes `tests/Graphiti.Net.Property.Tests/python-values.json` (45,454 cases of 35 helpers over 129 strings, with the text of each Python error) and `src/Graphiti.Net.PyCompat/PyUnicodeData.g.cs`. The inputs include negative numbers, zero divisors, empty strings, an emoji (U+1F600), a combining mark (U+0301 after `e`), a family emoji joined with zero width joiners, flags, lone surrogates, a final sigma in six contexts, and the letters that changed in Unicode 16 (U+10D50). `--check` found both files current.
+Python values: `port/tools/generate_pycompat_values.py` runs Python 3.12.13 and writes `tests/Graphiti.Net.Property.Tests/python-values.json` (56,349 cases of 36 helpers over 134 strings, 4.7 MB, with the text of each Python error) and `src/Graphiti.Net.PyCompat/PyUnicodeData.g.cs`. The inputs include negative numbers, zero divisors, empty strings, an emoji (U+1F600), a combining mark (U+0301 after `e`), a family emoji joined with zero width joiners, flags, lone surrogates, a final sigma in six contexts, and the letters that changed in Unicode 16 (U+10D50). `--check` found both files current.
 
-Tests: `tests/Graphiti.Net.Property.Tests` has 52 tests. 35 compare a helper with the recorded values. Each runs every case, then lets CsCheck draw 200 cases from the list. The test also compares the message of each error, except the Unicode errors. 17 are CsCheck laws that do not use Python, for example `a == FloorDiv(a, b) * b + Mod(a, b)`, `Join(Split(s, sep)) == s`, and the UTF-8 round trip.
+Tests: `tests/Graphiti.Net.Property.Tests` has 55 tests. 36 compare a helper with the recorded values. Each runs every case, then lets CsCheck draw 200 cases from the list. The test also compares the message of each error, except the encode errors. 19 are CsCheck laws that do not use Python, for example `a == FloorDiv(a, b) * b + Mod(a, b)`, `Join(Split(s, sep)) == s`, and the UTF-8 round trip.
 
 Evidence:
 
 | Command | Result |
 | --- | --- |
-| `COMPOSE_PROJECT_NAME=graphitinet scripts/check.sh --test` | `check: passed`. `check_docs: ok (35 markdown files)`. Build: 0 warnings, 0 errors. Format: exit 0. Tests: 53 passed (52 property, 1 end-to-end), 0 failed. Judge: `selfcheck: 9 vectors, 0 differ`, `cases=1999 passed=1 failed=1998`, `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`. |
+| `COMPOSE_PROJECT_NAME=graphitinet scripts/check.sh --test` | `check: passed`. `check_docs: ok (36 markdown files)`. Build: 0 warnings, 0 errors. Format: exit 0. Tests: 56 passed (55 property, 1 end-to-end), 0 failed. This is the run after the integrated review. Judge: `selfcheck: 9 vectors, 0 differ`, `cases=1999 passed=1 failed=1998`, `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`. |
 | Four hand-made mutants, each tested and then reverted | `q--` to `q++` in `FloorDiv`: caught by 2 tests. Final sigma test replaced by `true`: caught by `Lower` and `Capitalize`. `CompareStrings` length tie-break replaced by 0: caught by 2 tests. The skip length of a bad UTF-8 sequence set to 1: not caught, and the result is the same, because a continuation byte is always a bad start byte. |
 | One failing test run | The first run failed on `int('\x1c5\x1f')`: Python raises `ValueError` and the helper returned 5. The fix is in `Py.Numbers.cs`. |
 
@@ -215,7 +215,7 @@ Adversarial review, Codex gpt-6-astra at high effort, read-only, 3 minutes 20 se
 
 | # | Finding | Answer |
 | --- | --- | --- |
-| 1 | The generator recorded `OverflowError` for Python ints that a long cannot hold, which changed the oracle to fit the code. | Fixed. The file keeps Python's real value in `big`. The test asserts `OverflowException`. The limit stays and is debt T21. |
+| 1 | The generator recorded `OverflowError` for Python ints that a long cannot hold, which changed the oracle to fit the code. | Fixed. The file keeps Python's real value in `big`. The test asserts `OverflowException`. The limit stays and is debt T25. |
 | 2 | The one-ULP property rejected correct division (`1232334214084484197 / 5233191937471430191`), and two laws restated the implementation. | Fixed. The law now checks in exact integer arithmetic that the result is the nearest double. The `Int` law checks truncation properties and not the formula. |
 | 3 | `"abc"[1::2**63-1]` overflowed the index. | Fixed with `Int128` and the slice length. Big steps and bounds are recorded cases now. |
 | 4 | `Split` with a lone surrogate as separator cut an emoji in half. | Fixed. `Split` works on code points. Two surrogate separators are recorded cases. |
@@ -236,3 +236,29 @@ Not done and not checked:
 - No project references `Graphiti.Net.PyCompat` yet except the test project. The product projects get the reference in task 6.
 - `port/queue.json` is unchanged: `PyCompat` is not a queue unit, and no unit changed state.
 
+### Integrated review, 2026-11-26
+
+One Opus 5.5 pass at high effort reviewed `git diff main...claude/plan-0003-pycompat-882eaf` on 2026-11-26. It found 4 important and 6 minor findings. The maintainer chose to fix all of them. The helpers matched Python 3.12 on 180,000 random inputs. The findings are around the helpers.
+
+| # | Finding | Answer |
+| --- | --- | --- |
+| 1 | The plan said that no MVP module uses `Comb` or `TimeSeconds`. | Wrong. The first `ast` pass missed two call forms. The second pass found `comb` and `time` (see the scope paragraph of task 3). `Py.Comb` and `Py.TimeSeconds` are built. `Comb` has 279 recorded cases, with k = 0, k = n, k above n, negative arguments with their messages, and 6 results beyond a long (recorded as `big`). `TimeSeconds` has a law test. The pass also found `math.isnan` and `str.count`, which Part 2 does not name. They are not built. |
+| 2 | Debt ids pointed to the wrong rows. | Fixed. `ARCHITECTURE.md` and the plan now point to T23 and T21 as the rows say. Debt T25 records that the helpers that return a `long` throw `OverflowException` where Python returns a larger int. The `grep` over `T21` to `T25` found no wrong reference. |
+| 3 | Four mutants passed all 52 tests. | Fixed with recorded values. The generator adds `Aǅ` and similar strings for `IsUpper`, astral and surrogate number text, the floats 2^63 and -2^63 with their neighbors, and a probe for each range boundary of each table and each key of the case maps. Each code point also records `isupper` of `"A" + c`, `isprintable`, and `int(c)`. Each mutant now fails a test, see the next table. |
+| 4 | The `int()` error message did not cut the repr at 200 characters. | Fixed. The repr is cut after 200 code points, as `%.200R` does. The values include texts whose repr has 199, 200, 201, and 302 characters, a `\x00` escape across the cut, and an astral letter on each side of it. The longest message has 240 characters. `Py.Float` has no cut and is unchanged. |
+| 5 | The strict `DecodeUtf8` message always said "invalid utf-8". | Fixed. The message has Python's reason (`invalid start byte`, `invalid continuation byte`, `unexpected end of data`) and its byte or position range. The tests compare the message for each of 1,346 byte strings, hand-picked and random. They match on the first attempt. |
+| 6 | The doc comment of `Combinations` said that a negative `k` throws at the first read. | Fixed. The call throws, as in Python. |
+| 7 | The `using` directives stood above the namespace. | Moved inside the file-scoped namespace in each hand-written C# file of both projects. The format step accepts it. |
+| 8 | Three lines were stale (`docs/TESTING.md`, `port/STATE.md` twice). | Each line is true now. The lead authorized one edit to `port/RULES.md`: the sentence in R3 about `InternalsVisibleTo`. |
+
+Mutants, each applied alone and then reverted (`git diff` shows none left):
+
+| Mutant | Failing tests |
+| --- | --- |
+| `IsUpper` without the titlecase check | `IsUpper_matches_Python`, `Single_code_point_tables_match_Python` |
+| `NormalizeNumberText` without the astral and surrogate branch | `Int_of_text_matches_Python`, `Float_of_text_matches_Python` |
+| `Py.Int(double)` with `t >= 2^63` changed to `>` | `Int_of_float_matches_Python` |
+| `PyUnicodeData.Lower`: the range 0x61 to 0x7A cut to 0x79 | `Single_code_point_tables_match_Python` |
+| `PyUnicodeData.DecimalDigitStarts`: 0x660 changed to 0x661 | `Int_of_text_matches_Python`, `Float_of_text_matches_Python`, `Single_code_point_tables_match_Python` |
+
+R12, R1, R4, Part 2, the design's Errors table, and the dates of the rule-change tables are fixed in the task 2 layer.

@@ -1,8 +1,8 @@
+namespace Graphiti.PyCompat.Tests;
+
 using CsCheck;
 using Graphiti.PyCompat;
 using static Graphiti.PyCompat.Tests.PythonValues;
-
-namespace Graphiti.PyCompat.Tests;
 
 public class NumberTests
 {
@@ -27,7 +27,28 @@ public class NumberTests
     [Fact]
     public void Float_of_text_matches_Python() => CheckFloat("float_str", c => Py.Float(Text(c, "s")));
 
+    [Fact]
+    public void Comb_matches_Python() => CheckLong("comb", c => Py.Comb(c.GetProperty("n").GetInt64(), c.GetProperty("k").GetInt64()));
+
     // Laws that hold for any input. They do not use the Python values.
+
+    [Fact]
+    public void Comb_obeys_Pascals_rule_and_symmetry() =>
+        Gen.Int[2, 60].SelectMany(n => Gen.Int[1, n - 1].Select(k => (n, k))).Sample(t =>
+            Py.Comb(t.n, t.k) == Py.Comb(t.n - 1, t.k - 1) + Py.Comb(t.n - 1, t.k)
+            && Py.Comb(t.n, t.k) == Py.Comb(t.n, t.n - t.k));
+
+    [Fact]
+    public void TimeSeconds_is_Unix_seconds_with_a_fraction()
+    {
+        var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+        var t = Py.TimeSeconds();
+        var after = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+        Assert.InRange(t, before - 0.002, after + 0.002);
+        Assert.True(Py.TimeSeconds() >= t, "the clock went back");
+        var fractions = Enumerable.Range(0, 20).Select(_ => Py.TimeSeconds() % 1.0).Distinct().Count();
+        Assert.True(fractions > 1, "the value has no fraction");
+    }
 
     [Fact]
     public void FloorDiv_and_Mod_split_a_number()

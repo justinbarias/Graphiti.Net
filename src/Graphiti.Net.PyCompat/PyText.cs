@@ -1,6 +1,6 @@
-using System.Text;
-
 namespace Graphiti.PyCompat;
+
+using System.Text;
 
 /// <summary>
 /// The <c>str</c> methods of Python 3.12. Python counts code points and holds a lone surrogate as
@@ -464,6 +464,8 @@ internal static class PyText
     /// <c>b.decode('utf-8', errors)</c>. <paramref name="errors"/> is <c>strict</c> or <c>ignore</c>.
     /// Strict mode throws <see cref="DecoderFallbackException"/> (<c>UnicodeDecodeError</c>).
     /// A malformed sequence is the longest prefix that can still start a valid sequence, as in CPython.
+    /// The message has CPython's reason (<c>invalid start byte</c>, <c>invalid continuation byte</c>, or
+    /// <c>unexpected end of data</c>) and its byte or position range.
     /// </summary>
     internal static string DecodeUtf8(ReadOnlySpan<byte> bytes, string errors = "strict")
     {
@@ -526,10 +528,17 @@ internal static class PyText
             }
 
             var valid = need > 0 ? 1 : 0;
+            var truncated = false;
             if (need > 0)
             {
-                for (var k = 1; k <= need && i + k < bytes.Length; k++)
+                for (var k = 1; k <= need; k++)
                 {
+                    if (i + k >= bytes.Length)
+                    {
+                        truncated = true;
+                        break;
+                    }
+
                     var b = bytes[i + k];
                     var lo = k == 1 ? min2 : 0x80;
                     var hi = k == 1 ? max2 : 0xBF;
@@ -552,8 +561,12 @@ internal static class PyText
 
             if (errors == "strict")
             {
-                throw new DecoderFallbackException(
-                    $"'utf-8' codec can't decode byte 0x{b0:x2} in position {i}: invalid utf-8");
+                var length = Math.Max(valid, 1);
+                var reason = need == 0 ? "invalid start byte" : truncated ? "unexpected end of data" : "invalid continuation byte";
+                var where = length == 1
+                    ? $"byte 0x{b0:x2} in position {i}"
+                    : $"bytes in position {i}-{i + length - 1}";
+                throw new DecoderFallbackException($"'utf-8' codec can't decode {where}: {reason}");
             }
 
             i += Math.Max(valid, 1);

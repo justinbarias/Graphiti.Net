@@ -66,7 +66,7 @@ def in_long(n: int) -> bool:
 
 def int_result(n: int) -> dict:
     """Python's int result. One that a C# long cannot hold is recorded as it is, in 'big' (a decimal
-    string). The helper throws OverflowException for it: the representation limit of debt T23."""
+    string). The helper throws OverflowException for it: the representation limit of debt T25."""
     return {'r': n} if in_long(n) else {'big': str(n)}
 
 
@@ -210,7 +210,7 @@ BASE_STRINGS = [
     'a\r\nb\rc\nd\x0be\x0cf\x1cg\x1dh\x1ei\x85j k l', '\n\n', 'a\n', '\r\n\r\n',
     'a,b,,c', ',', 'a.b.c', 'x--y--z', 'abab', 'ababab', ' a b  c ', '.,!?;:\'"()[]{}word.,',
     'Alice', 'alice smith', 'ALICE', 'Hello World', '́', 'á́b', '٣٤', '￿', '',
-    '\U00010000', '\U0010ffff',
+    '\U00010000', '\U0010ffff', 'A\u01c5', '\u01c5A', 'Aa', 'a\u01c5', 'A\u01c8B',
 ]
 assert not any(has_joinable_surrogates(s) for s in BASE_STRINGS)
 
@@ -252,8 +252,15 @@ def build_values() -> dict:
 
     ints = [0, 1, -1, 2, -2, 3, -3, 7, -7, 10, -10, 100, 2**31 - 1, -2**31, 2**53, 2**53 + 1,
             -(2**53) - 1, 2**62, 2**63 - 1, -2**63, 12345678901234, -9007199254740993]
+    combs = [(n, k) for n in range(-2, 13) for k in range(-2, 15)] + [
+        (66, 33), (67, 33), (67, 1), (68, 34), (100, 50), (100, 3), (62, 31), (2**62, 1), (2**62, 2),
+        (2**63 - 1, 0), (2**63 - 1, 1), (2**63 - 1, 2), (2**63 - 1, 2**63 - 1), (2**63 - 1, 2**63 - 2),
+        (10**18, 3), (10**18, 1), (10**18, 0), (0, 0), (0, 1), (1, 0), (-2**63, 0), (5, -2**63), (21, 10), (64, 32)]
+    for n, k in combs:
+        add('comb', {'n': n, 'k': k, **R(lambda: math.comb(n, k), int_result)})
     floats = [0.0, -0.0, 1.0, -1.0, 0.5, -0.5, 2.5, -7.25, 3.0, 1e308, -1e308, 5e-324, 1e-300,
-              math.inf, -math.inf, math.nan, 0.1, 1e18, 9.3e18, -9.3e18, 2.9, -2.9]
+              math.inf, -math.inf, math.nan, 0.1, 1e18, 9.3e18, -9.3e18, 2.9, -2.9,
+              2.0**63, -2.0**63, math.nextafter(2.0**63, 0.0), math.nextafter(-2.0**63, -math.inf)]
 
     for a in ints:
         for b in ints:
@@ -273,8 +280,15 @@ def build_values() -> dict:
         '00012', '1e3', '0x10', '9223372036854775807', '9223372036854775808', '-9223372036854775808',
         '-9223372036854775809', ' 7', '\x1c5\x1f', '١_٢', '1.0', '²', '٣\U0001F600', '\U0001F600',
         '5́', '+ 5', '- 5', '--5', '5-', '१२३', ' -12 ', '1_2_3', '0_0', '+_1', '1\x00',
-        '\U00010D40', '\U0001D7CE\U0001D7CF', '\ud800',
+        '\U00010D40', '\U0001D7CE\U0001D7CF', '\ud800', '\U00010035', '1\U00010035', '\U00010035\U0001D7CE',
+        '1\U0001002E5', '5\U0001002E',
     ]
+    # The error message cuts the repr after 200 code points (%.200R). Lengths around the cut, a
+    # non-printable code point whose escape crosses it, and an astral letter on each side of it.
+    int_texts += ['a' * n for n in (1, 196, 197, 198, 199, 200, 300)]
+    int_texts += ['a' * 197 + '\x00', 'a' * 196 + '\x00', 'a' * 198 + '\U000e0001', 'b' * 195 + '\u200b' + 'c' * 10,
+                  'a' * 198 + '\U0001F600', 'a' * 199 + '\U0001F600', '  ' + 'a' * 300, "'" + 'a' * 250,
+                  "'" * 120 + '"', '\u00e9' * 260, '\ud800' * 120]
     int_texts += ['0' * 4300, '0' * 4301, '1' * 4301, '0_' * 4300 + '0', '-' + '0' * 4301, ' ' + '0' * 4301]
     for t in int_texts:
         add('int_str', {'s': cps(t), **R(lambda: int(t), int_result)})
@@ -284,7 +298,7 @@ def build_values() -> dict:
         'infinit', '', '.', '1.', '.5', '1e', 'e5', '1e+', '1_', '1__0', '0x1p3', '١٫٥', '٣.٥', '1e-400',
         '4.9e-324', '1.7976931348623157e308', '1.797693134862316e308', '3.14159265358979323846264338327950288',
         '0.1', '1_000.000_1e1_0', '\x1c1.5\x1f', '\x851.5\x85', ' 1 ', '1e5_0', '1_e5', '1e_5', '1._5', '1_.5', '-.5e-2',
-        '+1.', 'in f', 'nan1', '- 1', '+-1', '1.5.5', '१.५', '5́', '\ud800', '9' * 400, '0.' + '0' * 400 + '1',
+        '+1.', 'in f', 'nan1', '- 1', '+-1', '1.5.5', '१.५', '5́', '\ud800', '1\U0001002E5', '1\U00010035', '9' * 400, '0.' + '0' * 400 + '1',
     ]
     for t in float_texts:
         add('float_str', {'s': cps(t), **R(lambda: float(t), float_result)})
@@ -350,9 +364,9 @@ def build_values() -> dict:
         b'\xf0\x9f\x98', b'\xf0\x9f', b'a\xe2\x82', b'a\xe2\x82b', b'\xe2\x28\xa1', b'\xf0\x28\x8c\xbc',
         b'\xf0\x90\x28\xbc', b'\xf0\x28\x8c\x28', b'\xc3', b'\xc3(', b'\xc3\xa9\xc3', b'ab\x80cd', b'\x80\x80\x80',
         b'\xf8\x88\x80\x80\x80', b'\xfc\x84\x80\x80\x80\x80', b'\xf4\x8f\xbf\xbf', b'\xf4\x8f\xbf', b'\xed\x9f\xbf',
-        b'\xee\x80\x80', b'\xef\xbf\xbf', b'\xf1\x80\x80\x80', b'\xf3\xbf\xbf\xbf',
+        b'\xee\x80\x80', b'\xef\xbf\xbf', b'\xf4\x90', b'\xf4\x90\x80\x80', b'\xe0\x80', b'\xe0\xa0', b'\xed\xa0', b'\xf0\x80', b'\xf0\x90\x80', b'\xc2', b'\xc2\x20', b'x\xc3', b'\xe2\x82\xff', b'\xf0\x9f\x98\xff', b'\xff\xfe', b'\xc0\xaf', b'\xf1\x80\x80\x80', b'\xf3\xbf\xbf\xbf',
     ]
-    for _ in range(300):
+    for _ in range(1500):
         n = rng.randint(0, 10)
         byte_samples.append(bytes(rng.choice([rng.randint(0, 255), rng.randint(0x80, 0xBF), rng.randint(0xC0, 0xF4)])
                                   for _ in range(n)))
@@ -383,10 +397,24 @@ def build_values() -> dict:
                         [rng.randrange(0, MAX_CP) for _ in range(1500)] +
                         [rng.randrange(0x370, 0x600) for _ in range(300)] + [rng.randrange(0x1C00, 0x1F00) for _ in range(150)] +
                         [0x1E9E, 0x130, 0x131, 0x149, 0x1C4, 0x1C5, 0x1C6, 0x1F0, 0x390, 0x1FB3, 0xFB01]))
+    tables = {'Upper': ranges(lambda c: chr(c).isupper()), 'Lower': ranges(lambda c: chr(c).islower()),
+              'Title': ranges(lambda c: unicodedata.category(chr(c)) == 'Lt'), 'Cased': ranges(is_cased),
+              'NonPrintable': ranges(lambda c: not chr(c).isprintable()),
+              'CaseIgnorable': ranges(is_case_ignorable)}
+    edge = set()
+    for flat in tables.values():
+        for v in flat:
+            edge.update(x for x in (v - 1, v, v + 1) if 0 <= x < MAX_CP)
+    for v in digit_starts():
+        edge.update(x for x in (v - 1, v, v + 9, v + 10) if 0 <= x < MAX_CP)
+    edge.update(c for c, _ in mapping(str.lower))
+    edge.update(c for c, _ in mapping(str.title))
+    probes = sorted(set(probes) | edge)
     for c in probes:
         ch = chr(c)
         add('code_point_props', {'c': c, 'upper': ch.isupper(), 'lower': ch.islower(), 'space': ch.isspace(),
-                                 'decimal': ch.isdecimal(), 'lower_map': cps(ch.lower()), 'title_map': cps(ch.title())})
+                                 'decimal': ch.isdecimal(), 'digit': int(ch) if ch.isdecimal() else None,
+                                 'a_upper': ('A' + ch).isupper(), 'printable': ch.isprintable(), 'lower_map': cps(ch.lower()), 'title_map': cps(ch.title())})
 
     return {
         'meta': {'python': sys.version.split()[0], 'unicode': unicodedata.unidata_version, 'seed': SEED,

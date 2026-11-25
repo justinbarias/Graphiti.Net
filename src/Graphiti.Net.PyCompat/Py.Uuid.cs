@@ -1,6 +1,6 @@
-using System.Security.Cryptography;
-
 namespace Graphiti.PyCompat;
+
+using System.Security.Cryptography;
 
 internal static partial class Py
 {
@@ -12,6 +12,10 @@ internal static partial class Py
 
     /// <summary><c>uuid4().hex</c>: a random version 4 UUID in lower case with no hyphens.</summary>
     internal static string Uuid4Hex() => Guid.NewGuid().ToString("N");
+
+    /// <summary><c>time.time()</c>: Unix seconds with a fraction, from the system clock.</summary>
+    internal static double TimeSeconds() =>
+        (TimeProvider.System.GetUtcNow() - DateTimeOffset.UnixEpoch).Ticks / (double)TimeSpan.TicksPerSecond;
 
     /// <summary>
     /// <c>str(uuid5(namespace, name))</c>: the SHA-1 UUID of the namespace and the UTF-8 name.
