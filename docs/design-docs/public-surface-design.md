@@ -635,8 +635,15 @@ A public call works from any thread and with any `SynchronizationContext`. The t
 | `JsonException` | The model reply was not a JSON object in 4 attempts |
 | `HttpRequestException` with a provider exception inside | The classifier named a server error in 4 attempts |
 | `KeyNotFoundException`, `InvalidCastException`, `NotImplementedException`, `TimeoutException`, `MissingMemberException` | Each upstream `KeyError`, `TypeError`, `NotImplementedError`, timeout, and `AttributeError`, by the table of rule R4 |
+| `DivideByZeroException` | Each upstream `ZeroDivisionError`, by the table of rule R4 |
+| `OverflowException` | Each upstream `OverflowError`, by the table of rule R4. Also an integer that a 64-bit `long` cannot hold: see the limit below. |
 
 The two decisions client exceptions stay internal with their module.
+
+One limit: `Py.Int` and `Py.FloorDiv` throw `OverflowException` for an integer that a 64-bit `long` cannot hold, where Python returns a value.
+`OverflowException` does not derive from `ArgumentException`, so a host's `catch (ArgumentException)` does not catch it.
+Example: `attribute_utils.py:67` calls `int(raw)` inside `except ValueError`, and the environment value `99999999999999999999` is an int in Python.
+Rule R4 of [the rulebook](../../port/RULES.md) states the same limit for ported code.
 
 This page also gives the rule for the provider errors that rule R4 leaves open:
 

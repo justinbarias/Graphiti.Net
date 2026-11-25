@@ -33,7 +33,7 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 | The public surface: `IGraphiti`, the public records, the options | `src/Graphiti.Net/`, namespace `Graphiti`. Only the lead adds files there, except the two error files of the row above. [The public surface design](../docs/design-docs/public-surface-design.md) lists the types. |
 
 - Ported code never declares a type in the namespace `Graphiti` itself, except the two error files. The public records there have the names of ported classes, for example `EntityNode` and `SearchConfig` (decision D35).
-- Use a file-scoped namespace, and write each `using` directive after the namespace line, not at the top of the file. This holds for each file that names a ported type: the files of `Core/` and `Internal/`, the Neo4j project, the judge host with `Bindings.cs`, and the test projects. Each of these namespaces is a child of `Graphiti`, and C# searches the parent namespace `Graphiti` before it searches a `using` directive at the top of a file.
+- Use a file-scoped namespace, and write each `using` directive after the namespace line, not at the top of the file. This holds for each C# project below the namespace `Graphiti`: the files of `Core/` and `Internal/`, the Neo4j project, the `PyCompat` project, the judge host with `Bindings.cs`, and the test projects. Most of these files name a ported type. Each of these namespaces is a child of `Graphiti`. C# searches the parent namespace `Graphiti` before it searches a `using` directive at the top of a file.
 - A wrong placement binds a name such as `SearchConfig` or `EntityNode` to the public record. The build does not always fail. A constructor call gave `error CS1503`, but `typeof(SearchConfig)` and `value is SearchFilters` compiled and used the public record (measured on 2026-11-25 with the .NET 10 SDK). A directive inside the namespace binds to the ported type.
 - In the Neo4j project, write `using global::Neo4j.Driver;`. Inside `namespace Graphiti.Neo4j.<Sub>;` the name `Neo4j` is `Graphiti.Neo4j`, and `using Neo4j.Driver;` fails with `error CS0234`.
 - A ported file needs no `using Graphiti;`. The exception classes and `ModelCallFailure` are visible from each `Graphiti.Core` namespace.
@@ -115,6 +115,7 @@ Built-in exceptions:
 | `asyncio.CancelledError` | `OperationCanceledException` |
 | `asyncio.TimeoutError`, `TimeoutError` | `TimeoutException` |
 | `neo4j` driver errors (`ClientError`, `DatabaseError`) | The `Neo4j.Driver` exception as it arrives. Never wrap it or translate it in product code. |
+| `UnicodeDecodeError` from `b.decode()` | `DecoderFallbackException`. `PyText.DecodeUtf8` throws it in strict mode for bytes that are not UTF-8. It derives from `ArgumentException`, as the Python class derives from `ValueError`. |
 | `UnicodeEncodeError` from `s.encode()` | `EncoderFallbackException`. `PyText.EncodeUtf8` throws it. It derives from `ArgumentException`, as the Python class derives from `ValueError`. |
 | `httpx.HTTPStatusError`, also `error.response.status_code` | `HttpRequestException` with a `StatusCode` that is not null. To raise one: `new HttpRequestException(message, null, statusCode)`. To catch one: `catch (HttpRequestException e) when (e.StatusCode is not null)`. |
 | `httpx.TransportError` | `HttpRequestException` with a null `StatusCode`, or an `IOException`, which a failed body read throws: `catch (Exception e) when (e is HttpRequestException { StatusCode: null } or IOException)` |
@@ -132,6 +133,12 @@ Catch clauses:
 | `except NotImplementedError: pass` around a driver operation | `catch (NotImplementedException)`. See R24 for the skeleton, which must not throw this type. |
 | `raise X(...) from e` | `throw new XException(..., e)` |
 | Bare `raise` | `throw;` |
+
+One limit of the integer type. A Python `int` has no size limit, and the port uses `long` (R18).
+`Py.Int` and `Py.FloorDiv` throw `OverflowException` for an integer that a 64-bit `long` cannot hold, where Python returns a value.
+`OverflowException` does not derive from `ArgumentException`, so a `catch` for a Python `ValueError` does not catch it.
+Example: `utils/maintenance/attribute_utils.py:67` calls `int(raw)` inside `except ValueError`. For the environment value `99999999999999999999` Python gets an int, and the port throws out of the function.
+The maintainer chose on 2026-11-26 to document this limit and not to change the helpers. Add no `catch` for it in ported code.
 
 Do not add an argument guard that Python does not have. Do not replace an exception with a result type.
 `Codec.PythonExceptionName` in the judge host maps each C# type back to its Python name. Part 5 lists the rows that it lacks.
@@ -386,7 +393,10 @@ Python counts code points. C# counts UTF-16 units. Upstream text is episode cont
 | `s.lower()`, `s.upper()`, `s.title()`, `s.capitalize()` | `PyText.Lower`, `PyText.Upper`, `PyText.Title`, `PyText.Capitalize`. Never `ToLowerInvariant` (GAPS F16). |
 | `s.isalnum()`, `isalpha`, `isdigit`, `isspace`, `isupper`, `islower` | `PyText.IsAlnum` and the others |
 | `s.split()`, `s.strip()`, `s.lstrip()`, `s.rstrip()` with no argument | `PyText.Split(s)`, `PyText.Strip(s)` and the others. Python's whitespace set differs from .NET's. |
-| `s.split(sep)`, `s.strip(chars)`, `s.replace(a, b)`, `sep.join(xs)` | The `string` method with `StringComparison.Ordinal`. `Split` keeps empty entries, as Python does. |
+| `s.split(sep)`, `s.strip(chars)`, `s.lstrip(chars)`, `s.rstrip(chars)` | `PyText.Split(s, sep)`, `PyText.Strip(s, chars)`, `PyText.LStrip(s, chars)`, `PyText.RStrip(s, chars)`. Never `string.Split` or `string.Trim`, which work on UTF-16 units. `Trim` with the units of one emoji cuts half of another emoji. `Split` on a lone surrogate cuts an emoji in two. `Split("")` returns the text, and Python raises `ValueError`. All three were measured in both runtimes on 2026-11-26. |
+| `s.replace(a, b)` where `a` is a literal that is not empty and holds no lone surrogate | `s.Replace(a, b, StringComparison.Ordinal)`. For such a literal both runtimes give the same text. |
+| `s.replace(a, b)` where `a` comes from data, and each `s.replace(a, b, count)` | `PyText.Replace(s, a, b, count)`. For an empty `a`, Python puts `b` between the code points and `string.Replace` throws `ArgumentException`. For a lone surrogate, `string.Replace` changes half of an emoji and Python changes nothing (measured on 2026-11-26). `string.Replace` has no count. The two sites are `llm_client/decision_prompts.py:116` and `:119`. |
+| `sep.join(xs)` | `string.Join(sep, xs)`. It only joins the items, so both runtimes give the same text. |
 | `s.split(sep, n)`, `s.rsplit(sep, n)` | `PyText.Split(s, sep, n)`, `PyText.RSplit(s, sep, n)`. Python's `n` is the number of cuts. The count of `string.Split` is the number of parts. |
 | `s.splitlines()` | `PyText.SplitLines(s)` |
 | `s.startswith`, `s.endswith`, `a in s` | The `string` method with `StringComparison.Ordinal` |
@@ -710,7 +720,7 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `Py` | `At`, `Slice`, `CompareStrings`, `StringComparer` | Indexing and slicing by code point with negative indexes, string order by code point |
 | `Py` | `Contains`, `IndexOf`, `Remove`, `Count`, `SortInPlace`, `Combinations`, `ZipLongest` | `in`, `list.index`, `list.remove`, `list.count` with the identity test first, `list.sort`, `itertools.combinations`, `itertools.zip_longest` |
 | `Py` | `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl`, `TimeSeconds` | `str(uuid4())`, `uuid4().hex`, `str(uuid5(...))`, `uuid.NAMESPACE_URL`, `time.time()` |
-| `PyText` | `Lower`, `Upper`, `Title`, `Capitalize`, `IsAlnum`, `IsAlpha`, `IsDigit`, `IsSpace`, `IsUpper`, `IsLower`, `Split`, `RSplit`, `SplitLines`, `Strip`, `LStrip`, `RStrip`, `Find`, `RFind`, `Index`, `CodePoints`, `Ord`, `Chr`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates` | The `str` methods with full Unicode case mapping, Python's whitespace set, and positions in code points. A lone surrogate stays as it is. The tables come from the pinned Python build. |
+| `PyText` | `Lower`, `Upper`, `Title`, `Capitalize`, `IsAlnum`, `IsAlpha`, `IsDigit`, `IsSpace`, `IsUpper`, `IsLower`, `Split`, `RSplit`, `SplitLines`, `Strip`, `LStrip`, `RStrip`, `Replace`, `Find`, `RFind`, `Index`, `CodePoints`, `Ord`, `Chr`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates` | The `str` methods with full Unicode case mapping, Python's whitespace set, and positions in code points. A lone surrogate stays as it is. The tables come from the pinned Python build. |
 | `PyJson` | `Dumps`, `Loads` | `json.dumps` with `ensure_ascii`, `indent`, `sort_keys`, `default`, the compact separators `,` and `:`, `allow_nan`, Python float text, `NaN` and `Infinity` tokens, and keys that are not strings. `json.loads` into the value model. |
 | `PyAst` | `LiteralEval` | `ast.literal_eval` for strings, numbers, `True`, `False`, `None`, lists, tuples, and dicts |
 | `PyDateTime` | A struct. `IsNaive`, `IsUtc`, `IsoFormat`, `Str`, `ReplaceUtc`, `ToUtc`, `StrFTime`, the comparison operators, and the static `FromIsoFormat`, `StrPTime`, `UtcNow` | A `datetime` of Python 3.12, aware or naive, to the microsecond |
@@ -734,6 +744,8 @@ Each helper throws the C# type that R4 gives for the Python error, because porte
 | `PyJson.Loads` | `JsonException` (`JSONDecodeError`) |
 | `PyAst.LiteralEval` | `FormatException` for text that is not Python syntax (`SyntaxError`), `ArgumentException` for syntax that is not a literal (`ValueError`) |
 | `PyText.EncodeUtf8` for a lone surrogate | `EncoderFallbackException` (`UnicodeEncodeError`) |
+| `PyText.DecodeUtf8` in strict mode for bytes that are not UTF-8 | `DecoderFallbackException` (`UnicodeDecodeError`) |
+| `Py.Int` on text or on a float, and `Py.FloorDiv`, for a result that a `long` cannot hold | `OverflowException`. Python returns a value here. See the limit in R4. |
 | A `PyDateTime` comparison of a naive and an aware value, a `Py.As*` read of the wrong type | `InvalidCastException` (`TypeError`) |
 | A `PyDateTime` result outside year 1 to 9999 | `OverflowException` (`OverflowError`) |
 
@@ -1000,3 +1012,4 @@ Wrong-type cases of O4:
 | 2026-11-25 | After the adversarial review (plan 0003, results of task 1): `OnLoopAsync` for library callbacks, `Node` and `Edge` as classes with identity-first container helpers, `Pydantic.Wrap` for validators, the `PyDateTime` struct for each `datetime`, lone surrogates, Python escapes and inner trailing spaces in string literals, `re.IGNORECASE` and `\d`, one more set site, the retry log condition, the `except Exception` filter, call-time environment reads, and rules for 14 constructs that had none. Plain enums are not decoded from their value text. New open items O6 and O7. | None. No unit is ported. |
 | 2026-11-25 | After the public surface design (plan 0003, task 2, decisions D24 to D35): ported code moves to `src/Graphiti.Net/Core/` and the namespace `Graphiti.Core`, the class `Graphiti` is `GraphitiCore`, the exception classes of the two error files are public in `Graphiti`, four provider error rows, `Asyncio.CallHostAsync` for host services, the custom type descriptor and `IResponseModel`, `PortServices.ClassifyModelFailure`, and `HttpClient` for the decisions client. Open item O3 is closed. | None. No unit is ported. |
 | 2026-11-25 | After the adversarial review of the public surface design (plan 0003, results of task 2): the `using` placement covers each project and `global::Neo4j.Driver`, the default-object branches of `Graphiti.__init__`, XML comments on public exception members, the inner-exception constructor, the timeout and transport rows of R4, the server error wrap of the chat adapter, `Pydantic.Wrap<TException>`, `ModelFields` as an ordered dictionary, the exact `IResponseModel`, `Asyncio.Run` returns a task, the HTTP rules of the decisions client, the reranker unit on the seam `LogProbabilityChat`, and judge fixtures as descriptors. | None. No unit is ported. |
+| 2026-11-26 | After the integrated review of the pull request stack. R12 sends `split(sep)` and `strip(chars)` to the `PyText` members. R12 has two rows for `replace`, and Part 2 lists `PyText.Replace`. R1 names the `PyCompat` project in the `using` rule. R4 and Part 2 have rows for `UnicodeDecodeError` and `DecodeUtf8`. R4 states the limit of `OverflowException` for an integer above 64 bits. | None. No unit is ported. |

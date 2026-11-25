@@ -109,8 +109,9 @@ None.
 | --- | --- | --- |
 | 2026-11-25 | First version of [RULES.md](RULES.md). | None. No unit is ported. |
 | 2026-11-25 | Fixes after the adversarial review. The rulebook lists them in its own change table. | None. No unit is ported. |
-| 2026-11-25 | After the public surface design (D24 to D35): the namespace `Graphiti.Core` and the folder `src/Graphiti.Net/Core/`, `GraphitiCore`, public exception classes, provider error rows, `Asyncio.CallHostAsync`, the custom type descriptor, and `HttpClient` for the decisions client. | None. No unit is ported. |
-| 2026-11-26 | After the adversarial review of the design. The rulebook lists the changes in its own change table. | None. No unit is ported. |
+| 2026-11-25 | After the public surface design (D24 to D35). Ported code uses the namespace `Graphiti.Core` and the folder `src/Graphiti.Net/Core/`. The facade class is `GraphitiCore`, and the exception classes are public. New rules cover provider errors, `Asyncio.CallHostAsync`, the custom type descriptor, and `HttpClient` for the decisions client. | None. No unit is ported. |
+| 2026-11-25 | After the adversarial review of the design. The rulebook lists the changes in its own change table. | None. No unit is ported. |
+| 2026-11-26 | After the integrated review of the pull request stack. R12 uses the `PyText` members for `split(sep)` and `strip(chars)`. R1 names the `PyCompat` project in the `using` rule. R4 has a row for `UnicodeDecodeError` and the limit of `OverflowException`. | None. No unit is ported. |
 
 [GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
