@@ -21,15 +21,24 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 
 | Python | C# |
 | --- | --- |
-| `graphiti_core/<pkg>/<module>.py` | `src/Graphiti.Net/<Pkg>/<Module>.cs`, namespace `Graphiti.<Pkg>` |
-| `graphiti_core/<module>.py` | `src/Graphiti.Net/<Module>.cs`, namespace `Graphiti` |
+| `graphiti_core/<pkg>/<module>.py` | `src/Graphiti.Net/Core/<Pkg>/<Module>.cs`, namespace `Graphiti.Core.<Pkg>` |
+| `graphiti_core/<module>.py` | `src/Graphiti.Net/Core/<Module>.cs`, namespace `Graphiti.Core` |
+| `graphiti_core/errors.py`, `graphiti_core/llm_client/errors.py` | `src/Graphiti.Net/Errors.cs` and `src/Graphiti.Net/LlmClientErrors.cs`, namespace `Graphiti`. These exception classes are public (R3). |
 | `graphiti_core/driver/neo4j/<sub>/<module>.py` | `src/Graphiti.Net.Neo4j/<Sub>/<Module>.cs`, namespace `Graphiti.Neo4j.<Sub>` |
 | `graphiti_core/driver/neo4j_driver.py` | `src/Graphiti.Net.Neo4j/Neo4jDriver.cs`, namespace `Graphiti.Neo4j` |
 | A folder name such as `llm_client` or `utils/maintenance` | PascalCase for each part: `LlmClient`, `Utils/Maintenance` |
 | `__init__.py` that only imports and exports names | No file. Set `target` in the queue to `none: re-exports only`. |
 | `__init__.py` with code | `<Pkg>/Package.cs` with a static class `<Pkg>Package` |
-| Code that has no upstream module (the logger holder, the model adapter) | `src/Graphiti.Net/Internal/`, namespace `Graphiti.Internal`. Only the lead adds files there. |
+| Code that has no upstream module (the logger holder, the facade, the model adapters) | `src/Graphiti.Net/Internal/`, namespace `Graphiti.Internal`. Only the lead adds files there. |
+| The public surface: `IGraphiti`, the public records, the options | `src/Graphiti.Net/`, namespace `Graphiti`. Only the lead adds files there, except the two error files of the row above. [The public surface design](../docs/design-docs/public-surface-design.md) lists the types. |
 
+- Ported code never declares a type in the namespace `Graphiti` itself, except the two error files. The public records there have the names of ported classes, for example `EntityNode` and `SearchConfig` (decision D35).
+- Use a file-scoped namespace, and write each `using` directive after the namespace line, not at the top of the file. This holds for each file that names a ported type: the files of `Core/` and `Internal/`, the Neo4j project, the judge host with `Bindings.cs`, and the test projects. Each of these namespaces is a child of `Graphiti`, and C# searches the parent namespace `Graphiti` before it searches a `using` directive at the top of a file.
+- A wrong placement binds a name such as `SearchConfig` or `EntityNode` to the public record. The build does not always fail. A constructor call gave `error CS1503`, but `typeof(SearchConfig)` and `value is SearchFilters` compiled and used the public record (measured on 2026-11-25 with the .NET 10 SDK). A directive inside the namespace binds to the ported type.
+- In the Neo4j project, write `using global::Neo4j.Driver;`. Inside `namespace Graphiti.Neo4j.<Sub>;` the name `Neo4j` is `Graphiti.Neo4j`, and `using Neo4j.Driver;` fails with `error CS0234`.
+- A ported file needs no `using Graphiti;`. The exception classes and `ModelCallFailure` are visible from each `Graphiti.Core` namespace.
+- A branch that builds a default object from a module that is not ported, or the Neo4j driver from core code, is not ported. Keep the parameter, and throw in that branch: `throw new ArgumentException("<python parameter name> must be provided"); // PORT: D3, D28`. The four sites are in `Graphiti.__init__`: `Neo4jDriver(uri, user, password)` at `graphiti.py:372`, `OpenAIClient()` at `:385`, `OpenAIEmbedder()` at `:389`, and `OpenAIRerankerClient()` at `:393`. The `uri is None` test before the first one keeps its upstream message. The facade always passes the four objects.
+- A public member needs an XML comment, because the build treats a missing one as an error (CS1591). Where Python has no docstring, write `/// <summary>Initializes a new instance of the <see cref="X"/> class.</summary>` for a constructor and `/// <summary>Gets the Python attribute <c>name</c>.</summary>` for a property, with the Python attribute name. This applies to the two error files only.
 - Put `// Ported from graphiti_core/<path>.py` on the first line of each file.
 - Keep the definitions in the order of the Python file. One Python module is one C# file.
 - Copy each docstring into an XML doc comment with the same text.
@@ -49,6 +58,7 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 | `UPPER_SNAKE` constant | `PascalCase` constant or static readonly field: `DEFAULT_PAGE_LIMIT` gives `DefaultPageLimit` |
 | `_private` function or field | The same name without the underscore. `private` if only its own class uses it, `internal` if not. |
 | A class | The same name. An exception class follows R4. |
+| The class `Graphiti` of `graphiti.py` | `GraphitiCore`. A type named `Graphiti` inside a namespace that starts with `Graphiti` breaks each qualified name (decision D24). The module-level functions of the file go to `GraphitiModule`, by the row above. |
 | `Prompt` and `Versions` in each of the 8 prompt modules | `<Module>Prompt` and `<Module>Versions`, for example `DedupeNodesPrompt`. These are the names that `prompts/lib.py` imports them under. |
 | A name that is a C# keyword (`eval`, `params`, `event`) | Add the prefix `@` for a parameter or a local. For a member, use the PascalCase name. |
 | Keyword arguments with defaults | Optional parameters in the same order with the same defaults |
@@ -59,12 +69,13 @@ A member keeps the meaning of its Python name. Do not rename a member to make it
 
 ### R3. Visibility and the public surface
 
-- Every ported type and member is `internal`, or `private` by R2. Nothing ported is `public`.
-- The public surface design (plan 0003, task 2) names the types that become public. Until then, do not add `public`.
+- Every ported type and member is `internal`, or `private` by R2. One family is `public`: the exception classes of `errors.py` and `llm_client/errors.py` (R4), with their constructors and properties.
+- [The public surface design](../docs/design-docs/public-surface-design.md) names each other public type. Those types are lead code, not ported code. Never add `public` to another ported type.
 - No `InternalsVisibleTo` exists yet. The lead adds it to the core project for `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.Property.Tests` when each project first needs it. Only the lead changes that list.
 - `PyCompat` members are `internal` too. The `PyCompat` project grants `InternalsVisibleTo` to the two product projects and to the test projects.
 - The core project never references `Neo4j.Driver`. A type from `Neo4j.Driver` appears only in `src/Graphiti.Net.Neo4j`.
-- The facade class of `graphiti.py` and custom entity and edge types (GAPS G6) wait for the public surface design. A unit that needs one of them is `blocked` until task 2 is approved.
+- The public facade `IGraphiti` is lead code. It maps public records to ported types and calls `GraphitiCore`. A ported unit never refers to a public record or to `IGraphiti`.
+- A custom entity or edge type (GAPS G6) reaches ported code as the internal `GraphTypeDescriptor` (R15, decision D26).
 
 ### R4. Exceptions
 
@@ -77,9 +88,10 @@ Each Python exception class becomes one C# class. The name ends in `Exception`, 
 | `NodeLabelValidationError(GraphitiError, ValueError)` | `NodeLabelValidationException` | `GraphitiException`. C# has one base class. No upstream `except ValueError` receives this class (7 sites, read on 2026-11-25). |
 | `ChangeSetRejected` | `ChangeSetRejectedException` | `GraphitiException` |
 | `RateLimitError`, `RefusalError`, `EmptyResponseError` (`llm_client/errors.py`) | `RateLimitException`, `RefusalException`, `EmptyResponseException` | `Exception` |
-| `OpenAIDecisionsInputTooLongError`, `_OpenAIInputTooLongSignal` | `OpenAIDecisionsInputTooLongException`, `OpenAIInputTooLongSignalException` | `Exception` |
+| `OpenAIDecisionsInputTooLongError`, `_OpenAIInputTooLongSignal` | `OpenAIDecisionsInputTooLongException`, `OpenAIInputTooLongSignalException`. Both stay `internal` in the file of their module (decision D32). | `Exception` |
 
-- A constructor takes the same parameters as the Python `__init__`, in the same order, with the same defaults.
+- A constructor takes the same parameters as the Python `__init__`, in the same order, with the same defaults. A class with no `__init__` of its own, for example `GraphitiError`, takes `string message`.
+- Each class also has the same constructor with one more last parameter, `Exception? innerException`, for `raise X(...) from e`.
 - Build the message with the same text as Python. GAPS J1 records `str(exception)` for each class.
 - `self.message` is the `Message` property. Each other attribute, for example `group_id` on `UnitInProgressError`, is a get-only property.
 - A list inside a message is Python `repr` text: `f'... {uuids}'` is `"... " + Py.Repr(uuids)`.
@@ -104,7 +116,10 @@ Built-in exceptions:
 | `asyncio.TimeoutError`, `TimeoutError` | `TimeoutException` |
 | `neo4j` driver errors (`ClientError`, `DatabaseError`) | The `Neo4j.Driver` exception as it arrives. Never wrap it or translate it in product code. |
 | `UnicodeEncodeError` from `s.encode()` | `EncoderFallbackException`. `PyText.EncodeUtf8` throws it. It derives from `ArgumentException`, as the Python class derives from `ValueError`. |
-| `httpx.HTTPStatusError`, `httpx.TimeoutException`, `httpx.TransportError`, `openai.RateLimitError` | No rule yet. The model adapter design (plan 0003, task 2) maps provider errors. A unit that raises or catches one is `blocked` until then (open item O3). |
+| `httpx.HTTPStatusError`, also `error.response.status_code` | `HttpRequestException` with a `StatusCode` that is not null. To raise one: `new HttpRequestException(message, null, statusCode)`. To catch one: `catch (HttpRequestException e) when (e.StatusCode is not null)`. |
+| `httpx.TransportError` | `HttpRequestException` with a null `StatusCode`, or an `IOException`, which a failed body read throws: `catch (Exception e) when (e is HttpRequestException { StatusCode: null } or IOException)` |
+| `httpx.TimeoutException` | `TimeoutException`, which `Asyncio.WaitForAsync` throws, or an `OperationCanceledException` for which `Asyncio.IsCancellation(e, cancellationToken)` is false, which `HttpClient` throws for its own timeout: `catch (Exception e) when (e is TimeoutException \|\| (e is OperationCanceledException && !Asyncio.IsCancellation(e, cancellationToken)))` |
+| `openai.RateLimitError` | An exception that the classifier of the chat adapter names a rate limit (decision D31). Ported code reaches the classifier through `PortServices.ClassifyModelFailure(e)`, which returns `ModelCallFailure.RateLimit`, `ServerError`, or `None`. The one ported site is `cross_encoder/openai_reranker_client.py:120`. The chat adapter is lead code: for a server error it throws an `HttpRequestException` with the status 500 and the provider exception inside, so that the ported `is_server_or_retry_error` retries it by the first row. |
 
 Catch clauses:
 
@@ -193,7 +208,7 @@ Decision D21 keeps the library choice: records with an explicit `Validate()`. `J
 | `M.model_validate_json(text)` | `M.ModelValidate(Pydantic.LoadJson(text))` |
 | `m.model_dump()`, `m.model_dump(mode='json')` | `m.ModelDump()`, `m.ModelDump(json: true)`. See below. |
 | `M.model_json_schema()` | `M.ModelJsonSchema` |
-| `M.model_fields` | `M.ModelFields`, a list of field descriptors in field order with the Python names |
+| `M.model_fields` | `M.ModelFields`, an `OrderedDictionary<string, PydanticField>` in field order with the Python names as keys. Code reads it by name, by count, and by key order. |
 | `__eq__` and `__hash__` on `Node` and `Edge` | `Equals` and `GetHashCode`. See R18 and R21. |
 
 Each model has these members after its properties, in this order. Add a member only if upstream or a judge case needs it.
@@ -209,13 +224,30 @@ Validators at the pinned commit:
 
 | Site | Python | C# |
 | --- | --- | --- |
-| `nodes.py:107` | `@field_validator('labels')` on `Node`, with `validate_assignment=True` | `Validate()` and the `set` accessor of `Labels` call `Helpers.ValidateNodeLabels` inside `Pydantic.Wrap` |
-| `search/search_filters.py:75` | `@field_validator('node_labels')` on `SearchFilters` | `Validate()` calls `Helpers.ValidateNodeLabels(NodeLabels)` inside `Pydantic.Wrap` |
+| `nodes.py:107` | `@field_validator('labels')` on `Node`, with `validate_assignment=True` | `Validate()` and the `set` accessor of `Labels` call `Helpers.ValidateNodeLabels` inside `Pydantic.Wrap<NodeLabelValidationException>` |
+| `search/search_filters.py:75` | `@field_validator('node_labels')` on `SearchFilters` | `Validate()` calls `Helpers.ValidateNodeLabels(NodeLabels)` inside `Pydantic.Wrap<NodeLabelValidationException>` |
 | `ingestion/config.py:77` | `@model_validator(mode='after')` on `ConcurrentIngestionConfig` | `Validate()`, after the field constraints, inside `Pydantic.Wrap` |
 
 Pydantic catches a `ValueError` that a validator raises and raises `ValidationError` in its place. `NodeLabelValidationError` is a `ValueError` in Python, so a bad label gives `ValidationError`, and 16 judge cases expect that.
-`Pydantic.Wrap(() => ...)` runs the validator code. It catches `ArgumentException` and `NodeLabelValidationException`, and throws `ValidationException` with the caught exception inside. A call to `Helpers.ValidateNodeLabels` outside a model still throws `NodeLabelValidationException`.
+`Pydantic.Wrap(() => ...)` runs the validator code. It catches `ArgumentException` and throws `ValidationException` with the caught exception inside. `Pydantic.Wrap<TException>(() => ...)` also catches `TException`. `PyCompat` cannot name `NodeLabelValidationException`, which is a core type, so the call site names it. A call to `Helpers.ValidateNodeLabels` outside a model still throws `NodeLabelValidationException`.
 A record compares a list or a dict property by reference. If upstream compares two models with `==`, stop and tell the lead.
+
+A response model that code passes as a value (`response_model: type[BaseModel]`) is an `IResponseModel`. The lead writes the interface and one class in `src/Graphiti.Net/Internal/`, namespace `Graphiti.Internal`:
+
+```csharp
+internal interface IResponseModel
+{
+    string PythonName { get; }
+    PydanticSchema ModelJsonSchema { get; }
+}
+
+internal sealed class BuiltinResponseModel(string pythonName, PydanticSchema modelJsonSchema) : IResponseModel
+```
+
+- Each built-in response model has one more member after `ModelJsonSchema`: `internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("<Python class name>", ModelJsonSchema);`.
+- Pass `M.ResponseModel` where Python passes the class `M`. It is one object, so `a is b` on two response models is `ReferenceEquals(a, b)`, which `prompts/lib.py:355` needs.
+- `response_model.model_json_schema()` is `responseModel.ModelJsonSchema`. `response_model.__name__` is `responseModel.PythonName`.
+- The interface has no `ModelValidate`. Code that validates a reply names the model: `M(**data)` is `M.ModelValidate(data)`. A custom type validates through its descriptor (R15).
 
 Other shapes:
 
@@ -233,9 +265,11 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 
 - Add no lock and no concurrent collection where Python has none.
 - Never call `Task.Run`, `Task.WhenAll`, `Task.WhenAny`, `Parallel.*`, `ConfigureAwait(false)`, `.Result`, or `.Wait()` in ported code. Each one leaves the scheduler or blocks it.
-- `Asyncio.Run` enters the scheduler. Only the facade, the judge host, and tests call it.
-- A library does not keep the scheduler for a lambda that it calls. A `Neo4j.Driver` work function and a Polly callback run on the thread pool (measured on 2026-11-25 with Neo4j.Driver 6.5.1 and Polly 8.6.6). Each lambda that ported code passes to a library starts with `Asyncio.OnLoopAsync(() => ...)`, which runs its body on the scheduler. This covers the work function of `ExecuteReadAsync` and `ExecuteWriteAsync`, each Polly callback, and a callback of `IChatClient`.
+- `Asyncio.Run(func)` starts `func` on the scheduler and returns its task. It does not block the caller. Only the facade, the judge host, and tests call it.
+- A library does not keep the scheduler for a lambda that it calls. A `Neo4j.Driver` work function and a Polly callback run on the thread pool (measured on 2026-11-25 with Neo4j.Driver 6.5.1 and Polly 8.6.6). Each lambda that ported code passes to a library starts with `Asyncio.OnLoopAsync(() => ...)`, which runs its body on the scheduler. This covers the work function of `ExecuteReadAsync` and `ExecuteWriteAsync` and each Polly callback.
 - `Asyncio.GatherAsync` and `Asyncio.SemaphoreGatherAsync` throw `InvalidOperationException` if the caller is not on the scheduler. A missed `OnLoopAsync` then fails in a test and does not become a race.
+- Host services run off the scheduler (decision D33). The lead's adapters in `Graphiti.Internal` call `IChatClient`, `IEmbeddingGenerator`, and a host `ICrossEncoder` through `Asyncio.CallHostAsync(token => ...)`. It starts the call on the thread pool and resumes on the scheduler. Ported code never calls it and never calls a host service directly. The ported reranker calls the lead seam `LogProbabilityChat` (R19).
+- A host delegate that ported code calls in line (`enabled_for_group`, a prompt builder, the failure classifier) is a plain call. Add no wrapper.
 
 | Python | C# |
 | --- | --- |
@@ -246,7 +280,7 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 | `asyncio.gather(*coroutines)` | `Asyncio.GatherAsync` with lambdas |
 | `asyncio.gather(..., return_exceptions=True)` | `Asyncio.GatherAsync(..., returnExceptions: true)`. It never throws, and each result is a value or an exception. |
 | `asyncio.create_task(coro)`, `asyncio.ensure_future(coro)` | `Asyncio.CreateTask(token => ..., out var cancel)`. `task.cancel()` is `cancel.Cancel()`. |
-| `asyncio.to_thread(f)` | `Asyncio.ToThreadAsync(f)`. It runs `f` on the thread pool and returns to the scheduler. It is the one allowed way to leave the scheduler. |
+| `asyncio.to_thread(f)` | `Asyncio.ToThreadAsync(f)`. It runs `f` on the thread pool and returns to the scheduler. In ported code it is the one allowed way to leave the scheduler. |
 | `threading.Lock` | A `System.Threading.Lock` field with the `lock` statement. Keep it: code inside `to_thread` runs off the scheduler. |
 | `asyncio.Semaphore(n)` | `SemaphoreSlim(n, n)` with `WaitAsync(cancellationToken)` and `Release()` |
 | `with suppress(asyncio.CancelledError): await task` | `try { await task; } catch (OperationCanceledException) { }` |
@@ -451,7 +485,7 @@ No `dynamic` and no reflection, except the one site that the table names. Each `
 | `decorators.py:53`, `:54`, `:63`, `:95` | `hasattr(self, 'clients')`, `getattr(driver, '_database', None)` | Typed access inside the explicit wrapper of R16: `self.Clients.Driver`, `driver.Database`, `self.MaxCoroutines` |
 | `utils/bulk_utils.py:195` | `hasattr(session, 'query_timeout_ms')` | An interface `IQueryTimeoutSession` with the one property. Test with `is`. |
 | `utils/bulk_utils.py:283` | Tests whether the interface class overrides an operation | Reflection is allowed at this one site: compare `GetMethod(name).DeclaringType` with `typeof(GraphOperationsInterface)`. Keep the Python operation names in the result. |
-| `utils/maintenance/attribute_utils.py:87`, `:88`, `:98` | `getattr(field_info, 'metadata', [])`, `max_length`, `is_required` | Properties of the field descriptor of a custom type. Blocked until the public surface design (R3). |
+| `utils/maintenance/attribute_utils.py:87`, `:88`, `:98` | `getattr(field_info, 'metadata', [])`, `max_length`, `is_required` | `GraphFieldDescriptor.MaxLength` (a `long?`) and `GraphFieldDescriptor.Required` of the custom type descriptor (below) |
 | `namespaces/nodes.py:352`, `namespaces/edges.py:352` | `__getattr__` raises `NotImplementedError` for the names of the operations that a driver lacks | One property for each name that Python tests. Its getter throws `NotImplementedException` with the same message if the driver has no such operations. Other names do not exist in C#. |
 | `prompts/lib.py:477` to `:618` (11 sites) | `getattr(library, group_name)`, `getattr(group, method_name)`, `hasattr(library, 'specs')` | `IPromptLibrary` and `IPromptGroup` (below) |
 | `llm_client/prompt_config.py:96`, `:108`, `:118`, `:292`, `:312` | `getattr(parent, nested_name)`, `getattr(overrides, group_name)`, `fields(overrides)` | A static table from the Python group name to the nested type and to a getter, in field order |
@@ -463,6 +497,17 @@ The prompt library is read by name, so it gets two interfaces:
 - `getattr` on a missing name throws `MissingMemberException(name)`. `hasattr` is the `TryGet` call.
 - A class with `__getattr__` (`_OverrideGroup`, `_ComposedPromptLibrary`, `_LibraryWithBuiltinSpecs`) implements the interface and forwards in `TryGet`.
 - The typed members of the Python classes (`library.dedupe_nodes.node`) stay as properties and methods next to the lookup.
+
+A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeDescriptor` (decision D26). The lead writes it. The public `GraphTypeDefinition` builds it. It implements `IResponseModel` (R7), because upstream passes a custom type as the response model of the attribute prompt.
+
+| Python on a custom type class | C# on the descriptor |
+| --- | --- |
+| `dict[str, type[BaseModel]]` | `OrderedDictionary<string, GraphTypeDescriptor>`, in the order of the caller's list |
+| `type_model.__doc__` | `descriptor.Doc`, a `string?` |
+| `type_model.model_fields` | `descriptor.ModelFields`, an `OrderedDictionary<string, GraphFieldDescriptor>` with the Python field names |
+| `type_model.model_json_schema()` | `descriptor.ModelJsonSchema` |
+| `type_model(**data)` | `descriptor.ModelValidate(data)`. It applies lax coercion by the kind of each field and throws `ValidationException`. It returns the validated dictionary. |
+| `type_model.__name__` | `descriptor.PythonName` |
 
 | Python | C# |
 | --- | --- |
@@ -507,7 +552,7 @@ The prompt library is read by name, so it gets two interfaces:
 | `Neo4jDriver.__init__` starts an index build as a background task | Not ported. The .NET driver builds indexes only in `BuildIndicesAndConstraintsAsync` (GAPS G20). Write `// PORT: G20` at that place. |
 | An optional import in `try` and `except ImportError` | Port the branch that runs when the import works, if the package is in [DECISIONS.md](DECISIONS.md). If not, stop and tell the lead. |
 
-The ambient holder `Graphiti.Internal.PortServices` (decision D23) has three members: `Logger(Type)`, `Time` (a `TimeProvider`), and `Random` (a `PyRandom`).
+The ambient holder `Graphiti.Internal.PortServices` (decision D23) has four members: `Logger(Type)`, `Time` (a `TimeProvider`), `Random` (a `PyRandom`), and `ClassifyModelFailure(Exception)` (R4, decision D31).
 Read the clock, the random source, and loggers only through it. Never use `DateTime.Now`, `DateTimeOffset.UtcNow`, `Stopwatch`, `Random.Shared`, or `new Random()`.
 
 ### R18. Numbers, vectors, hashes, random values, and UUIDs
@@ -544,6 +589,17 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
 - A lazy import inside a function, used to break a cycle, becomes a normal reference.
 - The driver contract of group 10 lives in the core project. It never names a `Neo4j.Driver` type. Upstream core code uses the `neo4j` package in two places.
 - `neo4j_time.DateTime` in `helpers.parse_db_date`: the Neo4j project converts a driver date to `PyDateTime` before the value enters the core.
+- `httpx.AsyncClient` in `llm_client/openai_decisions_client.py` is an `HttpClient` that the constructor takes, as Python takes `http_client` (decision D32). No other MVP module uses `httpx` for a request. The request `http_client.post(url, headers=..., json=..., timeout=...)` follows these rules:
+  - The default client of the constructor is `new HttpClient { Timeout = TimeSpan.FromSeconds(timeoutSeconds) }`, because the default timeout of `HttpClient` is 100 seconds and upstream's is 120.
+  - The body is the UTF-8 bytes of `PyJson.Dumps(body, ensureAscii: false, compact: true, allowNan: false)`. httpx 0.28.1 writes `json=` with `ensure_ascii=False`, the separators `,` and `:`, and `allow_nan=False`.
+  - Send the body as a `ByteArrayContent` with `Headers.ContentType = new MediaTypeHeaderValue("application/json")`. `Content-Type` is a content header, and `StringContent` adds a `charset` that Python does not send. `Authorization` is a request header.
+  - Wrap the send in `Asyncio.WaitForAsync` with `timeout_seconds`. R4 gives the `catch` clause for `httpx.TimeoutException`.
+  - `response.json()` is `PyJson.Loads` of the body text. `response.text` is the body text. `response.status_code` is `(long)response.StatusCode`.
+- `cross_encoder/openai_reranker_client.py` stays a ported unit (decision D30). Its `self.client` is the lead seam `Graphiti.Internal.LogProbabilityChat`.
+  - The constructor is `OpenAIRerankerClient(LLMConfig? config = null, LogProbabilityChat? client = null)`. The branches that build `AsyncOpenAI` or unwrap an `OpenAIClient` are not ported. A null client throws by the default-object rule of R1.
+  - `self.client.chat.completions.create(model=..., messages=..., temperature=0, max_tokens=1, logit_bias={...}, logprobs=True, top_logprobs=2)` is `Client.CreateAsync(model, messages, temperature: 0, maxTokens: 1, logitBias, logprobs: true, topLogprobs: 2, cancellationToken)`. `model` is `Config.Model`, and null where Python falls back to `DEFAULT_MODEL` (the design page lists this difference).
+  - The call returns `List<TopLogprob>?`, which stands for `response.choices[0].logprobs.content[0].top_logprobs`. Null stands for the two `is not None` tests of upstream, and the port writes `?? []`. A `TopLogprob` has `Token` and `Logprob`.
+  - `np.exp(x)` is `Math.Exp(x)`. `except openai.RateLimitError` follows R4.
 - `from neo4j import unit_of_work` in `utils/bulk_utils.py:192`: the core needs a way to ask the driver session for a write with a timeout. That is a new member of the driver contract, which is an ask-first item. The unit is `blocked` until the maintainer decides (open item O6).
 - The pilot (plan 0003, task 6) ports `search.search_filters` alone, although it is in group 10. It adds skeleton members by R24 for each name that it uses from the other 17 modules. This is the one exception to the rule above.
 
@@ -584,6 +640,7 @@ The four lookup methods that apply no group filter (`node_distance_reranker`, `e
 ### R22. Judge bindings and wrong-type cases
 
 - Each ported unit adds its bindings to `tests/Graphiti.Net.JudgeHost/Bindings.cs`. A binding decodes the arguments, calls the product code, and encodes the result. It does nothing else.
+- A `{"$ref": "fixtures:Name"}` argument is a custom type. `tests/Graphiti.Net.JudgeHost/Fixtures.cs` holds one `GraphTypeDescriptor` for each of the five classes of `port/judge/host-python/fixtures.py`, built through the public `GraphTypeDefinition`. The lead writes that file.
 - A `$model` argument is decoded with `ModelValidate` (R7). A `$enum` argument is decoded with `FromValue`. A `$ref` to a constant or a function is decoded to the ported member.
 - A model in a result is encoded as `$type` with the Python class name and the Python field names. Use `ModelDump` if the model has it.
 - A function that only changes its arguments returns nothing, so no pure case observes it (GAPS F20). Bind it only if a case names it. The flow layer covers it.
@@ -654,7 +711,7 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `Py` | `Contains`, `IndexOf`, `Remove`, `Count`, `SortInPlace`, `Combinations`, `ZipLongest` | `in`, `list.index`, `list.remove`, `list.count` with the identity test first, `list.sort`, `itertools.combinations`, `itertools.zip_longest` |
 | `Py` | `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl`, `TimeSeconds` | `str(uuid4())`, `uuid4().hex`, `str(uuid5(...))`, `uuid.NAMESPACE_URL`, `time.time()` |
 | `PyText` | `Lower`, `Upper`, `Title`, `Capitalize`, `IsAlnum`, `IsAlpha`, `IsDigit`, `IsSpace`, `IsUpper`, `IsLower`, `Split`, `RSplit`, `SplitLines`, `Strip`, `LStrip`, `RStrip`, `Find`, `RFind`, `Index`, `CodePoints`, `Ord`, `Chr`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates` | The `str` methods with full Unicode case mapping, Python's whitespace set, and positions in code points. A lone surrogate stays as it is. The tables come from the pinned Python build. |
-| `PyJson` | `Dumps`, `Loads` | `json.dumps` with `ensure_ascii`, `indent`, `sort_keys`, `default`, Python float text, `NaN` and `Infinity` tokens, and keys that are not strings. `json.loads` into the value model. |
+| `PyJson` | `Dumps`, `Loads` | `json.dumps` with `ensure_ascii`, `indent`, `sort_keys`, `default`, the compact separators `,` and `:`, `allow_nan`, Python float text, `NaN` and `Infinity` tokens, and keys that are not strings. `json.loads` into the value model. |
 | `PyAst` | `LiteralEval` | `ast.literal_eval` for strings, numbers, `True`, `False`, `None`, lists, tuples, and dicts |
 | `PyDateTime` | A struct. `IsNaive`, `IsUtc`, `IsoFormat`, `Str`, `ReplaceUtc`, `ToUtc`, `StrFTime`, the comparison operators, and the static `FromIsoFormat`, `StrPTime`, `UtcNow` | A `datetime` of Python 3.12, aware or naive, to the microsecond |
 | `PyRegex` | `Space`, `NotSpace`, `Word`, `NotWord`, `Boundary`, `Digit`, `Split` | The character classes of `re` for `str` patterns, and `re.split` |
@@ -663,8 +720,8 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `PyRandom` | Type | The `random` functions that upstream calls, with a seed for tests |
 | `PyEnv` | `Str`, `Int`, `Float`, `Truthy` | `os.getenv` with the conversions of R17 |
 | `PyHash` | `Blake2b` | `hashlib.blake2b` with a digest size |
-| `Pydantic` | Field readers for each field type, `Wrap`, `ValidationException`, `PydanticSchema`, `JsonValue`, `DumpJson`, `LoadJson` | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError`, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode |
-| `Asyncio` | `Run`, `OnLoopAsync`, `GatherAsync`, `SemaphoreGatherAsync`, `CreateTask`, `WaitForAsync`, `ShieldAsync`, `ToThreadAsync`, `IsCancellation`, `AsyncEvent` | The asyncio calls of R8 on the exclusive scheduler |
+| `Pydantic` | Field readers for each field type, `Wrap`, `Wrap<TException>`, `PydanticField`, `ValidationException`, `PydanticSchema`, `JsonValue`, `DumpJson`, `LoadJson` | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError`, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode |
+| `Asyncio` | `Run`, `OnLoopAsync`, `GatherAsync`, `SemaphoreGatherAsync`, `CreateTask`, `WaitForAsync`, `ShieldAsync`, `ToThreadAsync`, `CallHostAsync`, `IsCancellation`, `AsyncEvent` | The asyncio calls of R8 on the exclusive scheduler. `CallHostAsync` has no Python form: it is the hop to a host service (decision D33). |
 
 There is no general regex helper. Translate each pattern by hand (R13).
 
@@ -765,7 +822,7 @@ R12 replaces this table. Three rows stay:
 | `Protocol`, `ABC` | R15 |
 | `Enum`, `TypedDict`, `dataclass`, pydantic `BaseModel` | R7 |
 | `Callable[[A], B]` | `Func<A, B>`, or a named delegate when Python names the type |
-| `type[BaseModel]` as a value, for example a response model | Blocked until the public surface design decides the descriptor type (R3). Built-in response models use their `ModelJsonSchema` and `ModelValidate`. |
+| `type[BaseModel]` as a value | For a custom entity or edge type: `GraphTypeDescriptor` (R15). For a response model parameter: `IResponseModel` (R7). A descriptor implements it, and each built-in response model has a static `ResponseModel` object. |
 
 ### Pydantic models and JSON
 
@@ -821,7 +878,7 @@ Each entry of [GAPS.md](GAPS.md) and the rule that answers it.
 | G3 | The pydantic JSON schema text | R7 |
 | G4 | `str(datetime)` and `isoformat()` | R11 |
 | G5 | Pydantic models, validators, and coercion | R6, R7 |
-| G6 | Custom entity and edge types | R3, R15. Blocked until the public surface design. |
+| G6 | Custom entity and edge types | R3, R15, decision D26 |
 | G7 | Duck typing | R15 |
 | G8 | `typing.Protocol` | R15 |
 | G9 | Decorators | R16 |
@@ -918,10 +975,11 @@ These items need the lead or the maintainer. An implementer that meets one stops
 | --- | --- | --- | --- |
 | O1 | The runner does not yet accept `JudgeTypeRejected` (decision D20). The change touches `port/judge/run.py` after gate 2, so it goes in its own pull request. | Maintainer approves the pull request | The pilot (plan 0003, task 6) |
 | O2 | `Codec.PythonExceptionName` lacks rows for `ValidationException`, `MissingMemberException`, `DivideByZeroException`, `OverflowException`, `JsonException`, `FormatException`, `InvalidOperationException`, `TimeoutException`, the `Neo4j.Driver` exception types, and each ported exception class of R4. Its default branch returns the C# type name. The row for `ValidationException` and the rows for other types that derive from `ArgumentException` must stand above the `ArgumentException` arm, which matches first today. `tests/Graphiti.Net.JudgeHost/Core/` changes in its own pull request. | Lead | The pilot |
-| O3 | Custom entity and edge types, the facade class name, the types that become public (GAPS G6), the C# types for provider errors (R4), and what a host callback can expect from the exclusive scheduler (R8) | Maintainer, through plan 0003, task 2 | Layer 3 of plan 0004 |
+| O3 | Closed on 2026-11-25. [The public surface design](../docs/design-docs/public-surface-design.md) and decisions D24 to D35 answer it: R1, R2, R3, R4, R8, R15, and R19 hold the rules. | | |
 | O4 | 23 cases with `wrong_type` in the id have a golden result that is not `TypeError` or `AttributeError`. The table below gives the proposed answer for each group. | Maintainer, by name at gate 4 | Gate 4 |
 | O5 | `.claude/settings.json` denies each edit under `port/judge/`, but the runner tells a session to remove a passing case from `port/judge/expected-failures.txt`. | Maintainer | The pilot |
 | O6 | `utils/bulk_utils.py:192` calls `neo4j.unit_of_work` from core code to set a transaction timeout. The port needs a new member on the driver session contract for a write with a timeout. That is an interface change, so it is an ask-first item (R19). | Maintainer | Layer 7 of plan 0004 |
+| O8 | The rule on `using` directives in R1 depends on the implementer, and a wrong placement does not always fail the build. One `.editorconfig` entry for all C# files that makes `csharp_using_directive_placement = inside_namespace` an error (IDE0065) turns the rule into a build failure. Nobody tested that IDE0065 fails the build for a file-scoped namespace. The existing files of the judge host and the end-to-end tests have their directives at the top and change in the same pull request. | Lead | The pilot |
 | O7 | Decision D22 holds only if each lambda that a library calls enters the scheduler again (R8). The rule depends on the implementer and on the test in `GatherAsync`. The pilot must show that this is enough. | Lead, after the pilot | Gate 3 |
 
 Wrong-type cases of O4:
@@ -940,3 +998,5 @@ Wrong-type cases of O4:
 | --- | --- | --- |
 | 2026-11-25 | First version, from the skill's `references/rules.md` and GAPS.md. Decisions D20 to D23. | None. No unit is ported. |
 | 2026-11-25 | After the adversarial review (plan 0003, results of task 1): `OnLoopAsync` for library callbacks, `Node` and `Edge` as classes with identity-first container helpers, `Pydantic.Wrap` for validators, the `PyDateTime` struct for each `datetime`, lone surrogates, Python escapes and inner trailing spaces in string literals, `re.IGNORECASE` and `\d`, one more set site, the retry log condition, the `except Exception` filter, call-time environment reads, and rules for 14 constructs that had none. Plain enums are not decoded from their value text. New open items O6 and O7. | None. No unit is ported. |
+| 2026-11-25 | After the public surface design (plan 0003, task 2, decisions D24 to D35): ported code moves to `src/Graphiti.Net/Core/` and the namespace `Graphiti.Core`, the class `Graphiti` is `GraphitiCore`, the exception classes of the two error files are public in `Graphiti`, four provider error rows, `Asyncio.CallHostAsync` for host services, the custom type descriptor and `IResponseModel`, `PortServices.ClassifyModelFailure`, and `HttpClient` for the decisions client. Open item O3 is closed. | None. No unit is ported. |
+| 2026-11-25 | After the adversarial review of the public surface design (plan 0003, results of task 2): the `using` placement covers each project and `global::Neo4j.Driver`, the default-object branches of `Graphiti.__init__`, XML comments on public exception members, the inner-exception constructor, the timeout and transport rows of R4, the server error wrap of the chat adapter, `Pydantic.Wrap<TException>`, `ModelFields` as an ordered dictionary, the exact `IResponseModel`, `Asyncio.Run` returns a task, the HTTP rules of the decisions client, the reranker unit on the seam `LogProbabilityChat`, and judge fixtures as descriptors. | None. No unit is ported. |

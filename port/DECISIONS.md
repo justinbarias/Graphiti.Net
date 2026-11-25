@@ -40,6 +40,19 @@ The section "Lead choices accepted at gate 1" lists the choices that the lead ma
 | D21 | 2026-11-25. Open data (`Any`, `dict[str, Any]`) is the Python value model: `object?` values from a closed set of types, handled only by `PyCompat`. Models stay records with an explicit `Validate()`. `JsonSerializer` does not bind models. This amends the `pydantic` row of the library table. |
 | D22 | 2026-11-25. All ported code runs on one process-wide exclusive `TaskScheduler`, so it interleaves only at an `await`, as asyncio does. Ported code adds no lock that Python does not have. Port phase 9 can replace it. |
 | D23 | 2026-11-25. Ported modules reach the logger, the clock, and the random source through one internal static holder, `PortServices`. Method signatures stay equal to Python. Port phase 9 can replace it. |
+| D24 | 2026-11-25. The public facade is the interface `IGraphiti`, with an internal implementation that DI resolves. The ported class of `graphiti.py` is the internal `GraphitiCore`. Amended on 2026-11-26: `IGraphiti` has no dispose member, and the container closes the implementation. |
+| D25 | 2026-11-25. Public data types are separate immutable records with `DateTimeOffset` and read-only collections. The facade maps them to and from the ported classes. |
+| D26 | 2026-11-25. A custom entity or edge type is a `GraphTypeDefinition` that a host builds in code from a closed set of field kinds. This answers GAPS G6. |
+| D27 | 2026-11-25. The M1 public surface is the 13 public members of the upstream class, the node and edge namespaces, prompt overrides and model routing, the token usage tracker, and the options of concurrent ingestion. The driver contract and the two ingestion write hooks stay internal. |
+| D28 | 2026-11-25. Graphiti resolves the unkeyed `IChatClient` and `IEmbeddingGenerator` of the host from DI. The builder can replace each one. |
+| D29 | 2026-11-25. One `IChatClient` serves both model sizes. The options `Llm.Model` and `Llm.SmallModel` set `ChatOptions.ModelId`. |
+| D30 | 2026-11-25. The cross-encoder is the public contract `ICrossEncoder`. The default is the upstream OpenAI reranker logic on `IChatClient`, and it reads token log probabilities through the public hook `IChatLogProbabilities`. The documents give the OpenAI implementation of the hook. Packages stay at two. This amends lead choice 2. |
+| D31 | 2026-11-25. A public delegate option classifies a provider exception as a rate limit or a server error. The default knows `HttpRequestException` only. The core references no provider package and not `System.ClientModel`. |
+| D32 | 2026-11-25. `llm_client.openai_decisions_client` is ported as it is onto `HttpClient` and stays internal in M1. A public route target on the OpenAI SDK's `DecisionsClient` can come after M1. This replaces lead choice 3. |
+| D33 | 2026-11-25. The adapters call host services (`IChatClient`, `IEmbeddingGenerator`, a host `ICrossEncoder`) on the thread pool and return to the exclusive scheduler. Short host delegates run in line on the scheduler. This answers what D22 left open for host code. |
+| D34 | 2026-11-25. `MaxCoroutines` and `Embedding.Dimensions` are options. The other ten import-time settings stay environment variables in M1. The question to the maintainer said nine, and the source has ten. This amends the answer of GAPS G10. |
+| D35 | 2026-11-25. Ported code uses the namespace `Graphiti.Core` and the folder `src/Graphiti.Net/Core/`. Public types use `Graphiti`. The exception classes of the two error files are public in `Graphiti`. |
+| D36 | 2026-11-26. The public surface reads a naive stored date as UTC, and a save through a public call writes a zoned UTC value. This changes the stored shape of a record that Python wrote with a naive date and that .NET saves again. Ported code keeps a naive value naive. |
 | D15 | M1 includes publishing `0.1.0-preview` to nuget.org. The publish step itself still needs the maintainer's approval at that time. |
 
 ## Scope by module
@@ -73,6 +86,7 @@ When code first uses a package, the package enters `Directory.Packages.props`.
 | `python-dotenv` | none | | The library does not read `.env` files. The host application owns configuration. |
 | `posthog` | none | | D9. |
 | `logging` | `Microsoft.Extensions.Logging.Abstractions` | 11.0.0 | Source-generated log methods. |
+| The `Graphiti(...)` constructor | `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Options` | 11.0.0 | Added on 2026-11-25 for `AddGraphiti` and `GraphitiOptions` (lead choice 4, D24). |
 | `pytest`, `pytest-asyncio` | `xunit.v3.mtp-v2` | 4.0.3 | On Microsoft.Testing.Platform. |
 | `hypothesis` (not used upstream) | `CsCheck` | 5.0.1 | For the property layer. |
 | mutation testing (none upstream) | `dotnet-stryker` | 5.1.0 | Local tool. Uses the `mtp` test runner. |
@@ -83,8 +97,8 @@ When code first uses a package, the package enters `Directory.Packages.props`.
 The lead made these choices alone. The maintainer accepted all seven at gate 1.
 
 1. `Microsoft.Extensions.*` packages use the 11.x line on a .NET 10 target. The alternative is to pin the 10.x line.
-2. The cross-encoder in the MVP is the upstream OpenAI reranker logic, moved onto `IChatClient`. Upstream reads token log probabilities. If `IChatClient` cannot expose them for a provider, the reranker fails with a clear error for that provider.
-3. The upstream OpenAI decisions client (node and edge dedupe) is ported onto `IChatClient`.
+2. The cross-encoder in the MVP is the upstream OpenAI reranker logic, moved onto `IChatClient`. Upstream reads token log probabilities. If `IChatClient` cannot expose them for a provider, the reranker fails with a clear error for that provider. Amended on 2026-11-25 by D30: `IChatClient` exposes them for no provider, so a public hook reads them.
+3. The upstream OpenAI decisions client (node and edge dedupe) is ported onto `IChatClient`. Replaced on 2026-11-25 by D32: the client posts to its own `/decisions` endpoint, so it is ported onto `HttpClient`.
 4. The public surface uses `IServiceCollection.AddGraphiti(...)`, options classes, and `Async` method names with a `CancellationToken`. Python names stay on internal members.
 5. The library does not load `.env` files.
 6. The upstream source is fetched by `scripts/fetch-upstream.sh` into the git-ignored `.upstream/` folder. It is not a git submodule and it is not copied into this repository.
@@ -96,4 +110,5 @@ The lead made these choices alone. The maintainer accepted all seven at gate 1.
 | --- | --- | --- |
 | 1. Decisions | 2026-11-24 | Approved by the maintainer, with all seven lead choices |
 | Phase 4 decisions | 2026-11-25 | The maintainer chose D20, D21, D22, and D23 while the rulebook was written. [The rulebook design](../docs/design-docs/rulebook-design.md) gives the options. |
+| Public surface | 2026-11-25 | The maintainer chose D24 to D35 and approved [The public surface design](../docs/design-docs/public-surface-design.md) with its 12 lead choices. On 2026-11-26, after one adversarial review, the maintainer chose D36, amended D24, and accepted lead choice L13. |
 | 2. Judge | 2026-11-25 | Approved by the maintainer, with D17, D18, and D19. The maintainer asked for the real-model scenarios first, read the final results, and closed the gate. `port/judge/` is read-only from commit `c052323`. |
