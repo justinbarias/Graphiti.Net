@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Graphiti.PyCompat</RootNamespace>
+    <PackageId>Graphiti.Net.PyCompat</PackageId>
+    <IsPackable>false</IsPackable>
+    <!-- UUID version 5 is defined with SHA-1 (RFC 4122). Py.Uuid5 is no security use. -->
+    <NoWarn>$(NoWarn);CA5350</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Graphiti.Net" />
+    <InternalsVisibleTo Include="Graphiti.Net.Neo4j" />
+    <InternalsVisibleTo Include="Graphiti.Net.JudgeHost" />
+    <InternalsVisibleTo Include="Port.Evaluation" />
+    <InternalsVisibleTo Include="Graphiti.Net.Property.Tests" />
+  </ItemGroup>
+</Project>

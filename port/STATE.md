@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 4. Plan 0003 is active. Task 1 is done: [RULES.md](RULES.md) is written. Task 2 is done: the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md). Task 3 runs in its own session. Tasks 4 to 8 are not started. |
+| Phase | 4. Plan 0003 is active. Tasks 1, 2, and 3 are done: [RULES.md](RULES.md) is written, the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md), and `PyCompat` has its scalar and text helpers. Tasks 4 to 8 are not started. |
 | Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md` after the pilot. |
-| Last action | 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. |
-| Next action | Plan 0003, task 3 (`PyCompat` and its property tests). Before the pilot, close open items O1, O2, O5, and O8 of the rulebook (debt T17, T18, T19, T22). |
+| Last action | 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. 2026-11-25 (task 3): built `src/Graphiti.Net.PyCompat` (scalar and text helpers) and `tests/Graphiti.Net.Property.Tests` (55 tests against Python values). |
+| Next action | Plan 0003, tasks 4 and 5 (mutation on `PyCompat`). The maintainer decides who builds the other `PyCompat` helpers (debt T23), because the pilot needs them. Before the pilot, close open items O1, O2, O5, and O8 of the rulebook (debt T17, T18, T19, T22). |
 
 ## Queue counts
 
@@ -119,7 +119,7 @@ None.
 
 | Skill text | What this port does | Why |
 | --- | --- | --- |
-| Scaffold in phase 4 | The solution, the Neo4j sidecar test, and the tooling exist from the bootstrap. `PyCompat` still waits for phase 4. | The maintainer asked for the development tooling first. |
+| Scaffold in phase 4 | The solution, the Neo4j sidecar test, and the tooling exist from the bootstrap. `PyCompat` was built in phase 4 (plan 0003, task 3). The core project holds no ported code yet. | The maintainer asked for the development tooling first. |
 | Port the unit tests with each module | pytest ports live in `tests/Port.Evaluation` and are temporary. | Decision D6. |
 | Lead model is Opus | The lead session ran on Fable 5.2. | The maintainer's global rules name Fable as orchestrator. |
 | Phase 3 completes type hints in the Python source | The source is not changed. `port/tools/infer_type_hints.py` writes the signatures that pyright infers into `TYPE_HINTS.md`. | The oracle stays identical to the pinned commit. |
@@ -158,5 +158,5 @@ Decided on 2026-11-25 for the public surface: D24 to D35. Decided on 2026-11-26 
 - The `Microsoft.Extensions.AI.Abstractions` facts of the design come from Learn pages for version 10.11.0, not from the 11.0.1 assembly. Debt T21.
 - Decision D22 depends on a rule at each library boundary (RULES.md, open item O7). No code tested it.
 - The site lists in the rulebook (regular expressions, sets, `getattr` calls, validators) come from `grep` over the 114 MVP modules. A site that the patterns missed is not in the lists. The rulebook tells an implementer to stop at such a site.
-- No mutation score. Stryker loaded its configuration and found 0 mutants, because the product projects contain no code yet.
+- No mutation score. Stryker loaded its configuration and found 0 mutants, when the product projects had no code. `PyCompat` now holds code to mutate, and no run has scored it (plan 0003, task 5).
 - The devcontainer and the Claude cloud session hook were not started. See [docs/RELIABILITY.md](../docs/RELIABILITY.md).

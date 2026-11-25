@@ -9,6 +9,8 @@ Update it in the same change that makes it stale.
 | --- | --- | --- |
 | `src/Graphiti.Net` | The core package. Root namespace `Graphiti`. | Empty project. No ported code. |
 | `src/Graphiti.Net.Neo4j` | The Neo4j driver package. References `Neo4j.Driver` and the core. | Empty project. No ported code. |
+| `src/Graphiti.Net.PyCompat` | The helpers that give Python behavior: numbers, text, slicing, string order, `itertools`, UUIDs. Namespace `Graphiti.PyCompat`. Members are `internal`. The Unicode tables in `PyUnicodeData.g.cs` come from Python. | Built for the scalar and text helpers that the queue needs. The value model, JSON, dates, `re.split`, pydantic, and asyncio helpers are not built. See debt T23. |
+| `tests/Graphiti.Net.Property.Tests` | CsCheck property tests that compare each PyCompat helper with values that real Python recorded in `python-values.json`. | 55 tests pass. |
 | `tests/Graphiti.Net.E2E.Tests` | End-to-end tests on xUnit v3 and Microsoft.Testing.Platform. | One environment test that proves the sidecar supports full-text and vector search. |
 | `docker-compose.yml` | Neo4j 5.26.2 sidecar on `localhost:7687`. | Works on a local machine. |
 | `tests/Graphiti.Net.JudgeHost` | The .NET judge host: protocol loop, codec, judge embedder, and the binding table. | Works. The binding table holds only `judge:embed`. |
