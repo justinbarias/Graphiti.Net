@@ -12,6 +12,7 @@ Gate 2 closed on 2026-11-25, so the judge in `port/judge/` is read-only. The pro
 | Where the port stands now | [port/STATE.md](port/STATE.md) |
 | Port scope and library choices | [port/DECISIONS.md](port/DECISIONS.md) |
 | Python constructs with no direct C# form, and upstream defects | [port/GAPS.md](port/GAPS.md) |
+| How each Python pattern becomes C#. Only the lead changes it. | [port/RULES.md](port/RULES.md) |
 | The judge: commands, protocol, noise rules | [port/judge/README.md](port/judge/README.md) |
 | Current work | [docs/PLANS.md](docs/PLANS.md) |
 | System layout and boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |

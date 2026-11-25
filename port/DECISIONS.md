@@ -36,6 +36,10 @@ The section "Lead choices accepted at gate 1" lists the choices that the lead ma
 | D17 | Gate 2, 2026-11-25. The LLM contract of the port is upstream's base client path: the adapter implements `_generate_response`, and the shared code appends the response schema text to the prompt. The port does not follow the `responses.parse` path of upstream's default `OpenAIClient`. Native structured output can come later as a .NET extension, covered by end-to-end tests only. |
 | D18 | Gate 2, 2026-11-25. The order of node labels is noise. The judge compares label lists without their order in flow results, in prompt text, in Cypher text, and in reply keys. The port writes `Entity` first. |
 | D19 | Gate 2, 2026-11-25. The maintainer accepted seven changes to the judge design. Three are from the build: UUID names from content, the .NET host outside `port/judge/`, and a fresh host process for each flow case. Four are from the review: bags in place of sorted names, clock rank and shape, the number rule, and the `bound_wrong` rule. |
+| D20 | 2026-11-25. A judge case that passes an argument of a type that the C# parameter cannot hold is a type rejection. The .NET host reports `JudgeTypeRejected`, and the runner accepts it only where the golden result is `TypeError` or `AttributeError`. The runner change goes in its own pull request. This answers GAPS F11. |
+| D21 | 2026-11-25. Open data (`Any`, `dict[str, Any]`) is the Python value model: `object?` values from a closed set of types, handled only by `PyCompat`. Models stay records with an explicit `Validate()`. `JsonSerializer` does not bind models. This amends the `pydantic` row of the library table. |
+| D22 | 2026-11-25. All ported code runs on one process-wide exclusive `TaskScheduler`, so it interleaves only at an `await`, as asyncio does. Ported code adds no lock that Python does not have. Port phase 9 can replace it. |
+| D23 | 2026-11-25. Ported modules reach the logger, the clock, and the random source through one internal static holder, `PortServices`. Method signatures stay equal to Python. Port phase 9 can replace it. |
 | D15 | M1 includes publishing `0.1.0-preview` to nuget.org. The publish step itself still needs the maintainer's approval at that time. |
 
 ## Scope by module
@@ -58,7 +62,7 @@ When code first uses a package, the package enters `Directory.Packages.props`.
 
 | Python | .NET | Version | Notes |
 | --- | --- | --- | --- |
-| `pydantic` | records with `System.Text.Json` and explicit `Validate()` methods | in box | The serializer does not validate. The rulebook must cover each validator. |
+| `pydantic` | records with explicit `Validate()` methods, and the Python value model in `PyCompat` for open data | in box | Amended by D21. `System.Text.Json` reads and writes JSON tokens inside `PyCompat`, and does not bind models. [RULES.md](RULES.md) R7 covers each validator. |
 | `neo4j` | `Neo4j.Driver` | 6.5.1 | Official driver. |
 | `openai`, `anthropic`, `groq`, `google-genai`, `voyageai` | `Microsoft.Extensions.AI.Abstractions` | 11.0.1 | D3. The user supplies the provider package. |
 | `httpx` | `HttpClient` from `IHttpClientFactory` | in box | Only where the core calls HTTP directly. |
@@ -91,4 +95,5 @@ The lead made these choices alone. The maintainer accepted all seven at gate 1.
 | Gate | Date | Result |
 | --- | --- | --- |
 | 1. Decisions | 2026-11-24 | Approved by the maintainer, with all seven lead choices |
+| Phase 4 decisions | 2026-11-25 | The maintainer chose D20, D21, D22, and D23 while the rulebook was written. [The rulebook design](../docs/design-docs/rulebook-design.md) gives the options. |
 | 2. Judge | 2026-11-25 | Approved by the maintainer, with D17, D18, and D19. The maintainer asked for the real-model scenarios first, read the final results, and closed the gate. `port/judge/` is read-only from commit `c052323`. |

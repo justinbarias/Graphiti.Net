@@ -21,7 +21,8 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
 
 Layer 0 is the skeleton that the porting skill requires, so every later layer compiles against fixed shapes.
-A skeleton member throws `NotImplementedException` with a `TODO(port)` marker, and the scanner counts the markers down to zero.
+A skeleton member throws `NotSupportedException` with a `TODO(port)` marker, and the scanner counts the markers down to zero.
+It never throws `NotImplementedException`, because ported code catches that type to fall back from a driver operation (`port/RULES.md`, R24).
 
 ## Loop for each unit
 

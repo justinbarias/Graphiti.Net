@@ -12,7 +12,7 @@ Update it in the same change that makes it stale.
 | `tests/Graphiti.Net.E2E.Tests` | End-to-end tests on xUnit v3 and Microsoft.Testing.Platform. | One environment test that proves the sidecar supports full-text and vector search. |
 | `docker-compose.yml` | Neo4j 5.26.2 sidecar on `localhost:7687`. | Works on a local machine. |
 | `tests/Graphiti.Net.JudgeHost` | The .NET judge host: protocol loop, codec, judge embedder, and the binding table. | Works. The binding table holds only `judge:embed`. |
-| `port/` | Port state, decisions, the module queue, the upstream pin, the gap list, and the judge. | Phase 2. |
+| `port/` | Port state, decisions, the module queue, the upstream pin, the gap list, the rulebook, and the judge. | Phase 4. The judge is read-only. The rulebook waits for gate 3. |
 | `scripts/` | Setup, the gate, the mutation run, the upstream fetch, the docs check. | Works on a local machine. |
 | `.devcontainer/`, `.claude/` | Devcontainer definition, Claude Code configuration, the `verify` skill. | Written, not started. See [docs/RELIABILITY.md](docs/RELIABILITY.md). |
 
