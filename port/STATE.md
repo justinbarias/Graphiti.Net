@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 4. The judge and the gap list are done. Plan 0003 is next: the rulebook, `PyCompat`, and the pilot. |
-| Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md`. |
-| Last action | 2026-11-25: added the label rule and the database preparation. Recorded 11 real-model scenarios and one hand-written communities scenario. Removed score ties from the cases, added 4 break tests, and recorded all flow golden files again. |
-| Next action | Start plan 0003: copy the rulebook to `port/RULES.md`, extend it with the answers from GAPS.md, and build `PyCompat` with its tests. |
+| Phase | 4. Plan 0003 is active. Task 1 is done: [RULES.md](RULES.md) is written. Tasks 2 to 8 are not started. |
+| Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md` after the pilot. |
+| Last action | 2026-11-25: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. |
+| Next action | Plan 0003, task 2 (the public surface design) and task 3 (`PyCompat` and its property tests). Before the pilot, close open items O1, O2, and O5 of the rulebook (debt T17, T18, T19). |
 
 ## Queue counts
 
@@ -105,7 +105,11 @@ None.
 
 ## Rule changes
 
-None. `port/RULES.md` does not exist yet. Phase 4 writes it.
+| Date | Change | Units to port again |
+| --- | --- | --- |
+| 2026-11-25 | First version of [RULES.md](RULES.md). | None. No unit is ported. |
+| 2026-11-25 | Fixes after the adversarial review. The rulebook lists them in its own change table. | None. No unit is ported. |
+
 [GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
 ## Deviations from the porting skill
@@ -123,13 +127,24 @@ None. `port/RULES.md` does not exist yet. Phase 4 writes it.
 For the maintainer, before gate 4:
 
 1. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
+2. Accept or reject by name the 23 wrong-type cases that decision D20 does not settle: RULES.md, open item O4.
+
+For the maintainer, before the pilot (plan 0003, task 6):
+
+1. A new member on the driver session contract for a write with a timeout (`utils/bulk_utils.py:192` uses `neo4j.unit_of_work` in core code). RULES.md, open item O6. Needed before layer 7.
+2. Who removes a passing case from `port/judge/expected-failures.txt`? `.claude/settings.json` denies each edit under `port/judge/`. RULES.md, open item O5.
+3. Approve the runner change of decision D20 in its own pull request. RULES.md, open item O1.
 
 Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.
+Decided on 2026-11-25 for the rulebook: D20 (wrong-type cases), D21 (the Python value model), D22 (the exclusive scheduler), D23 (the ambient service holder).
 
 ## Checks not run
 
 - The judge did not run against upstream's default `OpenAIClient` path. Decision D17 puts that path outside the contract.
 - CI does not run the judge against the Python build. Debt T13.
 - No second adversarial review ran on the changes after the first review. The maintainer closed gate 2 without one.
+- No C# code follows the rulebook yet. The pilot (plan 0003, task 6) is its first test. One adversarial review ran, and no second review ran after its fixes.
+- Decision D22 depends on a rule at each library boundary (RULES.md, open item O7). No code tested it.
+- The site lists in the rulebook (regular expressions, sets, `getattr` calls, validators) come from `grep` over the 114 MVP modules. A site that the patterns missed is not in the lists. The rulebook tells an implementer to stop at such a site.
 - No mutation score. Stryker loaded its configuration and found 0 mutants, because the product projects contain no code yet.
 - The devcontainer and the Claude cloud session hook were not started. See [docs/RELIABILITY.md](../docs/RELIABILITY.md).

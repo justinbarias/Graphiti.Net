@@ -15,6 +15,8 @@ Evidence by area. A cell says what was run and when. "Not verified" means that n
 | Score ties in flow cases | `port/tools/find_score_ties.py - port/judge/cases/flow/*.jsonl` | 0 ties in 34 cases | 2026-11-25 |
 | Adversarial review of the judge | One Opus 5.5 subagent, high effort | 6 important findings: 4 fixed, 1 decided at gate 2 (D17), 1 closed in part (debt T12 and T16). See [port/STATE.md](../port/STATE.md). | 2026-11-25 |
 | Upstream test baseline | `port/tools/upstream-tests.sh` | 1026 passed without a database, 40 passed on Neo4j | 2026-11-24 |
+| Rulebook gap map | A script reads each gap id in `port/GAPS.md` and its row in Part 4 of `port/RULES.md` | 78 gaps, 78 mapped, each to a rule that exists. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-25 |
+| Adversarial review of the rulebook | One Opus 5.5 subagent, high effort | 16 important findings and 14 smaller ones. All fixed in `port/RULES.md`, with two left as open items (O3, O6). No second review. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-25 |
 | Property tests | None | Not verified. The project does not exist. | |
 | Mutation score | `dotnet stryker --config-file stryker-config.json` | The configuration loads with the `mtp` runner. Stryker found 0 mutants, so no score exists. | 2026-11-24 |
 | Devcontainer | None | Not verified. Debt T1. | |
