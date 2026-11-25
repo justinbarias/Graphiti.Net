@@ -7,7 +7,7 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | # | Task | Owner, model, effort | Acceptance evidence |
 | --- | --- | --- | --- |
 | 1 | Done 2026-11-25. Copy the skill's `references/rules.md` to `port/RULES.md`. Add rules for this repository: naming, file layout, error types, logging, pydantic models and validators, async and cancellation, Cypher strings, prompts, and each answer in `port/GAPS.md`. | Lead, Fable 5.2, high | Every gap in `GAPS.md` maps to a rule. |
-| 2 | Write the public surface design document: `AddGraphiti`, options, the `Microsoft.Extensions.AI` adapter, the cross-encoder over `IChatClient`. This is an ask-first item. | Lead, Fable 5.2, high | The maintainer approves it. |
+| 2 | Done 2026-11-25. Write the public surface design document: `AddGraphiti`, options, the `Microsoft.Extensions.AI` adapter, the cross-encoder over `IChatClient`. This is an ask-first item. | Lead, Fable 5.2, high | The maintainer approves it. |
 | 3 | Create `src/Graphiti.Net.PyCompat` and `tests/Graphiti.Net.Property.Tests`. Build only the helpers that the queue needs. Generate expected values from Python into a file. | Workhorse, Sonnet 5.5, medium | CsCheck property tests pass against the Python values, including negative numbers, zero divisors, empty strings, an emoji, and a combining mark. |
 | 4 | Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
 | 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
@@ -92,3 +92,86 @@ Not done and not checked:
 - The site lists come from `grep` patterns. A site that the patterns missed is not listed. The rulebook tells an implementer to stop there.
 - Open items O1 to O7 of the rulebook: debt T17, T18, T19, plan task 2, the driver contract member of O6, and the scheduler test of O7.
 - Plan 0004 changed in one line: a skeleton member throws `NotSupportedException`, not `NotImplementedException` (rule R24).
+
+### Task 2, 2026-11-25
+
+Lead session on Fable 5.2. No subagent.
+
+Output:
+
+- [The public surface design](../../design-docs/public-surface-design.md): the `AddGraphiti` registration, the options, the facade `IGraphiti`, 59 public types, the chat adapter, the embedding adapter, the cross-encoder, prompt overrides and routing, the namespaces, and the rules for host code. After the review it lists 13 decisions, 13 lead choices, 21 checked facts, and 12 open questions.
+- [port/DECISIONS.md](../../../port/DECISIONS.md): decisions D24 to D36, two library rows, and amendments to lead choices 2 and 3.
+- [port/RULES.md](../../../port/RULES.md): the rule changes that the design needs, in R1, R2, R3, R4, R8, R15, R17, R19, Part 2, and Part 3. Open item O3 is closed. Open item O8 is new. The maintainer chose to make these changes in the same branch.
+- [port/GAPS.md](../../../port/GAPS.md) (G6, G10) and [ARCHITECTURE.md](../../../ARCHITECTURE.md) point to the design.
+
+The maintainer answered 16 questions in five rounds, each with the options, and approved the page.
+The maintainer took the recommendation in 12 of them. The other four: all four extra surfaces for M1, a question back about a native OpenAI SDK, the approval itself, and the choice to change the rulebook in this branch and not in a separate change.
+For the question back, the lead found the experimental `DecisionsClient` of `OpenAI` 2.15.0 and asked again with that fact (D32).
+`port/queue.json` did not change, because no unit changed its status.
+
+Findings that changed earlier records:
+
+| Finding | Evidence | Effect |
+| --- | --- | --- |
+| `Microsoft.Extensions.AI.Abstractions` has no member for token log probabilities, and the OpenAI adapter copies none. | The Learn page of `ChatOptions`. `OpenAIChatClient.cs` on `main` of `dotnet/extensions` holds no line with `LogProb`. | D30: a public hook. Lead choice 2 amended. |
+| The decisions client posts to `{base_url}/decisions` with `httpx`. | `llm_client/openai_decisions_client.py:191` | D32. Lead choice 3 replaced. |
+| A public record and a ported class with one name cannot share the namespace `Graphiti`. | Rule R1 and decision D25 | D35: ported code moves to `Graphiti.Core`. |
+| C# searches the parent namespace before a `using` directive at the top of a file. | A test project with the .NET 10 SDK: `error CS1503` with the directive at the top, a clean build with the directive inside the namespace. | Rule R1 states the placement. Open item O8 asks for a build check. |
+
+Three numbers in the questions to the maintainer were wrong, and the page has the right ones: the namespaces have 75 calls, not about 60, the decisions client has 14 pytest tests, not 9, and ten settings stay environment variables, not nine. No number was the reason for an option.
+
+The gate, before the adversarial review:
+
+| Command | Result |
+| --- | --- |
+| A Python script over the gap ids of `port/GAPS.md` and Part 4 of `port/RULES.md` | 78 gaps, 78 mapped, 0 missing, 0 extra. 25 rules, 0 references to a rule that does not exist. 0 rows that still say "blocked until" the design. |
+| `COMPOSE_PROJECT_NAME=graphitinet scripts/check.sh --test` | `check: passed`. `check_docs: ok (36 markdown files)`. Build: 0 warnings, 0 errors. Format: exit 0. Tests: 1 passed, 0 failed. Judge: `cases=1999 passed=1 failed=1998`, `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`, `judge: passed`. |
+
+The `verify` skill: steps 1, 2, and 5 ran as above. Steps 3 and 4 do not apply, because this change holds documents only and touches no ported code and no public flow.
+
+Not done and not checked:
+
+- No code follows the design. Plan 0004 writes the facade, the records, and the adapters.
+- One adversarial review ran. The section below gives its results. No second review ran after the fixes.
+- The Learn pages of `Microsoft.Extensions.AI.Abstractions` show version 10.11.0. The review found each member in the 10.8.3 assemblies. Nobody inspected the 11.0.1 assembly (debt T21).
+- Nobody tested what a provider adapter other than OpenAI's does with `ChatOptions.AdditionalProperties`. The design does not depend on it (lead choice L6).
+- The scheduler hop of D33 and the hook of D30 have no code and no test yet.
+- The 12 open questions of the design page. Three need the maintainer: the packaging of `PyCompat`, the library row for `IHttpClientFactory`, and the code fence step of the chat adapter.
+
+### Adversarial review of task 2, 2026-11-25 and 2026-11-26
+
+The maintainer chose the reviewer: one fresh Opus 5.5 subagent at high effort, briefed to refute the design page and the rule changes. It edited nothing.
+It ran 101 tool calls: `grep` and `ast` reads of upstream, a walk over the golden flow files, reflection on the local package cache, and throwaway .NET 10 projects.
+
+Result: 14 important findings and 18 smaller ones. The lead confirmed I1, I3, I12, I13, and S6 against the source, and took the measured results of the others from the report.
+
+| # | Finding | Evidence from the reviewer | Answer |
+| --- | --- | --- | --- |
+| I1 | A judge embedding generator cannot tell `create` from `create_batch`. | Each of the 6 MVP `create` calls passes a list with one string. The golden flow files hold 197 batch entries and 57 one-item lists. | The ambient call value has an `Operation`: `embed` or `embed_batch`. The ported `create` parameter is `List<string>`. |
+| I2 | The reranker was both a queue unit and lead code. | `port/queue.json`, order 57. The module imports `OpenAIClient` from a replaced module. | The unit stays ported. Its client is the lead seam `LogProbabilityChat`. Rule R19 gives the constructor and the call. |
+| I3 | No rule for the default-object branches of `Graphiti.__init__`. | `graphiti.py:372`, `:385`, `:389`, `:393` | R1: each such branch throws `ArgumentException`. The facade always passes the four objects. |
+| I4 | `_generate_response` does not receive the prompt name, so usage and the call value had no source for it. | `llm_client/client.py:152`. Only provider overrides record usage. | The chat adapter also overrides `generate_response`, sets the prompt name, and calls the base method. |
+| I5 | Nothing made a classified server error retry. | `is_server_or_retry_error` knows a server error only as an HTTP status error. | The adapter throws `HttpRequestException` with status 500 and the provider exception inside. |
+| I6 | R19 and R4 disagreed on the timeout of the decisions client. The default `HttpClient` timeout is 100 seconds, and upstream's is 120. | `openai_decisions_client.py:263` | R4 catches `TimeoutException` and the timeout form of `OperationCanceledException`. R19 sets the timeout of the default client. |
+| I7 | `using Neo4j.Driver;` inside `namespace Graphiti.Neo4j.<Sub>;` fails. | `error CS0234` in a test project | R1: `using global::Neo4j.Driver;`. |
+| I8 | The placement rule missed the judge host and the tests, and a wrong placement does not always fail the build. | `typeof(SearchConfig)` and `value is SearchFilters` compiled and bound to the public record. | R1 covers each project. Open item O8 and debt T22 ask for one build check for all C# files. |
+| I9 | Public exception members with no docstring break the build. | `error CS1591` on `UnitInProgressException` | R1: two fixed XML comment texts for the two error files. |
+| I10 | `IResponseModel` was not defined well enough. | The return types of `ModelValidate` conflicted. `prompts/lib.py:355` compares with `is`. | R7 holds the exact interface, one class, and one static object for each built-in model. |
+| I11 | The judge cannot recover the `model` field from `ChatOptions.ModelId`. | All 187 golden `llm` entries have `"model": null`. | `ModelCallInfo` has `Model`, the override argument. |
+| I12 | A default prompt library moves each call to another code path. | `graphiti_types.py:95`, `prompts/lib.py:545` | With no override and no route, the facade passes no library. |
+| I13 | Routes with the default options fail, and routed usage is not visible. | `prompt_config.py:188` rejects an empty model id. | `Llm.Model` is required with routes. Lead choice L13: one shared tracker. The maintainer accepted it. |
+| I14 | A read and a save of a naive date changes the stored value shape. | Python stores a naive date as a local value. | An ask-first item. The maintainer chose D36: read as UTC, save as a zoned value, and say so in the documents. |
+
+Smaller findings, fixed: the count of environment variables (ten, not nine), the count of calls with a `driver` parameter (four, not five), the line references of the custom type table, the `title` and docstring rules of the schema text, the reranker details (default model, the limit of the gather, the token rule, 32-bit log probabilities, a cache in front of the client), the body bytes and headers of the decisions client, the dispose form of the singleton, the host parts that run in line, the thread contract of a public call, the order of `edge_type_map`, the inner-exception constructor, `Pydantic.Wrap` for a core exception type, the missing rows of the error table, judge fixtures as descriptors, and the property shapes that the page leaves to the mapping rules.
+The maintainer also changed D24 on 2026-11-26: `IGraphiti` has no dispose member, and the container closes the implementation.
+
+Not fixed, only recorded as open questions of the design page: plan 0004 gives the adapter to a workhorse (question 10), the attribute values that the Neo4j project can return (question 11), and class names that two ported namespaces share (question 12).
+
+The reviewer found no defect in these claims: the upstream counts (13 public members, 75 namespace calls, 25 prompt names, 11 and 3 environment reads, 14 pytest tests, 16 recipes), the retry test, the reranker request, the options of concurrent ingestion, and each `Microsoft.Extensions.AI` member that the page names, in version 10.8.3.
+It measured that the ambient call value reaches the thread pool and that the caller resumes on an exclusive scheduler.
+The reviewer did not check the 11.0.1 assemblies, the `DecisionsClient` of `OpenAI` 2.15.0, any Microsoft Learn page, or whether IDE0065 fails a build for a file-scoped namespace.
+
+No second review ran after the fixes.
+
+The gate after the fixes, on 2026-11-26: `COMPOSE_PROJECT_NAME=graphitinet scripts/check.sh --test` printed `check: passed`, with `check_docs: ok (36 markdown files)`, 0 build warnings, 1 test passed, and the judge at `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`. The gap map script printed 78 gaps, 78 mapped, and no reference to a rule that does not exist.
+The change holds documents only, so steps 3 and 4 of the `verify` skill do not apply.

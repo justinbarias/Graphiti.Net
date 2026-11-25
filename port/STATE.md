@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 4. Plan 0003 is active. Task 1 is done: [RULES.md](RULES.md) is written. Tasks 2 to 8 are not started. |
+| Phase | 4. Plan 0003 is active. Task 1 is done: [RULES.md](RULES.md) is written. Task 2 is done: the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md). Task 3 runs in its own session. Tasks 4 to 8 are not started. |
 | Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md` after the pilot. |
-| Last action | 2026-11-25: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. |
-| Next action | Plan 0003, task 2 (the public surface design) and task 3 (`PyCompat` and its property tests). Before the pilot, close open items O1, O2, and O5 of the rulebook (debt T17, T18, T19). |
+| Last action | 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. |
+| Next action | Plan 0003, task 3 (`PyCompat` and its property tests). Before the pilot, close open items O1, O2, O5, and O8 of the rulebook (debt T17, T18, T19, T22). |
 
 ## Queue counts
 
@@ -109,6 +109,9 @@ None.
 | --- | --- | --- |
 | 2026-11-25 | First version of [RULES.md](RULES.md). | None. No unit is ported. |
 | 2026-11-25 | Fixes after the adversarial review. The rulebook lists them in its own change table. | None. No unit is ported. |
+| 2026-11-25 | After the public surface design (D24 to D35). Ported code uses the namespace `Graphiti.Core` and the folder `src/Graphiti.Net/Core/`. The facade class is `GraphitiCore`, and the exception classes are public. New rules cover provider errors, `Asyncio.CallHostAsync`, the custom type descriptor, and `HttpClient` for the decisions client. | None. No unit is ported. |
+| 2026-11-25 | After the adversarial review of the design. The rulebook lists the changes in its own change table. | None. No unit is ported. |
+| 2026-11-26 | After the integrated review of the pull request stack. R12 uses the `PyText` members for `split(sep)` and `strip(chars)`. R1 names the `PyCompat` project in the `using` rule. R4 has a row for `UnicodeDecodeError` and the limit of `OverflowException`. | None. No unit is ported. |
 
 [GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
@@ -129,6 +132,12 @@ For the maintainer, before gate 4:
 1. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
 2. Accept or reject by name the 23 wrong-type cases that decision D20 does not settle: RULES.md, open item O4.
 
+For the maintainer, from the public surface design (the page lists all 12 open questions):
+
+1. Does `PyCompat` ship inside the `Graphiti.Net` package or as its own package? Needed before plan 0005.
+2. A library row for `Microsoft.Extensions.Http`, or an `HttpClient` that the decisions client takes directly. Needed before the decisions client unit.
+3. Does the chat adapter strip a markdown code fence from a reply? Needed before the adapter unit.
+
 For the maintainer, before the pilot (plan 0003, task 6):
 
 1. A new member on the driver session contract for a write with a timeout (`utils/bulk_utils.py:192` uses `neo4j.unit_of_work` in core code). RULES.md, open item O6. Needed before layer 7.
@@ -137,6 +146,7 @@ For the maintainer, before the pilot (plan 0003, task 6):
 
 Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.
 Decided on 2026-11-25 for the rulebook: D20 (wrong-type cases), D21 (the Python value model), D22 (the exclusive scheduler), D23 (the ambient service holder).
+Decided on 2026-11-25 for the public surface: D24 to D35. Decided on 2026-11-26 after the review: D36 (naive dates) and an amendment to D24. [DECISIONS.md](DECISIONS.md) holds one row for each.
 
 ## Checks not run
 
@@ -144,6 +154,8 @@ Decided on 2026-11-25 for the rulebook: D20 (wrong-type cases), D21 (the Python 
 - CI does not run the judge against the Python build. Debt T13.
 - No second adversarial review ran on the changes after the first review. The maintainer closed gate 2 without one.
 - No C# code follows the rulebook yet. The pilot (plan 0003, task 6) is its first test. One adversarial review ran, and no second review ran after its fixes.
+- One adversarial review ran on the public surface design and its rule changes. No second review ran after the fixes. No code follows the design yet.
+- The `Microsoft.Extensions.AI.Abstractions` facts of the design come from Learn pages for version 10.11.0, not from the 11.0.1 assembly. Debt T21.
 - Decision D22 depends on a rule at each library boundary (RULES.md, open item O7). No code tested it.
 - The site lists in the rulebook (regular expressions, sets, `getattr` calls, validators) come from `grep` over the 114 MVP modules. A site that the patterns missed is not in the lists. The rulebook tells an implementer to stop at such a site.
 - No mutation score. Stryker loaded its configuration and found 0 mutants, because the product projects contain no code yet.

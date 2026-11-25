@@ -37,17 +37,20 @@ query
 
 ## Planned module map
 
-One folder in `src/Graphiti.Net` for each Python subpackage. [port/queue.json](port/queue.json) is the full list.
+Ported code goes to `src/Graphiti.Net/Core`, namespace `Graphiti.Core`, with one folder for each Python subpackage. [port/queue.json](port/queue.json) is the full list.
+The public surface goes to the root of `src/Graphiti.Net`, namespace `Graphiti`: the interface `IGraphiti`, the public records, the options, and `AddGraphiti`.
+The facade and the three model adapters go to `src/Graphiti.Net/Internal`. They map public records to ported types and call host services on the thread pool.
+[The public surface design](docs/design-docs/public-surface-design.md) is the contract for all three parts.
 
 | Upstream `graphiti_core` path | Responsibility | Target |
 | --- | --- | --- |
-| `graphiti.py` | The facade: `add_episode`, `search`, `build_communities`, and the rest of the public calls | `Graphiti.Net`, plus the .NET public surface |
+| `graphiti.py` | The facade: `add_episode`, `search`, `build_communities`, and the rest of the public calls | `Graphiti.Net`, as the internal class `GraphitiCore` behind the public `IGraphiti` |
 | `nodes.py`, `edges.py`, `models/`, `namespaces/` | Graph data types and their persistence queries | `Graphiti.Net` |
 | `ingestion/` | Phases, change sets, the scheduler for concurrent ingestion, the SQLite state store | `Graphiti.Net` |
 | `utils/maintenance/` | Node, edge, community, and attribute operations, dedupe helpers | `Graphiti.Net` |
 | `search/` | Search configuration, recipes, filters, and ranking | `Graphiti.Net` |
 | `prompts/` | The prompt library and configurable prompts | `Graphiti.Net` |
-| `llm_client/`, `embedder/`, `cross_encoder/` | Contracts, retry, token tracking, caching. Provider clients become one adapter. | `Graphiti.Net` |
+| `llm_client/`, `embedder/`, `cross_encoder/` | Contracts, retry, token tracking, caching. Provider clients become one adapter for chat, one for embeddings, and one reranker on `IChatClient`. | `Graphiti.Net` |
 | `driver/driver.py`, `driver/operations/`, `driver/graph_operations/`, `driver/search_interface/` | The driver contract | `Graphiti.Net` |
 | `driver/neo4j_driver.py`, `driver/neo4j/` | The Neo4j implementation | `Graphiti.Net.Neo4j` |
 | `tracer.py` | OpenTelemetry spans | `Graphiti.Net` |
@@ -57,7 +60,9 @@ One folder in `src/Graphiti.Net` for each Python subpackage. [port/queue.json](p
 | Boundary | Rule |
 | --- | --- |
 | Core to database | The core never references `Neo4j.Driver`. It talks to the driver contract. |
-| Core to models | The core talks to `IChatClient` and `IEmbeddingGenerator` from `Microsoft.Extensions.AI`. It references no provider package. |
+| Core to models | The core talks to `IChatClient` and `IEmbeddingGenerator` from `Microsoft.Extensions.AI`. It references no provider package. Provider detail enters through two public hooks: `IChatLogProbabilities` and the failure classifier. |
+| Core to host code | Host services run on the thread pool, never on the exclusive scheduler of ported code. |
+| Public to ported | A public type is never a ported type, except the exception classes. The facade maps between the two. |
 | Product to Python | Product code never calls Python. Only the judge recorder runs Python. |
 | Product to telemetry services | None. Tracing goes to the collector that the host application configures. |
 | Tests to product | Tests enter through the public surface. Fakes exist only at the LLM network boundary. |
