@@ -2,9 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/Graphiti.Net/Graphiti.Net.csproj" />
     <Project Path="src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
+    <Project Path="src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Graphiti.Net.E2E.Tests/Graphiti.Net.E2E.Tests.csproj" />
     <Project Path="tests/Graphiti.Net.JudgeHost/Graphiti.Net.JudgeHost.csproj" />
+    <Project Path="tests/Graphiti.Net.Property.Tests/Graphiti.Net.Property.Tests.csproj" />
   </Folder>
 </Solution>

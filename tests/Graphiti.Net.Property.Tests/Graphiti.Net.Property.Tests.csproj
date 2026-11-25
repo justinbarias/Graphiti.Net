@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <RootNamespace>Graphiti.PyCompat.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
+    <!-- Written by port/tools/generate_pycompat_values.py from real Python. -->
+    <Content Include="python-values.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

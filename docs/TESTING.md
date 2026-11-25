@@ -19,7 +19,7 @@ This is the canonical home of the test strategy. It follows
 | --- | --- | --- | --- |
 | Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,999 cases: 1,965 pure and 34 flow. 11 flow scenarios use replies from a real model. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
-| Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | Not created. Port phase 4. |
+| Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | 52 tests for `PyCompat`: each helper against the values that Python recorded, and laws that hold for any input. |
 | Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. No product code to mutate yet. |
 
 ### Differential judge
@@ -54,7 +54,7 @@ Use CsCheck. Good properties for this code base:
 - Round trip: a node or edge that is saved and loaded is equal to the original.
 - Idempotency: the dedupe step applied twice gives the same graph as the step applied once.
 - Invariant: a fact's `invalid_at` is never earlier than its `valid_at`. An invalidated fact is never deleted.
-- Equivalence: `PyCompat` helpers match values that Python computed and stored in a file.
+- Equivalence: `PyCompat` helpers match values that Python computed and stored in a file. `port/tools/generate_pycompat_values.py` writes `tests/Graphiti.Net.Property.Tests/python-values.json` and `src/Graphiti.Net.PyCompat/PyUnicodeData.g.cs` from the Python 3.12 of the upstream virtual environment. Run it with `--check` to see whether the files are stale. A case holds a result or a Python error name, and the test asserts the C# exception type from [RULES.md](../port/RULES.md) R4.
 
 ### Mutation
 

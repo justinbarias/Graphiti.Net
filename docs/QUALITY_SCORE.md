@@ -19,7 +19,7 @@ Evidence by area. A cell says what was run and when. "Not verified" means that n
 | Adversarial review of the rulebook | One Opus 5.5 subagent, high effort | 16 important findings and 14 smaller ones. All fixed in `port/RULES.md`, with two left as open items (O3, O6). No second review. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-25 |
 | Public surface design | The maintainer's approval, after 16 questions with options | Approved, with decisions D24 to D36. No code follows it yet. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-26 |
 | Adversarial review of the public surface design | One Opus 5.5 subagent, high effort | 14 important findings and 18 smaller ones. All 14 fixed or decided, 3 smaller ones left as open questions. No second review. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-26 |
-| Property tests | None | Not verified. The project does not exist. | |
+| Property tests | `scripts/check.sh --test` | 52 tests pass for the PyCompat scalar and text helpers, against 3 MB of values that Python 3.12.13 recorded. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-25 |
 | Mutation score | `dotnet stryker --config-file stryker-config.json` | The configuration loads with the `mtp` runner. Stryker found 0 mutants, so no score exists. | 2026-11-24 |
 | Devcontainer | None | Not verified. Debt T1. | |
 | Claude cloud session | None | Not verified. Debt T2. | |
