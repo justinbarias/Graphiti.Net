@@ -48,8 +48,8 @@ internal sealed record ExtractedEntity : IPydanticModel
 
     internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("ExtractedEntity")
         .Required("name", PydanticType.Str, "Name of the extracted entity")
-        .Required("entity_type_id", PydanticType.Int, "ID of the classified entity type. Must be one of the provided entity_type_id integers.")
-        .Factory("episode_indices", PydanticType.List(PydanticType.Int), "List of episode numbers (0-indexed) this entity was extracted from. When processing a single episode, this should be [0].");
+        .Required("entity_type_id", PydanticType.Int, "ID of the classified entity type. " + "Must be one of the provided entity_type_id integers.")
+        .Factory("episode_indices", PydanticType.List(PydanticType.Int), "List of episode numbers (0-indexed) this entity was extracted from. " + "When processing a single episode, this should be [0].");
 
     internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("ExtractedEntity", ModelJsonSchema);
 }
@@ -101,8 +101,6 @@ internal sealed record EntitySummary : IPydanticModel
 
     internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("EntitySummary")
         .Required("summary", PydanticType.Str, "Summary of the entity");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("EntitySummary", ModelJsonSchema);
 }
 
 internal sealed record SummarizedEntity : IPydanticModel
@@ -130,8 +128,6 @@ internal sealed record SummarizedEntity : IPydanticModel
     internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("SummarizedEntity")
         .Required("name", PydanticType.Str, "Name of the entity being summarized")
         .Required("summary", PydanticType.Str, "Updated summary for the entity");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("SummarizedEntity", ModelJsonSchema);
 }
 
 internal sealed record SummarizedEntities : IPydanticModel
@@ -677,7 +673,7 @@ If an entity has no relevant information in the messages and no existing summary
     // NOTE: This prompt is semantically mirrored in the Go async summary worker at
     // src/lib/graphsummary/processor.go (entitySummarySystemPrompt). Keep both in sync.
     // PORT: the Python literal joins lines with a backslash at the line end (R9). This text holds the joined lines.
-    private const string EntityEpisodeSummarySystemPrompt = """
+    internal const string EntityEpisodeSummarySystemPrompt = """
 You maintain detailed, information-dense entity memories from episode text.
 
 Use ONLY facts explicitly stated in EPISODES and durable facts already present in EXISTING_SUMMARY.
@@ -725,6 +721,7 @@ GOOD: "Jordan Lee works at Belmont Arts Center. Jordan presented a ceramics work
 BAD: "Jordan Lee seems interested in ceramics. Jordan mentioned teaching and was described as busy at the arts center."
 </EXAMPLES>
 """;
+
     internal static List<Message> ExtractEntitySummariesFromEpisodes(OrderedDictionary<string, object?> context)
     {
         return

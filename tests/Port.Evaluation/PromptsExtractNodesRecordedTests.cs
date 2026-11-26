@@ -3,7 +3,6 @@
 namespace Graphiti.Port.Evaluation;
 
 using System.IO.Compression;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Graphiti.Core.Prompts;
@@ -30,7 +29,7 @@ public class PromptsExtractNodesRecordedTests
     [Fact]
     public void The_recording_has_the_expected_number_of_cases()
     {
-        Assert.Equal(684, Cases.Count);
+        Assert.Equal(734, Cases.Count);
     }
 
     [Theory]
@@ -106,6 +105,9 @@ public class PromptsExtractNodesRecordedTests
                 return SummarizedEntity.ModelValidate(Context(args)).ModelDump();
             case "SummarizedEntities":
                 return SummarizedEntities.ModelValidate(Context(args)).ModelDump();
+            case "new.ExtractedEntity":
+                var fields = Context(args);
+                return new ExtractedEntity { Name = (string)fields["name"]!, EntityTypeId = (long)fields["entity_type_id"]! }.ModelDump();
             case "schema":
                 var schemas = new OrderedDictionary<string, PydanticSchema>
                 {
@@ -121,9 +123,7 @@ public class PromptsExtractNodesRecordedTests
                 {
                     "summary_instructions" => Snippets.SummaryInstructions,
                     "MAX_SUMMARY_CHARS" => TextUtils.MaxSummaryChars,
-                    "_entity_episode_summary_system_prompt" => typeof(ExtractNodes)
-                        .GetField("EntityEpisodeSummarySystemPrompt", BindingFlags.NonPublic | BindingFlags.Static)!
-                        .GetRawConstantValue(),
+                    "_entity_episode_summary_system_prompt" => ExtractNodes.EntityEpisodeSummarySystemPrompt,
                     _ => throw new InvalidOperationException("no constant " + args),
                 };
             case "versions_keys":
@@ -138,6 +138,8 @@ public class PromptsExtractNodesRecordedTests
             "versions" => ExtractNodes.Versions[name](context),
             "default" => Default(defaults, name, context),
             "default_as_messages" => Default(defaults, name, context).AsMessages(),
+            "getattr" => defaults.TryGetFunction(name, out var function) ? function!(context) : throw new InvalidOperationException($"no prompt {name}"),
+            "getattr_unknown" => defaults.TryGetFunction((string)context["name"]!, out _) ? throw new InvalidOperationException($"found {context["name"]}") : "AttributeError",
             _ => throw new InvalidOperationException($"no binding for {fn}"),
         };
     }

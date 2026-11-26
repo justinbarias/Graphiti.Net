@@ -24,12 +24,7 @@ internal static class ExtractNodesBindings
             .AddRef(Module + ":extract_message", (PromptFunction)ExtractNodes.ExtractMessage)
             .AddRef(Module + ":ExtractedEntity", ExtractedEntity.ResponseModel)
             .AddRef(Module + ":ExtractedEntities", ExtractedEntities.ResponseModel)
-            .AddModel(Module + ":ExtractedEntity", data => ExtractedEntity.ModelValidate(data))
-            .AddType<ExtractedEntity>("ExtractedEntity", m => [new("name", m.Name), new("entity_type_id", m.EntityTypeId), new("episode_indices", m.EpisodeIndices)])
-            .AddType<ExtractedEntities>("ExtractedEntities", m => [new("extracted_entities", m.ExtractedEntitiesValue)])
-            .AddType<EntitySummary>("EntitySummary", m => [new("summary", m.Summary)])
-            .AddType<SummarizedEntity>("SummarizedEntity", m => [new("name", m.Name), new("summary", m.Summary)])
-            .AddType<SummarizedEntities>("SummarizedEntities", m => [new("summaries", m.Summaries)]);
+            .AddModel(Module + ":ExtractedEntity", data => ExtractedEntity.ModelValidate(data));
 
         table.Schemas.Add(Module + ":ExtractedEntity", ExtractedEntity.ModelJsonSchema);
         table.Schemas.Add(Module + ":ExtractedEntities", ExtractedEntities.ModelJsonSchema);

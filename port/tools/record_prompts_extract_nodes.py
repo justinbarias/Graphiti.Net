@@ -115,7 +115,8 @@ def rvalue(depth=0, exotic=True):
     if exotic:
         d = {}
         for _ in range(R.randint(1, 3)):
-            # No NaN key: Python keeps one NaN key after a JSON round trip (the same object), and PyDict does not.
+            # No NaN key: json.loads returns one shared NaN object, so Python keeps one NaN key after a JSON round trip.
+            # PyJson.Loads boxes each NaN token separately, so a PyDict built from them keeps two keys.
             key = R.choice([1, 2, -5, 1.5, True, False, None, rkey(), (1, 'a'), 0.0])
             d[key] = rvalue(depth + 1, exotic)
         return d
@@ -329,6 +330,39 @@ for name, fn in FNS.items():
             add('default.' + name, ctx, lambda c, n=name: getattr(prompts, n)(c))
             add('default_as_messages.' + name, ctx, lambda c, n=name: getattr(prompts, n)(c).as_messages())
 
+# The lookup by name that prompts/lib.py does: getattr(group, name)(context). One well-formed context for each name,
+# so that a wrong entry of the map gives a different text. An unknown name raises AttributeError.
+GOOD = {
+    'entity_types': [{'entity_type_id': 0, 'entity_type_name': 'Entity', 'entity_type_description': 'A thing'}],
+    'previous_episodes': [{'uuid': 'u1', 'content': 'earlier', 'reference_time': '2024-01-01'}],
+    'episode_content': 'Alice met Bob in Paris.',
+    'custom_extraction_instructions': 'Be brief',
+    'source_description': 'a chat',
+    'extracted_entities': [{'name': 'Alice', 'summary': 's', 'entity_types': ['Person']}],
+    'entities': [{'name': 'Alice', 'summary': 's', 'entity_types': ['Person']}],
+    'node': {'name': 'Alice', 'summary': 's', 'attributes': {'age': 3}},
+    'entity_type_descriptions': {'Person': 'A human'},
+}
+GETATTR_PROMPTS = en.DefaultExtractNodesPrompts()
+for name in [n for n in FNS if n != '_entity_type_descriptions_section']:
+    good = {k: GOOD[k] for k in KEYS[name]}
+    add('getattr.' + name, good, lambda c, n=name: getattr(GETATTR_PROMPTS, n)(c))
+    for i in range(3):
+        add('getattr.' + name, rcontext(name), lambda c, n=name: getattr(GETATTR_PROMPTS, n)(c))
+
+
+def getattr_unknown(a, group=GETATTR_PROMPTS):
+    try:
+        getattr(group, a['name'])
+    except AttributeError:
+        return 'AttributeError'
+    raise AssertionError('found')
+
+
+# Names that are not methods: one that the map must not match by length or by case, and one that is far off.
+for name in ['no_such_prompt'] + [v for n in FNS if n != '_entity_type_descriptions_section' for v in (n[:-1] + 'x', n.upper())]:
+    add('getattr_unknown.extract_nodes', {'name': name}, getattr_unknown)
+
 # ---- models ----
 POOL = lambda: R.choice([  # noqa: E731
     rstr(), rstr(), '', R.choice(INTS), R.choice(FLOATS), True, False, None, '1', ' 2 ', '1.0', '1e3', '-1',
@@ -392,6 +426,10 @@ for a in [{'name': 'A', 'entity_type_id': 1}, {'name': 'A', 'entity_type_id': 1,
     add('ExtractedEntities', {'extracted_entities': [a, a]}, lambda a: en.ExtractedEntities(**a).model_dump())
 add('SummarizedEntities', {'summaries': [{'name': 'n', 'summary': 's'}]}, lambda a: en.SummarizedEntities(**a).model_dump())
 add('EntitySummary', {'summary': 's'}, lambda a: en.EntitySummary(**a).model_dump())
+
+# A typed construction with the required fields only: the default of each other field comes from the initializer.
+for a in [{'name': 'A', 'entity_type_id': 1}, {'name': 'é', 'entity_type_id': -3}]:
+    add('new.ExtractedEntity', a, lambda a: en.ExtractedEntity(**a).model_dump())
 
 # ---- schemas and constants ----
 for name in ['ExtractedEntity', 'ExtractedEntities', 'EntitySummary', 'SummarizedEntity', 'SummarizedEntities']:

@@ -315,6 +315,37 @@ for name, fn, required, optional, n in MODULES:
             add('default_as_messages_false.' + name, ctx,
                 lambda c, n=name: getattr(DEFAULTS[n], n)(c).as_messages(append_unicode_note=False))
 
+# The lookup by name that prompts/lib.py does: getattr(group, name)(context). One well-formed context for each name,
+# so that a wrong entry of the map gives a different text. An unknown name raises AttributeError.
+GOOD = {
+    'previous_episodes': [{'uuid': 'u1', 'content': 'earlier'}], 'episode_content': 'Alice met Bob in Paris.',
+    'nodes': [{'id': 0, 'name': 'Alice', 'entity_types': ['Person']}], 'reference_time': '2024-01-01T00:00:00Z',
+    'custom_extraction_instructions': 'Be brief', 'edge_types': EDGE_TYPE_LISTS[1], 'strict_edge_types': True,
+    'fact': 'Alice lives in Paris', 'existing_attributes': {'a': 1}, 'facts': ['Alice lives in Paris'],
+    'existing_edges': [{'idx': 0, 'fact': 'f'}], 'edge_invalidation_candidates': [{'idx': 1, 'fact': 'g'}],
+    'new_edge': 'Alice lives in Rome', 'entity_types': [{'entity_type_id': 0, 'entity_type_name': 'Entity'}],
+}
+for name, fn, required, optional, n in MODULES:
+    add('getattr.' + name, {k: GOOD[k] for k in required + optional}, lambda c, n=name: getattr(DEFAULTS[n], n)(c))
+    for i in range(3):
+        add('getattr.' + name, rcontext(required, optional), lambda c, n=name: getattr(DEFAULTS[n], n)(c))
+
+
+def getattr_unknown(a, group):
+    try:
+        getattr(group, a['name'])
+    except AttributeError:
+        return 'AttributeError'
+    raise AssertionError('found')
+
+
+# Names that are not methods: one that the map must not match by length or by case, and one that is far off.
+for group_name, group, names in [('extract_edges', ee.DefaultExtractEdgesPrompts(), ['edge', 'extract_attributes', 'extract_timestamps', 'extract_timestamps_batch']),
+                                 ('dedupe_edges', de.DefaultDedupeEdgesPrompts(), ['resolve_edge']),
+                                 ('extract_nodes_and_edges', ne.DefaultExtractNodesAndEdgesPrompts(), ['extract_message'])]:
+    for name in ['no_such_prompt'] + [v for n in names for v in (n[:-1] + 'x', n.upper())]:
+        add('getattr_unknown.' + group_name, {'name': name}, lambda a, g=group: getattr_unknown(a, g))
+
 # fixed contexts that cover each branch of the edge types section
 for et in EDGE_TYPE_LISTS:
     for strict in [True, False]:
@@ -430,12 +461,24 @@ for name, cls, gen in MODELS:
         for bad in [None, 1.5, {'a': 1}, [[]], b'x']:
             add(name, {**valid, n: bad}, lambda a, c=cls: c(**a).model_dump())
 
+# A typed construction with the required fields only: the default of each other field comes from the initializer.
+REQUIRED_ONLY = [
+    ('Edge', ee.Edge, {'source_entity_name': 'S', 'target_entity_name': 'T', 'relation_type': 'REL', 'fact': 'F é'}),
+    ('EdgeTimestamps', ee.EdgeTimestamps, {}),
+    ('CombinedFact', ne.CombinedFact, {'source_entity_name': 'S', 'target_entity_name': 'T', 'relation_type': 'REL', 'fact': 'F é'}),
+]
+for name, cls, req in REQUIRED_ONLY:
+    assert {k for k, v in cls.model_fields.items() if v.is_required()} == set(req)
+    add('new.' + name, req, lambda a, c=cls: c(**a).model_dump())
+
 # ---- schemas, constants, versions ----
 for name, cls, _ in MODELS:
     cases.append({'id': f'schema.{name}', 'fn': 'schema', 'args': json.dumps(name),
                   'expect': {'kind': 'ok', **pack(json.dumps(json.dumps(cls.model_json_schema())))}})
-cases.append({'id': 'const.SYSTEM_PROMPT', 'fn': 'const', 'args': '"x"',
+cases.append({'id': 'const._SYSTEM_PROMPT', 'fn': 'const', 'args': '"_SYSTEM_PROMPT"',
               'expect': {'kind': 'ok', **pack(json.dumps(ne._SYSTEM_PROMPT))}})
+cases.append({'id': 'const._C2_INSTRUCTION_TEXT', 'fn': 'const', 'args': '"_C2_INSTRUCTION_TEXT"',
+              'expect': {'kind': 'ok', **pack(json.dumps(ne._C2_INSTRUCTION_TEXT))}})
 for mod_name, mod in [('extract_edges', ee), ('dedupe_edges', de), ('extract_nodes_and_edges', ne)]:
     cases.append({'id': f'versions.keys.{mod_name}', 'fn': 'versions_keys', 'args': json.dumps(mod_name),
                   'expect': {'kind': 'ok', **pack(json.dumps(repr(list(mod.versions))))}})

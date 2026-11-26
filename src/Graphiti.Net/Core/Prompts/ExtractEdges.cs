@@ -59,7 +59,7 @@ internal sealed record Edge : IPydanticModel
             Fact = fact.Value,
             ValidAt = validAt.Value,
             InvalidAt = invalidAt.Value,
-            EpisodeIndices = [.. episodeIndices.Value],
+            EpisodeIndices = episodeIndices.Value,
         }.Validate();
     }
 
@@ -83,8 +83,6 @@ internal sealed record Edge : IPydanticModel
         .Default("valid_at", PydanticType.Optional(PydanticType.Str), null, "The date and time when the relationship or assertion described by the edge fact became true or was established. Future-tense plans/promises use the statement reference time, not the future occurrence date. Use ISO 8601 format (YYYY-MM-DDTHH:MM:SS.SSSSSSZ)")
         .Default("invalid_at", PydanticType.Optional(PydanticType.Str), null, "The date and time when the relationship described by the edge fact stopped being true or ended. Soft deadlines are not invalid_at values. Use ISO 8601 format (YYYY-MM-DDTHH:MM:SS.SSSSSSZ)")
         .Factory("episode_indices", PydanticType.List(PydanticType.Int), "List of episode numbers (0-indexed) that this fact was derived from. " + "When processing a single episode, this should be [0].");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("Edge", ModelJsonSchema);
 }
 
 internal sealed record ExtractedEdges : IPydanticModel
@@ -98,7 +96,7 @@ internal sealed record ExtractedEdges : IPydanticModel
         var f = new PydanticFields("ExtractedEdges", data);
         var edges = f.Required("edges", v => Pydantic.List(v, x => Pydantic.Model(x, "Edge", Edge.ModelValidate)));
         f.ThrowIfAny();
-        return new ExtractedEdges { Edges = [.. edges.Value] }.Validate();
+        return new ExtractedEdges { Edges = edges.Value }.Validate();
     }
 
     internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
@@ -154,7 +152,7 @@ internal sealed record BatchEdgeTimestamps : IPydanticModel
         var f = new PydanticFields("BatchEdgeTimestamps", data);
         var timestamps = f.Required("timestamps", v => Pydantic.List(v, x => Pydantic.Model(x, "EdgeTimestamps", EdgeTimestamps.ModelValidate)));
         f.ThrowIfAny();
-        return new BatchEdgeTimestamps { Timestamps = [.. timestamps.Value] }.Validate();
+        return new BatchEdgeTimestamps { Timestamps = timestamps.Value }.Validate();
     }
 
     internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>

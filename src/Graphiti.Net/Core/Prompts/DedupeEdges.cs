@@ -34,7 +34,7 @@ internal sealed record EdgeDuplicate : IPydanticModel
         var duplicateFacts = f.Required("duplicate_facts", v => Pydantic.List(v, Pydantic.Int));
         var contradictedFacts = f.Required("contradicted_facts", v => Pydantic.List(v, Pydantic.Int));
         f.ThrowIfAny();
-        return new EdgeDuplicate { DuplicateFacts = [.. duplicateFacts.Value], ContradictedFacts = [.. contradictedFacts.Value] }.Validate();
+        return new EdgeDuplicate { DuplicateFacts = duplicateFacts.Value, ContradictedFacts = contradictedFacts.Value }.Validate();
     }
 
     internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>

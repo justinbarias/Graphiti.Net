@@ -42,7 +42,7 @@ internal sealed record Summary : IPydanticModel
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 
     internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("Summary")
-        .Required("summary", PydanticType.Str, "Summary containing the important information about the entity. Under " + Py.Str(TextUtils.MaxSummaryChars) + " characters");
+        .Required("summary", PydanticType.Str, "Summary containing the important information about the entity. " + "Under " + Py.Str(TextUtils.MaxSummaryChars) + " characters");
 
     internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("Summary", ModelJsonSchema);
 }

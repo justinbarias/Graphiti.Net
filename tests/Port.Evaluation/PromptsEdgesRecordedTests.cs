@@ -79,7 +79,7 @@ public class PromptsEdgesRecordedTests
         }
     }
 
-    private const int CaseCount = 990;
+    private const int CaseCount = 1031;
 
     private static object? Run(string fn, object? args)
     {
@@ -99,12 +99,9 @@ public class PromptsEdgesRecordedTests
                 return ExtractNodesAndEdges.ExtractMessage(Context(args));
             case "_build_edge_types_section":
                 var a = Context(args);
-                var edgeTypes = a["edge_types"] is List<object?> items
-                    ? items.Select(x => (OrderedDictionary<string, object?>)x!).ToList()
-                    : null;
                 return a.TryGetValue("strict_edge_types", out var strict)
-                    ? ExtractNodesAndEdges.BuildEdgeTypesSection(edgeTypes, (bool)strict!)
-                    : ExtractNodesAndEdges.BuildEdgeTypesSection(edgeTypes);
+                    ? ExtractNodesAndEdges.BuildEdgeTypesSection(a["edge_types"], strict)
+                    : ExtractNodesAndEdges.BuildEdgeTypesSection(a["edge_types"]);
             case "_build_custom_instructions_section":
                 return ExtractNodesAndEdges.BuildCustomInstructionsSection((string?)Context(args)["text"]);
             case "Edge":
@@ -137,7 +134,32 @@ public class PromptsEdgesRecordedTests
                 };
                 return PyJson.Dumps(schemas[(string)args!].ToDict());
             case "const":
-                return ExtractNodesAndEdges.SystemPrompt;
+                return (string)args! switch
+                {
+                    "_SYSTEM_PROMPT" => ExtractNodesAndEdges.SystemPrompt,
+                    "_C2_INSTRUCTION_TEXT" => ExtractNodesAndEdges.C2InstructionText,
+                    _ => throw new InvalidOperationException("no constant " + args),
+                };
+            case "new.Edge":
+                var edge = Context(args);
+                return new Edge
+                {
+                    SourceEntityName = (string)edge["source_entity_name"]!,
+                    TargetEntityName = (string)edge["target_entity_name"]!,
+                    RelationType = (string)edge["relation_type"]!,
+                    Fact = (string)edge["fact"]!,
+                }.ModelDump();
+            case "new.EdgeTimestamps":
+                return new EdgeTimestamps().ModelDump();
+            case "new.CombinedFact":
+                var combined = Context(args);
+                return new CombinedFact
+                {
+                    SourceEntityName = (string)combined["source_entity_name"]!,
+                    TargetEntityName = (string)combined["target_entity_name"]!,
+                    RelationType = (string)combined["relation_type"]!,
+                    Fact = (string)combined["fact"]!,
+                }.ModelDump();
             case "versions_keys":
                 var versions = (string)args! switch
                 {
@@ -156,9 +178,25 @@ public class PromptsEdgesRecordedTests
             "default" => Default(name, context),
             "default_as_messages" => Default(name, context).AsMessages(),
             "default_as_messages_false" => Default(name, context).AsMessages(false),
+            "getattr" => Group(name).TryGetFunction(name, out var function) ? function!(context) : throw new InvalidOperationException($"no prompt {name}"),
+            "getattr_unknown" => GroupOf(name).TryGetFunction((string)context["name"]!, out _) ? throw new InvalidOperationException($"found {context["name"]}") : "AttributeError",
             _ => throw new InvalidOperationException($"no binding for {fn}"),
         };
     }
+
+    private static IPromptGroup Group(string name) => name switch
+    {
+        "resolve_edge" => new DefaultDedupeEdgesPrompts(),
+        "extract_message" => new DefaultExtractNodesAndEdgesPrompts(),
+        _ => new DefaultExtractEdgesPrompts(),
+    };
+
+    private static IPromptGroup GroupOf(string module) => module switch
+    {
+        "dedupe_edges" => new DefaultDedupeEdgesPrompts(),
+        "extract_nodes_and_edges" => new DefaultExtractNodesAndEdgesPrompts(),
+        _ => new DefaultExtractEdgesPrompts(),
+    };
 
     private static PromptFunction Version(string name) => name switch
     {

@@ -28,7 +28,7 @@ public class PromptsEvalSummariesRecordedTests
     [Fact]
     public void The_recording_has_the_expected_number_of_cases()
     {
-        Assert.Equal(1484, Cases.Count);
+        Assert.Equal(1532, Cases.Count);
     }
 
     [Theory]
@@ -135,6 +135,8 @@ public class PromptsEvalSummariesRecordedTests
             "default" => Default(name, context),
             "default_as_messages" => Default(name, context).AsMessages(),
             "default_as_messages_false" => Default(name, context).AsMessages(false),
+            "getattr" => Group(name).TryGetFunction(name, out var function) ? function!(context) : throw new InvalidOperationException($"no prompt {name}"),
+            "getattr_unknown" => GroupOf(name).TryGetFunction((string)context["name"]!, out _) ? throw new InvalidOperationException($"found {context["name"]}") : "AttributeError",
             _ => PlainFunction(fn, context),
         };
     }
@@ -150,6 +152,20 @@ public class PromptsEvalSummariesRecordedTests
         "summary_description" => SummarizeNodes.SummaryDescription(context),
         "summarize_saga" => SummarizeSagas.SummarizeSaga(context),
         _ => throw new InvalidOperationException($"no binding for {fn}"),
+    };
+
+    private static IPromptGroup Group(string name) => name switch
+    {
+        "summarize_pair" or "summarize_context" or "summary_description" => new DefaultSummarizeNodesPrompts(),
+        "summarize_saga" => new DefaultSummarizeSagasPrompts(),
+        _ => new DefaultEvalPrompts(),
+    };
+
+    private static IPromptGroup GroupOf(string module) => module switch
+    {
+        "summarize_nodes" => new DefaultSummarizeNodesPrompts(),
+        "summarize_sagas" => new DefaultSummarizeSagasPrompts(),
+        _ => new DefaultEvalPrompts(),
     };
 
     private static ChatPrompt Default(string name, OrderedDictionary<string, object?> context) => name switch

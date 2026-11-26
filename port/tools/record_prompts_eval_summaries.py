@@ -285,6 +285,36 @@ for mod, name, keys in FUNCS:
             add('default_as_messages_false.' + name, ctx,
                 lambda c, p=prompts, n=name: getattr(p, n)(c).as_messages(append_unicode_note=False))
 
+# The lookup by name that prompts/lib.py does: getattr(group, name)(context). One well-formed context for each name,
+# so that a wrong entry of the map gives a different text. An unknown name raises AttributeError.
+GOOD = {
+    'query': 'Who lives in Paris?', 'entity_summaries': [{'name': 'Alice', 'summary': 's'}], 'facts': ['Alice lives in Paris'],
+    'answer': 'Alice', 'response': 'Alice lives in Paris', 'previous_messages': ['hello'], 'message': 'hi there',
+    'baseline': 'base', 'candidate': 'cand', 'node_summaries': ['one', 'two'], 'previous_episodes': ['earlier'],
+    'episode_content': 'Alice met Bob.', 'node_name': 'Alice', 'node_summary': 'A person', 'attributes': {'age': 3},
+    'summary': 'A summary', 'saga_name': 'Saga', 'existing_summary': 'Old', 'episodes': ['e1', 'e2'],
+}
+for mod, name, keys in FUNCS:
+    prompts = PROMPTS[mod]
+    add('getattr.' + name, {k: GOOD[k] for k in keys}, lambda c, p=prompts, n=name: getattr(p, n)(c))
+    for i in range(3):
+        add('getattr.' + name, rcontext(name, keys), lambda c, p=prompts, n=name: getattr(p, n)(c))
+
+
+def getattr_unknown(a, group):
+    try:
+        getattr(group, a['name'])
+    except AttributeError:
+        return 'AttributeError'
+    raise AssertionError('found')
+
+
+# Names that are not methods: one that the map must not match by length or by case, and one that is far off.
+for group_name, mod in [('eval', ev), ('summarize_nodes', sn), ('summarize_sagas', ss)]:
+    names = [n for m_, n, _ in FUNCS if m_ is mod]
+    for name in ['no_such_prompt'] + [v for n in names for v in (n[:-1] + 'x', n.upper())]:
+        add('getattr_unknown.' + group_name, {'name': name}, lambda a, g=PROMPTS[mod]: getattr_unknown(a, g))
+
 # ---- the response models ----
 POOL = lambda: R.choice([  # noqa: E731
     rstr(), rstr(), '', R.choice(INTS), R.choice(FLOATS), True, False, None, '1', ' 2 ', '1.0', 'true', 'False',

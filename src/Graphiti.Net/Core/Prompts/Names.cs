@@ -17,9 +17,9 @@ limitations under the License.
 
 namespace Graphiti.Core.Prompts;
 
-// Keep in sync with PROMPT_GROUPS / BUILTIN_PROMPT_SPECS in lib.py.
 internal static class Names
 {
+    // Keep in sync with PROMPT_GROUPS / BUILTIN_PROMPT_SPECS in lib.py.
     internal static readonly IReadOnlyList<string> PromptGroup =
     [
         "extract_nodes",

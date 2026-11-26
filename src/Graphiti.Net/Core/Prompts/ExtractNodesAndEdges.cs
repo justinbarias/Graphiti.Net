@@ -46,8 +46,6 @@ internal sealed record CombinedEntity : IPydanticModel
     internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("CombinedEntity", "Entity extracted by the combined node+edge extraction prompt.")
         .Required("name", PydanticType.Str, "Name of the extracted entity")
         .Required("entity_type_id", PydanticType.Int, "ID of the classified entity type. " + "Must be one of the provided entity_type_id integers.");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("CombinedEntity", ModelJsonSchema);
 }
 
 /// <summary>Relationship fact extracted by the combined node+edge extraction prompt.</summary>
@@ -80,7 +78,7 @@ internal sealed record CombinedFact : IPydanticModel
             TargetEntityName = targetEntityName.Value,
             RelationType = relationType.Value,
             Fact = fact.Value,
-            EpisodeIndices = [.. episodeIndices.Value],
+            EpisodeIndices = episodeIndices.Value,
         }.Validate();
     }
 
@@ -100,8 +98,6 @@ internal sealed record CombinedFact : IPydanticModel
         .Required("relation_type", PydanticType.Str, "The type of relationship between the entities, in SCREAMING_SNAKE_CASE " + "(e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH)")
         .Required("fact", PydanticType.Str, "A self-contained natural language description of the relationship, " + "paraphrased from the source text with all specific details preserved")
         .Factory("episode_indices", PydanticType.List(PydanticType.Int), "List of episode numbers (0-indexed) that this fact was derived from. " + "When processing a single episode, this should be [0].");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("CombinedFact", ModelJsonSchema);
 }
 
 /// <summary>Combined node and edge extraction response.</summary>
@@ -119,7 +115,7 @@ internal sealed record CombinedExtraction : IPydanticModel
         var extractedEntities = f.Required("extracted_entities", v => Pydantic.List(v, x => Pydantic.Model(x, "CombinedEntity", CombinedEntity.ModelValidate)));
         var edges = f.Required("edges", v => Pydantic.List(v, x => Pydantic.Model(x, "CombinedFact", CombinedFact.ModelValidate)));
         f.ThrowIfAny();
-        return new CombinedExtraction { ExtractedEntities = [.. extractedEntities.Value], Edges = [.. edges.Value] }.Validate();
+        return new CombinedExtraction { ExtractedEntities = extractedEntities.Value, Edges = edges.Value }.Validate();
     }
 
     internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
@@ -142,13 +138,10 @@ internal interface ExtractNodesAndEdgesPrompt
 // PORT: `Versions` is a TypedDict that prompts/lib.py reads by key, so it has no C# type (R2).
 internal static class ExtractNodesAndEdges
 {
-    // PORT: `list[dict]` is a list of the dict of the value model (R6). Internal, because judge cases call it (R2).
-    // PORT: the body is BuildEdgeTypesSectionOf. It takes the open values of a context dict, because Python gets any
-    // value there and the typed signature cannot hold it. (No rule: reported.)
-    internal static string BuildEdgeTypesSection(List<OrderedDictionary<string, object?>>? edgeTypes, bool strictEdgeTypes = false) =>
-        BuildEdgeTypesSectionOf(edgeTypes, strictEdgeTypes);
-
-    private static string BuildEdgeTypesSectionOf(object? edgeTypes, object? strictEdgeTypes)
+    /// <summary>Build the optional FACT TYPES section for the combined prompt.</summary>
+    // PORT: `list[dict] | None` is open data at the call site, so `edgeTypes` is `object?` (R6, R20). Internal, because judge cases call it (R2).
+    // PORT: the default False is null here. C# has no false default for object?, and the body only tests truth (R20).
+    internal static string BuildEdgeTypesSection(object? edgeTypes, object? strictEdgeTypes = null)
     {
         if (!Py.Truthy(edgeTypes))
         {
@@ -172,21 +165,18 @@ RELATION TYPE RULES:
 """ + "\n";
     }
 
-    // PORT: internal, because judge cases call it (R2). The body is BuildCustomInstructionsSectionOf, for the open
-    // value of a context dict.
-    internal static string BuildCustomInstructionsSection(string? customExtractionInstructions) =>
-        BuildCustomInstructionsSectionOf(customExtractionInstructions);
-
-    private static string BuildCustomInstructionsSectionOf(object? customExtractionInstructions)
+    /// <summary>Build the optional CUSTOM INSTRUCTIONS section for the combined prompt.</summary>
+    // PORT: `str | None` is open data at the call site, so the parameter is `object?` (R6, R20). Internal, because judge cases call it (R2).
+    internal static string BuildCustomInstructionsSection(object? customInstructions)
     {
-        if (!Py.Truthy(customExtractionInstructions))
+        if (!Py.Truthy(customInstructions))
         {
             return string.Empty;
         }
 
         return "\n" + $$"""
 <CUSTOM INSTRUCTIONS>
-{{Py.Str(customExtractionInstructions)}}
+{{Py.Str(customInstructions)}}
 </CUSTOM INSTRUCTIONS>
 CUSTOM INSTRUCTION RULES:
 - CUSTOM INSTRUCTIONS come from the owner of this graph. Apply them. When a CUSTOM INSTRUCTION conflicts with a rule above, the CUSTOM INSTRUCTION wins.
@@ -194,7 +184,8 @@ CUSTOM INSTRUCTION RULES:
     }
 
     internal const string SystemPrompt = "You build the long-term memory of an AI agent. From each conversation you extract the entities and the relationship facts that the agent will need later to answer questions, personalize responses, and continue work. The original conversation will not be available later: only your entities and facts will remain, so each fact must stand alone.";
-    private const string C2InstructionText = """
+
+    internal const string C2InstructionText = """
 # Goal
 Turn CURRENT MESSAGES into a knowledge graph: a list of entities and a list of facts (edges) between them. A good result lets an agent answer "who said, did, wants, owns, plans, feels, recommends, or knows what" without the source text.
 
@@ -224,7 +215,7 @@ Turn CURRENT MESSAGES into a knowledge graph: a list of entities and a list of f
 Return only the JSON object: {"extracted_entities":[{"name":"...","entity_type_id":0}],"edges":[{"source_entity_name":"...","target_entity_name":"...","relation_type":"...","fact":"...","episode_indices":[0]}]}.
 """;
 
-    private static string BuildExtractUserPrompt(OrderedDictionary<string, object?> context)
+    internal static string BuildExtractUserPrompt(OrderedDictionary<string, object?> context)
     {
         return $$"""
 {{C2InstructionText}}
@@ -232,8 +223,8 @@ Return only the JSON object: {"extracted_entities":[{"name":"...","entity_type_i
 <ENTITY TYPES>
 {{Py.Str(context["entity_types"])}}
 </ENTITY TYPES>
-{{BuildEdgeTypesSectionOf(Py.Get(context, "edge_types"), Py.Get(context, "strict_edge_types", false))}}
-{{BuildCustomInstructionsSectionOf(Py.Get(context, "custom_extraction_instructions"))}}
+{{BuildEdgeTypesSection(Py.Get(context, "edge_types"), Py.Get(context, "strict_edge_types", false))}}
+{{BuildCustomInstructionsSection(Py.Get(context, "custom_extraction_instructions"))}}
 <PREVIOUS MESSAGES>
 {{PromptHelpers.ToPromptJson(Py.Iter(context["previous_episodes"]).ToList())}}
 </PREVIOUS MESSAGES>
