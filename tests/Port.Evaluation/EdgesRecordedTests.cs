@@ -128,8 +128,10 @@ public class EdgesRecordedTests
                     "IndexError" => typeof(ArgumentOutOfRangeException),
                     "KeyError" => typeof(KeyNotFoundException),
                     // PORT: Python fails on the None with an AttributeError (group check) or a TypeError (iteration). Py.NotNone
-                    // gives a MissingMemberException for both (the type of the result is not nullable, so only a fake shows it).
-                    "AttributeError" or "TypeError" => typeof(MissingMemberException),
+                    // gives the MissingMemberException, and LINQ gives an ArgumentNullException for the iteration. The type of
+                    // the result is not nullable, so only a fake shows it (GAPS F25).
+                    "AttributeError" => typeof(MissingMemberException),
+                    "TypeError" => typeof(ArgumentNullException),
                     "ValueError" => typeof(ArgumentException),
                     _ => throw new InvalidOperationException(type),
                 },

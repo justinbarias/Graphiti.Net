@@ -570,27 +570,23 @@ internal sealed class EntityEdge : Edge, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, and else (Part 3): a flag that the code sets after the call returned.
-            EntityEdge? edge = null;
+            // PORT: try, except, else (Part 3). The else body follows the call inside the try, and the filter keeps its
+            // exceptions out of the catch. The result is not the flag, because an interface can return None in Python.
             var returned = false;
             try
             {
-                edge = await driver.GraphOperationsInterface.EdgeGetByUuidAsync(typeof(EntityEdge), driver, uuid, cancellationToken);
+                var edge = await driver.GraphOperationsInterface.EdgeGetByUuidAsync(typeof(EntityEdge), driver, uuid, cancellationToken);
                 returned = true;
-            }
-            catch (NotImplementedException)
-            {
-                // PORT: Python passes
-            }
-
-            if (returned)
-            {
                 if (groupId is not null && Py.NotNone(edge, "group_id").GroupId != groupId)
                 {
                     throw new EdgeNotFoundException(uuid);
                 }
 
-                return Py.NotNone(edge, "uuid");
+                return edge;
+            }
+            catch (NotImplementedException) when (!returned)
+            {
+                // PORT: Python passes
             }
         }
 
@@ -682,27 +678,23 @@ internal sealed class EntityEdge : Edge, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, and else (Part 3): a flag that the code sets after the call returned.
-            List<EntityEdge>? found = null;
+            // PORT: try, except, else (Part 3). The else body follows the call inside the try, and the filter keeps its
+            // exceptions out of the catch. The result is not the flag, because an interface can return None in Python.
             var returned = false;
             try
             {
-                found = await driver.GraphOperationsInterface.EdgeGetByUuidsAsync(typeof(EntityEdge), driver, uuids, cancellationToken);
+                var found = await driver.GraphOperationsInterface.EdgeGetByUuidsAsync(typeof(EntityEdge), driver, uuids, cancellationToken);
                 returned = true;
-            }
-            catch (NotImplementedException)
-            {
-                // PORT: Python passes
-            }
-
-            if (returned)
-            {
                 if (groupId is not null)
                 {
-                    found = Py.NotNone(found, "__iter__").Where(edge => edge.GroupId == groupId).ToList();
+                    found = found.Where(edge => edge.GroupId == groupId).ToList();
                 }
 
-                return Py.NotNone(found, "__iter__");
+                return found;
+            }
+            catch (NotImplementedException) when (!returned)
+            {
+                // PORT: Python passes
             }
         }
 
