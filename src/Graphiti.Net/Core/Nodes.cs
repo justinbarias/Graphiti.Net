@@ -504,30 +504,23 @@ internal sealed class EpisodicNode : Node, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, else. The flag shows that the call returned, because the result can be None (Part 3).
-            // The interface type holds no None, but Python returns the value as it is. A slot of the array keeps the result
-            // without an annotation, so the code needs no null-forgiving operator.
-            var slot = new EpisodicNode[1];
+            // PORT: try, except, else (Part 3). The else body follows the call inside the try, and the filter keeps its
+            // exceptions out of the catch. The result is not the flag, because an interface can return None in Python.
             var returned = false;
             try
             {
-                slot[0] = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidAsync(typeof(EpisodicNode), driver, uuid, cancellationToken);
+                var episode = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidAsync(typeof(EpisodicNode), driver, uuid, cancellationToken);
                 returned = true;
-            }
-            catch (NotImplementedException)
-            {
-                // PORT: Python passes
-            }
-
-            if (returned)
-            {
-                var episode = slot[0];
                 if (groupId is not null && Py.NotNone(episode, "group_id").GroupId != groupId)
                 {
                     throw new NodeNotFoundException(uuid);
                 }
 
                 return episode;
+            }
+            catch (NotImplementedException) when (!returned)
+            {
+                // PORT: Python passes
             }
         }
 
@@ -584,24 +577,13 @@ internal sealed class EpisodicNode : Node, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, else. The flag shows that the call returned, because the result can be None (Part 3).
-            // The interface type holds no None, but Python returns the value as it is. A slot of the array keeps the result
-            // without an annotation, so the code needs no null-forgiving operator.
-            var slot = new List<EpisodicNode>[1];
+            // PORT: try, except, else (Part 3). The else body follows the call inside the try, and the filter keeps its
+            // exceptions out of the catch. The result is not the flag, because an interface can return None in Python.
             var returned = false;
             try
             {
-                slot[0] = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidsAsync(typeof(EpisodicNode), driver, uuids, cancellationToken);
+                var found = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidsAsync(typeof(EpisodicNode), driver, uuids, cancellationToken);
                 returned = true;
-            }
-            catch (NotImplementedException)
-            {
-                // PORT: Python passes
-            }
-
-            if (returned)
-            {
-                var found = slot[0];
                 if (groupId is not null)
                 {
                     found = found.Where(episode => episode.GroupId == groupId).ToList();
@@ -620,6 +602,10 @@ internal sealed class EpisodicNode : Node, IPydanticModel
                 }
 
                 return found;
+            }
+            catch (NotImplementedException) when (!returned)
+            {
+                // PORT: Python passes
             }
         }
 

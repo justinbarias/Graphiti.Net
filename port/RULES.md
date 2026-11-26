@@ -1002,7 +1002,7 @@ R8 replaces this section.
 | `with open(...) as f` | `using var f = ...` |
 | `async with` | `await using` |
 | A context manager whose `__exit__` suppresses exceptions | `try`, `catch`, `finally` written out. `Dispose` cannot see the exception. |
-| `try` / `except A as e` / `else` / `finally` | `try` / `catch (A e)` / code after the try guarded by a flag / `finally`. The flag is a separate `bool` that the code sets as the last statement of the `try`. Never use the result as the flag: a call that returns `None` runs the `else` branch in Python. |
+| `try` / `except A as e` / `else` / `finally` | `try` / `catch (A e)` / code after the try guarded by a flag / `finally`. The flag is a separate `bool`. Never use the result as the flag: a call that returns `None` runs the `else` branch in Python. If the `else` body uses a result of the `try` body, write the `else` body after the call inside the `try`: set `returned = true` between them, and filter the catch with `catch (A) when (!returned)`, so that an exception of the `else` body is not caught. `EpisodicNode.GetByUuidAsync` shows the form. |
 | `match x:` with `case` | `switch` with the cases in the same order. `case _:` is `default:`. |
 | `for ... else`, `while ... else` | A flag that the loop sets when it breaks, and an `if` after the loop |
 | List, dict, and set comprehensions | LINQ, ended with `ToList()`, `ToDictionary()`, or `ToHashSet()` so that they run one time. For a dict whose order is read, fill an `OrderedDictionary` in a loop. |
