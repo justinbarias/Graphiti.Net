@@ -36,8 +36,6 @@ internal static class PyJsonValues
         ["Priority.low"] = Priority.Low,
         ["Priority.high"] = Priority.High,
         ["Priority.huge"] = Priority.Huge,
-        ["Mode.fast"] = Mode.Fast,
-        ["Mode.slow"] = Mode.Slow,
     };
 
     internal static List<JsonElement> Cases(string name) =>
@@ -202,6 +200,8 @@ internal static class PyJsonValues
         {
             switch (e.ValueKind)
             {
+                case JsonValueKind.String:
+                    return e.GetString();
                 case JsonValueKind.Null:
                     return null;
                 case JsonValueKind.True:
@@ -265,13 +265,13 @@ internal static class PyJsonValues
             if (e.TryGetProperty("d", out var d))
             {
                 var entries = d.EnumerateArray().ToList();
-                if (entries.All(entry => entry[0].ValueKind == JsonValueKind.Object && entry[0].TryGetProperty("s", out _)))
+                if (entries.All(entry => entry[0].ValueKind == JsonValueKind.String || (entry[0].ValueKind == JsonValueKind.Object && entry[0].TryGetProperty("s", out _))))
                 {
                     var dict = new OrderedDictionary<string, object?>();
                     Keep(dict);
                     foreach (var entry in entries)
                     {
-                        dict[Text(entry[0].GetProperty("s"))] = Decode(entry[1]);
+                        dict[Decode(entry[0]) as string ?? string.Empty] = Decode(entry[1]);
                     }
 
                     return dict;
@@ -312,11 +312,6 @@ internal static class PyJsonValues
             if (e.TryGetProperty("enum", out var member))
             {
                 return EnumMembers[member.GetString() ?? string.Empty];
-            }
-
-            if (e.TryGetProperty("strenum", out var strMember))
-            {
-                return EnumMembers[strMember.GetString() ?? string.Empty];
             }
 
             if (e.TryGetProperty("deep", out var deep))
@@ -361,14 +356,4 @@ internal static class PyJsonValues
 internal sealed class ChainNode(object? next)
 {
     internal object? Next => next;
-}
-
-/// <summary>An enum for a Python class <c>Mode(str, Enum)</c>: JSON writes a member as its text.</summary>
-[PyStrEnum]
-internal enum Mode
-{
-    [PyEnumMember("fast", "fast")]
-    Fast,
-    [PyEnumMember("slow", "sé")]
-    Slow,
 }

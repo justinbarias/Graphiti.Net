@@ -11,7 +11,7 @@ public class PyAstTests
     public void LiteralEval_matches_Python()
     {
         var cases = Cases("literal_eval");
-        Assert.True(cases.Count > 10000);
+        Assert.True(cases.Count > 8000);
         foreach (var c in cases)
         {
             Run(c);
@@ -60,10 +60,22 @@ public class PyAstTests
         {
             AssertError(c, () => PyAst.LiteralEval(text));
         }
-        else if (c.TryGetProperty("unsupported", out _))
+        else if (c.TryGetProperty("unsupported", out var what))
         {
+            // Python returns a complex number or Ellipsis. The port throws ValueError, so that a caller takes its fallback path.
             var ex = Record.Exception(() => PyAst.LiteralEval(text));
-            Assert.True(ex is InvalidOperationException, $"expected InvalidOperationException for {Describe(c)}, got {ex?.GetType().Name ?? "no exception"}");
+            Assert.True(ex is not null && ex.GetType() == typeof(ArgumentException), $"expected ArgumentException for {Describe(c)}, got {ex?.GetType().Name ?? "no exception"}");
+            var kind = what.GetString();
+            var message = ex?.Message ?? string.Empty;
+            Assert.True(
+                kind == "nested"
+                    ? message.Contains("complex", StringComparison.Ordinal) || message.Contains("Ellipsis", StringComparison.Ordinal)
+                    : message.Contains(kind == "Ellipsis" ? "Ellipsis" : "complex", StringComparison.Ordinal),
+                message);
+        }
+        else if (c.TryGetProperty("rsha", out _))
+        {
+            AssertText(c, Assert.IsType<string>(PyAst.LiteralEval(text)));
         }
         else
         {

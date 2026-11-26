@@ -16,13 +16,22 @@ using System.Text;
 /// close to Python's, not equal. No upstream site shows them.
 /// </summary>
 /// <remarks>
-/// Not built, because no upstream site needs them. A complex number (<c>1+2j</c>), <c>Ellipsis</c> (<c>...</c>),
-/// and a <c>\N{name}</c> escape throw <see cref="InvalidOperationException"/>, as a value outside the model
-/// does (RULES.md R6). The inside of an f-string is checked for its braces only. Python raises
-/// <c>MemoryError</c> or <c>RecursionError</c> for a chain of about 6000 unary operators or 10000 additions, and the
+/// Differences from Python, none of which an upstream site can tell apart:
+/// <list type="bullet">
+/// <item>A literal that the value model cannot hold, a complex number (<c>1+2j</c>) or <c>Ellipsis</c> (<c>...</c>), throws
+/// <see cref="ArgumentException"/> (<c>ValueError</c>) with a message that names it. Python returns a value. Both upstream
+/// callers catch <c>ValueError</c> and take their fallback path, and a different exception would stop the call.</item>
+/// <item>A <c>\N{name}</c> escape resolves only the names in <see cref="PyUnicodeNames"/>, a generated table of a few hundred
+/// common characters. A name that is valid in Python and not in the table throws <see cref="FormatException"/>, as an
+/// unknown name does in Python. A malformed escape throws <see cref="FormatException"/> in both.</item>
+/// <item>An identifier is checked with the Unicode tables of .NET and no NFKC step, so a few texts give <see cref="ArgumentException"/>
+/// where Python gives <see cref="FormatException"/>, or the other way round. Both upstream callers catch both.</item>
+/// <item>The inside of an f-string is checked for its braces only.</item>
+/// <item>Python raises <c>MemoryError</c> or <c>RecursionError</c> for a chain of about 6000 unary operators or 10000 additions, and the
 /// port does not: it reads operator chains with a loop. A nesting of 1000 ternary or lambda expressions throws
-/// <see cref="InvalidOperationException"/>. A string whose escapes make a high and a low surrogate in a row
-/// (the escapes of a surrogate pair, one after the other) is one code point in a .NET string and two in Python.
+/// <see cref="InvalidOperationException"/>.</item>
+/// <item>A string whose escapes make a high and a low surrogate in a row is one code point in a .NET string and two in Python.</item>
+/// </list>
 /// </remarks>
 internal static class PyAst
 {
@@ -64,23 +73,25 @@ internal static class PyAst
 
         // Python returns a complex number or Ellipsis where it finds one, and it raises for a later malformed
         // node first. So the port keeps a marker and reports it when the whole text has been read.
-        if (ContainsMarker(result))
+        if (FindMarker(result) is { } marker)
         {
-            throw OutsideModel("complex numbers and Ellipsis");
+            throw OutsideModel(marker);
         }
 
         return result;
     }
 
-    private static bool ContainsMarker(object? value) => value switch
+    /// <summary>The name of the first literal in a result that the value model cannot hold, or null.</summary>
+    private static string? FindMarker(object? value) => value switch
     {
-        ComplexLiteral or EllipsisLiteral => true,
-        List<object?> list => list.Any(ContainsMarker),
-        PyTuple tuple => tuple.Any(ContainsMarker),
-        IPySet set => set.Items.Any(ContainsMarker),
-        PyDict pd => pd.Any(e => ContainsMarker(e.Key) || ContainsMarker(e.Value)),
-        OrderedDictionary<string, object?> dict => dict.Values.Any(ContainsMarker),
-        _ => false,
+        ComplexLiteral => "a complex number",
+        EllipsisLiteral => "Ellipsis (...)",
+        List<object?> list => list.Select(FindMarker).FirstOrDefault(m => m is not null),
+        PyTuple tuple => tuple.Select(FindMarker).FirstOrDefault(m => m is not null),
+        IPySet set => set.Items.Select(FindMarker).FirstOrDefault(m => m is not null),
+        PyDict pd => pd.SelectMany(e => new[] { FindMarker(e.Key), FindMarker(e.Value) }).FirstOrDefault(m => m is not null),
+        OrderedDictionary<string, object?> dict => dict.Values.Select(FindMarker).FirstOrDefault(m => m is not null),
+        _ => null,
     };
 
     private static void ThrowForLoneSurrogate(string text)
@@ -246,8 +257,8 @@ internal static class PyAst
         ? "malformed node or string: None"
         : string.Create(CultureInfo.InvariantCulture, $"malformed node or string on line {node.Line}: <ast.{node.AstName}>"));
 
-    private static InvalidOperationException OutsideModel(string what) =>
-        new($"PyAst.LiteralEval: {what} are not in the Python value model (RULES.md R6)");
+    private static ArgumentException OutsideModel(string what) =>
+        new($"malformed node or string: {what} is not in the Python value model (RULES.md R6)");
 
     private static FormatException Syntax(string message, int line) =>
         new(string.Create(CultureInfo.InvariantCulture, $"{message} (<unknown>, line {line})"));
@@ -844,7 +855,21 @@ internal static class PyAst
 
                         break;
                     case 'N':
-                        throw OutsideModel("\\N{name} escapes");
+                        var open = k;
+                        var close = open < content.Length && content[open] == '{' ? content.IndexOf('}', open) : -1;
+                        if (close < 0 || close == open + 1)
+                        {
+                            throw Syntax("(unicode error) 'unicodeescape' codec can't decode bytes: malformed \\N character escape", line);
+                        }
+
+                        if (!PyUnicodeNames.CodePoints.TryGetValue(content[(open + 1)..close].ToUpperInvariant(), out var named))
+                        {
+                            throw Syntax("(unicode error) 'unicodeescape' codec can't decode bytes: unknown Unicode character name", line);
+                        }
+
+                        sb.Append(char.ConvertFromUtf32(named));
+                        k = close + 1;
+                        break;
                     default:
                         sb.Append('\\').Append(e);
                         break;

@@ -7,17 +7,6 @@ using System.Text;
 using System.Text.Json;
 
 /// <summary>
-/// Marks a C# enum that stands for a Python <c>Enum</c> class that also derives from <c>str</c>, for
-/// example <c>class Mode(str, Enum)</c> or <c>StrEnum</c>. <see cref="PyJson.Dumps"/> writes a member of such
-/// an enum as its text, as <c>json.dumps</c> writes a <c>str</c> subclass. A plain <c>Enum</c> is not
-/// serializable. The members must have text values (<see cref="PyEnumMemberAttribute"/>).
-/// </summary>
-[AttributeUsage(AttributeTargets.Enum, AllowMultiple = false)]
-internal sealed class PyStrEnumAttribute : Attribute
-{
-}
-
-/// <summary>
 /// <c>json.dumps</c> and <c>json.loads</c> of Python 3.12 (RULES.md R11, GAPS G2, G5, F3). The text that
 /// <see cref="Dumps"/> writes reaches model prompts and the cache key, so it follows Python character by
 /// character. Both directions work with an explicit stack and never recurse, so a document of any depth
@@ -77,7 +66,8 @@ internal static class PyJson
     /// <c>JSONDecodeError</c>, for example <c>Expecting value: line 1 column 1 (char 0)</c>. Its position counts code
     /// points. An integer of more than 4300 digits throws <see cref="ArgumentException"/> (a plain <c>ValueError</c>,
     /// not a decode error). A nesting of 9998 containers throws <see cref="InvalidOperationException"/>
-    /// (<c>RecursionError</c>).
+    /// (<c>RecursionError</c>). One difference: with 9995 to 9997 containers open and an error after them, Python raises
+    /// <c>RecursionError</c> and the port raises <see cref="JsonException"/>.
     /// </summary>
     /// <param name="text">The JSON text.</param>
     /// <returns>The value.</returns>
@@ -245,9 +235,6 @@ internal static class PyJson
                     case double d:
                         sb.Append(FloatText(d));
                         return;
-                    case Enum e when IsStrEnum(e):
-                        WriteString((string)PyEnum.Value(e));
-                        return;
                     case byte[]:
                         break;
                     case PyTuple tuple:
@@ -355,15 +342,13 @@ internal static class PyJson
                 return;
             }
 
-            // A str enum compares as its text. Any other pair goes to Python's `<`, with its error. The one
-            // difference: the error for a str enum key against a key that is not text names `str`, not the enum.
-            Py.SortInPlace(entries, e => e.Key is Enum en && IsStrEnum(en) ? PyEnum.Value(en) : e.Key);
+            // The sort of CPython, with its comparisons in its order, so a nan key and the pair of an error are Python's.
+            Py.SortInPlace(entries, e => e.Key);
         }
 
         private string KeyText(object? key) => key switch
         {
             string s => s,
-            Enum e when IsStrEnum(e) => (string)PyEnum.Value(e),
             double d => FloatText(d),
             bool b => b ? "true" : "false",
             null => "null",
@@ -435,8 +420,6 @@ internal static class PyJson
 
         private void AppendEscape(char c) =>
             sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
-
-        private static bool IsStrEnum(Enum e) => e.GetType().IsDefined(typeof(PyStrEnumAttribute), false);
 
         /// <summary>The <c>__name__</c> of the Python class of a value, as the message of <c>default</c> shows it.</summary>
         private static string ClassName(object value) => value switch

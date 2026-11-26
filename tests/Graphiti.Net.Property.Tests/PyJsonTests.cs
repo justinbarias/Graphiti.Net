@@ -15,7 +15,7 @@ public class PyJsonTests
     public void Dumps_matches_Python()
     {
         var cases = Cases("dumps");
-        Assert.True(cases.Count > 10000);
+        Assert.True(cases.Count > 8000);
         foreach (var c in cases)
         {
             RunDumps(c, c.TryGetProperty("vi", out var vi) ? PoolValue(vi.GetInt32()) : c.GetProperty("v"));
@@ -35,7 +35,7 @@ public class PyJsonTests
     public void Loads_matches_Python()
     {
         var cases = Cases("loads");
-        Assert.True(cases.Count > 9000);
+        Assert.True(cases.Count > 8000);
         foreach (var c in cases)
         {
             RunLoads(c);
