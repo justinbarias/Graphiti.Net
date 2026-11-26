@@ -12,5 +12,7 @@
     <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
     <!-- Written by port/tools/generate_pycompat_values.py from real Python. -->
     <Content Include="python-values.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Written by port/tools/generate_small_values.py from real Python. -->
+    <Content Include="python-values.small.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
