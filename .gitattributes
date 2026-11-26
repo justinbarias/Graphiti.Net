@@ -1,5 +1,3 @@
 * text=auto eol=lf
 *.sh text eol=lf
 port/judge/golden/** -text
-# Each ported unit adds a block of bindings at the same place (port/RULES.md, R22). A union merge keeps both blocks.
-tests/Graphiti.Net.JudgeHost/Bindings.cs merge=union

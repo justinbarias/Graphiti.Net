@@ -72,7 +72,7 @@ A member keeps the meaning of its Python name. Do not rename a member to make it
 
 - Every ported type and member is `internal`, or `private` by R2. One family is `public`: the exception classes of `errors.py` and `llm_client/errors.py` (R4), with their constructors and properties.
 - [The public surface design](../docs/design-docs/public-surface-design.md) names each other public type. Those types are lead code, not ported code. Never add `public` to another ported type.
-- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants none yet. The lead adds it to the core project for `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.Property.Tests` when each project first needs it. Only the lead changes that list.
+- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants it to `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, and `Port.Evaluation`. The lead adds `Graphiti.Net.Property.Tests` when that project first needs it. Only the lead changes that list.
 - `PyCompat` members are `internal` too. The `PyCompat` project grants `InternalsVisibleTo` to the two product projects and to the test projects.
 - The core project never references `Neo4j.Driver`. A type from `Neo4j.Driver` appears only in `src/Graphiti.Net.Neo4j`.
 - The public facade `IGraphiti` is lead code. It maps public records to ported types and calls `GraphitiCore`. A ported unit never refers to a public record or to `IGraphiti`.
@@ -297,6 +297,7 @@ Other shapes:
 | `@dataclass` | `internal sealed record` with `{ get; set; }` properties. `frozen=True` gives `{ get; init; }`. `field(default_factory=...)` is a property initializer. |
 | `TypedDict` | `internal sealed record` with the same field names. If the code reads it by a string key, use `OrderedDictionary<string, T>`. |
 | `Enum`, `str` enum | A C# `enum` with the members in the same order. Each member has `[PyEnumMember("<python name>", <value>)]` with the Python member name and its value. `member.value` is `Py.EnumValue(member)`, and `E(value)` is `PyEnum.FromValue<E>(value)`. Write no `<Enum>Values` class. Never use `Enum.ToString()` or `Enum.Parse` for a wire value. |
+| A `@staticmethod` or a `@classmethod` of an `Enum` class (`EpisodeType.from_str` is the one MVP site) | A static method of the static class `<Enum>Extensions`, which follows the enum in the file: `EpisodeTypeExtensions.FromStr(string episodeType)`. A C# enum cannot hold a method. The docstring of the enum class is the XML comment of the enum. |
 | `Literal['a', 'b']` | `string`, with a test in `Validate()` |
 
 ### R8. Async, concurrency, and cancellation
@@ -606,7 +607,7 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | `Neo4jDriver.__init__` starts an index build as a background task | Not ported. The .NET driver builds indexes only in `BuildIndicesAndConstraintsAsync` (GAPS G20). Write `// PORT: G20` at that place. |
 | An optional import in `try` and `except ImportError` | Port the branch that runs when the import works, if the package is in [DECISIONS.md](DECISIONS.md). If not, stop and tell the lead. |
 
-The ambient holder `Graphiti.Internal.PortServices` (decision D23) has four members: `Logger(Type)`, `Time` (a `TimeProvider`), `Random` (a `PyRandom`), and `ClassifyModelFailure(Exception)` (R4, decision D31).
+The ambient holder `Graphiti.Internal.PortServices` (decision D23) has four members for ported code: `Logger(Type)`, `Time` (a `TimeProvider`), `Random` (a `PyRandom`), and `ClassifyModelFailure(Exception)` (R4, decision D31). Ported code never sets a value and never reads `LoggerFactory`, `ModelFailureClassifier`, or `DefaultClassifyModelFailure`: these are for the facade. A test replaces a value with `using (PortServices.Use(time: ..., random: ..., loggerFactory: ..., modelFailureClassifier: ...))`, which holds only for the flow of execution of that test.
 Read the clock, the random source, and loggers only through it. Never use `DateTime.Now`, `DateTimeOffset.UtcNow`, `Stopwatch`, `Random.Shared`, or `new Random()`.
 
 ### R18. Numbers, vectors, hashes, random values, and UUIDs
@@ -694,11 +695,12 @@ The four lookup methods that apply no group filter (`node_distance_reranker`, `e
 
 ### R22. Judge bindings and wrong-type cases
 
-- Each ported unit adds its bindings to `tests/Graphiti.Net.JudgeHost/Bindings.cs`. A binding decodes the arguments, calls the product code, and encodes the result. It does nothing else.
-- The usual binding names the Python parameters in order and gives the ported method: `["graphiti_core.helpers:lucene_sanitize"] = call => call.Signature("query").InvokeAsync(Helpers.LuceneSanitize),`. `InvokeAsync` converts each argument to the type of the C# parameter, takes a missing argument from the C# default, passes `CancellationToken.None` to a last token parameter, awaits a task, and encodes the result. An overloaded or generic method needs a cast to a `Func` type.
+- Each ported unit adds one file, `tests/Graphiti.Net.JudgeHost/Units/<Module>.cs`, with a static class `<Module>Bindings` in the namespace `Graphiti.JudgeHost.Units` and one method `internal static void Register(BindingTable table)`. `Bindings.cs` is lead code: it finds each such class and calls the method. A binding decodes the arguments, calls the product code, and encodes the result. It does nothing else.
+- The usual binding names the Python parameters in order and gives the ported method: `table.Pure.Add("graphiti_core.helpers:lucene_sanitize", call => call.Signature("query").InvokeAsync(Helpers.LuceneSanitize));`. `InvokeAsync` converts each argument to the type of the C# parameter, takes a missing argument from the C# default, passes `CancellationToken.None` to a last token parameter, awaits a task, and encodes the result. An overloaded or generic method needs a cast to a `Func` type.
 - A constructor, a property, or a method on an instance uses the explicit reads: `call => Codec.Result(new XException(call.Signature("uuid").String("uuid")))`. For a parameter with a default, read `Has("name")` only to choose between two constructor calls that Python also tells apart. Never write a default value in a binding.
-- Add the bindings of a unit as one block at the end of the `Pure` initializer, under a comment line with the Python module path. Put a helper method of the unit after the last helper method. `.gitattributes` gives `Bindings.cs` a union merge, so two units that each add a block at the same place merge with no conflict.
-- A unit registers each `$model`, `$enum`, and `$ref` path that its cases use, and the encoder of each model type that a result holds, in `Bindings.Registry`.
+- A unit that ports a member of another module for real (R24) puts the bindings of that member in the file of that module, for example `Units/Helpers.cs` for `helpers.validate_node_labels`. If the file exists, the unit adds its lines at the end of `Register`. `Add` throws for a name that is bound two times, so the host stops at its start.
+- A unit adds each model of its module to the schemas, with the Python path of the class as the key: `table.Schemas.Add("graphiti_core.prompts.dedupe_nodes:NodeDuplicate", NodeDuplicate.ModelJsonSchema);`. The judge function `judge:schema_text` reads that dictionary (R7).
+- A unit registers each `$model`, `$enum`, and `$ref` path that its cases use, and the encoder of each model type that a result holds, in `table.Registry`.
 - An exception type with no row in `Codec.PythonExceptionName` gives a `host_error`. If ported code throws such a type by a rule of R4, tell the lead. Only the lead changes `tests/Graphiti.Net.JudgeHost/Core/`.
 - A `{"$ref": "fixtures:Name"}` argument is a custom type. `tests/Graphiti.Net.JudgeHost/Fixtures.cs` holds one `GraphTypeDescriptor` for each of the five classes of `port/judge/host-python/fixtures.py`, built through the public `GraphTypeDefinition`. The lead writes that file.
 - A `$model` argument is decoded with `ModelValidate` (R7). A `$enum` argument is decoded with `PyEnum.FromValue<T>`. A `$ref` to a constant or a function is decoded to the ported member.
@@ -935,9 +937,9 @@ R4 holds the exception rules. R16 holds decorators and generators.
 | `@pytest.mark.parametrize` | `[Theory]` with `[InlineData]` or `[MemberData]`. Inside `TheoryData` rows, write values as tuples. |
 | A fixture | Constructor setup, `IAsyncLifetime`, or a class or collection fixture |
 | `tmp_path` | A temp folder created in the constructor and removed in `Dispose` |
-| `monkeypatch`, `mock.patch` | An injected interface with a fake. Use `PortServices.Time` for clocks and a stub `HttpMessageHandler` for HTTP. |
+| `monkeypatch`, `mock.patch` | An injected interface with a fake. Use `PortServices.Use(time: ...)` for clocks and a stub `HttpMessageHandler` for HTTP. Never assign `PortServices.Time` in a test: tests run at the same time. |
 | `pytest.raises(X, match=...)` | `Assert.Throws<X>`, then an assertion on the message |
-| `caplog` | A fake `ILogger` set on `PortServices` that collects entries |
+| `caplog` | A fake `ILoggerFactory` in `PortServices.Use(loggerFactory: ...)` that collects entries |
 
 ## Part 4. Gap map
 
@@ -1091,3 +1093,4 @@ Also, 19 `pure.queries.fulltext_query.*` cases pass a `types:SimpleNamespace` ob
 | 2026-11-26 | Open item O8 is closed: the build enforces the `using` placement of R1. | None. No unit is ported. |
 | 2026-11-26 | After the reviews of the `PyCompat` helpers (plan 0003, tasks P2, P4, P5). R7: an enum member carries `[PyEnumMember]`, and there is no `<Enum>Values` class. R8: cleanup after a cancellation passes `CancellationToken.None`, `WaitForAsync` takes the clock, a gather of existing tasks has its own form, and three differences from asyncio are stated. R11: no `strftime`, `strptime`, or subtraction, and `ToUtc()` throws for a naive value. R12: `PyText.Count`. R13: the `PyRegex` constants and the limits of `Split`. R14: `Py.SortInPlace` for float, datetime, and open keys. R18: `math.isnan`. Part 2 lists the members that exist. New open item O9. | None. No unit is ported. |
 | 2026-11-26 | After `PyJson`, `PyAst`, `Pydantic`, the judge host codec, and the first pilot unit (`errors`). R1: the licence text is a block comment, and the constructor with `innerException` has its own XML comment. R4: a class with no `__init__` takes `string message = ""`, each class has two constructors, and the row of `NodeLabelValidationError` names the pydantic sites. R7: how a model uses `PydanticFields`, `PydanticSchema`, and `IPydanticModel`, the schema facts that the Python class does not show, and five differences from pydantic. R22: the binding form `InvokeAsync`, the registry, and the `parity_pass` rule for a listed case. Part 2: the members of `Pydantic` and the limits of `PyAst`. Open items O1, O2, and O5 are closed, and O4 has 23 more cases. | `errors`: no. Its code already follows each new rule. |
+| 2026-11-26 | With the pilot base. R7: a static method of an enum class goes to `<Enum>Extensions`. R22: each unit has its own bindings file in `Units/`, and it adds its models to the schemas for `judge:schema_text`. `Bindings.cs` has no union merge, because that merge gave code that did not compile. R3 names the three assemblies that the core project grants access to, and R17 and Part 3 give `PortServices.Use` as the seam of a test. | None. No ported unit has an enum or a model. |
