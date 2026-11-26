@@ -17,230 +17,508 @@ limitations under the License.
 
 namespace Graphiti.Neo4j;
 
+using System.Collections;
+using System.Numerics;
 using global::Neo4j.Driver;
+using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Driver.Operations;
 using Graphiti.Internal;
+using Graphiti.Neo4j.Operations;
+using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
 
-// PORT: the module class of R2 and R5. The module name equals the class name, so it has the suffix Module. The unit
-// adds the Log class with the log calls.
+// PORT: the module class of R2 and R5. The module name equals the class name, so it has the suffix Module.
 internal static partial class Neo4jDriverModule
 {
     internal static ILogger Logger => PortServices.Logger(typeof(Neo4jDriverModule));
+
+    internal static partial class Log
+    {
+        // PORT: {e} is the text of the driver exception. A .NET exception has no Python str(), so it is Message.
+        [LoggerMessage(Level = LogLevel.Error, Message = "Error executing Neo4j query: {E}\n{CypherQuery}\nparameter keys: {ParameterKeys}")]
+        internal static partial void ErrorExecutingNeo4jQuery(ILogger logger, string e, string cypherQuery, string parameterKeys);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Index already exists (concurrent creation): {Query}...")]
+        internal static partial void IndexAlreadyExists(ILogger logger, string query);
+    }
 }
 
 // PORT: the class attributes provider = GraphProvider.NEO4J and default_group_id = '' are instance properties of
 // GraphDriver. The constructor sets Provider. DefaultGroupId already has the value ''.
 internal sealed class Neo4jDriver : GraphDriver
 {
+    private readonly EntityNodeOperations entityNodeOps;
+    private readonly EpisodeNodeOperations episodeNodeOps;
+    private readonly CommunityNodeOperations communityNodeOps;
+    private readonly SagaNodeOperations sagaNodeOps;
+    private readonly EntityEdgeOperations entityEdgeOps;
+    private readonly EpisodicEdgeOperations episodicEdgeOps;
+    private readonly CommunityEdgeOperations communityEdgeOps;
+    private readonly HasEpisodeEdgeOperations hasEpisodeEdgeOps;
+    private readonly NextEpisodeEdgeOperations nextEpisodeEdgeOps;
+    private readonly SearchOperations searchOps;
+    private readonly GraphMaintenanceOperations graphOps;
+
     // PORT: type(driver).__name__ (R15).
     internal override string PythonName => "Neo4jDriver";
 
-    // PORT: the index build that __init__ starts as a background task is not ported (R17, G20). The unit writes
-    // `// PORT: G20` at that place. aoss_client is set to None and only the Neptune driver reads it.
-    // PORT: aoss_client has no member (R9).
-    // TODO(port): Neo4jDriver.__init__
+    // PORT: R9. The first constructor builds the client and chains to the second one, which holds the rest of
+    // __init__.
     internal Neo4jDriver(string uri, string? user, string? password, string database = "neo4j")
+        : this(GraphDatabase.Driver(uri, AuthTokens.Basic(user ?? string.Empty, password ?? string.Empty)), database)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.__init__");
     }
 
     // PORT: the public surface design lets a host give its own IDriver (AddNeo4j with a factory). Python has one
     // constructor, which builds the client from uri, user, and password.
-    // PORT: R9 gives this constructor. The first constructor chains to it.
     internal Neo4jDriver(IDriver client, string database = "neo4j")
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.__init__ with a host IDriver");
+        Provider = GraphProvider.Neo4j;
+        Client = client;
+        Database = database;
+
+        // Instantiate Neo4j operations
+        entityNodeOps = new Neo4jEntityNodeOperations();
+        episodeNodeOps = new Neo4jEpisodeNodeOperations();
+        communityNodeOps = new Neo4jCommunityNodeOperations();
+        sagaNodeOps = new Neo4jSagaNodeOperations();
+        entityEdgeOps = new Neo4jEntityEdgeOperations();
+        episodicEdgeOps = new Neo4jEpisodicEdgeOperations();
+        communityEdgeOps = new Neo4jCommunityEdgeOperations();
+        hasEpisodeEdgeOps = new Neo4jHasEpisodeEdgeOperations();
+        nextEpisodeEdgeOps = new Neo4jNextEpisodeEdgeOperations();
+        searchOps = new Neo4jSearchOperations();
+        graphOps = new Neo4jGraphMaintenanceOperations();
+
+        // Schedule the indices and constraints to be built
+        // PORT: G20. The index build that __init__ starts as a background task is not ported (R17). The .NET driver
+        // builds indexes only in BuildIndicesAndConstraintsAsync, so there is no _init_task.
+
+        // PORT: aoss_client has no member (R9). Only the Neptune driver reads it.
     }
 
     internal IDriver Client { get; set; }
 
     // --- Operations properties ---
 
-    // TODO(port): Neo4jDriver.entity_node_ops
-    internal override EntityNodeOperations EntityNodeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.entity_node_ops");
+    internal override EntityNodeOperations EntityNodeOps => entityNodeOps;
 
-    // TODO(port): Neo4jDriver.episode_node_ops
-    internal override EpisodeNodeOperations EpisodeNodeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.episode_node_ops");
+    internal override EpisodeNodeOperations EpisodeNodeOps => episodeNodeOps;
 
-    // TODO(port): Neo4jDriver.community_node_ops
-    internal override CommunityNodeOperations CommunityNodeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.community_node_ops");
+    internal override CommunityNodeOperations CommunityNodeOps => communityNodeOps;
 
-    // TODO(port): Neo4jDriver.saga_node_ops
-    internal override SagaNodeOperations SagaNodeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.saga_node_ops");
+    internal override SagaNodeOperations SagaNodeOps => sagaNodeOps;
 
-    // TODO(port): Neo4jDriver.entity_edge_ops
-    internal override EntityEdgeOperations EntityEdgeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.entity_edge_ops");
+    internal override EntityEdgeOperations EntityEdgeOps => entityEdgeOps;
 
-    // TODO(port): Neo4jDriver.episodic_edge_ops
-    internal override EpisodicEdgeOperations EpisodicEdgeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.episodic_edge_ops");
+    internal override EpisodicEdgeOperations EpisodicEdgeOps => episodicEdgeOps;
 
-    // TODO(port): Neo4jDriver.community_edge_ops
-    internal override CommunityEdgeOperations CommunityEdgeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.community_edge_ops");
+    internal override CommunityEdgeOperations CommunityEdgeOps => communityEdgeOps;
 
-    // TODO(port): Neo4jDriver.has_episode_edge_ops
-    internal override HasEpisodeEdgeOperations HasEpisodeEdgeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.has_episode_edge_ops");
+    internal override HasEpisodeEdgeOperations HasEpisodeEdgeOps => hasEpisodeEdgeOps;
 
-    // TODO(port): Neo4jDriver.next_episode_edge_ops
-    internal override NextEpisodeEdgeOperations NextEpisodeEdgeOps => throw new NotSupportedException("TODO(port): Neo4jDriver.next_episode_edge_ops");
+    internal override NextEpisodeEdgeOperations NextEpisodeEdgeOps => nextEpisodeEdgeOps;
 
-    // TODO(port): Neo4jDriver.search_ops
-    internal override SearchOperations SearchOps => throw new NotSupportedException("TODO(port): Neo4jDriver.search_ops");
+    internal override SearchOperations SearchOps => searchOps;
 
-    // TODO(port): Neo4jDriver.graph_ops
-    internal override GraphMaintenanceOperations GraphOps => throw new NotSupportedException("TODO(port): Neo4jDriver.graph_ops");
+    internal override GraphMaintenanceOperations GraphOps => graphOps;
 
     // PORT: an async context manager that commits or rolls back takes the body as a lambda (R16).
-    // TODO(port): Neo4jDriver.transaction
-    internal override Task TransactionAsync(
+    // PORT: the session and transaction calls of Neo4j.Driver take no CancellationToken (R9, open item O9). The
+    // rollback and the close run after a cancellation as well, as R8 asks.
+    /// <summary>Neo4j transaction with real commit/rollback semantics.</summary>
+    internal override async Task TransactionAsync(
         Func<Transaction, Task> body,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.transaction");
+        await using var session = Client.AsyncSession(b => b.WithDatabase(Database));
+        var tx = await session.BeginTransactionAsync();
+        try
+        {
+            await body(new Neo4jTransaction(tx));
+            await tx.CommitAsync();
+        }
+        catch (Exception)
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     // PORT: the keys params, database_, and routing_ of the parameters are driver options (R2). The parameter values
     // and the records are converted at the driver boundary (R9). The summary and the keys of the EagerResult are the
     // second and the third items.
-    // TODO(port): Neo4jDriver.execute_query
-    internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+    internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
         string cypherQuery,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.execute_query");
+        // PORT: **kwargs is a new dict for each call, so the method reads a copy (R2).
+        var kwargs = new OrderedDictionary<string, object?>(parameters);
+        kwargs.Remove("params", out var paramsValue);
+        var @params = paramsValue is null ? new OrderedDictionary<string, object?>() : Py.AsDict(paramsValue);
+
+        // Route via Neo4j's database_ kwarg; an explicit override wins (including None,
+        // which lets the server resolve the home database), else the driver default.
+        var database = kwargs.Remove("database_", out var databaseValue)
+            ? (databaseValue is null ? null : Py.AsString(databaseValue))
+            : Database;
+
+        EagerResult<IReadOnlyList<IRecord>> result;
+        try
+        {
+            // PORT: the body of AsyncDriver.execute_query of the neo4j package. routing_ is a driver option, and
+            // the other entries join the entries of params: dict(parameters_ or {}, **kwargs) (R2).
+            var routing = RoutingControl.Writers;
+            var merged = new OrderedDictionary<string, object?>(@params);
+            foreach (var (key, value) in kwargs)
+            {
+                if (key == "routing_")
+                {
+                    routing = value switch
+                    {
+                        "w" => RoutingControl.Writers,
+                        "r" => RoutingControl.Readers,
+                        _ => throw new ArgumentException("Invalid routing control value: " + Py.Repr(value)),
+                    };
+                }
+                else
+                {
+                    merged[key] = value;
+                }
+            }
+
+            result = await Client
+                .ExecutableQuery(cypherQuery)
+                .WithParameters(ToDriverParameters(merged))
+                .WithConfig(new QueryConfig(routing, database))
+                .ExecuteAsync(cancellationToken);
+        }
+        catch (Exception e) when (!Asyncio.IsCancellation(e, cancellationToken))
+        {
+            // Log parameter names only; values may contain sensitive data.
+            var logger = Neo4jDriverModule.Logger;
+            if (logger.IsEnabled(LogLevel.Error))
+            {
+                List<string> keys = [.. @params.Keys, .. kwargs.Keys];
+                Py.SortInPlace(keys);
+                var text = Py.Repr(keys);
+                Neo4jDriverModule.Log.ErrorExecutingNeo4jQuery(logger, e.Message, cypherQuery, text);
+            }
+
+            throw;
+        }
+
+        return ([.. result.Result.Select(FromDriverRecord)], result.Summary, new List<string>(result.Keys));
     }
 
     // PORT: Python returns the session of the neo4j package, which has the shape of GraphDriverSession. The port wraps
     // it in Neo4jSession.
-    // TODO(port): Neo4jDriver.session
     internal override GraphDriverSession Session(string? database = null)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.session");
+        // PORT: database or self._database. An empty string also gives the default (R9).
+        var database_ = string.IsNullOrEmpty(database) ? Database : database;
+        return new Neo4jSession(Client.AsyncSession(b => b.WithDatabase(database_)));
     }
 
-    // TODO(port): Neo4jDriver.close
-    internal override Task CloseAsync(CancellationToken cancellationToken = default)
+    // PORT: G20. Python cancels and awaits _init_task first. The port has no such task. IDriver has no CloseAsync, so
+    // client.close() is DisposeAsync (R9).
+    internal override async Task CloseAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.close");
+        await Client.DisposeAsync();
     }
 
-    // TODO(port): Neo4jDriver.delete_all_indexes
     internal override Task DeleteAllIndexesAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.delete_all_indexes");
+        return ExecuteQueryAsync("CALL db.indexes() YIELD name DROP INDEX name", new(), cancellationToken);
     }
 
     // PORT: EagerResult | None is the result tuple of ExecuteQueryAsync, or null.
-    // TODO(port): Neo4jDriver._execute_index_query
-    private Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)?> ExecuteIndexQueryAsync(
+    /// <summary>
+    /// Execute an index creation query, ignoring 'index already exists' errors.
+    ///
+    /// Neo4j can raise EquivalentSchemaRuleAlreadyExists when concurrent CREATE INDEX
+    /// IF NOT EXISTS queries race, even though the index exists. This is safe to ignore.
+    /// </summary>
+    private async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)?> ExecuteIndexQueryAsync(
         string query,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver._execute_index_query");
+        try
+        {
+            return await ExecuteQueryAsync(query, new(), cancellationToken);
+        }
+        catch (ClientException e)
+        {
+            // Ignore "equivalent index already exists" error (race condition with IF NOT EXISTS)
+            // PORT: str(e) holds the code and the message of the error (R4).
+            if ((e.Code is not null && e.Code.Contains("EquivalentSchemaRuleAlreadyExists", StringComparison.Ordinal))
+                || e.Message.Contains("EquivalentSchemaRuleAlreadyExists", StringComparison.Ordinal))
+            {
+                var logger = Neo4jDriverModule.Logger;
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    var text = Py.Slice(query, null, 50);
+                    Neo4jDriverModule.Log.IndexAlreadyExists(logger, text);
+                }
+
+                return null;
+            }
+
+            throw;
+        }
     }
 
-    // TODO(port): Neo4jDriver.build_indices_and_constraints
-    internal override Task BuildIndicesAndConstraintsAsync(
+    internal override async Task BuildIndicesAndConstraintsAsync(
         bool deleteExisting = false,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.build_indices_and_constraints");
+        if (deleteExisting)
+        {
+            await DeleteAllIndexesAsync(cancellationToken);
+        }
+
+        var rangeIndices = GraphQueries.GetRangeIndices(Provider);
+
+        var fulltextIndices = GraphQueries.GetFulltextIndices(Provider);
+
+        List<string> indexQueries = [.. rangeIndices, .. fulltextIndices];
+
+        await Helpers.SemaphoreGatherAsync(
+            [.. indexQueries.Select(query =>
+                (Func<Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)?>>)(() => ExecuteIndexQueryAsync(query, cancellationToken)))],
+            cancellationToken: cancellationToken);
     }
 
     // PORT: GraphDriver has no health_check, so this is not an override.
-    // PORT: print(x) is Console.Out.WriteLine(x) (R4).
-    // TODO(port): Neo4jDriver.health_check
-    internal Task HealthCheckAsync(CancellationToken cancellationToken = default)
+    // PORT: VerifyConnectivityAsync takes no CancellationToken (R9).
+    /// <summary>Check Neo4j connectivity by running the driver's verify_connectivity method.</summary>
+    internal async Task HealthCheckAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jDriver.health_check");
+        try
+        {
+            await Client.VerifyConnectivityAsync();
+            return;
+        }
+        catch (Exception e) when (!Asyncio.IsCancellation(e, cancellationToken))
+        {
+            // PORT: print(x) is Console.Out.WriteLine(x) (R4). {e} is the Message of the driver exception.
+            Console.Out.WriteLine("Neo4j health check failed: " + e.Message);
+            throw;
+        }
     }
 
     // PORT: R9. The four members below have no Python name. ExecuteQueryAsync, Neo4jTransaction, and Neo4jSession
     // convert each parameter value before the driver call and each record after it, so the members are internal.
-    // TODO(port): R9, the conversion of the parameters
     internal static Dictionary<string, object?> ToDriverParameters(OrderedDictionary<string, object?> parameters)
     {
-        throw new NotSupportedException("TODO(port): R9 parameter conversion");
+        var converted = new Dictionary<string, object?>(parameters.Count);
+        foreach (var (key, value) in parameters)
+        {
+            converted[key] = ToDriverValue(value);
+        }
+
+        return converted;
     }
 
-    // TODO(port): R9, the conversion of one parameter value, at each depth
+    // PORT: R9. The errors follow the packer of the Python driver: OverflowError for an int out of range, TypeError
+    // for a dict key that is not a str, and ValueError for each other type.
     internal static object? ToDriverValue(object? value)
     {
-        throw new NotSupportedException("TODO(port): R9 parameter value conversion");
+        switch (value)
+        {
+            case null:
+                return null;
+            case bool or long or double or string or byte[] or DateOnly:
+                return value;
+            case PyDateTime dateTime:
+                return dateTime.IsNaive
+                    ? new LocalDateTime(
+                        dateTime.Year,
+                        dateTime.Month,
+                        dateTime.Day,
+                        dateTime.Hour,
+                        dateTime.Minute,
+                        dateTime.Second,
+                        dateTime.Microsecond * 1000)
+                    : dateTime.ToDateTimeOffset();
+            case BigInteger big:
+                return big >= long.MinValue && big <= long.MaxValue
+                    ? (long)big
+                    : throw new OverflowException("Integer " + big.ToString(System.Globalization.CultureInfo.InvariantCulture) + " out of range");
+            case ulong unsigned:
+                return unsigned <= long.MaxValue
+                    ? (long)unsigned
+                    : throw new OverflowException("Integer " + unsigned.ToString(System.Globalization.CultureInfo.InvariantCulture) + " out of range");
+            case PyDict pyDict:
+                {
+                    var map = new Dictionary<string, object?>();
+                    foreach (var (key, item) in pyDict)
+                    {
+                        map[key is string text ? text : throw new InvalidCastException("Map keys must be strings, not " + Py.Repr(key))] = ToDriverValue(item);
+                    }
+
+                    return map;
+                }
+
+            case IDictionary dictionary:
+                {
+                    var map = new Dictionary<string, object?>(dictionary.Count);
+                    foreach (DictionaryEntry entry in dictionary)
+                    {
+                        map[entry.Key is string text ? text : throw new InvalidCastException("Map keys must be strings, not " + Py.Repr(entry.Key))] = ToDriverValue(entry.Value);
+                    }
+
+                    return map;
+                }
+
+            case IEnumerable items:
+                {
+                    var list = new List<object?>();
+                    foreach (var item in items)
+                    {
+                        list.Add(ToDriverValue(item));
+                    }
+
+                    return list;
+                }
+
+            default:
+                throw new ArgumentException("Values of type " + value.GetType().FullName + " are not supported");
+        }
     }
 
-    // TODO(port): R9, the conversion of one record
     internal static OrderedDictionary<string, object?> FromDriverRecord(IRecord record)
     {
-        throw new NotSupportedException("TODO(port): R9 record conversion");
+        var converted = new OrderedDictionary<string, object?>();
+        foreach (var key in record.Keys)
+        {
+            converted[key] = FromDriverValue(record[key]);
+        }
+
+        return converted;
     }
 
-    // TODO(port): R9, the conversion of one record value, at each depth
+    // PORT: R9. Nanoseconds are cut to microseconds, as to_native() does. A named zone keeps only its offset.
     internal static object? FromDriverValue(object? value)
     {
-        throw new NotSupportedException("TODO(port): R9 record value conversion");
+        switch (value)
+        {
+            case null:
+                return null;
+            case bool or long or double or string or byte[]:
+                return value;
+            case IReadOnlyDictionary<string, object?> map:
+                {
+                    var converted = new OrderedDictionary<string, object?>();
+                    foreach (var (key, item) in map)
+                    {
+                        converted[key] = FromDriverValue(item);
+                    }
+
+                    return converted;
+                }
+
+            case IList list:
+                {
+                    var converted = new List<object?>(list.Count);
+                    foreach (var item in list)
+                    {
+                        converted.Add(FromDriverValue(item));
+                    }
+
+                    return converted;
+                }
+
+            case ZonedDateTime zoned:
+                return new PyDateTime(
+                    zoned.Year,
+                    zoned.Month,
+                    zoned.Day,
+                    zoned.Hour,
+                    zoned.Minute,
+                    zoned.Second,
+                    zoned.Nanosecond / 1000,
+                    zoned.OffsetSeconds * 1_000_000L);
+            case LocalDateTime local:
+                return new PyDateTime(
+                    local.Year,
+                    local.Month,
+                    local.Day,
+                    local.Hour,
+                    local.Minute,
+                    local.Second,
+                    local.Nanosecond / 1000);
+            case LocalDate date:
+                return new DateOnly(date.Year, date.Month, date.Day);
+            default:
+                throw new NotSupportedException("The driver type " + value.GetType().FullName + " has no place in the value model");
+        }
     }
 }
 
+/// <summary>Wraps a Neo4j AsyncTransaction for the Transaction ABC.</summary>
 internal sealed class Neo4jTransaction : Transaction
 {
-    // TODO(port): _Neo4jTransaction.__init__
+    private readonly IAsyncQueryRunner tx;
+
     internal Neo4jTransaction(IAsyncQueryRunner tx)
     {
-        throw new NotSupportedException("TODO(port): _Neo4jTransaction.__init__");
+        this.tx = tx;
     }
 
     // PORT: Python returns the result of the driver. No upstream site reads it, so it is a Task (R9).
-    // TODO(port): _Neo4jTransaction.run
-    internal override Task RunAsync(
+    // PORT: IAsyncQueryRunner.RunAsync takes no CancellationToken (R9, open item O9).
+    internal override async Task RunAsync(
         string query,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): _Neo4jTransaction.run");
+        await tx.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
     }
 }
 
 // PORT: Python has no such class. Neo4jDriver.session returns the AsyncSession of the neo4j package, which has the
 // members of GraphDriverSession. A C# session must derive from GraphDriverSession, so this class wraps the
 // IAsyncSession of Neo4j.Driver.
-// PORT: R9 names this adapter.
+// PORT: R9 names this adapter. The calls of IAsyncSession take no CancellationToken (R9, open item O9).
 internal sealed class Neo4jSession : GraphDriverSession
 {
-    // TODO(port): Neo4jSession constructor
+    private readonly IAsyncSession session;
+
     internal Neo4jSession(IAsyncSession session)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSession constructor");
+        this.session = session;
     }
 
-    // TODO(port): AsyncSession.__aexit__
+    // PORT: AsyncSession.__aexit__ closes the session.
     public override ValueTask DisposeAsync()
     {
-        throw new NotSupportedException("TODO(port): AsyncSession.__aexit__");
+        return session.DisposeAsync();
     }
 
-    // TODO(port): AsyncSession.run
-    internal override Task RunAsync(
+    // PORT: AsyncSession.run. A run call does not consume its result cursor, as in Python (R9).
+    internal override async Task RunAsync(
         string query,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): AsyncSession.run");
+        await session.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
     }
 
-    // TODO(port): AsyncSession.close
-    internal override Task CloseAsync(CancellationToken cancellationToken = default)
+    // PORT: AsyncSession.close.
+    internal override async Task CloseAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): AsyncSession.close");
+        await session.CloseAsync();
     }
 
-    // TODO(port): AsyncSession.execute_write
-    internal override Task ExecuteWriteAsync(
+    // PORT: AsyncSession.execute_write. The work function of the driver runs on the thread pool, so it starts with
+    // Asyncio.OnLoopAsync (R8). It receives the managed transaction as a Neo4jTransaction (R9).
+    internal override async Task ExecuteWriteAsync(
         Func<Transaction, Task> func,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): AsyncSession.execute_write");
+        await session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => func(new Neo4jTransaction(tx))));
     }
 }
