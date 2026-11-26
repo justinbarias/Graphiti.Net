@@ -48,9 +48,15 @@ internal sealed class PyLruCache<TKey, TValue>(int? maxSize)
 
         Misses++;
         var value = compute(key);
-        if (_map.ContainsKey(key))
+        if (_map.TryGetValue(key, out var filled))
         {
-            // The call itself filled this key. Python keeps the first entry.
+            // The call itself filled this key. An unbounded cache overwrites the entry with the
+            // outer value. A bounded cache keeps the first entry and returns the outer value.
+            if (MaxSize is null)
+            {
+                filled.Value = new KeyValuePair<TKey, TValue>(key, value);
+            }
+
             return value;
         }
 
@@ -62,14 +68,5 @@ internal sealed class PyLruCache<TKey, TValue>(int? maxSize)
 
         _map[key] = _order.AddLast(new KeyValuePair<TKey, TValue>(key, value));
         return value;
-    }
-
-    /// <summary><c>cache_clear()</c>: drops each entry and sets the counters to 0.</summary>
-    internal void Clear()
-    {
-        _map.Clear();
-        _order.Clear();
-        Hits = 0;
-        Misses = 0;
     }
 }

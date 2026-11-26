@@ -177,6 +177,36 @@ def lru_cases() -> list[dict]:
     return traces
 
 
+def run_reentrant(maxsize, outer: int, inner: int, calls: list[int]) -> dict:
+    """The compute function of key `outer` calls the cached function for `inner` one time, and
+    returns 1000 plus the inner result. Later calls are recorded after each step."""
+    entered = []
+
+    @lru_cache(maxsize=maxsize)
+    def f(k: int) -> int:
+        if k == outer and not entered:
+            entered.append(k)
+            return 1000 + f(inner)
+        return k * k + 1
+
+    steps = []
+    for k in [outer] + calls:
+        step = {'key': k, 'r': f(k)}
+        info = f.cache_info()
+        step.update(hits=info.hits, misses=info.misses, size=info.currsize)
+        steps.append(step)
+    return {'maxsize': maxsize, 'outer': outer, 'inner': inner, 'steps': steps}
+
+
+def reentrant_cases() -> list[dict]:
+    cases = []
+    for maxsize in (None, 1, 2, 3, 512):
+        # The inner call is for the same key, for another key, and for another key that evicts.
+        for outer, inner in ((1, 1), (1, 2), (3, 4)):
+            cases.append(run_reentrant(maxsize, outer, inner, [outer, inner, 5, outer, inner, 6, outer, inner]))
+    return cases
+
+
 # ---- random ----
 
 def splitmix64(state: int) -> tuple[int, int]:
@@ -212,6 +242,9 @@ class Xoshiro:
         return result
 
 
+UNIFORM_RANGES = [(0.0, 1.0), (5.0, 120.0), (-3.5, 2.25), (7.0, 7.0), (10.0, -10.0)]
+
+
 def random_sequences() -> list[dict]:
     cases = []
     for seed in (0, 1, -1, 42, 12345678901234, LONG_MAX, LONG_MIN, 2**40 + 3, 7, 99, 2026):
@@ -219,23 +252,28 @@ def random_sequences() -> list[dict]:
         ulongs = [x.next() for _ in range(16)]
         y = Xoshiro(seed)
         floats = [bits((y.next() >> 11) * (1.0 / 9007199254740992.0)) for _ in range(16)]
-        cases.append({'seed': seed, 'ulongs': [str(u) for u in ulongs], 'floats': floats})
+        uniform = []
+        for a, b in UNIFORM_RANGES:
+            z = Xoshiro(seed)
+            # CPython: random.uniform(a, b) is a + (b - a) * self.random()
+            uniform.append([bits(a + (b - a) * ((z.next() >> 11) * (1.0 / 9007199254740992.0))) for _ in range(4)])
+        cases.append({'seed': seed, 'ulongs': [str(u) for u in ulongs], 'floats': floats, 'uniform': uniform})
     return cases
 
 
 def random_error_cases() -> list[dict]:
     cases = []
-    for k in (4, -1):
+    for n, k in ((3, 4), (3, -1), (-1, 1), (-5, 3), (0, 1)):
         try:
-            random.sample(range(3), k)
+            random.sample(range(n), k)
         except ValueError as e:
-            cases.append({'op': 'sample', 'n': 3, 'k': k, **err(e)})
-    for args in ((0,), (-4,), (5, 5), (7, 3)):
-        try:
-            random.randrange(*args)
-        except ValueError as e:
-            cases.append({'op': 'randrange', 'args': list(args), **err(e)})
+            cases.append({'n': n, 'k': k, **err(e)})
     return cases
+
+
+def random_empty_cases() -> list[dict]:
+    """A negative n has len(range(n)) == 0, so k == 0 gives an empty list."""
+    return [{'n': n, 'k': 0, 'r': random.sample(range(n), 0)} for n in (-1, -5, 0)]
 
 
 def build_values() -> dict:
@@ -247,6 +285,8 @@ def build_values() -> dict:
             'lru': lru_cases(),
             'random_sequence': random_sequences(),
             'random_error': random_error_cases(),
+            'random_empty': random_empty_cases(),
+            'lru_reentrant': reentrant_cases(),
         },
     }
 

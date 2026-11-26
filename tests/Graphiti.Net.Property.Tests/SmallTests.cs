@@ -138,16 +138,32 @@ public class SmallTests
     });
 
     [Fact]
-    public void LruCache_clear_drops_entries_and_counters()
+    public void LruCache_matches_Python_when_the_compute_function_calls_the_cache() => Assert.All(Cases("lru_reentrant"), trace =>
     {
-        var cache = new PyLruCache<int, int>(4);
-        cache.GetOrAdd(1, k => k);
-        cache.GetOrAdd(1, k => k);
-        cache.Clear();
-        Assert.Equal((0, 0L, 0L), (cache.Count, cache.Hits, cache.Misses));
-        cache.GetOrAdd(1, k => k + 10);
-        Assert.Equal(1L, cache.Misses);
-    }
+        int? maxSize = trace.GetProperty("maxsize") is { ValueKind: not JsonValueKind.Null } m ? m.GetInt32() : null;
+        var outer = trace.GetProperty("outer").GetInt32();
+        var inner = trace.GetProperty("inner").GetInt32();
+        var cache = new PyLruCache<int, int>(maxSize);
+        var entered = false;
+        int Compute(int k)
+        {
+            if (k == outer && !entered)
+            {
+                entered = true;
+                return 1000 + cache.GetOrAdd(inner, Compute);
+            }
+
+            return (k * k) + 1;
+        }
+
+        foreach (var step in trace.GetProperty("steps").EnumerateArray())
+        {
+            Assert.Equal(step.GetProperty("r").GetInt32(), cache.GetOrAdd(step.GetProperty("key").GetInt32(), Compute));
+            Assert.Equal(step.GetProperty("hits").GetInt64(), cache.Hits);
+            Assert.Equal(step.GetProperty("misses").GetInt64(), cache.Misses);
+            Assert.Equal(step.GetProperty("size").GetInt32(), cache.Count);
+        }
+    });
 
     // ---- PyRandom ----
 
@@ -166,21 +182,32 @@ public class SmallTests
         {
             Assert.Equal(expected.GetInt64(), BitConverter.DoubleToInt64Bits(floats.Random()));
         }
+
+        var ranges = new (double, double)[] { (0.0, 1.0), (5.0, 120.0), (-3.5, 2.25), (7.0, 7.0), (10.0, -10.0) };
+        var uniform = c.GetProperty("uniform").EnumerateArray().ToList();
+        Assert.Equal(ranges.Length, uniform.Count);
+        for (var r = 0; r < ranges.Length; r++)
+        {
+            var source = new PyRandom(seed);
+            foreach (var expected in uniform[r].EnumerateArray())
+            {
+                Assert.Equal(expected.GetInt64(), BitConverter.DoubleToInt64Bits(source.Uniform(ranges[r].Item1, ranges[r].Item2)));
+            }
+        }
     });
 
     [Fact]
-    public void Random_errors_match_Python() => Assert.All(Cases("random_error"), c =>
+    public void Sample_errors_match_Python() => Assert.All(Cases("random_error"), c =>
     {
-        var rng = new PyRandom(1);
-        Action call = c.GetProperty("op").GetString() == "sample"
-            ? () => rng.SampleRange(c.GetProperty("n").GetInt64(), c.GetProperty("k").GetInt32())
-            : () =>
-            {
-                var a = c.GetProperty("args").EnumerateArray().Select(x => x.GetInt64()).ToArray();
-                _ = a.Length == 1 ? rng.RandRange(a[0]) : rng.RandRange(a[0], a[1]);
-            };
-        var ex = Assert.Throws<ArgumentException>(call);
+        var ex = Assert.Throws<ArgumentException>(() => new PyRandom(1).SampleRange(c.GetProperty("n").GetInt64(), c.GetProperty("k").GetInt32()));
         Assert.Equal(Text(c.GetProperty("msg")), ex.Message);
+    });
+
+    [Fact]
+    public void Sample_of_a_negative_or_empty_range_with_k_0_is_empty() => Assert.All(Cases("random_empty"), c =>
+    {
+        Assert.Empty(c.GetProperty("r").EnumerateArray());
+        Assert.Empty(new PyRandom(1).SampleRange(c.GetProperty("n").GetInt64(), c.GetProperty("k").GetInt32()));
     });
 
     [Fact]
@@ -258,22 +285,6 @@ public class SmallTests
     }
 
     [Fact]
-    public void RandRange_stays_in_range_and_reaches_each_value()
-    {
-        var rng = new PyRandom(11);
-        var seen = new HashSet<long>();
-        for (var i = 0; i < 2000; i++)
-        {
-            var v = rng.RandRange(-3, 4);
-            Assert.InRange(v, -3, 3);
-            seen.Add(v);
-            Assert.InRange(rng.RandRange(5), 0, 4);
-        }
-
-        Assert.Equal(7, seen.Count);
-    }
-
-    [Fact]
     public void Random_and_Uniform_stay_in_range()
     {
         var rng = new PyRandom(21);
@@ -281,24 +292,8 @@ public class SmallTests
         {
             Assert.InRange(rng.Random(), 0.0, 0.9999999999999999);
             Assert.InRange(rng.Uniform(5.0, 120.0), 5.0, 120.0);
+            Assert.InRange(rng.Uniform(-4.0, -2.0), -4.0, -2.0);
+            Assert.Equal(3.25, rng.Uniform(3.25, 3.25));
         }
-    }
-
-    [Fact]
-    public void Shuffle_keeps_the_items()
-    {
-        var items = Enumerable.Range(0, 30).ToList();
-        new PyRandom(4).Shuffle(items);
-        Assert.Equal(Enumerable.Range(0, 30), items.Order());
-        Assert.NotEqual(Enumerable.Range(0, 30), items);
-    }
-
-    [Fact]
-    public void Sample_of_a_list_takes_items_from_the_list()
-    {
-        var population = new[] { "a", "b", "c", "d", "e" };
-        var picked = new PyRandom(6).Sample(population, 3);
-        Assert.Equal(3, picked.Distinct().Count());
-        Assert.All(picked, p => Assert.Contains(p, population));
     }
 }

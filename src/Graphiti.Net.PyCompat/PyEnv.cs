@@ -6,13 +6,15 @@ namespace Graphiti.PyCompat;
 /// </summary>
 internal static class PyEnv
 {
-    // The one seam. An async-local value is private to a test and to the tasks that it starts,
-    // so tests that run in parallel do not see each other.
+    // The one seam. An async-local value is private to a test and to the tasks that it starts.
     private static readonly AsyncLocal<Func<string, string?>?> Override = new();
 
     /// <summary>
     /// Replaces the environment reader for the current flow of execution until the result is disposed.
     /// A reader returns <c>null</c> for a name that is not set.
+    /// Parallel tests do not see each other's reader for a read inside a function. A value that an
+    /// import-time read stores in a <c>static readonly</c> field (R17) stays for the whole process.
+    /// So a test must not start the static initializer of a ported class inside a <c>Use</c> scope.
     /// </summary>
     internal static IDisposable Use(Func<string, string?> reader)
     {

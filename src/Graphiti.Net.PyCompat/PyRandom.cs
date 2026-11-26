@@ -44,33 +44,12 @@ internal sealed class PyRandom
     internal double Uniform(double a, double b) => a + ((b - a) * Random());
 
     /// <summary>
-    /// <c>random.randrange(stop)</c>: an integer in [0, stop). A stop of 0 or less throws
-    /// <see cref="ArgumentException"/> (<c>ValueError</c>).
-    /// </summary>
-    internal long RandRange(long stop) =>
-        (long)(stop > 0 ? RandBelow((ulong)stop) : throw new ArgumentException("empty range for randrange()"));
-
-    /// <summary>
-    /// <c>random.randrange(start, stop)</c>: an integer in [start, stop). An empty range throws
-    /// <see cref="ArgumentException"/> (<c>ValueError</c>).
-    /// </summary>
-    internal long RandRange(long start, long stop)
-    {
-        if (stop <= start)
-        {
-            throw new ArgumentException($"empty range in randrange({start}, {stop})");
-        }
-
-        return unchecked(start + (long)RandBelow(unchecked((ulong)stop - (ulong)start)));
-    }
-
-    /// <summary>
-    /// <c>random.sample(range(n), k)</c>: k distinct integers in [0, n) in random order. A k below 0
+    /// <c>random.sample(range(n), k)</c>: k distinct integers in [0, n) in random order. A negative n counts as 0, as in <c>len(range(n))</c>. A k below 0
     /// or above n throws <see cref="ArgumentException"/> (<c>ValueError</c>).
     /// </summary>
     internal long[] SampleRange(long n, int k)
     {
-        if (k < 0 || k > n)
+        if (k < 0 || k > Math.Max(n, 0))
         {
             throw new ArgumentException("Sample larger than population or is negative");
         }
@@ -87,20 +66,6 @@ internal sealed class PyRandom
         }
 
         return result;
-    }
-
-    /// <summary><c>random.sample(population, k)</c> for a list. The result is in random order.</summary>
-    internal List<T> Sample<T>(IReadOnlyList<T> population, int k) =>
-        [.. SampleRange(population.Count, k).Select(i => population[(int)i])];
-
-    /// <summary><c>random.shuffle(items)</c>: a Fisher-Yates shuffle in place.</summary>
-    internal void Shuffle<T>(IList<T> items)
-    {
-        for (var i = items.Count - 1; i > 0; i--)
-        {
-            var j = (int)RandBelow((ulong)i + 1);
-            (items[i], items[j]) = (items[j], items[i]);
-        }
     }
 
     // An integer in [0, n) with no bias: draw the top bits, and draw again for a value that is too large.
