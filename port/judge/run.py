@@ -445,10 +445,22 @@ def differences(expected: object, actual: object, path: str = "$") -> list[str]:
 
 
 NOT_BOUND = "JudgeNotBound"
+TYPE_REJECTED = "JudgeTypeRejected"
+TYPE_ERRORS = ("TypeError", "AttributeError")
 
 
 def _not_bound(raw: object) -> bool:
     return isinstance(raw, dict) and (raw.get("error") == NOT_BOUND or raw.get("host_error") == NOT_BOUND) and len(raw) == 1
+
+
+def _type_rejected(raw: object) -> bool:
+    """The .NET host did not make the call, because a C# parameter cannot hold the argument (decision D20)."""
+    return isinstance(raw, dict) and raw.get("error") == TYPE_REJECTED and len(raw) == 1
+
+
+def _accepts_type_rejection(golden_result: object) -> bool:
+    """Python refused the same argument for its type. Only then is a type rejection a pass."""
+    return isinstance(golden_result, dict) and golden_result.get("error") in TYPE_ERRORS and len(golden_result) == 1
 
 
 def _errors_in(result: object) -> list[str]:
@@ -563,6 +575,9 @@ def main() -> int:
             if entry["id"] not in golden:
                 failed[entry["id"]] = ["no golden result. Record it from the Python build."]
                 continue
+            if args.build == "dotnet" and _type_rejected(raw) and _accepts_type_rejection(golden[entry["id"]]):
+                # Decision D20: C# refuses the argument at the binding, and Python refuses it with a type error.
+                continue
             found = differences(golden[entry["id"]], actual)
             if found:
                 failed[entry["id"]] = found
@@ -622,11 +637,13 @@ def main() -> int:
             expected &= {c["id"] for c in cases}
         surprise = sorted(set(failed) - expected)
         fixed = sorted(expected - set(failed))
-        # A listed case can fail for one reason only: its unit is not bound yet. A case that is
-        # bound and gives a wrong result is never an expected failure.
-        bound_wrong = sorted(i for i in set(failed) & expected if not _not_bound(raws.get(i)))
+        # A listed case can fail for two reasons only. Its unit is not bound yet, or the C# parameter
+        # cannot hold the argument and Python gives a result that is not a type error. The maintainer
+        # accepts such a case by name: its id stays in the list. A case that is bound, runs, and
+        # gives a wrong result is never an expected failure.
+        bound_wrong = sorted(i for i in set(failed) & expected if not (_not_bound(raws.get(i)) or _type_rejected(raws.get(i))))
         for case_id in bound_wrong:
-            print(f"FAIL {case_id} is bound and wrong. A listed case can fail only with {NOT_BOUND}.", file=sys.stderr)
+            print(f"FAIL {case_id} is bound and wrong. A listed case can fail only with {NOT_BOUND} or {TYPE_REJECTED}.", file=sys.stderr)
             for line in failed[case_id][: 20 if args.verbose else 3]:
                 print(f"     {line}", file=sys.stderr)
         if bound_wrong:
