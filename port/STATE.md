@@ -142,7 +142,7 @@ For the maintainer, from the public surface design (the page lists all 12 open q
 For the maintainer, before the pilot (plan 0003, task 6):
 
 1. A new member on the driver session contract for a write with a timeout (`utils/bulk_utils.py:192` uses `neo4j.unit_of_work` in core code). RULES.md, open item O6. Needed before layer 7.
-2. Apply the patch file that the lead writes for the runner change of decision D20, in its own pull request. RULES.md, open item O1. Plan 0003, task P8.
+2. Apply the runner change of decisions D20 and D40 with `git apply port/patches/judge-type-rejected.patch` on a branch from `main`. It goes in its own pull request. [patches/README.md](patches/README.md) gives the steps. RULES.md, open item O1. Plan 0003, task P8. Until then, no unit with a wrong-type case can be bound, and `utils.content_chunking` is the first one.
 3. Narrow the deny rule in `.claude/settings.json` so that a session can edit `port/judge/expected-failures.txt` and no other file under `port/judge/` (decision D38). Until then, no unit can reach `parity_pass`.
 
 Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.

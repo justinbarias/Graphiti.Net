@@ -18,8 +18,8 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | P5 | Build `PyRegex`, `PyRandom`, and `PyEnv`. | Workhorse, Sonnet 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
 | P6 | Build `Pydantic`. Needs P2 and P4. | Workhorse, Opus 5.5, medium | Property tests pass against values that pydantic recorded at the pinned version. |
 | P7 | Judge host: add the decoders for a `$model`, `$enum`, `$ref`, and `$dt` argument. Add the encoder for a `$type` result and the exception rows of open item O2. Write `Fixtures.cs` (R22). Needs P2 and P6. Closes O2 and debt T18. | Lead, Fable 5.2, medium | The gate passes, and the judge case count stays 1999. Own pull request. |
-| P8 | Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
-| P9 | Create the project `tests/Port.Evaluation`. Write the script in `port/tools/` that records `str(exception)` for the `errors` unit (R23, J1). | Lead, Fable 5.2, medium | The gate builds the project. The script records from `.upstream` with Python 3.12. |
+| P8 | In progress. Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
+| P9 | Done 2026-11-26. Write the script in `port/tools/` that records `str(exception)` for the `errors` unit (R23, J1). The project `tests/Port.Evaluation` comes with the `errors` unit of the pilot, because a test project with no test fails the test step. | Lead, Fable 5.2, medium | The script records from `.upstream` with Python 3.12. |
 | 6 | Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). A unit also ports the members of other modules that R24 names. Needs P1 to P9. | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering pure judge cases pass for each unit. `entity_node_ops` has no pure case: build and format only, and its 3 flow cases wait for plan 0004, layer 9. |
 | 7 | Review the pilot. Two fresh reviewers for each unit. If they disagree, a third reviewer decides. | Reviewers, Opus 5.5, high | Findings with inputs. Each finding that shows a missing rule changes `RULES.md`. |
 | 8 | Decide what to do with the pilot output. If a rule changed in a way that the output does not follow, delete the output. | Lead, Fable 5.2, medium | The decision, in `port/STATE.md`. |
@@ -415,3 +415,29 @@ Not checked: the exact `Pydantic` members that the units use, whether `entity_no
 A probe file in `src/Graphiti.Net.PyCompat` with `using System.Text;` above the namespace failed the build with `error IDE0065`. The probe file is deleted.
 `Program.cs` of the judge host has top-level statements and no namespace, and the rule does not report it.
 No adversarial review ran, because the change is configuration and formatter output.
+
+### Task P9, 2026-11-26
+
+`port/tools/record_error_messages.py` writes `tests/Port.Evaluation/values/errors.json`: 173 cases of the 15 classes of `graphiti_core/errors.py`, from Python 3.12.13.
+Each case holds the class name, the arguments, `str(exception)`, the `message` attribute, and the base classes.
+The arguments include an empty text, non-ASCII text, both quote characters, a line break, an emoji, a combining mark, lists with 0, 1, and 2 items, and the integers 0, 7, -1, and 2^63 - 1.
+`--check` reported that the file is current. The run changed nothing under `.upstream/`.
+The project `tests/Port.Evaluation` is not created here. The `errors` unit of the pilot creates it with its first test.
+
+### Task P8, 2026-11-26: the patch is written, and the maintainer applies it
+
+`port/patches/judge-type-rejected.patch` changes `port/judge/run.py` and `port/judge/README.md`. The lead wrote it on a copy outside `port/judge/`, because sessions cannot edit that folder.
+
+| Change | Reason |
+| --- | --- |
+| A `JudgeTypeRejected` answer of the .NET host passes if the golden result is `TypeError` or `AttributeError`. | Decision D20. |
+| A case in `expected-failures.txt` can fail with `JudgeTypeRejected`, and not only with `JudgeNotBound`. | Decision D40. The runner fails the gate if a bound unit has a listed case with another failure. The cases of open item O4 give a value in Python, and the C# type cannot hold their argument. |
+
+Checks on the changed copy, with the real case files and golden files:
+
+- A stand-in host answered `JudgeTypeRejected` for each `wrong_type` case of `pure.chunking`, a wrong value for one case, and `JudgeNotBound` for the others. 14 cases passed (golden `TypeError` or `AttributeError`). 5 cases stayed expected failures. The wrong value failed as `bound_wrong`.
+- With the real .NET host and all 1999 cases, the result did not change: `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`, `judge: passed`.
+- `git apply --check` passed on `main`.
+
+Not run: the changed runner against the Python build.
+The maintainer applies the patch with `git apply port/patches/judge-type-rejected.patch` on a branch. It goes in its own pull request.
