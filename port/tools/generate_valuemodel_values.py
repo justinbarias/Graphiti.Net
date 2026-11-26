@@ -43,6 +43,7 @@ from __future__ import annotations
 import copy
 import datetime
 import enum
+import hashlib
 import json
 import math
 import os
@@ -535,7 +536,7 @@ def build_values() -> dict:
     for cls in ENUMS.values():
         for m in cls:
             add('enum', {**encode_case(v=m, value=m.value), 'repr': cps(repr(m)), 'str': cps(str(m))})
-        for value in [m.value for m in cls] + [2.0, True, 1, 'x', 'red', '=', [1], None, 2**62 + 0.0]:
+        for value in [m.value for m in cls] + list(cls) + [2.0, True, 1, 'x', 'red', '=', [1], None, 2**62 + 0.0, EpisodeType.json]:
             try:
                 add('enum_from_value', {'cls': name_of(cls), **encode_case(value=value, r=cls(value))})
             except ValueError as e:
@@ -568,12 +569,51 @@ def build_values() -> dict:
     for n in range(500):
         keys_ = sort_keys(rng)
         for reverse in (False, True):
-            order = list(range(len(keys_)))
+            add('sort', sort_case(keys_, reverse))
+
+    # One bad key at each kind of place: in a descending run, in an ascending run, in binary insertion,
+    # and in a merge of runs. The TypeError names the pair that CPython compared.
+    big = list(range(70))
+    for keys_ in [[3, 2.0, 1, 'a'], [1, 2, 3, 'a', 5], ['a', 1], [1, 'a'], [2, 1, 'a', 0], [5, 4, 3, 2, 1, None],
+                  big + ['a'], big[::-1] + ['a'], big + ['a'] + big, big[:40] + ['a'] + big[:40][::-1] + big,
+                  list(range(64)) + list(range(64)) + [None], [0.5] * 100 + [(1,)] + [0.25] * 100]:
+        for reverse in (False, True):
+            add('sort', sort_case(keys_, reverse))
+
+    # Large sorts with keys from a generator that the test repeats (LCG): nan, inf, mixed int and float,
+    # and the shapes that drive runs and galloping. Positions are the stable second field.
+    for shape in ['nan3', 'nan20', 'nan50', 'inf', 'mixed']:
+        for n in [2, 10, 31, 32, 33, 63, 64, 65, 100, 128, 129, 1000, 5000]:
+            for seed in range(20):
+                for reverse in (False, True):
+                    add('sort_lcg', lcg_sort_case(shape, n, seed, reverse))
+    for shape in ['sorted', 'reversed', 'equal', 'sawtooth', 'swaps', 'halves']:
+        for n in [64, 65, 100, 129, 1000, 5000]:
+            for seed in range(3):
+                for reverse in (False, True):
+                    add('sort_lcg', lcg_sort_case(shape, n, seed, reverse))
+
+    # What the list holds while the sort runs and after it.
+    for items in [[], [7], [3, 1, 2], [5, 4, 3, 2, 1, 0], [1, 1, 0]]:
+        for reverse in (False, True):
+            add('sort_mutation', mutation_case('len', items, reverse))
+            add('sort_mutation', mutation_case('append', items, reverse))
+            add('sort_mutation', mutation_case('order', items, reverse))
+            for at in range(len(items)):
+                add('sort_mutation', mutation_case('raise', items, reverse, at))
+
+    # Python <, also for the pairs that raise.
+    nan_l = float('nan')
+    less_values = [0, 1, -1, 2**63, -2**63 - 1, 10**30, 0.5, 1.0, -0.0, nan_l, math.inf, -math.inf, float(2**63),
+                   2**53 + 1, float(2**53), True, False, 'a', 'b', '', '\U0001F600', '\uffff', (1, 'a'), (1.0, 'a'),
+                   (nan_l, 'a'), (1,), (), [1], [1, 2], [], [nan_l], b'a', b'b', {1}, {1, 2}, frozenset({1, 2}), set(),
+                   frozenset({2}), datetime.date(2025, 1, 3), DATETIMES[0], DATETIMES[2], None, Color.red, {'a': 1}]
+    for a in less_values:
+        for b in less_values:
             try:
-                order.sort(key=lambda i: keys_[i], reverse=reverse)
-                add('sort', {**encode_case(keys=keys_), 'reverse': reverse, 'r': order})
+                add('less_than', {**encode_case(a=a, b=b), 'r': a < b})
             except TypeError as e:
-                add('sort', {**encode_case(keys=keys_), 'reverse': reverse, **err(e)})
+                add('less_than', {**encode_case(a=a, b=b), **err(e)})
 
     return {'seed': SEED, 'cases': cases}
 
@@ -627,8 +667,6 @@ def sort_keys(rng: random.Random) -> list:
     n = rng.choice([0, 1, 2, 3, 5, 8, 12, 20, 63, 64, 70])
     shape = rng.choice(['int', 'float', 'num', 'str', 'tuple', 'bool_tuple', 'date', 'bytes', 'list', 'error', 'nan',
                         'datetime', 'naive', 'dt_tuple', 'dt_mixed', 'dt_none'])
-    if n > 63 and shape in ('error', 'nan', 'dt_mixed', 'dt_none'):
-        shape = 'num'  # The order of comparisons above 63 items is not CPython's (see Py.SortInPlace).
 
     def one():
         if shape == 'int':
@@ -665,6 +703,105 @@ def sort_keys(rng: random.Random) -> list:
         return rng.choice([1, 'a', None, (1, None), (1, 2), 2.5, Color.red, [1], (1,)])
 
     return [one() for _ in range(n)]
+
+
+def sort_case(keys_: list, reverse: bool) -> dict:
+    """Sorts the positions by their keys. After an error, the case holds the partly sorted positions."""
+    order = list(range(len(keys_)))
+    case = {**encode_case(keys=keys_), 'reverse': reverse}
+    try:
+        order.sort(key=lambda i: keys_[i], reverse=reverse)
+        case['r'] = order
+    except TypeError as e:
+        case.update(err(e))
+        case['after'] = order
+    return case
+
+
+def lcg(seed: int):
+    """A 64-bit linear congruential generator that the C# test repeats. It yields 31-bit values."""
+    state = seed
+    while True:
+        state = (state * 6364136223846793005 + 1442695040888963407) % 2**64
+        yield state >> 33
+
+
+def lcg_keys(shape: str, n: int, seed: int) -> list:
+    g = lcg(seed)
+    if shape.startswith('nan'):
+        p = int(shape[3:])
+        out = []
+        for _ in range(n):
+            r = next(g)
+            out.append(float('nan') if r % 100 < p else (r // 100 % 2000) / 8.0 - 125.0)
+        return out
+    if shape == 'inf':
+        out = []
+        for _ in range(n):
+            r = next(g)
+            out.append(math.inf if r % 10 == 0 else -math.inf if r % 10 == 1 else (r // 10 % 2000) / 8.0 - 125.0)
+        return out
+    if shape == 'mixed':
+        out = []
+        for _ in range(n):
+            r = next(g)
+            out.append(r // 2 % 300 - 150 if r % 2 == 0 else (r // 2 % 2400) / 8.0 - 150.0)
+        return out
+    if shape == 'sorted':
+        return [i // 3 for i in range(n)]
+    if shape == 'reversed':
+        return [(n - i) // 3 for i in range(n)]
+    if shape == 'equal':
+        return [0] * n
+    if shape == 'sawtooth':
+        return [i % 50 for i in range(n)]
+    if shape == 'halves':
+        return [i % (n // 2 + 1) for i in range(n)]
+    out = [i // 2 for i in range(n)]
+    for _ in range(max(1, n // 100)):
+        a, b = next(g) % n, next(g) % n
+        out[a], out[b] = out[b], out[a]
+    return out
+
+
+def lcg_sort_case(shape: str, n: int, seed: int, reverse: bool) -> dict:
+    keys_ = lcg_keys(shape, n, seed)
+    order = list(range(n))
+    order.sort(key=lambda i: keys_[i], reverse=reverse)
+    case = {'shape': shape, 'n': n, 'seed': seed, 'reverse': reverse}
+    if n <= 129:
+        case['r'] = order
+    else:
+        case['sha256'] = hashlib.sha256(','.join(map(str, order)).encode()).hexdigest()
+    return case
+
+
+def mutation_case(kind: str, items: list, reverse: bool, at: int = -1) -> dict:
+    """The list during and after a sort whose key function looks at it or changes it."""
+    xs = list(items)
+    seen: list = []
+
+    def key(x):
+        if kind == 'len':
+            seen.append(len(xs))
+        elif kind == 'order':
+            seen.append(x)
+        elif kind == 'append':
+            xs.append(99)
+        elif kind == 'raise' and len(seen) == at:
+            raise ValueError('boom')
+        else:
+            seen.append(x)
+        return x
+
+    case = {'kind': kind, 'items': items, 'reverse': reverse, 'at': at}
+    try:
+        xs.sort(key=key, reverse=reverse)
+    except ValueError as e:
+        case.update(err(e))
+    case['seen'] = seen if kind in ('len', 'order') else []
+    case['final'] = xs
+    return case
 
 
 def typed_reads(v) -> dict:

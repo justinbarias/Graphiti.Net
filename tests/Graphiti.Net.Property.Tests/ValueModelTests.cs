@@ -437,6 +437,9 @@ public class ValueModelTests
             if (c.TryGetProperty("e", out _))
             {
                 AssertError(c, () => Py.SortInPlace(order, i => keys[i], reverse));
+
+                // The list holds the partly sorted items of the moment of the error.
+                Assert.Equal(c.GetProperty("after").EnumerateArray().Select(x => x.GetInt32()), order);
             }
             else
             {
@@ -446,7 +449,111 @@ public class ValueModelTests
         }
     }
 
+    [Fact]
+    public void SortInPlace_of_generated_keys_matches_Python()
+    {
+        foreach (var c in Cases("sort_lcg"))
+        {
+            var keys = LcgKeys(c.GetProperty("shape").GetString() ?? string.Empty, c.GetProperty("n").GetInt32(), (ulong)c.GetProperty("seed").GetInt64());
+            var order = Enumerable.Range(0, keys.Count).ToList();
+            Py.SortInPlace(order, i => keys[i], c.GetProperty("reverse").GetBoolean());
+            if (c.TryGetProperty("r", out var r))
+            {
+                Assert.True(r.EnumerateArray().Select(x => x.GetInt32()).SequenceEqual(order), $"{c.GetProperty("shape")} n={c.GetProperty("n")}");
+            }
+            else
+            {
+                var text = string.Join(',', order.Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                var digest = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)));
+                Assert.True(c.GetProperty("sha256").GetString() == digest, $"{c.GetProperty("shape")} n={c.GetProperty("n")} seed={c.GetProperty("seed")} reverse={c.GetProperty("reverse")}");
+            }
+        }
+    }
+
+    [Fact]
+    public void SortInPlace_treats_the_list_as_Python_does()
+    {
+        foreach (var c in Cases("sort_mutation"))
+        {
+            var kind = c.GetProperty("kind").GetString();
+            var at = c.GetProperty("at").GetInt32();
+            var xs = c.GetProperty("items").EnumerateArray().Select(x => x.GetInt64()).ToList();
+            var seen = new List<long>();
+            object? Key(long x)
+            {
+                switch (kind)
+                {
+                    case "len":
+                        seen.Add(xs.Count);
+                        break;
+                    case "order":
+                        seen.Add(x);
+                        break;
+                    case "append":
+                        xs.Add(99);
+                        break;
+                    default:
+                        if (seen.Count == at)
+                        {
+                            throw new ArgumentException("boom");
+                        }
+
+                        seen.Add(x);
+                        break;
+                }
+
+                return x;
+            }
+
+            var reverse = c.GetProperty("reverse").GetBoolean();
+            if (c.TryGetProperty("e", out _))
+            {
+                AssertError(c, () => Py.SortInPlace(xs, Key, reverse));
+            }
+            else
+            {
+                Py.SortInPlace(xs, Key, reverse);
+            }
+
+            if (kind is "len" or "order")
+            {
+                Assert.Equal(c.GetProperty("seen").EnumerateArray().Select(x => x.GetInt64()), seen);
+            }
+
+            Assert.Equal(c.GetProperty("final").EnumerateArray().Select(x => x.GetInt64()), xs);
+        }
+    }
+
+    [Fact]
+    public void LessThan_matches_Python() =>
+        Check("less_than", (c, d) => Py.LessThan(d.Decode(c.GetProperty("a")), d.Decode(c.GetProperty("b"))), (c, r) => Assert.True(c.GetProperty("r").GetBoolean() == r, $"{c}"));
+
+    [Fact]
+    public void LessThan_takes_typed_lists_and_refuses_types_outside_the_value_model()
+    {
+        Assert.True(Py.LessThan(new List<string> { "a" }, new List<object?> { "b" }));
+        Assert.False(Py.LessThan(new List<long> { 2 }, new List<double> { 1.5 }));
+        Assert.Throws<InvalidOperationException>(() => Py.LessThan((1.0, "a"), (2.0, "a")));
+        Assert.Throws<InvalidOperationException>(() => Py.LessThan(1, 2L));
+        Assert.Throws<InvalidOperationException>(() => Py.LessThan(1L, 2m));
+    }
+
     // Laws that hold for any input. They do not use the Python values.
+
+    [Fact]
+    public void SortInPlace_of_100000_doubles_is_ordered_and_stable()
+    {
+        var random = new Random(7);
+        var keys = Enumerable.Range(0, 100_000).Select(_ => (object?)Math.Round(random.NextDouble() * 1000, 1)).ToList();
+        var order = Enumerable.Range(0, keys.Count).ToList();
+        Py.SortInPlace(order, i => keys[i]);
+        for (var i = 1; i < order.Count; i++)
+        {
+            var a = (double)(keys[order[i - 1]] ?? 0.0);
+            var b = (double)(keys[order[i]] ?? 0.0);
+            Assert.True(a < b || (a == b && order[i - 1] < order[i]), $"at {i}");
+        }
+    }
 
     [Fact]
     public void PySet_iterates_in_first_insertion_order()
@@ -493,6 +600,67 @@ public class ValueModelTests
         Assert.Throws<InvalidOperationException>(() => Py.Len(outside));
         Assert.Throws<InvalidOperationException>(() => Py.DeepCopy(outside));
         Assert.Throws<InvalidOperationException>(() => Py.Format(outside, ">3"));
+    }
+
+    /// <summary>The keys of <c>lcg_keys</c> in the generator, built from the same 64-bit LCG.</summary>
+    private static List<object?> LcgKeys(string shape, int n, ulong seed)
+    {
+        var state = seed;
+        long Next()
+        {
+            state = unchecked((state * 6364136223846793005UL) + 1442695040888963407UL);
+            return (long)(state >> 33);
+        }
+
+        var keys = new List<object?>(n);
+        switch (shape)
+        {
+            case "sorted":
+                keys.AddRange(Enumerable.Range(0, n).Select(i => (object?)(long)(i / 3)));
+                return keys;
+            case "reversed":
+                keys.AddRange(Enumerable.Range(0, n).Select(i => (object?)(long)((n - i) / 3)));
+                return keys;
+            case "equal":
+                keys.AddRange(Enumerable.Range(0, n).Select(_ => (object?)0L));
+                return keys;
+            case "sawtooth":
+                keys.AddRange(Enumerable.Range(0, n).Select(i => (object?)(long)(i % 50)));
+                return keys;
+            case "halves":
+                keys.AddRange(Enumerable.Range(0, n).Select(i => (object?)(long)(i % ((n / 2) + 1))));
+                return keys;
+            case "swaps":
+                keys.AddRange(Enumerable.Range(0, n).Select(i => (object?)(long)(i / 2)));
+                for (var j = 0; j < Math.Max(1, n / 100); j++)
+                {
+                    var a = (int)(Next() % n);
+                    var b = (int)(Next() % n);
+                    (keys[a], keys[b]) = (keys[b], keys[a]);
+                }
+
+                return keys;
+        }
+
+        for (var i = 0; i < n; i++)
+        {
+            var r = Next();
+            if (shape.StartsWith("nan", StringComparison.Ordinal))
+            {
+                var p = int.Parse(shape[3..], System.Globalization.CultureInfo.InvariantCulture);
+                keys.Add(r % 100 < p ? double.NaN : ((r / 100 % 2000) / 8.0) - 125.0);
+            }
+            else if (shape == "inf")
+            {
+                keys.Add(r % 10 == 0 ? double.PositiveInfinity : r % 10 == 1 ? double.NegativeInfinity : ((r / 10 % 2000) / 8.0) - 125.0);
+            }
+            else
+            {
+                keys.Add(r % 2 == 0 ? (object?)((r / 2 % 300) - 150) : ((r / 2 % 2400) / 8.0) - 150.0);
+            }
+        }
+
+        return keys;
     }
 
     private static bool Hashable(object? x)

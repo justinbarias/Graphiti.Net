@@ -56,6 +56,12 @@ internal static class PyEnum
     internal static T FromValue<T>(object? value)
         where T : struct, Enum
     {
+        if (value is T same)
+        {
+            // Cls(member) gives the member itself.
+            return same;
+        }
+
         foreach (var (member, attribute) in Info(typeof(T)).Members)
         {
             if (PyValueEquality.Equal(attribute.Value, value))
