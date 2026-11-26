@@ -1,7 +1,6 @@
 namespace Graphiti.JudgeHost.Units;
 
 using System.Text.Json.Nodes;
-using Graphiti.Core.Driver;
 using Graphiti.Core.Search;
 using Graphiti.JudgeHost.Core;
 using Graphiti.PyCompat;
@@ -38,9 +37,6 @@ internal static class SearchFiltersBindings
                 new("edge_target_node_uuids", m.EdgeTargetNodeUuids),
                 new("property_filters", m.PropertyFilters),
             ]);
-
-        // The cases of this module pass GraphProvider members. The driver module has no bindings file yet.
-        table.Registry.AddEnum<GraphProvider>("graphiti_core.driver.driver:GraphProvider");
 
         table.Schemas.Add(Module + ":DateFilter", DateFilter.ModelJsonSchema);
         table.Schemas.Add(Module + ":PropertyFilter", PropertyFilter.ModelJsonSchema);
