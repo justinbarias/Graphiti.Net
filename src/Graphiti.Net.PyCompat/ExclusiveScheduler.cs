@@ -15,6 +15,12 @@ namespace Graphiti.PyCompat;
 /// <c>await f()</c> on an async method that ends on the loop, which in Python runs in the same task with
 /// no trip through the ready queue. A continuation that becomes ready on another thread is queued.
 /// </para>
+/// <para>
+/// Warning: the in-line rule also applies to a plain <see cref="TaskCompletionSource"/> that code on the loop
+/// completes. Its waiters then run inside <c>SetResult</c>, in the middle of code that has no <c>await</c>, where
+/// asyncio only schedules the waiter. Each <see cref="Asyncio"/> helper creates its sources with
+/// <see cref="TaskCreationOptions.RunContinuationsAsynchronously"/>. Code outside the helpers must do the same.
+/// </para>
 /// </remarks>
 internal sealed class ExclusiveScheduler : TaskScheduler
 {

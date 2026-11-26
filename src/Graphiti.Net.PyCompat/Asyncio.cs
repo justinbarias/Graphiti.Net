@@ -13,7 +13,8 @@ namespace Graphiti.PyCompat;
 /// Python cancels a task by a call to <c>task.cancel()</c>. C# cancels through a
 /// <see cref="CancellationToken"/>, which code sees only where it passes the token. A call that never looks
 /// at its token runs to its end. A canceled token stays canceled, and a Python cancellation is delivered one
-/// time. Each member below says what it does with its token.
+/// time. Each member below says what it does with its token. When one token cancels several waiters at once, they
+/// wake in the reverse order of their registration on the token. asyncio wakes them in order.
 /// </para>
 /// <para>
 /// An exception that a call throws reaches the awaiter with its own type, never as an
@@ -76,8 +77,9 @@ internal static class Asyncio
     /// <remarks>
     /// With <paramref name="returnExceptions"/> true each call starts even if <paramref name="cancellationToken"/> is
     /// canceled, so that a gather of a task that <see cref="CreateTask{T}"/> started waits for that task, as the
-    /// Python cleanup <c>task.cancel(); await asyncio.gather(task, return_exceptions=True)</c> does. With false it is
-    /// <see cref="GatherAsync{T}(IReadOnlyList{Func{Task{T}}}, CancellationToken)"/> with boxed results.
+    /// Python cleanup <c>task.cancel(); await asyncio.gather(task, return_exceptions=True)</c> does. It does not throw
+    /// when the token is canceled. Python raises <c>CancelledError</c> when the gather itself is canceled. With false it
+    /// is <see cref="GatherAsync{T}(IReadOnlyList{Func{Task{T}}}, CancellationToken)"/> with boxed results.
     /// </remarks>
     internal static Task<List<object?>> GatherAsync<T>(
         IReadOnlyList<Func<Task<T>>> calls, bool returnExceptions, CancellationToken cancellationToken = default)
@@ -97,6 +99,33 @@ internal static class Asyncio
     internal static Task<List<object?>> GatherAsync(
         IReadOnlyList<Func<Task>> calls, bool returnExceptions, CancellationToken cancellationToken = default) =>
         GatherAsync([.. calls.Select(Boxed)], returnExceptions, cancellationToken);
+
+    /// <summary>
+    /// <c>asyncio.gather(*tasks, return_exceptions=...)</c> over tasks that exist already, for example a task of
+    /// <see cref="CreateTask{T}"/>. The gather waits on each task itself, with no task of its own in between, so the
+    /// awaiter resumes after the same trips through the ready queue as in Python. Each result is the value of the task,
+    /// or with <paramref name="returnExceptions"/> true the exception of the task.
+    /// </summary>
+    /// <remarks>
+    /// It takes no token, because a token cannot reach a task that runs already. Python cancels the tasks when the gather
+    /// is canceled. Cancel a task through the source that <see cref="CreateTask{T}"/> gave. The caller must be on the
+    /// scheduler, or the call throws <see cref="InvalidOperationException"/> (R8).
+    /// </remarks>
+    internal static Task<List<object?>> GatherAsync<T>(IReadOnlyList<Task<T>> tasks, bool returnExceptions)
+    {
+        RequireLoop(nameof(GatherAsync));
+        Task<T>[] children = [.. tasks];
+        return GatherCore(children, returnExceptions, () => children.Select(Outcome).ToList());
+    }
+
+    /// <summary><c>asyncio.gather(*tasks, return_exceptions=...)</c> over tasks that return <c>None</c>. A value is <c>null</c>.</summary>
+    /// <inheritdoc cref="GatherAsync{T}(IReadOnlyList{Task{T}}, bool)" path="/remarks"/>
+    internal static Task<List<object?>> GatherAsync(IReadOnlyList<Task> tasks, bool returnExceptions)
+    {
+        RequireLoop(nameof(GatherAsync));
+        Task[] children = [.. tasks];
+        return GatherCore(children, returnExceptions, () => children.Select(t => t.IsCompletedSuccessfully ? null : (object?)Failure(t)).ToList());
+    }
 
     /// <summary><c>a, b = await asyncio.gather(f(), g())</c> with two result types.</summary>
     /// <inheritdoc cref="GatherAsync{T}(IReadOnlyList{Func{Task{T}}}, CancellationToken)" path="/remarks"/>
@@ -203,7 +232,8 @@ internal static class Asyncio
 
     /// <summary>
     /// <c>asyncio.wait_for(coro, timeout)</c> with the timeout in seconds. <c>None</c> is <c>null</c> and waits with no
-    /// limit. At the limit the token that the call gets is canceled. If the call then ends with
+    /// limit. The timer runs on <paramref name="timeProvider"/>, the clock that <c>asyncio.sleep</c> uses in the port
+    /// (R8), as asyncio has one loop clock for both. At the limit the token that the call gets is canceled. If the call then ends with
     /// <see cref="OperationCanceledException"/>, this throws <see cref="TimeoutException"/> with an empty message, as
     /// <c>str(TimeoutError())</c> is empty, and the cancellation inside. If the call catches the cancellation and
     /// returns a value, the value is returned, as in Python.
@@ -217,12 +247,16 @@ internal static class Asyncio
     /// <para>
     /// The call gets a token that <paramref name="cancellationToken"/> also cancels. A cancellation through
     /// <paramref name="cancellationToken"/> ends with <see cref="OperationCanceledException"/> and not with a
-    /// timeout. As in Python, it waits for the call to end after the limit. A call that never looks at its token
-    /// runs to its end.
+    /// timeout.
+    /// </para>
+    /// <para>
+    /// It ends only when the call ends. A call that ignores its token runs past the limit, and this waits for it. If that
+    /// call then returns a value, the value is returned. In Python the cancellation reaches the call at its next await,
+    /// so a call runs past the limit only if it catches the cancellation.
     /// </para>
     /// </remarks>
     internal static async Task<T> WaitForAsync<T>(
-        Func<CancellationToken, Task<T>> call, double? timeout, CancellationToken cancellationToken = default)
+        Func<CancellationToken, Task<T>> call, double? timeout, TimeProvider timeProvider, CancellationToken cancellationToken = default)
     {
         if (timeout is not { } seconds)
         {
@@ -240,29 +274,25 @@ internal static class Asyncio
             throw new TimeoutException(string.Empty, new TaskCanceledException());
         }
 
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        if (double.IsNaN(seconds))
-        {
-            linked.Cancel();
-        }
-        else if (seconds * 1000 < uint.MaxValue - 1)
-        {
-            linked.CancelAfter(TimeSpan.FromSeconds(seconds));
-        }
-
+        var delay = double.IsNaN(seconds) ? TimeSpan.Zero
+            : seconds * 1000 < uint.MaxValue - 1 ? TimeSpan.FromSeconds(seconds)
+            : Timeout.InfiniteTimeSpan;
+        using var timer = new CancellationTokenSource(delay, timeProvider);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token);
         try
         {
             return await call(linked.Token);
         }
-        catch (OperationCanceledException e) when (linked.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException e) when (timer.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException(string.Empty, e);
         }
     }
 
-    /// <inheritdoc cref="WaitForAsync{T}(Func{CancellationToken, Task{T}}, double?, CancellationToken)"/>
-    internal static Task WaitForAsync(Func<CancellationToken, Task> call, double? timeout, CancellationToken cancellationToken = default) =>
-        WaitForAsync(Boxed(call), timeout, cancellationToken);
+    /// <inheritdoc cref="WaitForAsync{T}(Func{CancellationToken, Task{T}}, double?, TimeProvider, CancellationToken)"/>
+    internal static Task WaitForAsync(
+        Func<CancellationToken, Task> call, double? timeout, TimeProvider timeProvider, CancellationToken cancellationToken = default) =>
+        WaitForAsync(Boxed(call), timeout, timeProvider, cancellationToken);
 
     /// <summary>
     /// <c>await asyncio.shield(task)</c>. It ends with the outcome of <paramref name="task"/>. When
@@ -291,10 +321,6 @@ internal static class Asyncio
             TaskScheduler.Current);
         return outer.Task;
     }
-
-    /// <inheritdoc cref="ShieldAsync{T}(Task{T}, CancellationToken)"/>
-    internal static Task ShieldAsync(Task task, CancellationToken cancellationToken = default) =>
-        ShieldAsync(Boxed(task), cancellationToken);
 
     /// <summary>
     /// <c>await asyncio.to_thread(func)</c>. It runs <paramref name="func"/> on the thread pool, and the awaiter
@@ -447,7 +473,9 @@ internal static class Asyncio
     /// <summary>
     /// The outer future of <c>asyncio.gather</c>. Each child reports one trip after it ends (its done callback). The
     /// gather ends with the first failure, or when each child has ended, and its awaiter resumes one trip later.
-    /// All of this runs on the loop, so the counter needs no lock.
+    /// A child that has ended before the gather starts reports at once, in input order, as Python 3.12 runs the done
+    /// callbacks of such children before it returns the outer future. All of this runs on the loop, so the counter
+    /// needs no lock.
     /// </summary>
     private static Task<TResult> GatherCore<TResult>(Task[] children, bool returnExceptions, Func<TResult> results)
     {
@@ -458,31 +486,43 @@ internal static class Asyncio
 
         var outer = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var finished = 0;
+
+        void OnDone(Task done)
+        {
+            finished++;
+            if (outer.Task.IsCompleted)
+            {
+                return;
+            }
+
+            if (!returnExceptions && !done.IsCompletedSuccessfully)
+            {
+                outer.TrySetException(Failure(done));
+                return;
+            }
+
+            if (finished == children.Length)
+            {
+                outer.TrySetResult(results());
+            }
+        }
+
+        var doneAtStart = new List<Task>();
         foreach (var child in children)
         {
-            _ = child.ContinueWith(
-                done =>
-                {
-                    finished++;
-                    if (outer.Task.IsCompleted)
-                    {
-                        return;
-                    }
+            if (child.IsCompleted)
+            {
+                doneAtStart.Add(child);
+            }
+            else
+            {
+                _ = child.ContinueWith(OnDone, CancellationToken.None, TaskContinuationOptions.None, ExclusiveScheduler.Instance);
+            }
+        }
 
-                    if (!returnExceptions && !done.IsCompletedSuccessfully)
-                    {
-                        outer.TrySetException(Failure(done));
-                        return;
-                    }
-
-                    if (finished == children.Length)
-                    {
-                        outer.TrySetResult(results());
-                    }
-                },
-                CancellationToken.None,
-                TaskContinuationOptions.None,
-                ExclusiveScheduler.Instance);
+        foreach (var child in doneAtStart)
+        {
+            OnDone(child);
         }
 
         return outer.Task;
@@ -549,12 +589,6 @@ internal static class Asyncio
             return null;
         };
 
-    private static async Task<object?> Boxed(Task task)
-    {
-        await task;
-        return null;
-    }
-
     /// <summary>
     /// <c>asyncio.Semaphore</c> for <see cref="SemaphoreGatherAsync{T}"/>, used on the loop only. Waiters wake in the
     /// order that they came, one trip after a release, as in Python. A waiter whose token is canceled ends canceled
@@ -577,7 +611,7 @@ internal static class Asyncio
 
         internal Task AcquireAsync(CancellationToken token)
         {
-            if (value > 0 && !waiters.Any(w => !w.Waiter.Task.IsCanceled))
+            if (value > 0)
             {
                 value--;
                 return Task.CompletedTask;

@@ -35,6 +35,10 @@ internal sealed class AsyncioScripts
 
     internal static JsonElement Script(string id) => Scripts.Single(s => s.GetProperty("id").GetString() == id);
 
+    /// <summary>The scripts where the port differs from asyncio by a rule of R8. Their trace is the asyncio trace.</summary>
+    internal static JsonElement Difference(string id) =>
+        Document.RootElement.GetProperty("differs").EnumerateArray().Single(s => s.GetProperty("id").GetString() == id);
+
     /// <summary>Runs the script on the scheduler and returns its trace up to the end of <c>main</c>.</summary>
     internal static Task<List<string>> TraceAsync(JsonElement script) => Asyncio.Run(async () =>
     {
@@ -152,6 +156,11 @@ internal sealed class AsyncioScripts
                         catch (Exception e)
                         {
                             Log(me, $"caught {Fmt(e)}");
+                            if (op.GetArrayLength() > 3)
+                            {
+                                await BlockAsync(me, op[3], token);
+                            }
+
                             if (e is OperationCanceledException ? mode != "all" : mode == "reraise")
                             {
                                 throw;
@@ -209,10 +218,8 @@ internal sealed class AsyncioScripts
 
                 case "gather_tasks":
                     {
-                        List<Func<Task<object?>>> calls = [.. Names(op[1]).Select(h => (Func<Task<object?>>)(() => tasks[h].Task))];
-                        object r = op[2].GetBoolean()
-                            ? await Asyncio.GatherAsync(calls, returnExceptions: true, token)
-                            : await Asyncio.GatherAsync(calls, token);
+                        List<Task<object?>> existing = [.. Names(op[1]).Select(h => tasks[h].Task)];
+                        var r = await Asyncio.GatherAsync(existing, op[2].GetBoolean());
                         Log(me, $"gather_tasks -> {Fmt(r)}");
                         break;
                     }
@@ -221,7 +228,7 @@ internal sealed class AsyncioScripts
                     {
                         var name = Text(op, 1);
                         double? timeout = op[2].ValueKind == JsonValueKind.Null ? null : op[2].GetDouble();
-                        var r = await Asyncio.WaitForAsync(t => RunAsync(name, t), timeout, token);
+                        var r = await Asyncio.WaitForAsync(t => RunAsync(name, t), timeout, TimeProvider.System, token);
                         Log(me, $"wait_for {name} -> {Fmt(r)}");
                         break;
                     }

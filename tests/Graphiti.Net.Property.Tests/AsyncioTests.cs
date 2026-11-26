@@ -16,6 +16,9 @@ public class AsyncioTests
 
     private static CancellationToken TestToken => TestContext.Current.CancellationToken;
 
+    private static List<string> Trace(System.Text.Json.JsonElement script) =>
+        [.. script.GetProperty("trace").EnumerateArray().Select(e => e.GetString() ?? string.Empty)];
+
     [Theory]
     [MemberData(nameof(ScriptIds))]
     public async Task Script_trace_matches_asyncio(string id)
@@ -24,6 +27,35 @@ public class AsyncioTests
         var expected = script.GetProperty("trace").EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToList();
         var actual = await AsyncioScripts.TraceAsync(script).WaitAsync(Guard, TestToken);
         Assert.Equal(expected, actual);
+    }
+
+    // Differences from asyncio that rules of R8 accept. Each test asserts the trace of the helpers. The comment names
+    // the asyncio trace, which the generator records in the group "differs". If the helpers come to match asyncio, the
+    // second assertion fails, and the rule can go.
+
+    [Fact]
+    public async Task Differs_by_rule_cleanup_after_a_caught_cancellation_ends_at_once()
+    {
+        // asyncio: t:caught CancelledError, t:to_thread -> 1, main:caught CancelledError, main:after, main:-> None.
+        // The cancellation is delivered once, and the cleanup runs. The token stays canceled, so the cleanup that passes
+        // it ends at once with OperationCanceledException.
+        var script = AsyncioScripts.Difference("differs_cleanup_after_cancel");
+        var actual = await AsyncioScripts.TraceAsync(script).WaitAsync(Guard, TestToken);
+        Assert.Equal(["t:caught CancelledError", "main:caught CancelledError", "main:after", "main:-> None"], actual);
+        Assert.NotEqual(Trace(script), actual);
+    }
+
+    [Fact]
+    public async Task Differs_by_rule_one_cancellation_wakes_waiters_in_reverse_order()
+    {
+        // asyncio: w1, w2, w3 catch CancelledError in that order. A token runs its callbacks in the reverse order of
+        // registration, so the waiters wake w3, w2, w1.
+        var script = AsyncioScripts.Difference("differs_cancel_wake_order");
+        var actual = await AsyncioScripts.TraceAsync(script).WaitAsync(Guard, TestToken);
+        Assert.Equal(
+            ["w3:caught CancelledError", "w2:caught CancelledError", "w1:caught CancelledError", "main:caught CancelledError", "main:-> None"],
+            actual);
+        Assert.NotEqual(Trace(script), actual);
     }
 
     [Fact]
@@ -513,6 +545,7 @@ public class AsyncioTests
                     await Task.Delay(Timeout.Infinite, t);
                 },
                 0.002,
+                TimeProvider.System,
                 token));
             return (error, callToken.IsCancellationRequested);
         }).WaitAsync(Guard, token);
@@ -524,13 +557,37 @@ public class AsyncioTests
     }
 
     [Fact]
+    public async Task WaitForAsync_runs_its_timer_on_the_given_clock()
+    {
+        var clock = new ManualClock();
+        var token = TestToken;
+        var result = await Asyncio.Run(async () =>
+        {
+            var waiting = new AsyncEvent();
+            var task = Asyncio.WaitForAsync(t => waiting.WaitAsync(t), 3600.0, clock, token);
+            await Task.Yield();
+            clock.Advance(TimeSpan.FromSeconds(3599.999));
+            await Task.Yield();
+            await Task.Yield();
+            var beforeLimit = task.IsCompleted;
+            clock.Advance(TimeSpan.FromSeconds(0.001));
+            var error = await Record.ExceptionAsync(() => task);
+            return (beforeLimit, error);
+        }).WaitAsync(Guard, token);
+
+        // The limit is one hour, so only the given clock can end the call within the guard.
+        Assert.False(result.beforeLimit, "the timeout fired before the clock reached the limit");
+        Assert.IsType<TimeoutException>(result.error);
+    }
+
+    [Fact]
     public async Task WaitForAsync_canceled_by_the_caller_throws_OperationCanceledException_and_not_a_timeout()
     {
         var result = await Asyncio.Run(async () =>
         {
             using var source = new CancellationTokenSource();
             var waiting = new AsyncEvent();
-            var task = Asyncio.WaitForAsync(t => waiting.WaitAsync(t), 1000.0, source.Token);
+            var task = Asyncio.WaitForAsync(t => waiting.WaitAsync(t), 1000.0, TimeProvider.System, source.Token);
             await Task.Yield();
             await source.CancelAsync();
             var error = await Record.ExceptionAsync(() => task);
@@ -546,7 +603,7 @@ public class AsyncioTests
     {
         using var source = new CancellationTokenSource();
         var outer = source.Token;
-        var same = await Asyncio.Run(() => Asyncio.WaitForAsync(t => Task.FromResult(t == outer), null, outer)).WaitAsync(Guard, TestToken);
+        var same = await Asyncio.Run(() => Asyncio.WaitForAsync(t => Task.FromResult(t == outer), null, TimeProvider.System, outer)).WaitAsync(Guard, TestToken);
         Assert.True(same);
     }
 
@@ -566,7 +623,6 @@ public class AsyncioTests
                 var innerStillRunning = !inner.IsCompleted;
                 gate.SetResult(41);
                 var value = await inner;
-                await Asyncio.ShieldAsync((Task)inner, CancellationToken.None);
                 return (error, innerStillRunning, value);
             }
         }).WaitAsync(Guard, TestToken);
@@ -670,5 +726,64 @@ public class AsyncioTests
         Assert.True(result.woke);
         Assert.True(result.IsCompletedSuccessfully, "a wait on a set event ends at once, even with a canceled token");
         Assert.True(result.Item5);
+    }
+
+    /// <summary>A clock that moves only when a test calls <see cref="Advance"/>. Timers fire inside that call.</summary>
+    private sealed class ManualClock : TimeProvider
+    {
+        private readonly List<ManualTimer> timers = [];
+        private long ticks;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => ticks;
+
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(ticks);
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new ManualTimer(this, callback, state);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+
+        public void Advance(TimeSpan by)
+        {
+            ticks += by.Ticks;
+            foreach (var timer in timers.Where(t => t.Due is { } due && due <= ticks).ToList())
+            {
+                timer.Fire();
+            }
+        }
+
+        private sealed class ManualTimer(ManualClock clock, TimerCallback callback, object? state) : ITimer
+        {
+            public long? Due { get; private set; }
+
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                Due = dueTime == Timeout.InfiniteTimeSpan ? null : clock.ticks + dueTime.Ticks;
+                if (!clock.timers.Contains(this))
+                {
+                    clock.timers.Add(this);
+                }
+
+                return true;
+            }
+
+            public void Fire()
+            {
+                Due = null;
+                callback(state);
+            }
+
+            public void Dispose() => Due = null;
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
     }
 }

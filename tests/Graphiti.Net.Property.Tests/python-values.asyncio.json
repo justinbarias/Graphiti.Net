@@ -3936,6 +3936,611 @@
    ]
   },
   {
+   "id": "gather_existing_task_hops_plain",
+   "note": "the trips of a gather of a task that exists, seen from a task that runs beside it",
+   "coros": {
+    "bg": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y2"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y3"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y4"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y5"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y6"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y7"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y8"
+     ],
+     [
+      "log",
+      "end"
+     ]
+    ],
+    "inner": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "log",
+      "done"
+     ],
+     [
+      "return",
+      4
+     ]
+    ]
+   },
+   "main": [
+    [
+     "create_task",
+     "bg",
+     "t"
+    ],
+    [
+     "create_task",
+     "inner",
+     "h"
+    ],
+    [
+     "gather_tasks",
+     [
+      "h"
+     ],
+     false
+    ],
+    [
+     "log",
+     "gathered"
+    ],
+    [
+     "await",
+     "t"
+    ]
+   ],
+   "trace": [
+    "bg:start",
+    "inner:start",
+    "bg:y0",
+    "inner:y0",
+    "bg:y1",
+    "inner:y1",
+    "inner:done",
+    "bg:y2",
+    "bg:y3",
+    "main:gather_tasks -> [4]",
+    "main:gathered",
+    "bg:y4",
+    "bg:y5",
+    "bg:y6",
+    "bg:y7",
+    "bg:y8",
+    "bg:end",
+    "main:await t -> None",
+    "main:-> None"
+   ]
+  },
+  {
+   "id": "gather_existing_task_hops_rx",
+   "note": "the trips of a gather of a task that exists, seen from a task that runs beside it",
+   "coros": {
+    "bg": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y2"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y3"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y4"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y5"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y6"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y7"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y8"
+     ],
+     [
+      "log",
+      "end"
+     ]
+    ],
+    "inner": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "log",
+      "done"
+     ],
+     [
+      "return",
+      4
+     ]
+    ]
+   },
+   "main": [
+    [
+     "create_task",
+     "bg",
+     "t"
+    ],
+    [
+     "create_task",
+     "inner",
+     "h"
+    ],
+    [
+     "gather_tasks",
+     [
+      "h"
+     ],
+     true
+    ],
+    [
+     "log",
+     "gathered"
+    ],
+    [
+     "await",
+     "t"
+    ]
+   ],
+   "trace": [
+    "bg:start",
+    "inner:start",
+    "bg:y0",
+    "inner:y0",
+    "bg:y1",
+    "inner:y1",
+    "inner:done",
+    "bg:y2",
+    "bg:y3",
+    "main:gather_tasks -> [4]",
+    "main:gathered",
+    "bg:y4",
+    "bg:y5",
+    "bg:y6",
+    "bg:y7",
+    "bg:y8",
+    "bg:end",
+    "main:await t -> None",
+    "main:-> None"
+   ]
+  },
+  {
+   "id": "gather_existing_tasks_failure_hops",
+   "note": "the first failure of a gather of tasks, against a task beside it",
+   "coros": {
+    "bg": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y2"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y3"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y4"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y5"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y6"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y7"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y8"
+     ],
+     [
+      "log",
+      "end"
+     ]
+    ],
+    "x": [
+     [
+      "yield"
+     ],
+     [
+      "raise",
+      "ValueError",
+      "x"
+     ]
+    ],
+    "y": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y2"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y3"
+     ]
+    ]
+   },
+   "main": [
+    [
+     "create_task",
+     "bg",
+     "t"
+    ],
+    [
+     "create_task",
+     "x",
+     "hx"
+    ],
+    [
+     "create_task",
+     "y",
+     "hy"
+    ],
+    [
+     "try",
+     [
+      [
+       "gather_tasks",
+       [
+        "hx",
+        "hy"
+       ],
+       false
+      ]
+     ],
+     "swallow"
+    ],
+    [
+     "log",
+     "gathered"
+    ],
+    [
+     "await",
+     "t"
+    ]
+   ],
+   "trace": [
+    "bg:start",
+    "y:start",
+    "bg:y0",
+    "y:y0",
+    "bg:y1",
+    "y:y1",
+    "bg:y2",
+    "main:caught ValueError(x)",
+    "main:gathered",
+    "y:y2",
+    "bg:y3",
+    "y:y3",
+    "bg:y4",
+    "bg:y5",
+    "bg:y6",
+    "bg:y7",
+    "bg:y8",
+    "bg:end",
+    "main:await t -> None",
+    "main:-> None"
+   ]
+  },
+  {
+   "id": "gather_existing_done_task_hops",
+   "note": "a gather of a task that has ended",
+   "coros": {
+    "bg": [
+     [
+      "log",
+      "start"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y0"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y1"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y2"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y3"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y4"
+     ],
+     [
+      "yield"
+     ],
+     [
+      "log",
+      "y5"
+     ],
+     [
+      "log",
+      "end"
+     ]
+    ],
+    "inner": [
+     [
+      "return",
+      1
+     ]
+    ]
+   },
+   "main": [
+    [
+     "create_task",
+     "inner",
+     "h"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "create_task",
+     "bg",
+     "t"
+    ],
+    [
+     "gather_tasks",
+     [
+      "h"
+     ],
+     true
+    ],
+    [
+     "log",
+     "gathered"
+    ],
+    [
+     "await",
+     "t"
+    ]
+   ],
+   "trace": [
+    "main:gather_tasks -> [1]",
+    "main:gathered",
+    "bg:start",
+    "bg:y0",
+    "bg:y1",
+    "bg:y2",
+    "bg:y3",
+    "bg:y4",
+    "bg:y5",
+    "bg:end",
+    "main:await t -> None",
+    "main:-> None"
+   ]
+  },
+  {
    "id": "random_000",
    "note": "seed 20261126, script 0",
    "coros": {
@@ -16643,6 +17248,154 @@
     "c1:2",
     "main:gather -> [10]",
     "main:end",
+    "main:-> None"
+   ]
+  }
+ ],
+ "differs": [
+  {
+   "id": "differs_cleanup_after_cancel",
+   "note": "except BaseException: await to_thread(f). The cancellation of asyncio is delivered once, so the cleanup runs. A canceled token stays canceled, so the cleanup that passes it ends at once.",
+   "coros": {
+    "t": [
+     [
+      "try",
+      [
+       [
+        "ev_wait",
+        "never"
+       ]
+      ],
+      "reraise",
+      [
+       [
+        "to_thread",
+        1
+       ]
+      ]
+     ]
+    ]
+   },
+   "main": [
+    [
+     "create_task",
+     "t",
+     "h"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "cancel",
+     "h"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "log",
+     "after"
+    ]
+   ],
+   "trace": [
+    "t:caught CancelledError",
+    "t:to_thread -> 1",
+    "main:caught CancelledError",
+    "main:after",
+    "main:-> None"
+   ]
+  },
+  {
+   "id": "differs_cancel_wake_order",
+   "note": "one cancellation of three waiters: asyncio wakes them in order, a token in reverse order of registration",
+   "coros": {
+    "t": [
+     [
+      "gather",
+      [
+       "w1",
+       "w2",
+       "w3"
+      ],
+      false
+     ]
+    ],
+    "w1": [
+     [
+      "try",
+      [
+       [
+        "ev_wait",
+        "e"
+       ]
+      ],
+      "reraise"
+     ]
+    ],
+    "w2": [
+     [
+      "try",
+      [
+       [
+        "ev_wait",
+        "e"
+       ]
+      ],
+      "reraise"
+     ]
+    ],
+    "w3": [
+     [
+      "try",
+      [
+       [
+        "ev_wait",
+        "e"
+       ]
+      ],
+      "reraise"
+     ]
+    ]
+   },
+   "main": [
+    [
+     "create_task",
+     "t",
+     "h"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "cancel",
+     "h"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h"
+      ]
+     ],
+     "all"
+    ]
+   ],
+   "trace": [
+    "w1:caught CancelledError",
+    "w2:caught CancelledError",
+    "w3:caught CancelledError",
+    "main:caught CancelledError",
     "main:-> None"
    ]
   }
