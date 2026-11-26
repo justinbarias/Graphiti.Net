@@ -3,7 +3,7 @@ namespace Graphiti.JudgeHost.Core;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Neo4j.Driver;
+using global::Neo4j.Driver;
 
 /// <summary>The Python class name of each exception type of RULES.md R4 (open item O2).</summary>
 internal static partial class Codec
