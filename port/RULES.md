@@ -72,7 +72,7 @@ A member keeps the meaning of its Python name. Do not rename a member to make it
 
 - Every ported type and member is `internal`, or `private` by R2. One family is `public`: the exception classes of `errors.py` and `llm_client/errors.py` (R4), with their constructors and properties.
 - [The public surface design](../docs/design-docs/public-surface-design.md) names each other public type. Those types are lead code, not ported code. Never add `public` to another ported type.
-- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants none yet. The lead adds it to the core project for `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.Property.Tests` when each project first needs it. Only the lead changes that list.
+- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants it to `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, and `Port.Evaluation`. The lead adds `Graphiti.Net.Property.Tests` when that project first needs it. Only the lead changes that list.
 - `PyCompat` members are `internal` too. The `PyCompat` project grants `InternalsVisibleTo` to the two product projects and to the test projects.
 - The core project never references `Neo4j.Driver`. A type from `Neo4j.Driver` appears only in `src/Graphiti.Net.Neo4j`.
 - The public facade `IGraphiti` is lead code. It maps public records to ported types and calls `GraphitiCore`. A ported unit never refers to a public record or to `IGraphiti`.
@@ -607,7 +607,7 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | `Neo4jDriver.__init__` starts an index build as a background task | Not ported. The .NET driver builds indexes only in `BuildIndicesAndConstraintsAsync` (GAPS G20). Write `// PORT: G20` at that place. |
 | An optional import in `try` and `except ImportError` | Port the branch that runs when the import works, if the package is in [DECISIONS.md](DECISIONS.md). If not, stop and tell the lead. |
 
-The ambient holder `Graphiti.Internal.PortServices` (decision D23) has four members: `Logger(Type)`, `Time` (a `TimeProvider`), `Random` (a `PyRandom`), and `ClassifyModelFailure(Exception)` (R4, decision D31).
+The ambient holder `Graphiti.Internal.PortServices` (decision D23) has four members for ported code: `Logger(Type)`, `Time` (a `TimeProvider`), `Random` (a `PyRandom`), and `ClassifyModelFailure(Exception)` (R4, decision D31). Ported code never sets a value and never reads `LoggerFactory`, `ModelFailureClassifier`, or `DefaultClassifyModelFailure`: these are for the facade. A test replaces a value with `using (PortServices.Use(time: ..., random: ..., loggerFactory: ..., modelFailureClassifier: ...))`, which holds only for the flow of execution of that test.
 Read the clock, the random source, and loggers only through it. Never use `DateTime.Now`, `DateTimeOffset.UtcNow`, `Stopwatch`, `Random.Shared`, or `new Random()`.
 
 ### R18. Numbers, vectors, hashes, random values, and UUIDs
@@ -937,9 +937,9 @@ R4 holds the exception rules. R16 holds decorators and generators.
 | `@pytest.mark.parametrize` | `[Theory]` with `[InlineData]` or `[MemberData]`. Inside `TheoryData` rows, write values as tuples. |
 | A fixture | Constructor setup, `IAsyncLifetime`, or a class or collection fixture |
 | `tmp_path` | A temp folder created in the constructor and removed in `Dispose` |
-| `monkeypatch`, `mock.patch` | An injected interface with a fake. Use `PortServices.Time` for clocks and a stub `HttpMessageHandler` for HTTP. |
+| `monkeypatch`, `mock.patch` | An injected interface with a fake. Use `PortServices.Use(time: ...)` for clocks and a stub `HttpMessageHandler` for HTTP. Never assign `PortServices.Time` in a test: tests run at the same time. |
 | `pytest.raises(X, match=...)` | `Assert.Throws<X>`, then an assertion on the message |
-| `caplog` | A fake `ILogger` set on `PortServices` that collects entries |
+| `caplog` | A fake `ILoggerFactory` in `PortServices.Use(loggerFactory: ...)` that collects entries |
 
 ## Part 4. Gap map
 
@@ -1093,4 +1093,4 @@ Also, 19 `pure.queries.fulltext_query.*` cases pass a `types:SimpleNamespace` ob
 | 2026-11-26 | Open item O8 is closed: the build enforces the `using` placement of R1. | None. No unit is ported. |
 | 2026-11-26 | After the reviews of the `PyCompat` helpers (plan 0003, tasks P2, P4, P5). R7: an enum member carries `[PyEnumMember]`, and there is no `<Enum>Values` class. R8: cleanup after a cancellation passes `CancellationToken.None`, `WaitForAsync` takes the clock, a gather of existing tasks has its own form, and three differences from asyncio are stated. R11: no `strftime`, `strptime`, or subtraction, and `ToUtc()` throws for a naive value. R12: `PyText.Count`. R13: the `PyRegex` constants and the limits of `Split`. R14: `Py.SortInPlace` for float, datetime, and open keys. R18: `math.isnan`. Part 2 lists the members that exist. New open item O9. | None. No unit is ported. |
 | 2026-11-26 | After `PyJson`, `PyAst`, `Pydantic`, the judge host codec, and the first pilot unit (`errors`). R1: the licence text is a block comment, and the constructor with `innerException` has its own XML comment. R4: a class with no `__init__` takes `string message = ""`, each class has two constructors, and the row of `NodeLabelValidationError` names the pydantic sites. R7: how a model uses `PydanticFields`, `PydanticSchema`, and `IPydanticModel`, the schema facts that the Python class does not show, and five differences from pydantic. R22: the binding form `InvokeAsync`, the registry, and the `parity_pass` rule for a listed case. Part 2: the members of `Pydantic` and the limits of `PyAst`. Open items O1, O2, and O5 are closed, and O4 has 23 more cases. | `errors`: no. Its code already follows each new rule. |
-| 2026-11-26 | With the pilot base. R7: a static method of an enum class goes to `<Enum>Extensions`. R22: each unit has its own bindings file in `Units/`, and it adds its models to the schemas for `judge:schema_text`. `Bindings.cs` has no union merge, because that merge gave code that did not compile. | None. No ported unit has an enum or a model. |
+| 2026-11-26 | With the pilot base. R7: a static method of an enum class goes to `<Enum>Extensions`. R22: each unit has its own bindings file in `Units/`, and it adds its models to the schemas for `judge:schema_text`. `Bindings.cs` has no union merge, because that merge gave code that did not compile. R3 names the three assemblies that the core project grants access to, and R17 and Part 3 give `PortServices.Use` as the seam of a test. | None. No ported unit has an enum or a model. |

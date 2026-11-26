@@ -35,7 +35,7 @@ internal static class Bindings
 
     private const string UnitNamespace = "Graphiti.JudgeHost.Units";
 
-    private static readonly BindingTable Table = Load();
+    private static readonly BindingTable Table = Load(typeof(Bindings).Assembly.GetTypes());
 
     /// <summary>
     /// Gets the <c>$ref</c>, <c>$enum</c>, and <c>$model</c> paths and the encoders of product types.
@@ -60,21 +60,30 @@ internal static class Bindings
     }
 
     /// <summary>
-    /// Builds the table: the two judge functions, then <c>Register</c> of each unit class in name order. A unit class
-    /// with no such method, and a name that two units bind, stop the host at its start.
+    /// Builds the table: the two judge functions, then <c>Register</c> of each unit class in name order.
+    /// A unit class is a type of the unit namespace, or a type with a static method <c>Register(BindingTable)</c>.
+    /// Each one must have all three: the namespace, a name that ends in <c>Bindings</c>, and the method. A class
+    /// that lacks one, a <c>Register</c> that throws, and a name that two units bind stop the host at its start,
+    /// so that a unit file never binds nothing in silence.
     /// </summary>
-    private static BindingTable Load()
+    internal static BindingTable Load(IEnumerable<Type> types)
     {
         var table = new BindingTable();
         table.Pure.Add("judge:embed", call => call.Signature("text").InvokeAsync(JudgeEmbedding.Embed));
         table.Pure.Add("judge:schema_text", call => call.Signature("model_path").InvokeAsync((Func<string, string>)(path => SchemaText(table, path))));
 
-        var units = typeof(Bindings).Assembly.GetTypes()
-            .Where(type => type.Namespace == UnitNamespace && type.Name.EndsWith("Bindings", StringComparison.Ordinal))
+        // A nested type is a closure class that the compiler made.
+        var units = types
+            .Where(type => !type.IsNested && type != typeof(Bindings) && (type.Namespace == UnitNamespace || FindRegister(type) is not null))
             .OrderBy(type => type.FullName, StringComparer.Ordinal);
         foreach (var unit in units)
         {
-            var register = unit.GetMethod("Register", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public, [typeof(BindingTable)])
+            if (unit.Namespace != UnitNamespace || !unit.Name.EndsWith("Bindings", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"{unit.FullName} is not a unit class: the namespace must be {UnitNamespace}, and the name must end in Bindings.");
+            }
+
+            var register = FindRegister(unit)
                 ?? throw new InvalidOperationException($"{unit.FullName} has no static method Register(BindingTable).");
             try
             {
@@ -88,6 +97,9 @@ internal static class Bindings
 
         return table;
     }
+
+    private static MethodInfo? FindRegister(Type type) =>
+        type.GetMethod("Register", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public, [typeof(BindingTable)]);
 
     /// <summary>
     /// <c>json.dumps(M.model_json_schema())</c>, the text that upstream puts into a prompt, as <c>_schema_text</c> of

@@ -22,12 +22,32 @@ public sealed class BindingsTests
     }
 
     [Fact]
-    public void Each_unit_class_is_loaded()
+    public void Load_calls_Register_of_each_unit_class()
     {
-        // A class in the unit namespace that the loader skips binds nothing, and its cases stay JudgeNotBound in silence.
-        // A nested type is a closure class that the compiler made.
-        var units = typeof(Bindings).Assembly.GetTypes().Where(type => type.Namespace == "Graphiti.JudgeHost.Units" && !type.IsNested).ToList();
+        var table = Bindings.Load([typeof(Graphiti.JudgeHost.Units.GoodProbeBindings)]);
 
-        Assert.All(units, unit => Assert.EndsWith("Bindings", unit.Name, StringComparison.Ordinal));
+        Assert.Contains("probe:good", table.Pure.Keys);
+    }
+
+    [Theory]
+    [InlineData(typeof(Graphiti.JudgeHost.Unit.WrongNamespaceBindings), "is not a unit class")]
+    [InlineData(typeof(Graphiti.JudgeHost.Units.WrongNameProbe), "is not a unit class")]
+    [InlineData(typeof(Graphiti.JudgeHost.Units.NoRegisterBindings), "has no static method Register")]
+    [InlineData(typeof(Graphiti.JudgeHost.Units.WrongSignatureBindings), "has no static method Register")]
+    [InlineData(typeof(Graphiti.JudgeHost.Units.ThrowingBindings), "Register failed")]
+    [InlineData(typeof(Graphiti.JudgeHost.Units.DuplicateBindings), "Register failed")]
+    public void Load_stops_for_a_unit_class_that_would_bind_nothing_or_bind_wrong(Type unit, string message)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => Bindings.Load([unit]));
+
+        Assert.Contains(message, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_host_assembly_has_no_unit_class_that_Load_rejects()
+    {
+        var table = Bindings.Load(typeof(Bindings).Assembly.GetTypes());
+
+        Assert.Equal(Bindings.Pure.Keys.Order(StringComparer.Ordinal), table.Pure.Keys.Order(StringComparer.Ordinal));
     }
 }

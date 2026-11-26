@@ -8,7 +8,8 @@ internal static class ErrorsBindings
 {
     internal static void Register(BindingTable table)
     {
-        // GraphitiError has no __init__ of its own: the Python call takes a message or none.
+        // GraphitiError has no __init__ of its own: the Python call takes a message or none, by position only.
+        // Python has no keyword for it, and the name "message" here is the name of the C# parameter.
         table.Pure.Add("graphiti_core.errors:GraphitiError", call => GraphitiError(call.Signature("message")));
         table.Pure.Add("graphiti_core.errors:EdgeNotFoundError", call => Codec.Result(new EdgeNotFoundException(call.Signature("uuid").String("uuid"))));
         table.Pure.Add("graphiti_core.errors:EdgesNotFoundError", call => Codec.Result(new EdgesNotFoundException(call.Signature("uuids").List<string>("uuids"))));
