@@ -185,6 +185,9 @@ Typed data stays typed: `dict[str, list[str]]` is `OrderedDictionary<string, Lis
 
 - Only `PyCompat` formats, parses, compares, or copies these values. Never call `ToString()`, `JsonSerializer`, or `Convert` on one.
 - Read a typed value out of open data with the `Py.As*` helpers. They throw the exception that Python raises for the wrong type.
+- `Py.AsDateTime` reads a datetime. `Py.AsDate` reads a date and refuses a datetime, although Python counts a datetime as a date.
+- `d.get(k)` on a dict with values of a value type, for example `dict[str, int]`, is `Py.GetNullable(d, k)`. It gives null for a missing key, where `Py.Get` gives 0.
+- A `nan` in a `double` variable is boxed again at each call. A `PyDict` or a `PySet<T>` does not find it again, where Python finds the same object. No MVP module uses a `nan` key.
 - `{**a, **b}` is a new dictionary with the entries of `a`, then the entries of `b`. A key of `a` keeps its position and takes the value of `b`.
 - `d.get(k)`, `d.get(k, default)`, `d.setdefault`, `d.pop`, and `d.update` become the matching `OrderedDictionary` calls. `d[k]` on a missing key throws `KeyNotFoundException`.
 - `copy.deepcopy(x)` is `Py.DeepCopy(x)`. `copy.copy(x)` and `dict(x)` are a new collection with the same items.
@@ -262,7 +265,7 @@ Other shapes:
 | --- | --- |
 | `@dataclass` | `internal sealed record` with `{ get; set; }` properties. `frozen=True` gives `{ get; init; }`. `field(default_factory=...)` is a property initializer. |
 | `TypedDict` | `internal sealed record` with the same field names. If the code reads it by a string key, use `OrderedDictionary<string, T>`. |
-| `Enum`, `str` enum | A C# `enum` with the members in the same order, and a static class `<Enum>Values` with `ToValue` and `FromValue` as explicit `switch` expressions. Never use `Enum.ToString()` or `Enum.Parse` for a wire value. |
+| `Enum`, `str` enum | A C# `enum` with the members in the same order. Each member has `[PyEnumMember("<python name>", <value>)]` with the Python member name and its value. `member.value` is `Py.EnumValue(member)`, and `E(value)` is `PyEnum.FromValue<E>(value)`. Write no `<Enum>Values` class. Never use `Enum.ToString()` or `Enum.Parse` for a wire value. |
 | `Literal['a', 'b']` | `string`, with a test in `Validate()` |
 
 ### R8. Async, concurrency, and cancellation
@@ -277,6 +280,9 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 - `Asyncio.GatherAsync` and `Asyncio.SemaphoreGatherAsync` throw `InvalidOperationException` if the caller is not on the scheduler. A missed `OnLoopAsync` then fails in a test and does not become a race.
 - Host services run off the scheduler (decision D33). The lead's adapters in `Graphiti.Internal` call `IChatClient`, `IEmbeddingGenerator`, and a host `ICrossEncoder` through `Asyncio.CallHostAsync(token => ...)`. It starts the call on the thread pool and resumes on the scheduler. Ported code never calls it and never calls a host service directly. The ported reranker calls the lead seam `LogProbabilityChat` (R19).
 - A host delegate that ported code calls in line (`enabled_for_group`, a prompt builder, the failure classifier) is a plain call. Add no wrapper.
+- A canceled token stays canceled, and a Python cancellation arrives one time. Code that runs after a caught cancellation, for example a cleanup call in `except` or `finally`, passes `CancellationToken.None` to each call. The sites are `ingestion/scheduler.py:166` and `ingestion/phases.py:268`. With the canceled token, `Asyncio.ToThreadAsync` and `SemaphoreSlim.WaitAsync` throw at once, and the cleanup does not run.
+- One token wakes its waiters in reverse order of registration. asyncio wakes them in order. This order is not a contract (GAPS G19).
+- A `TaskCompletionSource` in lead code is created with `TaskCreationOptions.RunContinuationsAsynchronously`. Without it, a waiter runs inside `SetResult`, in the middle of code that has no `await`.
 
 | Python | C# |
 | --- | --- |
@@ -285,14 +291,15 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 | `semaphore_gather(*coroutines, max_coroutines=n)` | `Helpers.SemaphoreGatherAsync([() => F1Async(...), () => F2Async(...)], n, cancellationToken)`. Pass a lambda for each call. A C# async method starts when it is called, so a list of tasks ignores the limit. |
 | `a, b = await semaphore_gather(f(), g())` with different result types | The overload that takes two or three lambdas and returns a tuple |
 | `asyncio.gather(*coroutines)` | `Asyncio.GatherAsync` with lambdas |
-| `asyncio.gather(..., return_exceptions=True)` | `Asyncio.GatherAsync(..., returnExceptions: true)`. It never throws, and each result is a value or an exception. |
-| `asyncio.create_task(coro)`, `asyncio.ensure_future(coro)` | `Asyncio.CreateTask(token => ..., out var cancel)`. `task.cancel()` is `cancel.Cancel()`. |
+| `asyncio.gather(..., return_exceptions=True)` | `Asyncio.GatherAsync(..., returnExceptions: true, cancellationToken)`. Each result is a value or an exception. It does not throw for a canceled token, where Python raises `CancelledError`. |
+| `asyncio.gather(task, return_exceptions=True)` on a task that exists (`ingestion/scheduler.py:173`, `ingestion/phases.py:321`) | `Asyncio.GatherAsync([task], returnExceptions: true)`. This form takes tasks, not lambdas. A lambda that returns the task adds one more trip through the queue than Python makes. |
+| `asyncio.create_task(coro)`, `asyncio.ensure_future(coro)` | `Asyncio.CreateTask(token => ..., out var cancel)`. `task.cancel()` is `cancel.Cancel()`. Dispose `cancel` after the last use of the task, for example after the cleanup gather. |
 | `asyncio.to_thread(f)` | `Asyncio.ToThreadAsync(f)`. It runs `f` on the thread pool and returns to the scheduler. In ported code it is the one allowed way to leave the scheduler. |
 | `threading.Lock` | A `System.Threading.Lock` field with the `lock` statement. Keep it: code inside `to_thread` runs off the scheduler. |
 | `asyncio.Semaphore(n)` | `SemaphoreSlim(n, n)` with `WaitAsync(cancellationToken)` and `Release()` |
 | `with suppress(asyncio.CancelledError): await task` | `try { await task; } catch (OperationCanceledException) { }` |
-| `asyncio.wait_for(x, timeout)` | `Asyncio.WaitForAsync(token => ..., timeout, cancellationToken)`. It throws `TimeoutException` and cancels the call. |
-| `asyncio.shield(x)` | `Asyncio.ShieldAsync` |
+| `asyncio.wait_for(x, timeout)` | `Asyncio.WaitForAsync(token => ..., timeout, PortServices.Time, cancellationToken)`. At the limit it cancels the token of the call and throws `TimeoutException` after the call ends. A call that ignores its token runs past the limit (open item O9). |
+| `asyncio.shield(x)` | `Asyncio.ShieldAsync(task, cancellationToken)` for a task with a result. Upstream has one site, `ingestion/phases.py:270`. |
 | `asyncio.sleep(s)` | `Task.Delay(TimeSpan.FromSeconds(s), PortServices.Time, cancellationToken)` |
 | `asyncio.Lock` | `SemaphoreSlim(1, 1)` with `WaitAsync(cancellationToken)` and `Release()` in `try` and `finally` |
 | `asyncio.Event` | `AsyncEvent` |
@@ -372,14 +379,15 @@ The judge compares each prompt character for character.
 | A `datetime` annotation, typed or open | `PyDateTime`, a struct that holds a date and time to the microsecond and an offset that is null for a naive value. Never `DateTime` or `DateTimeOffset` in ported code. A naive value stays naive, and judge cases pin that, for example `pure.models.EntityNode.created_at_naive_kept_naive`. | G4 |
 | `dt.isoformat()` | `dt.IsoFormat()`. No fraction if the microseconds are zero. `+00:00`, never `Z`. | G4 |
 | `str(dt)`, `f'{dt}'` | `dt.Str()`, and `Py.Str` calls it. A space in place of `T`. | G4, F2 |
-| `a < b`, `a == b`, `a - b` on two datetimes | The operators of `PyDateTime`. A naive value compared with an aware value throws `InvalidCastException`, as Python raises `TypeError`. | G4 |
+| `repr(dt)` | `dt.Repr()`, and `Py.Repr` calls it | G4 |
+| `a < b`, `a == b` on two datetimes | The operators of `PyDateTime`. A naive value compared with an aware value throws `InvalidCastException`, as Python raises `TypeError`. No MVP module subtracts two datetimes, and the struct has no subtraction. | G4 |
 | `datetime.fromisoformat(s)` | `PyDateTime.FromIsoFormat(s)`, with the rules of Python 3.12 | F8 |
 | `datetime.now(timezone.utc)`, `utc_now()` | `DatetimeUtils.UtcNow()`, which calls `PyDateTime.UtcNow(PortServices.Time)` | G4 |
-| `dt.replace(tzinfo=timezone.utc)`, `dt.astimezone(timezone.utc)`, `dt.tzinfo is None`, `dt.tzinfo != timezone.utc` | `dt.ReplaceUtc()`, `dt.ToUtc()`, `dt.IsNaive`, `!dt.IsUtc` | G4 |
-| `dt.strftime(f)`, `datetime.strptime(s, f)` | `dt.StrFTime(f)`, `PyDateTime.StrPTime(s, f)` | G4 |
+| `dt.replace(tzinfo=timezone.utc)`, `dt.astimezone(timezone.utc)`, `dt.tzinfo is None`, `dt.tzinfo != timezone.utc` | `dt.ReplaceUtc()`, `dt.ToUtc()`, `dt.IsNaive`, `!dt.IsUtc`. `ToUtc()` throws `InvalidOperationException` for a naive value, where Python reads it as local time. Upstream calls `astimezone` only after a test for a naive value (`utils/datetime_utils.py:40`). | G4 |
+| `dt.strftime(f)`, `datetime.strptime(s, f)` | Not built. No live code in an MVP module calls them. If your unit needs one, stop and tell the lead. | G4 |
 | `int(s)`, `float(s)` on text | `Py.Int(s)`, `Py.Float(s)` | |
 
-A `PyDateTime` never holds more than 6 fraction digits. A value from `Neo4j.Driver` or from `TimeProvider` becomes a `PyDateTime` at the point where it enters ported code, and is cut to microseconds there.
+A `PyDateTime` never holds more than 6 fraction digits. A value from `Neo4j.Driver` or from `TimeProvider` becomes a `PyDateTime` at the point where it enters ported code, and is cut to microseconds there. `PyDateTime.FromDateTimeOffset` and `ToDateTimeOffset` are the conversions. `ToDateTimeOffset` reads a naive value as UTC (decision D36). A local date and time of the driver has no helper: the Neo4j project builds the value with the constructor.
 
 ### R12. Unicode text
 
@@ -393,7 +401,8 @@ Python counts code points. C# counts UTF-16 units. Upstream text is episode cont
 | `s.lower()`, `s.upper()`, `s.title()`, `s.capitalize()` | `PyText.Lower`, `PyText.Upper`, `PyText.Title`, `PyText.Capitalize`. Never `ToLowerInvariant` (GAPS F16). |
 | `s.isalnum()`, `isalpha`, `isdigit`, `isspace`, `isupper`, `islower` | `PyText.IsAlnum` and the others |
 | `s.split()`, `s.strip()`, `s.lstrip()`, `s.rstrip()` with no argument | `PyText.Split(s)`, `PyText.Strip(s)` and the others. Python's whitespace set differs from .NET's. |
-| `s.split(sep)`, `s.strip(chars)`, `s.lstrip(chars)`, `s.rstrip(chars)` | `PyText.Split(s, sep)`, `PyText.Strip(s, chars)`, `PyText.LStrip(s, chars)`, `PyText.RStrip(s, chars)`. Never `string.Split` or `string.Trim`, which work on UTF-16 units. `Trim` with the units of one emoji cuts half of another emoji. `Split` on a lone surrogate cuts an emoji in two. `Split("")` returns the text, and Python raises `ValueError`. All three were measured in both runtimes on 2026-11-26. |
+| `s.split(sep)`, `s.strip(chars)`, `s.lstrip(chars)`, `s.rstrip(chars)` | `PyText.Split(s, sep)`, `PyText.Strip(s, chars)`, `PyText.LStrip(s, chars)`, `PyText.RStrip(s, chars)`. `LStrip` with `chars` is not built, because no MVP module calls it. Never `string.Split` or `string.Trim`, which work on UTF-16 units. `Trim` with the units of one emoji cuts half of another emoji. `Split` on a lone surrogate cuts an emoji in two. `Split("")` returns the text, and Python raises `ValueError`. All three were measured in both runtimes on 2026-11-26. |
+| `s.count(sub)` | `PyText.Count(s, sub)`. It counts matches that do not overlap, by code point. The two sites are in the `*_db_queries.py` files. |
 | `s.replace(a, b)` where `a` is a literal that is not empty and holds no lone surrogate | `s.Replace(a, b, StringComparison.Ordinal)`. For such a literal both runtimes give the same text. |
 | `s.replace(a, b)` where `a` comes from data, and each `s.replace(a, b, count)` | `PyText.Replace(s, a, b, count)`. For an empty `a`, Python puts `b` between the code points and `string.Replace` throws `ArgumentException`. For a lone surrogate, `string.Replace` changes half of an emoji and Python changes nothing (measured on 2026-11-26). `string.Replace` has no count. The two sites are `llm_client/decision_prompts.py:116` and `:119`. |
 | `sep.join(xs)` | `string.Join(sep, xs)`. It only joins the items, so both runtimes give the same text. |
@@ -414,8 +423,9 @@ A module-level `re.compile` is a `private static readonly Regex`. A pattern insi
 
 | Python | C# |
 | --- | --- |
-| `\s` and `\S`, also inside a class such as `[\s]` | `PyRegex.Space` and `PyRegex.NotSpace`. Python's `\s` also matches U+001C to U+001F (GAPS F17). |
-| `\w`, `\W`, `\b` | `PyRegex.Word`, `PyRegex.NotWord`, `PyRegex.Boundary` |
+| `\s`, also inside a class such as `[\s]` | `PyRegex.Space`. Inside a class that is not negated, use `PyRegex.SpaceClassBody`. Python's `\s` also matches U+001C to U+001F (GAPS F17). |
+| `\w`, `\b` | `PyRegex.Word`, `PyRegex.Boundary`. `\w` inside a class becomes an alternation: `(?:` + `PyRegex.Word` + `\|[.-])`. |
+| `\S`, `\W`, a negated class that holds `\s`, `\w`, or `\d` | Not built. No MVP site uses one. If your unit needs one, stop and tell the lead. |
 | `\d` | `PyRegex.Digit`. .NET's `\d` misses the decimal digits above U+FFFF. Never set `RegexOptions.ECMAScript`. |
 | `re.IGNORECASE` | `RegexOptions.IgnoreCase \| RegexOptions.CultureInvariant`, and write three letters out. Python also matches U+017F for `s`, and U+0130 and U+0131 for `i`. .NET does not. Each `s` that the flag covers becomes `[sſ]`, each `i` becomes `[iİı]`, and a class such as `[a-z]` becomes `[a-zſİı]`. The evaluation tests of the unit hold one case for each of the three characters, recorded from Python. |
 | `$` with no `re.MULTILINE` | `$`. Both also match before a final line break. Do not change it to `\z` (GAPS F7). |
@@ -442,17 +452,19 @@ The 17 sites at the pinned commit:
 | `utils/content_chunking.py:589` | `re.search(speaker_pattern, content, re.MULTILINE \| re.DOTALL)` | Both flags |
 | `utils/content_chunking.py:615` | `re.split(pattern, content, flags=re.MULTILINE)` | A split on an empty match. Empty first item. |
 
-`re.split` and `Regex.Split` differ for empty matches and for groups. Use `PyRegex.Split`, which follows Python.
+`re.split` and `Regex.Split` differ for empty matches and for groups. Use `PyRegex.Split(regex, text, maxsplit)`, which follows Python. The flags are the options of the `Regex`. It throws `ArgumentException` for an inline `(?x)` flag, `RegexOptions.NonBacktracking`, and `RegexOptions.RightToLeft`. Use only named groups or only unnamed groups in a pattern for `Split`, because .NET numbers unnamed groups first.
+Each `PyRegex` constant sits in `(?-i:...)`, so `RegexOptions.IgnoreCase` does not change it. .NET folds case with a newer Unicode version than the Python build.
 GAPS.md G16 counts 19 `re` calls with a wider `grep` pattern. The table above names each call site of the 114 MVP modules.
 
 ### R14. Order: sorts, dicts, and sets
 
 | Python | C# |
 | --- | --- |
-| `sorted(xs)`, `sorted(xs, key=f)` | `xs.Order(comparer)`, or `OrderBy` with a key. Both are stable and give a new sequence. For strings the comparer is `Py.StringComparer`. |
-| `xs.sort()`, `xs.sort(key=f)` | `Py.SortInPlace(xs, ...)`. Python sorts the list object itself, and a caller can hold the same list. Never assign a new list. |
-| A tuple key, or a sort of tuples | `OrderBy(a).ThenBy(b)` in the order of the tuple items |
-| `reverse=True` | `OrderByDescending`, and `ThenByDescending` for each further tuple item. It keeps equal items in their first order, as Python does. Never sort and then reverse. |
+| `sorted(xs)`, `sorted(xs, key=f)` with keys that are text or `int` | `xs.Order(comparer)`, or `OrderBy` with a key. Both are stable and give a new sequence. For strings the comparer is `Py.StringComparer`. |
+| A sort with a key that is a `float`, a datetime, a value from open data, or a tuple that holds one of these | `Py.SortInPlace(list, key, reverse)`, on a copy of the list for `sorted`. It is a port of the list sort of CPython 3.12 and makes the same comparisons, so `nan` keys give Python's order (`search/search_utils.py:1701`). A tuple key is `new PyTuple(a, b)`. A comparison that Python refuses throws `InvalidCastException` as itself, for example a naive datetime against an aware one. A key of a type outside the value model, for example a `ValueTuple`, throws `InvalidOperationException`. |
+| `xs.sort()`, `xs.sort(key=f)`, `xs.sort(key=f, reverse=True)` | `Py.SortInPlace(xs, key, reverse)`. Python sorts the list object itself, and a caller can hold the same list. Never assign a new list. |
+| A tuple key of text and `int` items, or a sort of such tuples | `OrderBy(a).ThenBy(b)` in the order of the tuple items |
+| `reverse=True` with `Order` or `OrderBy` | `OrderByDescending`, and `ThenByDescending` for each further tuple item. It keeps equal items in their first order, as Python does. Never sort and then reverse. |
 | `min(xs, key=f)`, `max(xs, key=f)` | `MinBy`, `MaxBy`. Both return the first of equal items, as Python does. If a key can be `nan` or null, write the loop, because .NET orders those in a different way. |
 | `List.Sort`, `Array.Sort` | Not allowed for a ported sort. They are not stable. |
 | A `dict` that code iterates, dumps, or passes to a prompt or a query | `OrderedDictionary<TKey, TValue>` |
@@ -539,7 +551,7 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | `@asynccontextmanager` | A method that returns an `IAsyncDisposable`, used with `await using` |
 | A context manager that reads the exception, for example to roll back a transaction or to set a span status | `try`, `catch`, and `finally` written out at the call site, or a method that takes the body as a lambda. `Dispose` cannot see the exception. |
 | `with self.tracer.start_span(name) as span:` | `using (var span = Tracer.StartSpan(name)) { ... }` with a block, so that the span ends where the Python `with` ends. A `set_status('error')` in an `except` stays in a `catch`. |
-| `@lru_cache(maxsize=n)` | `PyLruCache<TKey, TValue>` with the same size, in a static field |
+| `@lru_cache(maxsize=n)` | `PyLruCache<TKey, TValue>` with the same size, in a static field. The cached function is `cache.GetOrAdd(key, compute)`. |
 | `@property`, `@staticmethod`, `@classmethod` | A property, a static method, a static method. A classmethod that builds an instance is a static factory. |
 | `@abstractmethod` | `abstract` |
 | A generator with `yield` | `IEnumerable<T>` with `yield return`. An async generator is `IAsyncEnumerable<T>` with `[EnumeratorCancellation]`. |
@@ -555,6 +567,7 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | `int(os.getenv('X', 20))`, `float(os.getenv('X', 0.15))` | `PyEnv.Int("X", 20)`, `PyEnv.Float("X", 0.15)`. A value that does not parse throws, as Python does at import. |
 | `bool(os.getenv('X', False))` | `PyEnv.Truthy("X")`. Python gives `True` for each value that is not empty, also for `"false"`. |
 | `os.environ.get('X', 'default')` | `PyEnv.Str("X", "default")` |
+| A test that needs an environment value | `using (PyEnv.Use(name => ...))`. It holds for a read inside a function. Never start the static initializer of a ported class inside such a scope, because a `static readonly` field keeps the value for the whole process. |
 | `load_dotenv()` | Not ported. The library reads no `.env` file. |
 | A module-level mutable object, for example a search recipe | A `static readonly` field that holds the same single object. Upstream changes one of them in a call (R21, U8). |
 | A module-level cache or a "warned once" set | A `static readonly` field. The exclusive scheduler of R8 protects it. |
@@ -575,6 +588,7 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
 | `round(x)`, `round(x, n)` | `Py.Round(x)`, `Py.Round(x, n)` |
 | `int(x)` on a float | `Py.Int(x)`. It cuts toward zero and throws for `nan` and `inf`. |
 | `math.comb`, `math.log2`, `math.ceil`, `math.floor` | `Py.Comb`, `Math.Log2`, `(long)Math.Ceiling(x)`, `(long)Math.Floor(x)` |
+| `math.isnan(x)` | `double.IsNaN(x)` |
 | `sum(xs)`, `sum(1 for ...)` | A loop or `Sum()` over the same order. Float sums keep the Python order. |
 | A function that returns the integer `0` in one branch and a float in others | `double` (GAPS F18) |
 | `numpy` L2 norm, dot product, and array math (25 calls) | `System.Numerics.Tensors.TensorPrimitives` on `double`. `inf` and `nan` inputs give `NaN` in the same places (GAPS F10). If a judge case differs by more than 1e-6, sum in a plain loop in index order (GAPS G17). |
@@ -585,11 +599,11 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
 | `blake2b(b, digest_size=8)` | `PyHash.Blake2b(b, 8)`. .NET has no BLAKE2b. |
 | `int.from_bytes(b, 'big')` | `BinaryPrimitives.ReadUInt64BigEndian(b)` for 8 bytes |
 | `zlib.compress`, `zlib.decompress` | `ZLibStream`. If a judge case compares compressed bytes and fails, stop and tell the lead. |
-| `random.*` | `PortServices.Random`, a `PyRandom` (GAPS F9). The random path of `generate_covering_chunks` has no judge case. Its evaluation test uses a fixed seed and the property that each pair is covered. |
+| `random.*` | `PortServices.Random`, a `PyRandom` (GAPS F9). Its members are `Random()`, `Uniform(a, b)`, and `SampleRange(n, k)` for `random.sample(range(n), k)`. The sequence for a seed is not Python's. The random path of `generate_covering_chunks` has no judge case. Its evaluation test uses a fixed seed and the property that each pair is covered. |
 | `str(uuid4())`, `uuid4().hex` | `Py.Uuid4()`, `Py.Uuid4Hex()`. Lower case, as Python writes them. |
 | `str(uuid5(NAMESPACE_URL, name))` (`ingestion/phases.py:330`) | `Py.Uuid5(Py.NamespaceUrl, name)`. .NET has no version 5 UUID. The value is a stored episode UUID, so the helper is tested against Python values. |
 | `a == b` where `a` is a node or an edge | `a.Equals(b)`. `Node` and `Edge` are classes (R7) that override `Equals(object)` with the body of the Python `__eq__`, and nothing more. No reference test: `e == e` is `False` for an edge in Python (R21, U12). A node equals an edge with the same UUID, and two judge cases pin that. |
-| `x in list`, `list.index(x)`, `list.remove(x)`, `list.count(x)` for nodes or edges | `Py.Contains`, `Py.IndexOf`, `Py.Remove`, `Py.Count`. A Python container tests identity first and `==` second, and the helpers do the same. Never `List.Contains` for these types. |
+| `x in list`, `list.index(x)`, `list.remove(x)`, `list.count(x)` for nodes or edges | `Py.Contains`, `Py.IndexOf`, `Py.Remove`, `Py.Count`. A Python container tests identity first and `==` second, with the list item on the left, and the helpers do the same. Never `List.Contains` for these types. |
 | A set or a dict with nodes or edges as keys | Pass `PyEqualityComparer<T>.Instance`, which tests identity first |
 
 ### R19. Import cycles and assemblies
@@ -651,7 +665,7 @@ The four lookup methods that apply no group filter (`node_distance_reranker`, `e
 
 - Each ported unit adds its bindings to `tests/Graphiti.Net.JudgeHost/Bindings.cs`. A binding decodes the arguments, calls the product code, and encodes the result. It does nothing else.
 - A `{"$ref": "fixtures:Name"}` argument is a custom type. `tests/Graphiti.Net.JudgeHost/Fixtures.cs` holds one `GraphTypeDescriptor` for each of the five classes of `port/judge/host-python/fixtures.py`, built through the public `GraphTypeDefinition`. The lead writes that file.
-- A `$model` argument is decoded with `ModelValidate` (R7). A `$enum` argument is decoded with `FromValue`. A `$ref` to a constant or a function is decoded to the ported member.
+- A `$model` argument is decoded with `ModelValidate` (R7). A `$enum` argument is decoded with `PyEnum.FromValue<T>`. A `$ref` to a constant or a function is decoded to the ported member.
 - A model in a result is encoded as `$type` with the Python class name and the Python field names. Use `ModelDump` if the model has it.
 - A function that only changes its arguments returns nothing, so no pure case observes it (GAPS F20). Bind it only if a case names it. The flow layer covers it.
 - `driver/neo4j/operations/search_ops.py` is reached only by the direct flow scenarios (GAPS F21). Its unit is not `parity_pass` before those scenarios pass.
@@ -663,7 +677,7 @@ Wrong-type cases, decision D20 (GAPS F11):
 - The host then reports `JudgeTypeRejected`. The runner accepts that result only if the golden result is `TypeError` or `AttributeError`.
 - Give each parameter the type that its Python annotation and its call sites give. Never widen a type to `object` to make a wrong-type case pass. Never add a guard for one.
 - If Python handles `None` for a parameter (the annotation has `| None`, or the code tests for it), the C# type is nullable and the case runs.
-- `GraphProvider` and `EpisodeType` are plain `Enum` classes. A member does not equal its value text, so a case that passes the text for an enum parameter is a type rejection. Never decode such an argument with `FromValue`. Only a `$enum` tag gives an enum value.
+- `GraphProvider` and `EpisodeType` are plain `Enum` classes. A member does not equal its value text, so a case that passes the text for an enum parameter is a type rejection. Never decode such an argument with `PyEnum.FromValue<T>`. Only a `$enum` tag gives an enum value.
 - The reviewer found 23 more cases with a golden `TypeError` or `AttributeError` whose id does not hold `wrong_type`. The rule is the same for them.
 - Part 5 lists the wrong-type cases that this rule does not settle.
 
@@ -724,24 +738,25 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 
 | Class | Members | Matches Python |
 | --- | --- | --- |
-| `Py` | `Repr`, `Str`, `Format`, `Truthy`, `Len`, `Get`, `SetDefault`, `Unpack2`, `DeepCopy`, `EnumValue` | `repr`, `str`, format specs, `bool(x)`, `len`, `dict.get`, `dict.setdefault`, tuple unpacking, `copy.deepcopy`, `enum.value` |
-| `Py` | `As*` | A typed read from the value model, with Python's error for a wrong type |
+| `Py` | `Repr`, `Str`, `Format`, `Truthy`, `Len`, `Get`, `GetNullable`, `SetDefault`, `Unpack2`, `DeepCopy`, `EnumValue` | `repr`, `str`, format specs, `bool(x)`, `len`, `dict.get`, `dict.setdefault`, tuple unpacking, `copy.deepcopy`, `enum.value`. `Format` has the specs that upstream uses and throws `InvalidOperationException` for `e`, `g`, `%`, `n`, `#`, and grouping with `0`. |
+| `Py` | `AsBool`, `AsLong`, `AsDouble`, `AsString`, `AsList`, `AsTuple`, `AsDict`, `AsPyDict`, `AsDate`, `AsDateTime`, `AsBytes`, `AsEnum<T>` | A typed read from the value model. A wrong type throws `InvalidCastException`. |
 | `Py` | `TrueDiv`, `FloorDiv`, `Mod`, `Round`, `Int`, `Float`, `Comb` | `/`, `//`, `%`, `round`, `int()`, `float()`, `math.comb` |
 | `Py` | `At`, `Slice`, `CompareStrings`, `StringComparer` | Indexing and slicing by code point with negative indexes, string order by code point |
-| `Py` | `Contains`, `IndexOf`, `Remove`, `Count`, `SortInPlace`, `Combinations`, `ZipLongest` | `in`, `list.index`, `list.remove`, `list.count` with the identity test first, `list.sort`, `itertools.combinations`, `itertools.zip_longest` |
+| `Py` | `Contains`, `IndexOf`, `Remove`, `Count`, `SortInPlace`, `LessThan`, `Combinations`, `ZipLongest` | `in`, `list.index`, `list.remove`, `list.count` with the identity test first, `list.sort` with the comparisons of CPython, `<` on two values, `itertools.combinations`, `itertools.zip_longest` |
 | `Py` | `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl`, `TimeSeconds` | `str(uuid4())`, `uuid4().hex`, `str(uuid5(...))`, `uuid.NAMESPACE_URL`, `time.time()` |
-| `PyText` | `Lower`, `Upper`, `Title`, `Capitalize`, `IsAlnum`, `IsAlpha`, `IsDigit`, `IsSpace`, `IsUpper`, `IsLower`, `Split`, `RSplit`, `SplitLines`, `Strip`, `LStrip`, `RStrip`, `Replace`, `Find`, `RFind`, `Index`, `CodePoints`, `Ord`, `Chr`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates` | The `str` methods with full Unicode case mapping, Python's whitespace set, and positions in code points. A lone surrogate stays as it is. The tables come from the pinned Python build. |
+| `PyText` | `Lower`, `Upper`, `Title`, `Capitalize`, `IsAlnum`, `IsAlpha`, `IsDigit`, `IsSpace`, `IsUpper`, `IsLower`, `Split`, `RSplit`, `SplitLines`, `Strip`, `LStrip`, `RStrip`, `Replace`, `Count`, `Find`, `RFind`, `Index`, `CodePoints`, `Ord`, `Chr`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates` | The `str` methods with full Unicode case mapping, Python's whitespace set, and positions in code points. A lone surrogate stays as it is. The tables come from the pinned Python build. |
 | `PyJson` | `Dumps`, `Loads` | `json.dumps` with `ensure_ascii`, `indent`, `sort_keys`, `default`, the compact separators `,` and `:`, `allow_nan`, Python float text, `NaN` and `Infinity` tokens, and keys that are not strings. `json.loads` into the value model. |
 | `PyAst` | `LiteralEval` | `ast.literal_eval` for strings, numbers, `True`, `False`, `None`, lists, tuples, and dicts |
-| `PyDateTime` | A struct. `IsNaive`, `IsUtc`, `IsoFormat`, `Str`, `ReplaceUtc`, `ToUtc`, `StrFTime`, the comparison operators, and the static `FromIsoFormat`, `StrPTime`, `UtcNow` | A `datetime` of Python 3.12, aware or naive, to the microsecond |
-| `PyRegex` | `Space`, `NotSpace`, `Word`, `NotWord`, `Boundary`, `Digit`, `Split` | The character classes of `re` for `str` patterns, and `re.split` |
+| `PyDateTime` | A struct. `IsNaive`, `IsUtc`, `IsoFormat`, `Str`, `Repr`, `ReplaceUtc`, `ToUtc`, `ToDateTimeOffset`, the field properties, the comparison operators, equality and hashing, and the static `FromIsoFormat`, `UtcNow`, `FromDateTimeOffset` | A `datetime` of Python 3.12, aware or naive, to the microsecond |
+| `PyRegex` | `Space`, `SpaceClassBody`, `Word`, `Digit`, `Boundary`, `Split` | The character classes of `re` for `str` patterns, and `re.split` |
 | `PyTuple`, `PyDict`, `PySet<T>`, `PyEqualityComparer<T>` | Types | A tuple, a dict with keys of any type in insertion order, a set that iterates in insertion order, a comparer that tests identity first |
-| `PyLruCache<TKey, TValue>` | Type | `functools.lru_cache` |
-| `PyRandom` | Type | The `random` functions that upstream calls, with a seed for tests |
-| `PyEnv` | `Str`, `Int`, `Float`, `Truthy` | `os.getenv` with the conversions of R17 |
+| `PyEnum`, `PyEnumMemberAttribute` | `FromValue<T>`, `Name`, `Value`, `ClassName` | The Python member name and value of an enum member, and `E(value)` |
+| `PyLruCache<TKey, TValue>` | Type. `GetOrAdd`, `Hits`, `Misses`, `Count` | `functools.lru_cache` |
+| `PyRandom` | Type. `Random`, `Uniform`, `SampleRange` | The `random` functions that upstream calls, with a seed for tests. The sequence is not Python's (GAPS F9). |
+| `PyEnv` | `Str`, `Int`, `Float`, `Truthy`, `Use` | `os.getenv` with the conversions of R17. `Use` is the seam for tests. |
 | `PyHash` | `Blake2b` | `hashlib.blake2b` with a digest size |
 | `Pydantic` | Field readers for each field type, `Wrap`, `Wrap<TException>`, `PydanticField`, `ValidationException`, `PydanticSchema`, `JsonValue`, `DumpJson`, `LoadJson` | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError`, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode |
-| `Asyncio` | `Run`, `OnLoopAsync`, `GatherAsync`, `SemaphoreGatherAsync`, `CreateTask`, `WaitForAsync`, `ShieldAsync`, `ToThreadAsync`, `CallHostAsync`, `IsCancellation`, `AsyncEvent` | The asyncio calls of R8 on the exclusive scheduler. `CallHostAsync` has no Python form: it is the hop to a host service (decision D33). |
+| `Asyncio` | `Run`, `OnLoopAsync`, `GatherAsync`, `SemaphoreGatherAsync`, `CreateTask`, `WaitForAsync`, `ShieldAsync`, `ToThreadAsync`, `CallHostAsync`, `IsCancellation`, `IsOnLoop`, `Scheduler`, `AsyncEvent` | The asyncio calls of R8 on the exclusive scheduler. `CallHostAsync` has no Python form: it is the hop to a host service (decision D33). |
 
 There is no general regex helper. Translate each pattern by hand (R13).
 
@@ -749,7 +764,7 @@ Each helper throws the C# type that R4 gives for the Python error, because porte
 
 | Helper | Throws |
 | --- | --- |
-| `PyDateTime.FromIsoFormat`, `PyDateTime.StrPTime`, `Py.Int`, `Py.Float` on text that does not parse | `ArgumentException` (`ValueError`) |
+| `PyDateTime.FromIsoFormat`, `Py.Int`, `Py.Float` on text that does not parse | `ArgumentException` (`ValueError`) |
 | `PyJson.Dumps` for a type that JSON cannot hold, for example a datetime or a set with no `default` | `InvalidCastException` (`TypeError`) |
 | `PyJson.Loads` | `JsonException` (`JSONDecodeError`) |
 | `PyAst.LiteralEval` | `FormatException` for text that is not Python syntax (`SyntaxError`), `ArgumentException` for syntax that is not a literal (`ValueError`) |
@@ -1003,6 +1018,7 @@ These items need the lead or the maintainer. An implementer that meets one stops
 | O6 | `utils/bulk_utils.py:192` calls `neo4j.unit_of_work` from core code to set a transaction timeout. The port needs a new member on the driver session contract for a write with a timeout. That is an interface change, so it is an ask-first item (R19). | Maintainer | Layer 7 of plan 0004 |
 | O8 | Closed on 2026-11-26. `.editorconfig` makes IDE0065 an error for each C# file, so a `using` directive above the namespace fails the build (plan 0003, task P1). | | |
 | O7 | Decision D22 holds only if each lambda that a library calls enters the scheduler again (R8). The rule depends on the implementer and on the test in `GatherAsync`. The pilot must show that this is enough. | Lead, after the pilot | Gate 3 |
+| O9 | `Asyncio.WaitForAsync` returns only after its call ends. A session call of Neo4j.Driver 6.5.1 takes no `CancellationToken`, so the write budgets of `ingestion/phases.py:1292` to `:1319` and of `utils/bulk_utils.py:197` do not hold if the ported save goes through a session. The adversarial review of the `Asyncio` helpers found it. | Maintainer | Layer 7 of plan 0004 |
 
 Wrong-type cases of O4:
 
@@ -1025,3 +1041,4 @@ Wrong-type cases of O4:
 | 2026-11-26 | After the integrated review of the pull request stack. R12 sends `split(sep)` and `strip(chars)` to the `PyText` members. R12 has two rows for `replace`, and Part 2 lists `PyText.Replace`. R1 names the `PyCompat` project in the `using` rule. R4 and Part 2 have rows for `UnicodeDecodeError` and `DecodeUtf8`. R4 states the limit of `OverflowException` for an integer above 64 bits. | None. No unit is ported. |
 | 2026-11-26 | After the pre-pilot scan (plan 0003, results). R24 names the members of modules outside the pilot that a pilot unit ports for real, and R19 points to it. R22 says who removes a passing case from `expected-failures.txt`. Open item O5 is decided (D38), and O1 and O2 name tasks P8 and P7. | None. No unit is ported. |
 | 2026-11-26 | Open item O8 is closed: the build enforces the `using` placement of R1. | None. No unit is ported. |
+| 2026-11-26 | After the reviews of the `PyCompat` helpers (plan 0003, tasks P2, P4, P5). R7: an enum member carries `[PyEnumMember]`, and there is no `<Enum>Values` class. R8: cleanup after a cancellation passes `CancellationToken.None`, `WaitForAsync` takes the clock, a gather of existing tasks has its own form, and three differences from asyncio are stated. R11: no `strftime`, `strptime`, or subtraction, and `ToUtc()` throws for a naive value. R12: `PyText.Count`. R13: the `PyRegex` constants and the limits of `Split`. R14: `Py.SortInPlace` for float, datetime, and open keys. R18: `math.isnan`. Part 2 lists the members that exist. New open item O9. | None. No unit is ported. |

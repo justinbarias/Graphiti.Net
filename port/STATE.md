@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 4. Plan 0003 is active. Tasks 1 to 4 are done: [RULES.md](RULES.md) is written, the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md), `PyCompat` has its scalar and text helpers, and `scripts/mutation_survivors.py` lists the tests that the pruning rule deletes. Tasks 5 to 8 are not started. |
+| Phase | 4. Plan 0003 is active. Tasks 1 to 4 are done: [RULES.md](RULES.md) is written, the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md), `PyCompat` has its scalar and text helpers, the value model, `PyDateTime`, `PyRegex`, `PyEnv`, `PyHash`, `PyLruCache`, `PyRandom`, and `Asyncio` (tasks P1, P2, P4, P5, and P9 are done), and `scripts/mutation_survivors.py` lists the tests that the pruning rule deletes. Tasks 5 to 8 are not started. |
 | Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md` after the pilot. |
 | Last action | 2026-11-26 (task 4): wrote `scripts/mutation_survivors.py` and ran Stryker two times on `PyCompat` (93.22% each). 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. 2026-11-25 (task 3): built `src/Graphiti.Net.PyCompat` (scalar and text helpers) and `tests/Graphiti.Net.Property.Tests` (55 tests against Python values). |
-| Next action | Plan 0003, task 5 (apply the pruning rule to `PyCompat`) and tasks P2 to P9, which the pilot needs. P1 is done. P2 to P6 build the value-model helpers of `PyCompat` (debt T23). P7 and P8 close open items O2 and O1 of the rulebook (debt T18, T17). The pre-pilot scan in the plan gives the reasons. |
+| Next action | Plan 0003, tasks P3 (`PyJson`, `PyAst`) and P6 (`Pydantic`), which are in progress. Then P7 (the judge host codec), task 5 (the pruning rule), and the pilot (task 6). P8 waits for the maintainer, who applies the runner patch. The pilot gives the reasons in its section "Pre-pilot scan". |
 
 ## Queue counts
 
@@ -113,6 +113,7 @@ None.
 | 2026-11-25 | After the adversarial review of the design. The rulebook lists the changes in its own change table. | None. No unit is ported. |
 | 2026-11-26 | After the integrated review of the pull request stack. R12 uses the `PyText` members for `split(sep)` and `strip(chars)`. R1 names the `PyCompat` project in the `using` rule. R4 has a row for `UnicodeDecodeError` and the limit of `OverflowException`. | None. No unit is ported. |
 | 2026-11-26 | After the pre-pilot scan. R24 names the members of modules outside the pilot that a pilot unit ports for real. R22 says who removes a passing case from `expected-failures.txt`. Open item O5 is decided (D38). | None. No unit is ported. |
+| 2026-11-26 | After the reviews of the `PyCompat` helpers. R7 (enum attributes), R8 (cleanup tokens, `WaitForAsync`, gather of tasks), R11, R12, R13, R14 (`Py.SortInPlace` for float, datetime, and open keys), R18, and Part 2 changed. New open item O9. The rulebook lists the changes in its own change table. | None. No unit is ported. |
 
 [GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
