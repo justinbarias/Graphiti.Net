@@ -191,7 +191,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/DatetimeUtils.cs",
       "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. 2 covering cases stay listed: they need a model that a later unit registers."
+      "notes": "Layer 1. Two reviews and one fix round. 2 covering cases stay listed. pure.datetime.ensure_utc.wrong_type_date_only passes the class datetime:date, which the host codec does not resolve (open item O4)."
     },
     {
       "order": 9,
@@ -505,7 +505,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Helpers.cs",
       "status": "reviewed",
-      "notes": "Layer 1. Two reviews and one fix round. 16 covering cases stay listed with the answer JudgeTypeRejected (open item O4). The numpy sum is PyNumpy.AddReduce."
+      "notes": "Layer 1. Two reviews and one fix round. 16 covering cases stay listed (open item O4): 13 answer JudgeTypeRejected, and 3 answer JudgeNotBound. Two of the 3 need the descriptor of a custom type. pure.datetime.parse_db_date.neo4j_datetime_naive needs the decoder of neo4j.time:DateTime, which comes with the Neo4j conversion of layer 5. The numpy sum is PyNumpy.AddReduce."
     },
     {
       "order": 24,
@@ -1223,9 +1223,9 @@
       "lines": 52,
       "imports": [],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": "out-of-mvp: driver deferred to milestone M5 (upstream parity)"
+      "target": "src/Graphiti.Net/Core/Driver/Falkordb/Package.cs",
+      "status": "reviewed",
+      "notes": "Layer 1, with graph_queries. The module holds only STOPWORDS. The rest of the FalkorDB package is out of the MVP (milestone M5)."
     },
     {
       "order": 59,

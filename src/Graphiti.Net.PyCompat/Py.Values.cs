@@ -188,7 +188,7 @@ internal static partial class Py
 
     /// <summary>
     /// <c>for x in value</c> and <c>sep.join(value)</c> on a value from open data (RULES.md R6): the items of a list,
-    /// a tuple, or a set, the keys of a dict, the code points of a <c>str</c>, and the ints of <c>bytes</c>. Another
+    /// a tuple, or a set (in insertion order), the keys of a dict, the code points of a <c>str</c>, and the ints of <c>bytes</c>. Another
     /// value throws <see cref="InvalidCastException"/> (<c>TypeError: 'X' object is not iterable</c>) at the call.
     /// </summary>
     internal static IEnumerable<object?> Iter(object? x) => x switch

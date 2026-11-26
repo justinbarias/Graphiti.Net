@@ -107,7 +107,8 @@ internal sealed class NoOpTracer : Tracer
 internal sealed class OpenTelemetrySpan : TracerSpan
 {
     // PORT: ActivitySource.StartActivity returns null if no listener reads the source, so the span can be null. A
-    // Python span that nobody records does nothing, and each member below does nothing for a null span.
+    // Python span that nobody records (NonRecordingSpan) does nothing. Each member below does nothing for a null span
+    // and for a span with IsAllDataRequested false, which is the Activity that a sampler does not record.
     private readonly Activity? span;
 
     internal OpenTelemetrySpan(Activity? span)
@@ -151,9 +152,9 @@ internal sealed class OpenTelemetrySpan : TracerSpan
                 // keeps the other pairs (it logs: invalid attribute key, must be non-empty string, dropping key).
                 foreach (var (key, value) in filteredAttrs)
                 {
-                    if (key.Length > 0)
+                    if (key.Length > 0 && span is { IsAllDataRequested: true })
                     {
-                        span?.SetTag(key, value);
+                        span.SetTag(key, value);
                     }
                 }
             }
@@ -173,14 +174,14 @@ internal sealed class OpenTelemetrySpan : TracerSpan
             // after the status OK, and Activity.SetStatus does not. The test on Status is that rule of the SDK.
             if (status == "error")
             {
-                if (span is { Status: not ActivityStatusCode.Ok })
+                if (span is { IsAllDataRequested: true, Status: not ActivityStatusCode.Ok })
                 {
                     span.SetStatus(ActivityStatusCode.Error, description);
                 }
             }
             else if (status == "ok")
             {
-                if (span is { Status: not ActivityStatusCode.Ok })
+                if (span is { IsAllDataRequested: true, Status: not ActivityStatusCode.Ok })
                 {
                     span.SetStatus(ActivityStatusCode.Ok, description);
                 }
@@ -198,7 +199,10 @@ internal sealed class OpenTelemetrySpan : TracerSpan
         try
         {
             // PORT: D46. The telemetry of an exception keeps its .NET type name. Python gives its own class name here.
-            span?.AddException(exception);
+            if (span is { IsAllDataRequested: true })
+            {
+                span.AddException(exception);
+            }
         }
         catch (Exception)
         {

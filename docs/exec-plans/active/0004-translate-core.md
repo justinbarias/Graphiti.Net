@@ -142,11 +142,20 @@ Evidence that waits for a later layer:
 - `namespaces`: the recording reaches the entity node namespace. The others wait for the Neo4j operations of layer 5.
 - `utils.text_utils`: 16 judge cases need the `EpisodicNode` model, which layer 2 registers.
 
+One Opus 5.5 adversarial pass read the whole layer and gave 7 findings (2 important). The lead fixed each one:
+
+- The binding of `utils.text_utils` did not register `MAX_SUMMARY_CHARS`, so the case `pure.prompts.const.max_summary_chars` stayed listed. It passes now.
+- `port/STATE.md` named `Py.NotNone`, which comes with layer 2.
+- The queue notes of `helpers` and `utils.datetime_utils` gave a wrong reason for 4 listed cases, and the queue did not show `driver.falkordb` as ported.
+- R18 and G17 named a `np.sum` site that upstream does not have, and left out the float32 norm of `ingestion/delta.py:56`.
+- `Py.Iter` gives a set in insertion order. R6 says so now.
+- `OpenTelemetrySpan` wrote to a span that a sampler does not record, where the `NonRecordingSpan` of Python does nothing. Each member tests `IsAllDataRequested` now, and one new test fails for the seeded defect of the reviewer.
+
 Commands at the tip:
 
 - `scripts/check.sh`: `check: passed`.
-- `dotnet test --project tests/Port.Evaluation`: 2,450 tests, 0 failed, 0 skipped.
+- `dotnet test --project tests/Port.Evaluation`: 2,451 tests, 0 failed, 0 skipped.
 - The recorders with `--check`: `helpers` 1,926 cases, the query builders 2,804, `namespaces` 177, `tracer` 900, and the numpy values. Each one is current.
-- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 680 passed, 0 unexpected, 0 bound and wrong. 277 ids left `expected-failures.txt`, and 1,319 stay. The pull request lists the ids.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 681 passed, 0 unexpected, 0 bound and wrong. 278 ids left `expected-failures.txt`, and 1,318 stay. The pull request lists the ids.
 
 Found beside the plan: `scripts/mutate.sh` gave no result on 2026-11-26. Two tests, `PyAstTests.LiteralEval_matches_Python` and `PyAstTests.LiteralEval_of_long_and_deeply_nested_texts_matches_Python`, stop the test host in a mutated build. Stryker then runs them against each mutant, and each mutant gets the status `RuntimeError`. A probe on `PyHash.cs` with 56 mutants took 159 seconds and gave 56 errors. With the two tests skipped it took 8 seconds and killed 56. The probable cause is a stack overflow in the mutated parser. The lead fixes the two tests before the mutation run of layer 5.

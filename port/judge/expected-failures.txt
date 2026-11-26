@@ -772,7 +772,6 @@ pure.parsers.episodic_node.source_text
 pure.parsers.episodic_node.source_uppercase
 pure.parsers.episodic_node.valid_at_none
 pure.parsers.episodic_node.z_suffix
-pure.prompts.const.max_summary_chars
 pure.prompts.const.summary_instructions
 pure.prompts.const.system_prompt_combined
 pure.prompts.decision_prompts.assemble_edge_answers.empty

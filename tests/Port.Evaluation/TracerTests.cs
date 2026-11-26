@@ -48,6 +48,35 @@ public class TracerTests
         Assert.Equal("exception", recorded.Name);
     }
 
+    // Python: a span of a sampler that drops it is a NonRecordingSpan. use_span tests span.is_recording() before it
+    // records the exception, and each call on the span does nothing. The RuntimeError still leaves.
+    [Fact]
+    public async Task a_span_that_the_sampler_does_not_record_keeps_no_exception_no_status_and_no_attribute()
+    {
+        using var probe = new SpanProbe(sampling: ActivitySamplingResult.PropagationData);
+        var tracer = TracerModule.CreateTracer(probe.Source);
+        var error = new ArgumentException("boom");
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tracer.StartSpanAsync<long>(
+                "op",
+                span =>
+                {
+                    span.AddAttributes(new OrderedDictionary<string, object?> { ["group_id"] = "g" });
+                    span.SetStatus("error", "d");
+                    span.RecordException(error);
+                    throw error;
+                },
+                TestContext.Current.CancellationToken));
+
+        Assert.Same(error, thrown.InnerException);
+        var stopped = Assert.Single(probe.Stopped);
+        Assert.False(stopped.IsAllDataRequested);
+        Assert.Equal(ActivityStatusCode.Unset, stopped.Status);
+        Assert.Empty(stopped.Events);
+        Assert.Empty(stopped.TagObjects);
+    }
+
     // Python: ValueError('boom'), with no context.
     [Fact]
     public async Task a_body_that_raises_leaves_as_it_is_with_the_no_op_tracer()
@@ -205,14 +234,14 @@ public class TracerTests
     {
         private readonly ActivityListener _listener;
 
-        internal SpanProbe(Action<Activity>? stopped = null)
+        internal SpanProbe(Action<Activity>? stopped = null, ActivitySamplingResult sampling = ActivitySamplingResult.AllDataAndRecorded)
         {
             var name = "tracer-test-" + Guid.NewGuid().ToString("N");
             Source = new ActivitySource(name);
             _listener = new ActivityListener
             {
                 ShouldListenTo = candidate => candidate.Name == name,
-                Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                Sample = (ref ActivityCreationOptions<ActivityContext> _) => sampling,
                 ActivityStopped = stopped ?? Stopped.Add,
             };
             ActivitySource.AddActivityListener(_listener);

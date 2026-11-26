@@ -10,6 +10,8 @@ internal static class TextUtilsBindings
 
     internal static void Register(BindingTable table)
     {
+        table.Registry.AddRef(Module + "MAX_SUMMARY_CHARS", TextUtils.MaxSummaryChars);
+
         table.Pure.Add(Module + "truncate_utf8_to_bytes", call => call.Signature("text", "max_bytes").InvokeAsync(TextUtils.TruncateUtf8ToBytes));
         table.Pure.Add(Module + "truncate_at_sentence", call => call.Signature("text", "max_chars").InvokeAsync(TextUtils.TruncateAtSentence));
         table.Pure.Add(Module + "concatenate_episodes", call => call.Signature("episodes").InvokeAsync(TextUtils.ConcatenateEpisodes));
