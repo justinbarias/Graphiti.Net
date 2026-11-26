@@ -17,15 +17,41 @@ limitations under the License.
 
 namespace Graphiti.Core.Prompts;
 
-// PORT: each response model has its fields as properties. The unit adds the members of R7.
-internal sealed record CombinedEntity
+using Graphiti.Internal;
+using Graphiti.PyCompat;
+
+/// <summary>Entity extracted by the combined node+edge extraction prompt.</summary>
+internal sealed record CombinedEntity : IPydanticModel
 {
     internal required string Name { get; set; }
 
     internal required long EntityTypeId { get; set; }
+
+    internal CombinedEntity Validate() => this;
+
+    internal static CombinedEntity ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("CombinedEntity", data);
+        var name = f.Required("name", Pydantic.Str);
+        var entityTypeId = f.Required("entity_type_id", Pydantic.Int);
+        f.ThrowIfAny();
+        return new CombinedEntity { Name = name.Value, EntityTypeId = entityTypeId.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("name", Name), ("entity_type_id", EntityTypeId));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("CombinedEntity", "Entity extracted by the combined node+edge extraction prompt.")
+        .Required("name", PydanticType.Str, "Name of the extracted entity")
+        .Required("entity_type_id", PydanticType.Int, "ID of the classified entity type. " + "Must be one of the provided entity_type_id integers.");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("CombinedEntity", ModelJsonSchema);
 }
 
-internal sealed record CombinedFact
+/// <summary>Relationship fact extracted by the combined node+edge extraction prompt.</summary>
+internal sealed record CombinedFact : IPydanticModel
 {
     internal required string SourceEntityName { get; set; }
 
@@ -36,13 +62,76 @@ internal sealed record CombinedFact
     internal required string Fact { get; set; }
 
     internal List<long> EpisodeIndices { get; set; } = [0];
+
+    internal CombinedFact Validate() => this;
+
+    internal static CombinedFact ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("CombinedFact", data);
+        var sourceEntityName = f.Required("source_entity_name", Pydantic.Str);
+        var targetEntityName = f.Required("target_entity_name", Pydantic.Str);
+        var relationType = f.Required("relation_type", Pydantic.Str);
+        var fact = f.Required("fact", Pydantic.Str);
+        var episodeIndices = f.Default("episode_indices", v => Pydantic.List(v, Pydantic.Int), () => [0]);
+        f.ThrowIfAny();
+        return new CombinedFact
+        {
+            SourceEntityName = sourceEntityName.Value,
+            TargetEntityName = targetEntityName.Value,
+            RelationType = relationType.Value,
+            Fact = fact.Value,
+            EpisodeIndices = [.. episodeIndices.Value],
+        }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("source_entity_name", SourceEntityName),
+        ("target_entity_name", TargetEntityName),
+        ("relation_type", RelationType),
+        ("fact", Fact),
+        ("episode_indices", EpisodeIndices));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("CombinedFact", "Relationship fact extracted by the combined node+edge extraction prompt.")
+        .Required("source_entity_name", PydanticType.Str, "The name of the source entity. MUST exactly match an entity `name` in " + "extracted_entities (including value-like endpoints such as versions).")
+        .Required("target_entity_name", PydanticType.Str, "The name of the target entity. MUST exactly match an entity `name` in " + "extracted_entities (including value-like endpoints such as versions).")
+        .Required("relation_type", PydanticType.Str, "The type of relationship between the entities, in SCREAMING_SNAKE_CASE " + "(e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH)")
+        .Required("fact", PydanticType.Str, "A self-contained natural language description of the relationship, " + "paraphrased from the source text with all specific details preserved")
+        .Factory("episode_indices", PydanticType.List(PydanticType.Int), "List of episode numbers (0-indexed) that this fact was derived from. " + "When processing a single episode, this should be [0].");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("CombinedFact", ModelJsonSchema);
 }
 
-internal sealed record CombinedExtraction
+/// <summary>Combined node and edge extraction response.</summary>
+internal sealed record CombinedExtraction : IPydanticModel
 {
     internal required List<CombinedEntity> ExtractedEntities { get; set; }
 
     internal required List<CombinedFact> Edges { get; set; }
+
+    internal CombinedExtraction Validate() => this;
+
+    internal static CombinedExtraction ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("CombinedExtraction", data);
+        var extractedEntities = f.Required("extracted_entities", v => Pydantic.List(v, x => Pydantic.Model(x, "CombinedEntity", CombinedEntity.ModelValidate)));
+        var edges = f.Required("edges", v => Pydantic.List(v, x => Pydantic.Model(x, "CombinedFact", CombinedFact.ModelValidate)));
+        f.ThrowIfAny();
+        return new CombinedExtraction { ExtractedEntities = [.. extractedEntities.Value], Edges = [.. edges.Value] }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("extracted_entities", ExtractedEntities), ("edges", Edges));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("CombinedExtraction", "Combined node and edge extraction response.")
+        .Required("extracted_entities", PydanticType.List(PydanticType.Model(CombinedEntity.ModelJsonSchema)), "List of extracted entities")
+        .Required("edges", PydanticType.List(PydanticType.Model(CombinedFact.ModelJsonSchema)), "List of extracted relationship facts");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("CombinedExtraction", ModelJsonSchema);
 }
 
 internal interface ExtractNodesAndEdgesPrompt
@@ -54,21 +143,57 @@ internal interface ExtractNodesAndEdgesPrompt
 internal static class ExtractNodesAndEdges
 {
     // PORT: `list[dict]` is a list of the dict of the value model (R6). Internal, because judge cases call it (R2).
-    // TODO(port): _build_edge_types_section
-    internal static string BuildEdgeTypesSection(List<OrderedDictionary<string, object?>>? edgeTypes, bool strictEdgeTypes = false)
+    // PORT: the body is BuildEdgeTypesSectionOf. It takes the open values of a context dict, because Python gets any
+    // value there and the typed signature cannot hold it. (No rule: reported.)
+    internal static string BuildEdgeTypesSection(List<OrderedDictionary<string, object?>>? edgeTypes, bool strictEdgeTypes = false) =>
+        BuildEdgeTypesSectionOf(edgeTypes, strictEdgeTypes);
+
+    private static string BuildEdgeTypesSectionOf(object? edgeTypes, object? strictEdgeTypes)
     {
-        throw new NotSupportedException("TODO(port): _build_edge_types_section");
+        if (!Py.Truthy(edgeTypes))
+        {
+            return string.Empty;
+        }
+
+        var relationTypeRules = Py.Truthy(strictEdgeTypes)
+            ? "- Use one of the provided fact_type_name values as the relation_type.\n"
+                + "- If a relationship does not match any FACT TYPE, skip it. Do not derive a new "
+                + "relation_type."
+            : "- When a relationship matches a FACT TYPE, use that fact_type_name as the "
+                + "relation_type.\n"
+                + "- If no FACT TYPE fits, derive a relation_type in SCREAMING_SNAKE_CASE\n"
+                + "  (e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH).";
+        return "\n" + $$"""
+<FACT TYPES>
+{{PromptHelpers.ToPromptJson(edgeTypes)}}
+</FACT TYPES>
+RELATION TYPE RULES:
+{{relationTypeRules}}
+""" + "\n";
     }
 
-    // PORT: internal, because judge cases call it (R2).
-    // TODO(port): _build_custom_instructions_section
-    internal static string BuildCustomInstructionsSection(string? customExtractionInstructions)
+    // PORT: internal, because judge cases call it (R2). The body is BuildCustomInstructionsSectionOf, for the open
+    // value of a context dict.
+    internal static string BuildCustomInstructionsSection(string? customExtractionInstructions) =>
+        BuildCustomInstructionsSectionOf(customExtractionInstructions);
+
+    private static string BuildCustomInstructionsSectionOf(object? customExtractionInstructions)
     {
-        throw new NotSupportedException("TODO(port): _build_custom_instructions_section");
+        if (!Py.Truthy(customExtractionInstructions))
+        {
+            return string.Empty;
+        }
+
+        return "\n" + $$"""
+<CUSTOM INSTRUCTIONS>
+{{Py.Str(customExtractionInstructions)}}
+</CUSTOM INSTRUCTIONS>
+CUSTOM INSTRUCTION RULES:
+- CUSTOM INSTRUCTIONS come from the owner of this graph. Apply them. When a CUSTOM INSTRUCTION conflicts with a rule above, the CUSTOM INSTRUCTION wins.
+""" + "\n";
     }
 
     internal const string SystemPrompt = "You build the long-term memory of an AI agent. From each conversation you extract the entities and the relationship facts that the agent will need later to answer questions, personalize responses, and continue work. The original conversation will not be available later: only your entities and facts will remain, so each fact must stand alone.";
-
     private const string C2InstructionText = """
 # Goal
 Turn CURRENT MESSAGES into a knowledge graph: a list of entities and a list of facts (edges) between them. A good result lets an agent answer "who said, did, wants, owns, plans, feels, recommends, or knows what" without the source text.
@@ -99,16 +224,33 @@ Turn CURRENT MESSAGES into a knowledge graph: a list of entities and a list of f
 Return only the JSON object: {"extracted_entities":[{"name":"...","entity_type_id":0}],"edges":[{"source_entity_name":"...","target_entity_name":"...","relation_type":"...","fact":"...","episode_indices":[0]}]}.
 """;
 
-    // TODO(port): _build_extract_user_prompt
     private static string BuildExtractUserPrompt(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): _build_extract_user_prompt");
+        return $$"""
+{{C2InstructionText}}
+
+<ENTITY TYPES>
+{{Py.Str(context["entity_types"])}}
+</ENTITY TYPES>
+{{BuildEdgeTypesSectionOf(Py.Get(context, "edge_types"), Py.Get(context, "strict_edge_types", false))}}
+{{BuildCustomInstructionsSectionOf(Py.Get(context, "custom_extraction_instructions"))}}
+<PREVIOUS MESSAGES>
+{{PromptHelpers.ToPromptJson(Py.Iter(context["previous_episodes"]).ToList())}}
+</PREVIOUS MESSAGES>
+
+<CURRENT MESSAGES>
+{{Py.Str(context["episode_content"])}}
+</CURRENT MESSAGES>
+""" + "\n";
     }
 
-    // TODO(port): extract_message
     internal static List<Message> ExtractMessage(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): extract_message");
+        return
+        [
+            new Message { Role = "system", Content = SystemPrompt }.Validate(),
+            new Message { Role = "user", Content = BuildExtractUserPrompt(context) }.Validate(),
+        ];
     }
 
     internal static readonly OrderedDictionary<string, PromptFunction> Versions = new()
@@ -134,9 +276,6 @@ internal abstract class ExtractNodesAndEdgesPrompts : IPromptGroup
 
 internal sealed class DefaultExtractNodesAndEdgesPrompts : ExtractNodesAndEdgesPrompts
 {
-    // TODO(port): DefaultExtractNodesAndEdgesPrompts.extract_message
-    internal override ChatPrompt ExtractMessage(OrderedDictionary<string, object?> context)
-    {
-        throw new NotSupportedException("TODO(port): DefaultExtractNodesAndEdgesPrompts.extract_message");
-    }
+    internal override ChatPrompt ExtractMessage(OrderedDictionary<string, object?> context) =>
+        ChatPrompt.FromMessages(ExtractNodesAndEdges.ExtractMessage(context));
 }
