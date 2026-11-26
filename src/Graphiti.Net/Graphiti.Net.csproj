@@ -6,7 +6,10 @@
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" />
     <ProjectReference Include="../Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
   </ItemGroup>
   <ItemGroup>
