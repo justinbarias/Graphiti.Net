@@ -197,19 +197,25 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
         using var factory = new CaptureFactory(lines);
         using var scope = PortServices.Use(loggerFactory: factory);
 
+        // database_ is a driver option, so it is not a parameter key (Python pops it before it builds the keys).
         var parameters = new OrderedDictionary<string, object?>
         {
             ["params"] = new OrderedDictionary<string, object?> { ["a"] = 1L },
             ["zeta"] = 2L,
             ["routing_"] = "r",
+            ["database_"] = null,
         };
         var error = await Assert.ThrowsAsync<ClientException>(() => Asyncio.Run(() => driver.ExecuteQueryAsync("RETURN $a +", parameters, Ct)));
         Assert.Equal("Neo.ClientError.Statement.SyntaxError", error.Code);
 
-        // Python: the second and third lines are "RETURN $a +" and "parameter keys: ['a', 'routing_', 'zeta']".
+        // Python (the oracle, `.upstream/graphiti/.venv/bin/python -B` against the local Neo4j on 2026-11-27:
+        // execute_query('RETURN $a +', params={'a': 1}, zeta=2, routing_='r', database_=None)). The first line is
+        // str(e) of the ClientError of the neo4j package.
         var (level, text) = Assert.Single(lines);
         Assert.Equal(LogLevel.Error, level);
-        Assert.Equal("Error executing Neo4j query: " + error.Message + "\nRETURN $a +\nparameter keys: ['a', 'routing_', 'zeta']", text);
+        Assert.Equal(
+            "Error executing Neo4j query: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input '': expected an expression (line 1, column 12 (offset: 11))\n\"RETURN $a +\"\n            ^} {gql_status: 50N42} {gql_status_description: error: general processing exception - unexpected error. Unexpected error has occurred. See debug log for details.}\nRETURN $a +\nparameter keys: ['a', 'routing_', 'zeta']",
+            text);
     }
 
     [Fact]
@@ -305,6 +311,100 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_session_closes_without_the_error_of_a_result_that_it_did_not_read()
+    {
+        // Python: AsyncSession.close consumes the open result inside try ... except Exception (neo4j/_async/work/session.py,
+        // lines 196 to 203) and drops the error. `async with drv.session() as s: await s.run(<this query>, g=G)` returns
+        // normally and writes nothing (the oracle, 2026-11-27).
+        const string failing = "CREATE (:DriverProbe {group_id: $g, kind: 'z1'}) WITH 1 AS one UNWIND [1, 0] AS x RETURN 1 / x AS y";
+
+        await Asyncio.Run(async () =>
+        {
+            await using (var disposed = driver.Session())
+            {
+                await disposed.RunAsync(failing, new() { ["g"] = group }, Ct);
+            }
+
+            var closed = driver.Session();
+            await closed.RunAsync(failing, new() { ["g"] = group }, Ct);
+            await closed.CloseAsync(Ct);
+        });
+
+        Assert.Equal(0L, await CountProbes());
+    }
+
+    [Fact]
+    public async Task A_closed_session_and_a_closed_driver_refuse_the_next_query()
+    {
+        // Python: a query after close is a driver error, for the session and for the driver (the oracle, 2026-11-27).
+        await Asyncio.Run(async () =>
+        {
+            var session = driver.Session();
+            await session.CloseAsync(Ct);
+            await Assert.ThrowsAnyAsync<Exception>(() => session.RunAsync("RETURN 1", new(), Ct));
+        });
+
+        var other = new Neo4jDriver(Uri, User, Password);
+        await Asyncio.Run(() => other.CloseAsync(Ct));
+        await Assert.ThrowsAnyAsync<Exception>(() => Asyncio.Run(() => other.ExecuteQueryAsync("RETURN 1", new(), Ct)));
+    }
+
+    [Fact]
+    public async Task A_database_that_does_not_exist_gives_the_error_of_the_server_for_each_way_to_name_it()
+    {
+        // Python: execute_query('RETURN 1', database_='no_such_db'), driver.session('no_such_db').execute_write(...),
+        // and Neo4jDriver(..., 'no_such_db').transaction() all raise ClientError with this code (the oracle, 2026-11-27).
+        // Python raises the same error for driver.session('no_such_db').run('RETURN 1'). The .NET driver sends the
+        // statement and reports its failure only when the result is read, and Neo4jSession.CloseAsync drops that
+        // pending error as Python does, so a bare run cannot show the database here. A managed transaction can.
+        const string code = "Neo.ClientError.Database.DatabaseNotFound";
+
+        var queryError = await Assert.ThrowsAnyAsync<Neo4jException>(() => Asyncio.Run(() => driver.ExecuteQueryAsync(
+            "RETURN 1", new() { ["database_"] = "no_such_db" }, Ct)));
+        Assert.Equal(code, queryError.Code);
+
+        var sessionError = await Assert.ThrowsAnyAsync<Neo4jException>(() => Asyncio.Run(async () =>
+        {
+            await using var session = driver.Session("no_such_db");
+            await session.ExecuteWriteAsync(tx => tx.RunAsync("RETURN 1", new(), Ct), Ct);
+        }));
+        Assert.Equal(code, sessionError.Code);
+
+        var other = new Neo4jDriver(Uri, User, Password, "no_such_db");
+        try
+        {
+            var transactionError = await Assert.ThrowsAnyAsync<Neo4jException>(() => Asyncio.Run(() => other.TransactionAsync(
+                tx => tx.RunAsync("RETURN 1", new(), Ct),
+                Ct)));
+            Assert.Equal(code, transactionError.Code);
+        }
+        finally
+        {
+            await other.CloseAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task A_write_with_routing_w_succeeds_in_the_group_of_the_test()
+    {
+        // Python: execute_query('CREATE (:DriverProbe {group_id: $g})', params={'g': G}, routing_='w') succeeds.
+        await Asyncio.Run(() => driver.ExecuteQueryAsync(
+            "CREATE (:DriverProbe {group_id: $g})", new() { ["params"] = new OrderedDictionary<string, object?> { ["g"] = group }, ["routing_"] = "w" }, Ct));
+        Assert.Equal(1L, await CountProbes());
+    }
+
+    [Fact]
+    public async Task A_zoned_datetime_with_nanoseconds_keeps_the_microseconds_and_the_offset()
+    {
+        // Python: execute_query("RETURN datetime('2024-01-02T03:04:05.123456789+01:00') AS z").records[0]['z']
+        // .to_native().isoformat() gives 2024-01-02T03:04:05.123456+01:00, because to_native() cuts the nanoseconds
+        // (the oracle, 2026-11-27).
+        var (records, _, _) = await Asyncio.Run(() => driver.ExecuteQueryAsync(
+            "RETURN datetime('2024-01-02T03:04:05.123456789+01:00') AS z", new(), Ct));
+        Assert.Equal("2024-01-02T03:04:05.123456+01:00", Assert.IsType<PyDateTime>(Assert.Single(records)["z"]).IsoFormat());
+    }
+
+    [Fact]
     public async Task Build_indices_and_constraints_two_times_gives_the_same_indexes()
     {
         const string show = "SHOW INDEXES YIELD name, type, entityType, labelsOrTypes, properties RETURN name, type, entityType, labelsOrTypes, properties ORDER BY name";
@@ -342,8 +442,13 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
         Console.SetOut(output);
         try
         {
-            var error = await Assert.ThrowsAnyAsync<Exception>(() => Asyncio.Run(() => broken.HealthCheckAsync(Ct)));
-            Assert.Equal("Neo4j health check failed: " + error.Message + Environment.NewLine, output.ToString());
+            // Python: ServiceUnavailable, and str(e) of a driver error is its message, which names the machine, so the
+            // text is compared by its parts. values/neo4j_driver.json (health_check) holds the exact form.
+            var error = await Assert.ThrowsAsync<ServiceUnavailableException>(() => Asyncio.Run(() => broken.HealthCheckAsync(Ct)));
+            Assert.Null(error.Code);
+            Assert.StartsWith("Neo4j health check failed: ", output.ToString(), StringComparison.Ordinal);
+            Assert.Contains("localhost:1", output.ToString(), StringComparison.Ordinal);
+            Assert.EndsWith(Environment.NewLine, output.ToString(), StringComparison.Ordinal);
         }
         finally
         {
@@ -377,7 +482,8 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
     public async Task Delete_all_indexes_sends_the_query_text_of_Python()
     {
         // A fake client, so that no index of the shared database is dropped.
-        var client = new RecordingClient();
+        var client = new FakeClient();
+        client.Fail["CALL db.indexes()"] = new ClientException("Neo.ClientError.Test", "recorded");
         var fake = new Neo4jDriver(client, "graphiti");
         var lines = new List<(LogLevel, string)>();
         using var factory = new CaptureFactory(lines);
@@ -385,73 +491,12 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<ClientException>(() => Asyncio.Run(() => fake.DeleteAllIndexesAsync(Ct)));
 
-        // Python: neo4j_driver.py:208.
-        Assert.Equal(["CALL db.indexes() YIELD name DROP INDEX name"], client.Queries);
-        Assert.Equal((LogLevel.Error, "Error executing Neo4j query: recorded\nCALL db.indexes() YIELD name DROP INDEX name\nparameter keys: []"), Assert.Single(lines));
+        // Python: neo4j_driver.py:198.
+        Assert.Equal(["CALL db.indexes() YIELD name DROP INDEX name"], client.Executed.Select(e => e.Query));
+        // The text of the error is str(e) of Python (values/neo4j_driver.json, error_texts).
+        Assert.Equal(
+            (LogLevel.Error, "Error executing Neo4j query: {neo4j_code: Neo.ClientError.Test} {message: recorded} {gql_status: } {gql_status_description: }\nCALL db.indexes() YIELD name DROP INDEX name\nparameter keys: []"),
+            Assert.Single(lines));
         Assert.Equal("graphiti", fake.Database);
-    }
-
-    private sealed class RecordingClient : IDriver
-    {
-        internal List<string> Queries { get; } = [];
-
-        public Config Config => throw new NotSupportedException();
-
-        public bool Encrypted => false;
-
-        public IAsyncSession AsyncSession() => throw new NotSupportedException();
-
-        public IAsyncSession AsyncSession(Action<SessionConfigBuilder> action) => throw new NotSupportedException();
-
-        public Task<IServerInfo> GetServerInfoAsync() => throw new NotSupportedException();
-
-        public Task<bool> TryVerifyConnectivityAsync() => throw new NotSupportedException();
-
-        public Task VerifyConnectivityAsync() => throw new NotSupportedException();
-
-        public Task<bool> SupportsMultiDbAsync() => throw new NotSupportedException();
-
-        public Task<bool> SupportsSessionAuthAsync() => throw new NotSupportedException();
-
-        public IExecutableQuery<IRecord, IRecord> ExecutableQuery(string cypher)
-        {
-            Queries.Add(cypher);
-            throw new ClientException("Neo.ClientError.Test", "recorded");
-        }
-
-        public Task<bool> VerifyAuthenticationAsync(IAuthToken authToken) => throw new NotSupportedException();
-
-        public IBookmarkManager GetExecutableQueryBookmarkManager() => throw new NotSupportedException();
-
-        public void Dispose()
-        {
-        }
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
-
-    private sealed class CaptureFactory(List<(LogLevel, string)> lines) : ILoggerFactory
-    {
-        public void AddProvider(ILoggerProvider provider)
-        {
-        }
-
-        public ILogger CreateLogger(string categoryName) =>
-            categoryName.EndsWith("Neo4jDriverModule", StringComparison.Ordinal) ? new CaptureLogger(lines) : Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
-
-        public void Dispose()
-        {
-        }
-
-        private sealed class CaptureLogger(List<(LogLevel, string)> lines) : ILogger
-        {
-            public IDisposable? BeginScope<TState>(TState state)
-                where TState : notnull => null;
-
-            public bool IsEnabled(LogLevel logLevel) => true;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-                lines.Add((logLevel, formatter(state, exception)));
-        }
     }
 }

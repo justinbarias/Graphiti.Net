@@ -35,7 +35,7 @@ internal static partial class Neo4jDriverModule
 
     internal static partial class Log
     {
-        // PORT: {e} is the text of the driver exception. A .NET exception has no Python str(), so it is Message.
+        // PORT: {e} is str(e) of the exception (Neo4jDriver.DriverErrorText).
         [LoggerMessage(Level = LogLevel.Error, Message = "Error executing Neo4j query: {E}\n{CypherQuery}\nparameter keys: {ParameterKeys}")]
         internal static partial void ErrorExecutingNeo4jQuery(ILogger logger, string e, string cypherQuery, string parameterKeys);
 
@@ -125,13 +125,15 @@ internal sealed class Neo4jDriver : GraphDriver
     internal override GraphMaintenanceOperations GraphOps => graphOps;
 
     // PORT: an async context manager that commits or rolls back takes the body as a lambda (R16).
-    // PORT: the session and transaction calls of Neo4j.Driver take no CancellationToken (R9, open item O9). The
-    // rollback and the close run after a cancellation as well, as R8 asks.
+    // PORT: the session and transaction calls of Neo4j.Driver take no CancellationToken (R9). The port checks the token
+    // before each driver call, so that a cancellation arrives at the await where Python raises CancelledError (R8,
+    // open item O9). The rollback and the close run after a cancellation as well, as R8 asks.
     /// <summary>Neo4j transaction with real commit/rollback semantics.</summary>
     internal override async Task TransactionAsync(
         Func<Transaction, Task> body,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         await using var session = Client.AsyncSession(b => b.WithDatabase(Database));
         var tx = await session.BeginTransactionAsync();
         try
@@ -204,7 +206,7 @@ internal sealed class Neo4jDriver : GraphDriver
                 List<string> keys = [.. @params.Keys, .. kwargs.Keys];
                 Py.SortInPlace(keys);
                 var text = Py.Repr(keys);
-                Neo4jDriverModule.Log.ErrorExecutingNeo4jQuery(logger, e.Message, cypherQuery, text);
+                Neo4jDriverModule.Log.ErrorExecutingNeo4jQuery(logger, DriverErrorText(e), cypherQuery, text);
             }
 
             throw;
@@ -298,15 +300,27 @@ internal sealed class Neo4jDriver : GraphDriver
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await Client.VerifyConnectivityAsync();
             return;
         }
         catch (Exception e) when (!Asyncio.IsCancellation(e, cancellationToken))
         {
-            // PORT: print(x) is Console.Out.WriteLine(x) (R4). {e} is the Message of the driver exception.
-            Console.Out.WriteLine("Neo4j health check failed: " + e.Message);
+            // PORT: print(x) is Console.Out.WriteLine(x) (R4). {e} is str(e) of the exception.
+            Console.Out.WriteLine("Neo4j health check failed: " + DriverErrorText(e));
             throw;
         }
+    }
+
+    // PORT: R9. str(e) of an exception. The Python driver prints an error that the server sent as
+    // {neo4j_code: ...} {message: ...} {gql_status: ...} {gql_status_description: ...}. Each other exception prints its
+    // message. A .NET exception from the server is a Neo4jException with a code. No Python name.
+    private static string DriverErrorText(Exception e)
+    {
+        return e is Neo4jException { Code: not null } serverError
+            ? "{neo4j_code: " + serverError.Code + "} {message: " + serverError.Message + "} {gql_status: " + serverError.GqlStatus
+                + "} {gql_status_description: " + serverError.GqlStatusDescription + "}"
+            : e.Message;
     }
 
     // PORT: R9. The four members below have no Python name. ExecuteQueryAsync, Neo4jTransaction, and Neo4jSession
@@ -316,6 +330,7 @@ internal sealed class Neo4jDriver : GraphDriver
         var converted = new Dictionary<string, object?>(parameters.Count);
         foreach (var (key, value) in parameters)
         {
+            _ = PyText.EncodeUtf8(key);
             converted[key] = ToDriverValue(value);
         }
 
@@ -323,15 +338,19 @@ internal sealed class Neo4jDriver : GraphDriver
     }
 
     // PORT: R9. The errors follow the packer of the Python driver: OverflowError for an int out of range, TypeError
-    // for a dict key that is not a str, and ValueError for each other type.
+    // for a dict key that is not a str, ValueError for each other type, and UnicodeEncodeError for a str that holds a
+    // lone surrogate. PyText.EncodeUtf8 is the strict encode that the packer does (R12).
     internal static object? ToDriverValue(object? value)
     {
         switch (value)
         {
             case null:
                 return null;
-            case bool or long or double or string or byte[] or DateOnly:
+            case bool or long or double or byte[] or DateOnly:
                 return value;
+            case string text:
+                _ = PyText.EncodeUtf8(text);
+                return text;
             case PyDateTime dateTime:
                 return dateTime.IsNaive
                     ? new LocalDateTime(
@@ -356,7 +375,7 @@ internal sealed class Neo4jDriver : GraphDriver
                     var map = new Dictionary<string, object?>();
                     foreach (var (key, item) in pyDict)
                     {
-                        map[key is string text ? text : throw new InvalidCastException("Map keys must be strings, not " + Py.Repr(key))] = ToDriverValue(item);
+                        map[CheckedKey(key)] = ToDriverValue(item);
                     }
 
                     return map;
@@ -367,7 +386,7 @@ internal sealed class Neo4jDriver : GraphDriver
                     var map = new Dictionary<string, object?>(dictionary.Count);
                     foreach (DictionaryEntry entry in dictionary)
                     {
-                        map[entry.Key is string text ? text : throw new InvalidCastException("Map keys must be strings, not " + Py.Repr(entry.Key))] = ToDriverValue(entry.Value);
+                        map[CheckedKey(entry.Key)] = ToDriverValue(entry.Value);
                     }
 
                     return map;
@@ -385,8 +404,22 @@ internal sealed class Neo4jDriver : GraphDriver
                 }
 
             default:
-                throw new ArgumentException("Values of type " + value.GetType().FullName + " are not supported");
+                throw new ArgumentException("Values of type " + PythonTypeText(value) + " are not supported");
         }
+    }
+
+    // PORT: R9. A map key of the packer: a str that the strict encode accepts, else TypeError.
+    private static string CheckedKey(object? key)
+    {
+        var text = key as string ?? throw new InvalidCastException("Map keys must be strings, not " + PythonTypeText(key));
+        _ = PyText.EncodeUtf8(text);
+        return text;
+    }
+
+    // PORT: R9. {type(value)} in the message of the packer: <class 'int'>, or <enum 'GraphProvider'> for an enum.
+    private static string PythonTypeText(object? value)
+    {
+        return value is Enum ? "<enum '" + Py.TypeName(value) + "'>" : "<class '" + Py.TypeName(value) + "'>";
     }
 
     internal static OrderedDictionary<string, object?> FromDriverRecord(IRecord record)
@@ -469,12 +502,14 @@ internal sealed class Neo4jTransaction : Transaction
     }
 
     // PORT: Python returns the result of the driver. No upstream site reads it, so it is a Task (R9).
-    // PORT: IAsyncQueryRunner.RunAsync takes no CancellationToken (R9, open item O9).
+    // PORT: IAsyncQueryRunner.RunAsync takes no CancellationToken (R9, open item O9). The port checks the token
+    // before the driver call.
     internal override async Task RunAsync(
         string query,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         await tx.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
     }
 }
@@ -492,10 +527,17 @@ internal sealed class Neo4jSession : GraphDriverSession
         this.session = session;
     }
 
-    // PORT: AsyncSession.__aexit__ closes the session.
-    public override ValueTask DisposeAsync()
+    // PORT: AsyncSession.__aexit__ closes the session. AsyncSession.close drops the error of the result that the
+    // session did not consume.
+    public override async ValueTask DisposeAsync()
     {
-        return session.DisposeAsync();
+        try
+        {
+            await session.DisposeAsync();
+        }
+        catch (Neo4jException)
+        {
+        }
     }
 
     // PORT: AsyncSession.run. A run call does not consume its result cursor, as in Python (R9).
@@ -504,13 +546,21 @@ internal sealed class Neo4jSession : GraphDriverSession
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         await session.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
     }
 
-    // PORT: AsyncSession.close.
+    // PORT: AsyncSession.close. It drops the error of the result that the session did not consume. No token check,
+    // because close is a cleanup call (R8).
     internal override async Task CloseAsync(CancellationToken cancellationToken = default)
     {
-        await session.CloseAsync();
+        try
+        {
+            await session.CloseAsync();
+        }
+        catch (Neo4jException)
+        {
+        }
     }
 
     // PORT: AsyncSession.execute_write. The work function of the driver runs on the thread pool, so it starts with
@@ -519,6 +569,7 @@ internal sealed class Neo4jSession : GraphDriverSession
         Func<Transaction, Task> func,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         await session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => func(new Neo4jTransaction(tx))));
     }
 }
