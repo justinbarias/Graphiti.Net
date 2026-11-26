@@ -284,9 +284,29 @@ internal static partial class Py
         BigInteger => throw new OverflowException("the value does not fit in a long"),
         double d => Int(d),
         string s => Int(s),
-        byte[] bytes => Int(System.Text.Encoding.Latin1.GetString(bytes)),
+        byte[] bytes => IntOfBytes(bytes),
         _ => throw new InvalidCastException($"int() argument must be a string, a bytes-like object or a real number, not '{TypeName(x)}'"),
     };
+
+    // int(bytes): Python reads the bytes as ASCII. Only the six ASCII whitespace bytes are whitespace, so a byte
+    // such as 0x1C or 0xA0, which is whitespace in text, makes the literal invalid. The error shows the bytes repr.
+    private static long IntOfBytes(byte[] bytes)
+    {
+        if (!Array.TrueForAll(bytes, b => b is (>= (byte)'0' and <= (byte)'9') or (byte)'+' or (byte)'-' or (byte)'_' or (byte)' ' or (>= 0x09 and <= 0x0D)))
+        {
+            throw InvalidIntLiteralRepr(Repr(bytes));
+        }
+
+        var text = System.Text.Encoding.ASCII.GetString(bytes);
+        try
+        {
+            return Int(text);
+        }
+        catch (ArgumentException e) when (e.Message.StartsWith("invalid literal", StringComparison.Ordinal))
+        {
+            throw InvalidIntLiteralRepr(Repr(bytes));
+        }
+    }
 
     /// <summary>
     /// <c>int(text)</c>: decimal text with an optional sign, underscores between digits, Unicode digits,
@@ -410,9 +430,11 @@ internal static partial class Py
     /// CPython formats this message with <c>%.200R</c>: the repr is cut after 200 code points, with no
     /// closing quote when it is longer. <c>float()</c> has no such cut.
     /// </summary>
-    private static ArgumentException InvalidIntLiteral(string text)
+    private static ArgumentException InvalidIntLiteral(string text) => InvalidIntLiteralRepr(ReprStr(text));
+
+    private static ArgumentException InvalidIntLiteralRepr(string repr)
     {
-        var shown = PyText.ToCodePoints(ReprStr(text));
+        var shown = PyText.ToCodePoints(repr);
         var cut = shown.Length > 200 ? shown[..200] : shown;
         return new ArgumentException("invalid literal for int() with base 10: " + PyText.FromCodePoints(cut));
     }

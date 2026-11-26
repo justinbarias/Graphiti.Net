@@ -794,6 +794,29 @@ public class ValueModelTests
         Assert.Equal(12L, Py.Int((object?)"  12 "));
         Assert.Equal(12L, Py.Int((object?)"12"u8.ToArray()));
 
+        // Python 3.12: int(b' 12 '), int(b'\t12\n\x0b\x0c\r'), int(b'1_2'), and int(b'+12') give 12.
+        foreach (var good in new byte[][] { " 12 "u8.ToArray(), "\t12\n\v\f\r"u8.ToArray(), "1_2"u8.ToArray(), "+12"u8.ToArray() })
+        {
+            Assert.Equal(12L, Py.Int((object?)good));
+        }
+
+        // Python 3.12: for bytes, only ASCII whitespace is whitespace. Each of these raises ValueError with the
+        // bytes repr: b'12\xa0', b'\xa012', b'\x8512', b'\x1c12', b'', b'12\x00', and b'1 2'.
+        foreach (var (bad, repr) in new (byte[], string)[]
+        {
+            ([0x31, 0x32, 0xA0], @"b'12\xa0'"),
+            ([0xA0, 0x31, 0x32], @"b'\xa012'"),
+            ([0x85, 0x31, 0x32], @"b'\x8512'"),
+            ([0x1C, 0x31, 0x32], @"b'\x1c12'"),
+            ([], "b''"),
+            ([0x31, 0x32, 0x00], @"b'12\x00'"),
+            ([0x31, 0x20, 0x32], "b'1 2'"),
+        })
+        {
+            var error = Assert.Throws<ArgumentException>(() => Py.Int((object?)bad));
+            Assert.Equal("invalid literal for int() with base 10: " + repr, error.Message);
+        }
+
         // Python 3.12: int(None), int([1]), and int({'a': 1}) raise TypeError with the type name at the end.
         foreach (var (value, name) in new (object?, string)[] { (null, "NoneType"), (new List<object?> { 1L }, "list"), (new OrderedDictionary<string, object?>(), "dict") })
         {

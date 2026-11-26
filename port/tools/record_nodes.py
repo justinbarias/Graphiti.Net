@@ -252,6 +252,9 @@ def record_cases():
         'uuid': [5],
     }
     out.extend(variants('get_entity_node_from_record', entity, entity_values))
+    # Two fields of a wrong type: Python runs group_id.replace before the read of labels.
+    for both in [{'labels': 5, 'group_id': None}, {'labels': None, 'group_id': 5}, {'labels': 'x', 'group_id': ['a']}]:
+        out.append({'function': 'get_entity_node_from_record', 'record': {**entity, **both}})
     # A bad label together with another field error (the record helper passes labels only for an entity node).
     for other in [{'summary': None}, {'name': None}, {'created_at': 'nope'}, {'summary': None, 'name_embedding': ['x']}]:
         out.append({'function': 'get_entity_node_from_record', 'record': {**entity, 'labels': ['Bad Label', 'Entity_abc'], **other}})

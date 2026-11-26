@@ -1811,9 +1811,11 @@ internal static partial class Nodes
         attributes.Remove("labels");
 
         // PORT: labels is open data. The `in` test keeps the typed read (GAPS F24), and remove is a method call on it (R4, Py.Receiver).
+        // PORT: Python runs the left operand of `in` first, so a local holds it before the read of labels.
         var labels = Py.Get(record, "labels", (object?)new List<object?>());
         var groupId = Py.Get(record, "group_id");
-        if (Py.Contains(Py.AsList(labels), "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal)))
+        var needle = "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal);
+        if (Py.Contains(Py.AsList(labels), needle))
         {
             Py.Remove(Py.Receiver<List<object?>>(labels, "remove"), "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal));
         }

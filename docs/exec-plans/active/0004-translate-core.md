@@ -180,10 +180,17 @@ What the reviews found, and the result:
 | `GraphDriver.transaction` closed its session with a canceled token, so a canceled body left the session open. | `CancellationToken.None` in the `finally` (rule R8), with a test that fails for the old form. |
 | A fake that completes at once cannot show a missing `await`, and no test passed a canceled token. | Each fake yields first, and each unit has a canceled-token theory (rule R25). |
 | A wrong tie order in label propagation made the test run hang, because of upstream defect U11. | Each case has a time limit of 5 seconds. |
-| The recorders left out defaults, a limit of 0, an empty group id, equality, hashing, and the order of log lines and calls. | The recordings have 1,152 (`nodes`), 1,140 (`edges`), and 1,128 (driver contract) cases. |
+| The recorders left out defaults, a limit of 0, an empty group id, equality, hashing, and the order of log lines and calls. | The recordings have 1,155 (`nodes`), 1,140 (`edges`), and 1,128 (driver contract) cases. |
 | Two pilot tests read each JSON integer as a float. | Fixed. A seeded reader that rejects an int now fails 4 tests. |
 
 Differences that the lead accepted by name under D39: GAPS F24, GAPS F25, the R7 row for `load_fact_embedding`, and `model_copy(update=...)` on a `validate_assignment` model. No upstream site reaches them with Neo4j.
+
+The adversarial pass over the layer (Opus 5.5, high effort) gave 3 important findings and 3 small ones. The lead fixed each one:
+
+- `get_entity_node_from_record` read `labels` before it ran `group_id.replace`. The port now keeps the order of Python, and the recording holds three records with two wrong fields.
+- `Py.Int` accepted bytes with a byte that is whitespace only in text, such as `0xA0`. It now reads bytes as Python does and gives the bytes repr in the error.
+- The text of GAPS F24 named fewer differences than the tests exempt. It now names each one: a list as `attributes`, a value that is not a list as `labels`, and a dict with keys that are not text.
+- The gate log, an O4 row, a count in `port/STATE.md`, and a sentence of rule R8 were stale. One fake did not yield.
 
 Evidence that waits for a later layer:
 
@@ -195,7 +202,7 @@ Evidence that waits for a later layer:
 Commands at the tip:
 
 - `scripts/check.sh`: `check: passed`.
-- `dotnet test --project tests/Port.Evaluation`: 5,886 tests, 0 failed, 0 skipped.
+- `dotnet test --project tests/Port.Evaluation`: 5,889 tests, 0 failed, 0 skipped.
 - The recorders with `--check`: each of the eight is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 957 passed, 0 unexpected, 0 bound and wrong. 276 ids left `expected-failures.txt`, and 1,042 stay. The pull request lists the ids.
 

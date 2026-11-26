@@ -582,11 +582,17 @@ public class EdgesRecordedTests
     // An operation that returns null where the C# type is not nullable: Python returns None.
     private sealed record NullOperations : GraphOperationsInterface
     {
-        internal override Task<EntityEdge> EdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            Task.FromResult<EntityEdge>(null!);
+        internal override async Task<EntityEdge> EdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            return null!;
+        }
 
-        internal override Task<List<EntityEdge>> EdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
-            Task.FromResult<List<EntityEdge>>(null!);
+        internal override async Task<List<EntityEdge>> EdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            return null!;
+        }
     }
 
     // The base class: each operation throws NotImplementedException, as each Python method raises NotImplementedError.

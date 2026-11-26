@@ -110,7 +110,7 @@ public partial class NodesValuesTests
 
     // Two outcomes differ from Python by design, and each one has a reason:
     // - GAPS F24: the `in` test of labels keeps the typed read, so a labels value that is not a list throws InvalidCastException.
-    //   Python takes str (a substring test) and None or int (TypeError) there.
+    //   Python takes str (a substring test), dict (a key test), and None or int (TypeError) there. A tuple or a set that Python accepts is not recorded.
     // - R4: Py.Receiver<OrderedDictionary> refuses a list as attributes with the AttributeError of Python for a missing method, and a Python list has pop.
     //   Python then raises TypeError: pop expected at most 1 argument, got 2.
     private static (Type Type, string? Text)? DifferenceByDesign(OrderedDictionary<string, object?> record)
