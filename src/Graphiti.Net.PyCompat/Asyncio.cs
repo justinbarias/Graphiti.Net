@@ -150,6 +150,23 @@ internal static class Asyncio
         return GatherCore([a, b, c], returnExceptions: false, () => (Value(a), Value(b), Value(c)));
     }
 
+    /// <summary><c>a, b, c, d = await asyncio.gather(f(), g(), h(), i())</c> with four result types.</summary>
+    /// <inheritdoc cref="GatherAsync{T}(IReadOnlyList{Func{Task{T}}}, CancellationToken)" path="/remarks"/>
+    internal static Task<(T1, T2, T3, T4)> GatherAsync<T1, T2, T3, T4>(
+        Func<Task<T1>> first,
+        Func<Task<T2>> second,
+        Func<Task<T3>> third,
+        Func<Task<T4>> fourth,
+        CancellationToken cancellationToken = default)
+    {
+        RequireLoop(nameof(GatherAsync));
+        var a = Spawn(first, cancellationToken);
+        var b = Spawn(second, cancellationToken);
+        var c = Spawn(third, cancellationToken);
+        var d = Spawn(fourth, cancellationToken);
+        return GatherCore([a, b, c, d], returnExceptions: false, () => (Value(a), Value(b), Value(c), Value(d)));
+    }
+
     /// <summary>
     /// The mechanism of upstream <c>semaphore_gather</c> (<c>helpers.py</c>):
     /// <c>asyncio.gather</c> over each call wrapped in <c>async with asyncio.Semaphore(max_coroutines)</c>.
@@ -204,6 +221,29 @@ internal static class Asyncio
             Wrap(semaphore, first, cancellationToken),
             Wrap(semaphore, second, cancellationToken),
             Wrap(semaphore, third, cancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// <c>a, b, c, d = await semaphore_gather(f(), g(), h(), i())</c> with four result types. The one upstream call
+    /// with different result types has this form (<c>search/search.py</c>).
+    /// </summary>
+    /// <inheritdoc cref="SemaphoreGatherAsync{T}(IReadOnlyList{Func{Task{T}}}, long, CancellationToken)" path="/remarks"/>
+    internal static Task<(T1, T2, T3, T4)> SemaphoreGatherAsync<T1, T2, T3, T4>(
+        Func<Task<T1>> first,
+        Func<Task<T2>> second,
+        Func<Task<T3>> third,
+        Func<Task<T4>> fourth,
+        long maxCoroutines,
+        CancellationToken cancellationToken = default)
+    {
+        RequireLoop(nameof(SemaphoreGatherAsync));
+        var semaphore = new LoopSemaphore(maxCoroutines);
+        return GatherAsync(
+            Wrap(semaphore, first, cancellationToken),
+            Wrap(semaphore, second, cancellationToken),
+            Wrap(semaphore, third, cancellationToken),
+            Wrap(semaphore, fourth, cancellationToken),
             cancellationToken);
     }
 

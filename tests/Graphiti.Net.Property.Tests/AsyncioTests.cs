@@ -261,6 +261,18 @@ public class AsyncioTests
             var triple = await Asyncio.SemaphoreGatherAsync(() => Task.FromResult(1L), () => Task.FromResult('c'), () => Task.FromResult(3.5), 1, token);
             var pairBySemaphore = await Asyncio.SemaphoreGatherAsync(() => Task.FromResult("a"), () => Task.FromResult(2), 1, token);
             var tripleByGather = await Asyncio.GatherAsync(() => Task.FromResult(1), () => Task.FromResult(2), () => Task.FromResult(3), token);
+            var four = await Asyncio.SemaphoreGatherAsync(
+                async () =>
+                {
+                    await Task.Yield();
+                    return 1L;
+                },
+                () => Task.FromResult("b"),
+                () => Task.FromResult(3.5),
+                () => Task.FromResult('d'),
+                2,
+                token);
+            Assert.Equal((1L, "b", 3.5, 'd'), four);
             await Asyncio.GatherAsync(
                 [
                     async () =>

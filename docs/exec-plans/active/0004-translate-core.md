@@ -77,4 +77,36 @@ The lead made these decisions under decision D39. The maintainer reads them at t
 
 ## Results
 
-None yet.
+### Layer 0, the skeleton for layers 1 to 6, 2026-11-27
+
+Five packets declared the types and the signatures of the modules of layers 1 to 6. One Opus 5.5 high reviewer read each packet and tried to refute it.
+
+| Packet | Modules | Review findings |
+| --- | --- | --- |
+| S1 | The driver contract, `helpers`, `tracer`, and the query modules | 4 contract problems |
+| S2 | `nodes`, `edges`, and `namespaces` | 7 minor |
+| S3 | `llm_client`, `embedder`, `cross_encoder`, and `prompts` | 5 important, 9 minor |
+| S4 | `driver.neo4j_driver` and `driver.neo4j.operations` | 1 important, 9 minor |
+| S5 | `search` and `decorators` | 1 important, 3 minor |
+
+What the reviews changed:
+
+- The work function of `ExecuteWriteAsync` receives a `Transaction`, and `Neo4jTransaction` wraps an `IAsyncQueryRunner`.
+- The tracer takes the body of a span (decision D45), because the end of the Python context manager depends on the exception of the body. This showed upstream defect U19.
+- `GraphDriver` and `LLMClient` have a `PythonName`, for the messages that Python builds from a class name.
+- The wrapper of `handle_multiple_group_ids` takes the two values that it reads, and has one overload for each result shape.
+- The reranker seam takes the ported `Message` and a nullable model id.
+- The rulebook has one row in its change table for each round. Open item O12 is closed, and O4 has 25 more cases.
+
+The lead did not apply two findings: the docstrings and the section comments of the Neo4j files. Each unit copies them with its body (rule R24).
+
+Commands at the tip, after the rebase on `main`:
+
+- `scripts/check.sh --test`: `check: passed`. 2,590 tests, 0 failed, 0 skipped.
+- `dotnet test --project tests/Port.Evaluation`: 2,214 tests, 0 failed.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 403 passed, 1,596 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong.
+- `scan_port.py src --allow-todo`: 1,136 `TODO(port)` markers in 115 files. The other 105 findings are `NotImplementedException` sites that port a Python `raise NotImplementedError` (rule R4).
+
+Not in this pull request: the two skeleton packets for layers 7 to 9. They are outside the goal of decision D39, which ends at layer 6.
+
+Found beside the plan: `scripts/mutate.sh` gave no result on 2026-11-26. Two tests, `PyAstTests.LiteralEval_matches_Python` and `PyAstTests.LiteralEval_of_long_and_deeply_nested_texts_matches_Python`, stop the test host in a mutated build. Stryker then runs them against each mutant, and each mutant gets the status `RuntimeError`. A probe on `PyHash.cs` with 56 mutants took 159 seconds and gave 56 errors. With the two tests skipped it took 8 seconds and killed 56. The probable cause is a stack overflow in the mutated parser. The lead fixes the two tests before the mutation run of layer 5.

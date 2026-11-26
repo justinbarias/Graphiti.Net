@@ -1,0 +1,109 @@
+// Ported from graphiti_core/driver/neo4j/operations/episodic_edge_ops.py
+/*
+Copyright 2024, Zep Software, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+namespace Graphiti.Neo4j.Operations;
+
+using Graphiti.Core;
+using Graphiti.Core.Driver;
+using Graphiti.Core.Driver.Operations;
+using Graphiti.Internal;
+using Microsoft.Extensions.Logging;
+
+// PORT: the module class of R2 and R5, with the logger and the record function. The unit adds the Log class with the log calls.
+internal static partial class EpisodicEdgeOps
+{
+    internal static ILogger Logger => PortServices.Logger(typeof(EpisodicEdgeOps));
+
+    // TODO(port): _episodic_edge_from_record
+    internal static EpisodicEdge EpisodicEdgeFromRecord(OrderedDictionary<string, object?> record)
+    {
+        throw new NotSupportedException("TODO(port): _episodic_edge_from_record");
+    }
+}
+
+internal sealed class Neo4jEpisodicEdgeOperations : EpisodicEdgeOperations
+{
+    // TODO(port): Neo4jEpisodicEdgeOperations.save
+    internal override Task SaveAsync(
+        QueryExecutor executor,
+        EpisodicEdge edge,
+        Transaction? tx = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.save");
+    }
+
+    // TODO(port): Neo4jEpisodicEdgeOperations.save_bulk
+    internal override Task SaveBulkAsync(
+        QueryExecutor executor,
+        List<EpisodicEdge> edges,
+        Transaction? tx = null,
+        long batchSize = 100,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.save_bulk");
+    }
+
+    // TODO(port): Neo4jEpisodicEdgeOperations.delete
+    internal override Task DeleteAsync(
+        QueryExecutor executor,
+        EpisodicEdge edge,
+        Transaction? tx = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.delete");
+    }
+
+    // TODO(port): Neo4jEpisodicEdgeOperations.delete_by_uuids
+    internal override Task DeleteByUuidsAsync(
+        QueryExecutor executor,
+        List<string> uuids,
+        Transaction? tx = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.delete_by_uuids");
+    }
+
+    // TODO(port): Neo4jEpisodicEdgeOperations.get_by_uuid
+    internal override Task<EpisodicEdge> GetByUuidAsync(
+        QueryExecutor executor,
+        string uuid,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.get_by_uuid");
+    }
+
+    // TODO(port): Neo4jEpisodicEdgeOperations.get_by_uuids
+    internal override Task<List<EpisodicEdge>> GetByUuidsAsync(
+        QueryExecutor executor,
+        List<string> uuids,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.get_by_uuids");
+    }
+
+    // TODO(port): Neo4jEpisodicEdgeOperations.get_by_group_ids
+    internal override Task<List<EpisodicEdge>> GetByGroupIdsAsync(
+        QueryExecutor executor,
+        List<string> groupIds,
+        long? limit = null,
+        string? uuidCursor = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): Neo4jEpisodicEdgeOperations.get_by_group_ids");
+    }
+}
