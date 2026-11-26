@@ -11,5 +11,6 @@
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Graphiti.Net/Graphiti.Net.csproj" />
     <ProjectReference Include="../../src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
+    <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
   </ItemGroup>
 </Project>

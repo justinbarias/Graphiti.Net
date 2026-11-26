@@ -84,7 +84,7 @@ A member keeps the meaning of its Python name. Do not rename a member to make it
 
 - Every ported type and member is `internal`, or `private` by R2. One family is `public`: the exception classes of `errors.py` and `llm_client/errors.py` (R4), with their constructors and properties.
 - [The public surface design](../docs/design-docs/public-surface-design.md) names each other public type. Those types are lead code, not ported code. Never add `public` to another ported type.
-- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants it to `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, and `Port.Evaluation`. The Neo4j project grants it to `Port.Evaluation`. The lead adds `Graphiti.Net.Property.Tests` when that project first needs it. Only the lead changes that list.
+- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants it to `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, and `Port.Evaluation`. The Neo4j project grants it to `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.E2E.Tests`. The three product projects grant it to `Graphiti.Net.E2E.Tests`, because a test on Neo4j uses the internal driver and the internal models until the public facade exists (layer 9). A test that needs a real Neo4j is in `tests/Graphiti.Net.E2E.Tests`, never in `tests/Port.Evaluation`. The lead adds `Graphiti.Net.Property.Tests` when that project first needs it. Only the lead changes that list.
 - `PyCompat` members are `internal` too. The `PyCompat` project grants `InternalsVisibleTo` to the two product projects and to the test projects.
 - The core project never references `Neo4j.Driver`. A type from `Neo4j.Driver` appears only in `src/Graphiti.Net.Neo4j`.
 - The public facade `IGraphiti` is lead code. It maps public records to ported types and calls `GraphitiCore`. A ported unit never refers to a public record or to `IGraphiti`.
@@ -1206,6 +1206,7 @@ The review of the first skeleton packet found 14 more cases of open item O4. Eac
 | `pure.queries.get_vector_cosine_func_query.non_str` | `1` and `[2, 3]` for two parameters of the type `string`. Each caller passes Cypher text. | Accept by name. |
 | `pure.parsers.entity_node.created_at_int` | `created_at: 12345`. `parse_db_date` returns the int unchanged, and pydantic reads it as a Unix time. | Closed with layer 2 by rule R20. The case passes. |
 | `pure.parsers.episodic_node.source_none` | `source: None` reaches `EpisodeType.from_str(None)`. | Closed with layer 2, as `pure.models.EpisodeType.from_str.invalid_none`. The case passes. |
+| `pure.queries.build_neo4j_fulltext_query.wrong_group_type` | A `str` for `group_ids`. Python iterates its characters and returns a query text. | The C# parameter is `List<string>?`, and each caller passes a list. Accept by name: the case stays listed with the answer `JudgeTypeRejected`. |
 
 The reviews of skeleton packets S3 and S5 found 11 more cases. Each one stays in `expected-failures.txt` (decision D40) until the maintainer decides it at gate 4.
 

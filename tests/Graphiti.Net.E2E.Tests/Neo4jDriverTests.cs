@@ -1,9 +1,9 @@
 // Tests of graphiti_core/driver/neo4j_driver.py against the local Neo4j (plan 0004, layer 5, packet P5a).
 // The expected values come from the Python Neo4jDriver at the pinned commit, run against the same database on
 // 2026-11-27 (neo4j 6 Python driver). Each test uses its own group id and touches only the data of that group.
-// PORT: the packet brief puts these tests in tests/Graphiti.Net.E2E.Tests, but that project cannot see the internal
-// types of the product projects (port/RULES.md, R3). Only the lead changes the InternalsVisibleTo lists.
-namespace Graphiti.Port.Evaluation;
+// The product projects grant this project InternalsVisibleTo, because the public facade comes with layer 9
+// (port/RULES.md, R3).
+namespace Graphiti.E2E.Tests;
 
 using System.Numerics;
 using global::Neo4j.Driver;
@@ -16,11 +16,11 @@ using Microsoft.Extensions.Logging;
 
 public sealed class Neo4jDriverTests : IAsyncLifetime
 {
-    private static readonly string Uri = Environment.GetEnvironmentVariable("NEO4J_URI") ?? "bolt://localhost:7687";
-    private static readonly string User = Environment.GetEnvironmentVariable("NEO4J_USER") ?? "neo4j";
-    private static readonly string Password = Environment.GetEnvironmentVariable("NEO4J_PASSWORD") ?? "password";
+    private static readonly string Uri = Neo4jSidecar.Uri;
+    private static readonly string User = Neo4jSidecar.User;
+    private static readonly string Password = Neo4jSidecar.Password;
 
-    private readonly string group = $"e2e_{Guid.NewGuid():N}";
+    private readonly string group = Neo4jSidecar.NewGroupId();
     private readonly Neo4jDriver driver = new(Uri, User, Password);
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;

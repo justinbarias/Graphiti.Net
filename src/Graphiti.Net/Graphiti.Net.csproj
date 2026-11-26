@@ -17,5 +17,6 @@
     <InternalsVisibleTo Include="Graphiti.Net.Neo4j" />
     <InternalsVisibleTo Include="Graphiti.Net.JudgeHost" />
     <InternalsVisibleTo Include="Port.Evaluation" />
+    <InternalsVisibleTo Include="Graphiti.Net.E2E.Tests" />
   </ItemGroup>
 </Project>
