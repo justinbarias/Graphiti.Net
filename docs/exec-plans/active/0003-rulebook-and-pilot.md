@@ -9,7 +9,7 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | 1 | Done 2026-11-25. Copy the skill's `references/rules.md` to `port/RULES.md`. Add rules for this repository: naming, file layout, error types, logging, pydantic models and validators, async and cancellation, Cypher strings, prompts, and each answer in `port/GAPS.md`. | Lead, Fable 5.2, high | Every gap in `GAPS.md` maps to a rule. |
 | 2 | Done 2026-11-25. Write the public surface design document: `AddGraphiti`, options, the `Microsoft.Extensions.AI` adapter, the cross-encoder over `IChatClient`. This is an ask-first item. | Lead, Fable 5.2, high | The maintainer approves it. |
 | 3 | Done 2026-11-25. Create `src/Graphiti.Net.PyCompat` and `tests/Graphiti.Net.Property.Tests`. Build only the helpers that the queue needs. Generate expected values from Python into a file. | Workhorse, Sonnet 5.5, medium | CsCheck property tests pass against the Python values, including negative numbers, zero divisors, empty strings, an emoji, and a combining mark. |
-| 4 | Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
+| 4 | Done 2026-11-26. Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
 | 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
 | 6 | Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering judge cases pass for each unit. |
 | 7 | Review the pilot. Two fresh reviewers for each unit. If they disagree, a third reviewer decides. | Reviewers, Opus 5.5, high | Findings with inputs. Each finding that shows a missing rule changes `RULES.md`. |
@@ -262,3 +262,106 @@ Mutants, each applied alone and then reverted (`git diff` shows none left):
 | `PyUnicodeData.DecimalDigitStarts`: 0x660 changed to 0x661 | `Int_of_text_matches_Python`, `Float_of_text_matches_Python`, `Single_code_point_tables_match_Python` |
 
 R12, R1, R4, Part 2, the design's Errors table, and the dates of the rule-change tables are fixed in the task 2 layer.
+
+### Task 4, 2026-11-26
+
+Workhorse session on Sonnet 5.5. No subagent built the script.
+
+Output: [scripts/mutation_survivors.py](../../../scripts/mutation_survivors.py), Python standard library only. Its docstring and [TESTING.md](../../TESTING.md), "Mutation", state how it applies the rule and the limits. Debt T4 is closed. `stryker-config.json` did not change.
+
+Four choices that the rule does not state, for the lead to confirm in task 5:
+
+- "Broader" in step 3 means one other test whose killed mutants are a strict superset. Several tests that only together cover a test do not count.
+- Tests that kill the same mutants, with no broader test, are not listed. The script shows them as a group for a person.
+- A timeout mutant with no named killer and one covering test counts as a kill of that test.
+- `EnvironmentTests` is exempt by file name, as TESTING.md says that the rule does not apply to it.
+
+Two runs on the same code, each with `COMPOSE_PROJECT_NAME=graphitinet scripts/mutate.sh` and then `python3 scripts/mutation_survivors.py`:
+
+| Value | Run 1 | Run 2 |
+| --- | --- | --- |
+| Report folder in `StrykerOutput/` (not committed) | `2026-11-26.10-02-46` | `2026-11-26.10-04-25` |
+| Score | 93.22% | 93.22% |
+| Killed / survived / no coverage / timeout / ignored | 809 / 59 / 3 / 44 / 167 | 808 / 59 / 3 / 45 / 167 |
+| Compile error / static | 54 / 3 | 54 / 3 |
+| Listed tests, of 56 | 13 | 14 |
+| Exempt tests | 1 | 1 |
+
+The 62 surviving and uncovered mutants were the same in both runs: 36 in `Py.Numbers.cs`, 15 in `PyText.cs`, 9 in `Py.Sequences.cs`, and 2 in `Py.Uuid.cs`.
+
+Each listed test is listed by step 3. Apart from the exempt test, each test killed a mutant. Neither run showed an equal group. The 13 tests of run 1:
+
+| Class | Tests |
+| --- | --- |
+| `NumberTests` | `Comb_obeys_Pascals_rule_and_symmetry`, `Int_of_a_float_cuts_toward_zero`, `TrueDiv_of_ints_is_the_nearest_double_to_the_exact_quotient` |
+| `SequenceAndUuidTests` | `Combinations_count_is_n_choose_k`, `Combinations_reads_the_list_when_it_is_called`, `ZipLongest_is_as_long_as_the_longer_input` |
+| `StringTests` | `EncodeUtf8_matches_Python`, `Full_slice_with_step_minus_one_reverses_code_points`, `Join_undoes_Split_on_a_separator`, `Slice_of_a_list_matches_Python`, `Slice_of_the_whole_string_is_the_string`, `Strip_leaves_no_whitespace_at_either_end`, `Utf8_round_trips_a_string_without_lone_surrogates` |
+
+Run 2 listed the same 13 and `CompareStrings_is_zero_only_for_equal_strings_and_is_antisymmetric`.
+
+For task 5:
+
+- The list depends on the run, because CsCheck draws random inputs. A test is safe to delete only if two runs list it.
+- `EncodeUtf8_matches_Python` is listed because `Uuid5_of_the_url_namespace_matches_Python` kills its one mutant. `Slice_of_a_list_matches_Python` is listed because `Slice_of_a_string_matches_Python` kills the same mutants and more. Each is a direct comparison with Python for its own helper.
+- A script over the report of run 1 found 0 killed mutants that lose every killer when all 13 listed tests go, and 0 timeout mutants that only listed tests cover. No run without those tests checked this.
+
+A report that anyone can recompute. Save this as `report.json` in a temporary folder:
+
+```json
+{"schemaVersion":"2","thresholds":{"high":80,"low":60},"projectRoot":"/p",
+ "files":{"/p/src/Calc.cs":{"language":"cs","source":"","mutants":[
+  {"id":"1","mutatorName":"Arithmetic","replacement":"a - b","status":"Killed","location":{"start":{"line":3,"column":5},"end":{"line":3,"column":10}},"coveredBy":["t1"],"killedBy":["t1"]},
+  {"id":"2","mutatorName":"Equality","replacement":"a >= b","status":"Killed","location":{"start":{"line":7,"column":5},"end":{"line":7,"column":10}},"coveredBy":["t1","t2"],"killedBy":["t1","t2"]},
+  {"id":"3","mutatorName":"Boolean","replacement":"false","status":"Killed","location":{"start":{"line":11,"column":5},"end":{"line":11,"column":9}},"coveredBy":["t3"],"killedBy":["t3"]},
+  {"id":"4","mutatorName":"String","replacement":"\"\"","status":"Survived","location":{"start":{"line":15,"column":5},"end":{"line":15,"column":9}},"coveredBy":["t3"]}]}},
+ "testFiles":{"/p/tests/CalcTests.cs":{"tests":[{"id":"t1","name":"AddsAndCompares"},{"id":"t2","name":"ComparesOnly"},{"id":"t3","name":"Flags"}]}}}
+```
+
+`python3 <repository>/scripts/mutation_survivors.py report.json` printed this and exited 0:
+
+```text
+report: report.json
+score: 75.0% (killed=3 survived=1 no_coverage=0 timeout=0 ignored=0)
+other: compile_error=0 runtime_error=0 pending=0 static=0
+
+tests to delete: 1 of 3
+  ComparesOnly (tests/CalcTests.cs)
+    rule 3: AddsAndCompares kills all 1 of its mutants and 1 more
+
+surviving and uncovered mutants: 1
+  src/Calc.cs:15:5 Survived String: ""
+```
+
+Changes to that report, applied in a throwaway script:
+
+| Change | Result |
+| --- | --- |
+| `t1` and `t2` kill mutants 1 and 2 | No test listed. `AddsAndCompares` and `ComparesOnly` shown as an equal group |
+| Only `t1` kills mutant 2 | `ComparesOnly` listed, rule `2` |
+| Mutant 1 killed by `t1` and `t3`, mutant 3 by `t2` and `t3`, mutant 2 by `t1` and `t2` | No test listed |
+| Mutant 1 has no `killedBy` | No list: "1 killed mutants have no `killedBy`" |
+| No `testFiles` | No list: "the report lists no tests" |
+| A file that is not JSON, or a missing file | A message on stderr, exit 2 |
+
+
+### Adversarial review of task 4, 2026-11-26
+
+The maintainer chose the reviewer: one fresh Opus 5.5 subagent at high effort, briefed to refute the diff.
+It found each number in the documents equal to the two reports, and the printed output of the hand-built report equal to the plan.
+It found no wrong result on the real reports. The findings come from inputs that those reports do not hold.
+
+| # | Finding | Answer |
+| --- | --- | --- |
+| I1 | The `3-equal` rule listed a test that rule 3 keeps, because an equal test is not broader. | Fixed. Equal tests are shown as a group and are not in the list. |
+| I2 | The only test that covers a timeout mutant could be listed as a test that kills nothing. | Fixed. That test gets the credit. With more covering tests, the note stays. |
+| I3 | A report made with bail on gives a wrong list, and the script cannot see it. | Not fixed. TESTING.md and the docstring state the limit. |
+| M | "First by name" sorted by file. A Windows path broke the exemption. Duplicate test ids were dropped. The project root was cut as a plain prefix. A deeply nested file gave a traceback. The newest report went by file time. | Fixed. The newest report is now the last run folder name. |
+| M | Three wordings in the plan, STATE.md, and TESTING.md. | Fixed. |
+
+Not changed: every file named `EnvironmentTests.cs` is exempt, and a readable JSON file with a wrong shape gets the "cannot read" message and exit 2.
+
+After the fixes, both reports gave the same 13 and 14 listed tests, no equal group, and the same score and survivors.
+The hand-built report printed the same output. The variants in the table above ran again, and three new inputs (one covering test for a timeout, a duplicate id, a root that is only a text prefix) gave the new behavior.
+No second review ran after the fixes.
+
+The gate after the fixes: `COMPOSE_PROJECT_NAME=graphitinet scripts/check.sh --test` printed `check: passed`, with 56 tests passed and the judge at `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`. `scripts/command_center.sh --check` exited 0. The `verify` skill ran: steps 1, 2, and 5. Steps 3 and 4 do not apply, because this change touches no ported code and no public flow.
