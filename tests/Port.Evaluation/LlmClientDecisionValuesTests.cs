@@ -329,7 +329,7 @@ public class LlmClientDecisionValuesTests
             return Reply((int)Py.AsLong(reply["status"]), S(reply["body"]), S(reply["content_type"]));
         }
 
-        var tracer = new RecordingTracer();
+        var tracer = new DecisionRecordingTracer();
         using var patch = OpenaiDecisionsClientModule.Sleep.Use((delay, _) =>
         {
             delays.Add(delay);

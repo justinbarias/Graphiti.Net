@@ -67,7 +67,7 @@ internal sealed class RecordingSpan(string name) : TracerSpan
     }
 }
 
-internal sealed class RecordingTracer : Tracer
+internal sealed class DecisionRecordingTracer : Tracer
 {
     internal List<RecordingSpan> Spans { get; } = [];
 
