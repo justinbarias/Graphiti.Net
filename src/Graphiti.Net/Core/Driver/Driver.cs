@@ -115,22 +115,33 @@ internal abstract class GraphDriver : QueryExecutor
     // PORT: Python declares a sync method that returns a coroutine, and callers await it.
     internal abstract Task DeleteAllIndexesAsync(CancellationToken cancellationToken = default);
 
-    // TODO(port): with_database
+    /// <summary>
+    /// Returns a shallow copy of this driver with a different default database.
+    /// Reuses the same connection (e.g. FalkorDB, Neo4j).
+    /// </summary>
     internal GraphDriver WithDatabase(string database)
     {
-        throw new NotSupportedException("TODO(port): with_database");
+        // PORT: copy.copy(self) is MemberwiseClone (R6).
+        var cloned = (GraphDriver)MemberwiseClone();
+        cloned.Database = database;
+
+        return cloned;
     }
 
     internal abstract Task BuildIndicesAndConstraintsAsync(
         bool deleteExisting = false,
         CancellationToken cancellationToken = default);
 
-    // TODO(port): clone
+    /// <summary>Clone the driver with a different database or graph name.</summary>
     internal virtual GraphDriver Clone(string database)
     {
-        throw new NotSupportedException("TODO(port): clone");
+        return this;
     }
 
+    /// <summary>
+    /// Specific fulltext query builder for database providers.
+    /// Only implemented by providers that need custom fulltext query building.
+    /// </summary>
     internal virtual string BuildFulltextQuery(string query, List<string>? groupIds = null, long maxQueryLength = 128)
     {
         throw new NotImplementedException("build_fulltext_query not implemented for " + Py.Str(Provider));
@@ -139,12 +150,34 @@ internal abstract class GraphDriver : QueryExecutor
     // --- New operations interfaces ---
 
     // PORT: an async context manager that reads the exception (commit or roll back) takes the body as a lambda (R16).
-    // TODO(port): transaction
-    internal virtual Task TransactionAsync(
+    /// <summary>
+    /// Return a transaction context manager.
+    ///
+    /// Usage::
+    ///
+    ///     async with driver.transaction() as tx:
+    ///         await ops.save(driver, node, tx=tx)
+    ///
+    /// Drivers with real transaction support (e.g., Neo4j) commit on clean exit
+    /// and roll back on exception. Drivers without native transactions return a
+    /// thin wrapper where queries execute immediately.
+    ///
+    /// The base implementation provides a no-op wrapper using the session. Drivers
+    /// should override this to provide real transaction semantics where supported.
+    /// </summary>
+    internal virtual async Task TransactionAsync(
         Func<Transaction, Task> body,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): transaction");
+        var session = Session();
+        try
+        {
+            await body(new SessionTransaction(session));
+        }
+        finally
+        {
+            await session.CloseAsync(cancellationToken);
+        }
     }
 
     internal virtual EntityNodeOperations? EntityNodeOps => null;
@@ -170,20 +203,21 @@ internal abstract class GraphDriver : QueryExecutor
     internal virtual GraphMaintenanceOperations? GraphOps => null;
 }
 
+/// <summary>Fallback transaction that wraps a session — queries execute immediately.</summary>
 internal sealed class SessionTransaction : Transaction
 {
-    // TODO(port): _SessionTransaction.__init__
+    private readonly GraphDriverSession session;
+
     internal SessionTransaction(GraphDriverSession session)
     {
-        throw new NotSupportedException("TODO(port): _SessionTransaction.__init__");
+        this.session = session;
     }
 
-    // TODO(port): _SessionTransaction.run
-    internal override Task RunAsync(
+    internal override async Task RunAsync(
         string query,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): _SessionTransaction.run");
+        await session.RunAsync(query, parameters, cancellationToken);
     }
 }
