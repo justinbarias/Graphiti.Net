@@ -20,90 +20,187 @@ namespace Graphiti.Neo4j.Operations;
 using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Driver.Operations;
+using Graphiti.Core.Models.Edges;
 using Graphiti.Internal;
 using Microsoft.Extensions.Logging;
 
-// PORT: the module class of R2 and R5, with the logger and the record function. The unit adds the Log class with the log calls.
+// PORT: the module class of R2 and R5, with the logger and the record function.
 internal static partial class HasEpisodeEdgeOps
 {
     internal static ILogger Logger => PortServices.Logger(typeof(HasEpisodeEdgeOps));
 
-    // TODO(port): _has_episode_edge_from_record
     internal static HasEpisodeEdge HasEpisodeEdgeFromRecord(OrderedDictionary<string, object?> record)
     {
-        throw new NotSupportedException("TODO(port): _has_episode_edge_from_record");
+        // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
+        return HasEpisodeEdge.ModelValidate(new OrderedDictionary<string, object?>
+        {
+            ["uuid"] = record["uuid"],
+            ["group_id"] = record["group_id"],
+            ["source_node_uuid"] = record["source_node_uuid"],
+            ["target_node_uuid"] = record["target_node_uuid"],
+            ["created_at"] = Helpers.ParseDbDate(record["created_at"]), // type: ignore[arg-type]
+        });
+    }
+
+    internal static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Saved Edge to Graph: {Uuid}")]
+        internal static partial void SavedEdgeToGraph(ILogger logger, string uuid);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Deleted Edge: {Uuid}")]
+        internal static partial void DeletedEdge(ILogger logger, string uuid);
     }
 }
 
 internal sealed class Neo4jHasEpisodeEdgeOperations : HasEpisodeEdgeOperations
 {
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.save
-    internal override Task SaveAsync(
+    internal override async Task SaveAsync(
         QueryExecutor executor,
         HasEpisodeEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.save");
+        var parameters = new OrderedDictionary<string, object?>
+        {
+            ["saga_uuid"] = edge.SourceNodeUuid,
+            ["episode_uuid"] = edge.TargetNodeUuid,
+            ["uuid"] = edge.Uuid,
+            ["group_id"] = edge.GroupId,
+            ["created_at"] = edge.CreatedAt,
+        };
+        if (tx is not null)
+        {
+            await tx.RunAsync(EdgeDbQueries.HasEpisodeEdgeSave, parameters, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(EdgeDbQueries.HasEpisodeEdgeSave, parameters, cancellationToken);
+        }
+
+        HasEpisodeEdgeOps.Log.SavedEdgeToGraph(HasEpisodeEdgeOps.Logger, edge.Uuid);
     }
 
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.save_bulk
-    internal override Task SaveBulkAsync(
+    internal override async Task SaveBulkAsync(
         QueryExecutor executor,
         List<HasEpisodeEdge> edges,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.save_bulk");
+        foreach (var edge in edges)
+        {
+            await SaveAsync(executor, edge, tx, cancellationToken);
+        }
     }
 
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.delete
-    internal override Task DeleteAsync(
+    internal override async Task DeleteAsync(
         QueryExecutor executor,
         HasEpisodeEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.delete");
+        var query = "\n" + """
+            MATCH (n:Saga)-[e:HAS_EPISODE {uuid: $uuid}]->(m:Episodic)
+            DELETE e
+""" + "\n        ";
+        if (tx is not null)
+        {
+            await tx.RunAsync(query, new OrderedDictionary<string, object?> { ["uuid"] = edge.Uuid }, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuid"] = edge.Uuid }, cancellationToken);
+        }
+
+        HasEpisodeEdgeOps.Log.DeletedEdge(HasEpisodeEdgeOps.Logger, edge.Uuid);
     }
 
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.delete_by_uuids
-    internal override Task DeleteByUuidsAsync(
+    internal override async Task DeleteByUuidsAsync(
         QueryExecutor executor,
         List<string> uuids,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.delete_by_uuids");
+        var query = "\n" + """
+            MATCH (n:Saga)-[e:HAS_EPISODE]->(m:Episodic)
+            WHERE e.uuid IN $uuids
+            DELETE e
+""" + "\n        ";
+        if (tx is not null)
+        {
+            await tx.RunAsync(query, new OrderedDictionary<string, object?> { ["uuids"] = uuids }, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuids"] = uuids }, cancellationToken);
+        }
     }
 
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.get_by_uuid
-    internal override Task<HasEpisodeEdge> GetByUuidAsync(
+    internal override async Task<HasEpisodeEdge> GetByUuidAsync(
         QueryExecutor executor,
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.get_by_uuid");
+        var query = "\n" + """
+            MATCH (n:Saga)-[e:HAS_EPISODE {uuid: $uuid}]->(m:Episodic)
+            RETURN
+""" + "\n            " + EdgeDbQueries.HasEpisodeEdgeReturn;
+        var (records, _, _) = await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuid"] = uuid, ["routing_"] = "r" }, cancellationToken);
+        var edges = records.Select(HasEpisodeEdgeOps.HasEpisodeEdgeFromRecord).ToList();
+        if (edges.Count == 0)
+        {
+            throw new EdgeNotFoundException(uuid);
+        }
+
+        return edges[0];
     }
 
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.get_by_uuids
-    internal override Task<List<HasEpisodeEdge>> GetByUuidsAsync(
+    internal override async Task<List<HasEpisodeEdge>> GetByUuidsAsync(
         QueryExecutor executor,
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.get_by_uuids");
+        var query = "\n" + """
+            MATCH (n:Saga)-[e:HAS_EPISODE]->(m:Episodic)
+            WHERE e.uuid IN $uuids
+            RETURN
+""" + "\n            " + EdgeDbQueries.HasEpisodeEdgeReturn;
+        var (records, _, _) = await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuids"] = uuids, ["routing_"] = "r" }, cancellationToken);
+        return records.Select(HasEpisodeEdgeOps.HasEpisodeEdgeFromRecord).ToList();
     }
 
-    // TODO(port): Neo4jHasEpisodeEdgeOperations.get_by_group_ids
-    internal override Task<List<HasEpisodeEdge>> GetByGroupIdsAsync(
+    internal override async Task<List<HasEpisodeEdge>> GetByGroupIdsAsync(
         QueryExecutor executor,
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jHasEpisodeEdgeOperations.get_by_group_ids");
+        var cursorClause = !string.IsNullOrEmpty(uuidCursor) ? "AND e.uuid < $uuid" : string.Empty;
+        var limitClause = limit is not null ? "LIMIT $limit" : string.Empty;
+        var query = "\n" + """
+            MATCH (n:Saga)-[e:HAS_EPISODE]->(m:Episodic)
+            WHERE e.group_id IN $group_ids
+""" + "\n            "
+            + cursorClause
+            + "\n" + """
+            RETURN
+""" + "\n            "
+            + EdgeDbQueries.HasEpisodeEdgeReturn
+            + "\n" + """
+            ORDER BY e.uuid DESC
+""" + "\n            "
+            + limitClause;
+        var (records, _, _) = await executor.ExecuteQueryAsync(
+            query,
+            new OrderedDictionary<string, object?>
+            {
+                ["group_ids"] = groupIds,
+                ["uuid"] = uuidCursor,
+                ["limit"] = limit,
+                ["routing_"] = "r",
+            },
+            cancellationToken);
+        return records.Select(HasEpisodeEdgeOps.HasEpisodeEdgeFromRecord).ToList();
     }
 }
