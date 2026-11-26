@@ -112,8 +112,8 @@ internal sealed class VersionWrapper
     }
 }
 
-// PORT: open item O12. PromptTypeWrapper sets one attribute for each prompt version of its group with `setattr`.
-// This class implements the 8 `<Module>Prompt` interfaces, each member with an explicit implementation, so that
+// PORT: R15, the form of the prompt wrappers. PromptTypeWrapper sets one attribute for each prompt version of its
+// group with `setattr`. This class implements the 8 `<Module>Prompt` interfaces, each member with an explicit implementation, so that
 // `extract_attributes` and `extract_message`, which are in two groups each, get one member for each group. A member
 // of a group that the instance does not hold throws, as Python raises AttributeError.
 internal sealed class PromptTypeWrapper :
@@ -126,121 +126,156 @@ internal sealed class PromptTypeWrapper :
     SummarizeSagasPrompt,
     EvalPrompt
 {
-    // TODO(port): open item O12
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): PromptTypeWrapper.__init__
     internal PromptTypeWrapper(OrderedDictionary<string, PromptFunction> versions)
     {
-        throw new NotSupportedException("TODO(port): open item O12, PromptTypeWrapper.__init__");
+        throw new NotSupportedException("TODO(port): PromptTypeWrapper.__init__");
     }
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractMessage => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_message");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_message
+    PromptFunction ExtractNodesPrompt.ExtractMessage => throw new NotSupportedException("TODO(port): extract_nodes.extract_message");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractJson => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_json");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_json
+    PromptFunction ExtractNodesPrompt.ExtractJson => throw new NotSupportedException("TODO(port): extract_nodes.extract_json");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractText => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_text");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_text
+    PromptFunction ExtractNodesPrompt.ExtractText => throw new NotSupportedException("TODO(port): extract_nodes.extract_text");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ClassifyNodes => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.classify_nodes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.classify_nodes
+    PromptFunction ExtractNodesPrompt.ClassifyNodes => throw new NotSupportedException("TODO(port): extract_nodes.classify_nodes");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractAttributes => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_attributes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_attributes
+    PromptFunction ExtractNodesPrompt.ExtractAttributes => throw new NotSupportedException("TODO(port): extract_nodes.extract_attributes");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractSummary => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_summary");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_summary
+    PromptFunction ExtractNodesPrompt.ExtractSummary => throw new NotSupportedException("TODO(port): extract_nodes.extract_summary");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractSummariesBatch => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_summaries_batch");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_summaries_batch
+    PromptFunction ExtractNodesPrompt.ExtractSummariesBatch => throw new NotSupportedException("TODO(port): extract_nodes.extract_summaries_batch");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesPrompt.ExtractEntitySummariesFromEpisodes => throw new NotSupportedException("TODO(port): open item O12, extract_nodes.extract_entity_summaries_from_episodes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes.extract_entity_summaries_from_episodes
+    PromptFunction ExtractNodesPrompt.ExtractEntitySummariesFromEpisodes => throw new NotSupportedException("TODO(port): extract_nodes.extract_entity_summaries_from_episodes");
 
-    // TODO(port): open item O12
-    PromptFunction DedupeNodesPrompt.Node => throw new NotSupportedException("TODO(port): open item O12, dedupe_nodes.node");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): dedupe_nodes.node
+    PromptFunction DedupeNodesPrompt.Node => throw new NotSupportedException("TODO(port): dedupe_nodes.node");
 
-    // TODO(port): open item O12
-    PromptFunction DedupeNodesPrompt.NodeList => throw new NotSupportedException("TODO(port): open item O12, dedupe_nodes.node_list");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): dedupe_nodes.node_list
+    PromptFunction DedupeNodesPrompt.NodeList => throw new NotSupportedException("TODO(port): dedupe_nodes.node_list");
 
-    // TODO(port): open item O12
-    PromptFunction DedupeNodesPrompt.Nodes => throw new NotSupportedException("TODO(port): open item O12, dedupe_nodes.nodes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): dedupe_nodes.nodes
+    PromptFunction DedupeNodesPrompt.Nodes => throw new NotSupportedException("TODO(port): dedupe_nodes.nodes");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractEdgesPrompt.Edge => throw new NotSupportedException("TODO(port): open item O12, extract_edges.edge");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_edges.edge
+    PromptFunction ExtractEdgesPrompt.Edge => throw new NotSupportedException("TODO(port): extract_edges.edge");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractEdgesPrompt.ExtractAttributes => throw new NotSupportedException("TODO(port): open item O12, extract_edges.extract_attributes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_edges.extract_attributes
+    PromptFunction ExtractEdgesPrompt.ExtractAttributes => throw new NotSupportedException("TODO(port): extract_edges.extract_attributes");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractEdgesPrompt.ExtractTimestamps => throw new NotSupportedException("TODO(port): open item O12, extract_edges.extract_timestamps");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_edges.extract_timestamps
+    PromptFunction ExtractEdgesPrompt.ExtractTimestamps => throw new NotSupportedException("TODO(port): extract_edges.extract_timestamps");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractEdgesPrompt.ExtractTimestampsBatch => throw new NotSupportedException("TODO(port): open item O12, extract_edges.extract_timestamps_batch");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_edges.extract_timestamps_batch
+    PromptFunction ExtractEdgesPrompt.ExtractTimestampsBatch => throw new NotSupportedException("TODO(port): extract_edges.extract_timestamps_batch");
 
-    // TODO(port): open item O12
-    PromptFunction ExtractNodesAndEdgesPrompt.ExtractMessage => throw new NotSupportedException("TODO(port): open item O12, extract_nodes_and_edges.extract_message");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes_and_edges.extract_message
+    PromptFunction ExtractNodesAndEdgesPrompt.ExtractMessage => throw new NotSupportedException("TODO(port): extract_nodes_and_edges.extract_message");
 
-    // TODO(port): open item O12
-    PromptFunction DedupeEdgesPrompt.ResolveEdge => throw new NotSupportedException("TODO(port): open item O12, dedupe_edges.resolve_edge");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): dedupe_edges.resolve_edge
+    PromptFunction DedupeEdgesPrompt.ResolveEdge => throw new NotSupportedException("TODO(port): dedupe_edges.resolve_edge");
 
-    // TODO(port): open item O12
-    PromptFunction SummarizeNodesPrompt.SummarizePair => throw new NotSupportedException("TODO(port): open item O12, summarize_nodes.summarize_pair");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): summarize_nodes.summarize_pair
+    PromptFunction SummarizeNodesPrompt.SummarizePair => throw new NotSupportedException("TODO(port): summarize_nodes.summarize_pair");
 
-    // TODO(port): open item O12
-    PromptFunction SummarizeNodesPrompt.SummarizeContext => throw new NotSupportedException("TODO(port): open item O12, summarize_nodes.summarize_context");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): summarize_nodes.summarize_context
+    PromptFunction SummarizeNodesPrompt.SummarizeContext => throw new NotSupportedException("TODO(port): summarize_nodes.summarize_context");
 
-    // TODO(port): open item O12
-    PromptFunction SummarizeNodesPrompt.SummaryDescription => throw new NotSupportedException("TODO(port): open item O12, summarize_nodes.summary_description");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): summarize_nodes.summary_description
+    PromptFunction SummarizeNodesPrompt.SummaryDescription => throw new NotSupportedException("TODO(port): summarize_nodes.summary_description");
 
-    // TODO(port): open item O12
-    PromptFunction SummarizeSagasPrompt.SummarizeSaga => throw new NotSupportedException("TODO(port): open item O12, summarize_sagas.summarize_saga");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): summarize_sagas.summarize_saga
+    PromptFunction SummarizeSagasPrompt.SummarizeSaga => throw new NotSupportedException("TODO(port): summarize_sagas.summarize_saga");
 
-    // TODO(port): open item O12
-    PromptFunction EvalPrompt.QaPrompt => throw new NotSupportedException("TODO(port): open item O12, eval.qa_prompt");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): eval.qa_prompt
+    PromptFunction EvalPrompt.QaPrompt => throw new NotSupportedException("TODO(port): eval.qa_prompt");
 
-    // TODO(port): open item O12
-    PromptFunction EvalPrompt.EvalPromptFunction => throw new NotSupportedException("TODO(port): open item O12, eval.eval_prompt");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): eval.eval_prompt
+    PromptFunction EvalPrompt.EvalPromptFunction => throw new NotSupportedException("TODO(port): eval.eval_prompt");
 
-    // TODO(port): open item O12
-    PromptFunction EvalPrompt.QueryExpansion => throw new NotSupportedException("TODO(port): open item O12, eval.query_expansion");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): eval.query_expansion
+    PromptFunction EvalPrompt.QueryExpansion => throw new NotSupportedException("TODO(port): eval.query_expansion");
 
-    // TODO(port): open item O12
-    PromptFunction EvalPrompt.EvalAddEpisodeResults => throw new NotSupportedException("TODO(port): open item O12, eval.eval_add_episode_results");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): eval.eval_add_episode_results
+    PromptFunction EvalPrompt.EvalAddEpisodeResults => throw new NotSupportedException("TODO(port): eval.eval_add_episode_results");
 }
 
-// PORT: open item O12. PromptLibraryWrapper sets one attribute for each group with `setattr`. This class implements
-// the interface PromptLibrary.
+// PORT: R15, the form of the prompt wrappers. PromptLibraryWrapper sets one attribute for each group with
+// `setattr`. This class implements the interface PromptLibrary.
 internal sealed class PromptLibraryWrapper : PromptLibrary
 {
-    // TODO(port): open item O12
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): PromptLibraryWrapper.__init__
     internal PromptLibraryWrapper(OrderedDictionary<string, OrderedDictionary<string, PromptFunction>> library)
     {
-        throw new NotSupportedException("TODO(port): open item O12, PromptLibraryWrapper.__init__");
+        throw new NotSupportedException("TODO(port): PromptLibraryWrapper.__init__");
     }
 
-    // TODO(port): open item O12
-    ExtractNodesPrompt PromptLibrary.ExtractNodes => throw new NotSupportedException("TODO(port): open item O12, extract_nodes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes
+    ExtractNodesPrompt PromptLibrary.ExtractNodes => throw new NotSupportedException("TODO(port): extract_nodes");
 
-    // TODO(port): open item O12
-    DedupeNodesPrompt PromptLibrary.DedupeNodes => throw new NotSupportedException("TODO(port): open item O12, dedupe_nodes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): dedupe_nodes
+    DedupeNodesPrompt PromptLibrary.DedupeNodes => throw new NotSupportedException("TODO(port): dedupe_nodes");
 
-    // TODO(port): open item O12
-    ExtractEdgesPrompt PromptLibrary.ExtractEdges => throw new NotSupportedException("TODO(port): open item O12, extract_edges");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_edges
+    ExtractEdgesPrompt PromptLibrary.ExtractEdges => throw new NotSupportedException("TODO(port): extract_edges");
 
-    // TODO(port): open item O12
-    ExtractNodesAndEdgesPrompt PromptLibrary.ExtractNodesAndEdges => throw new NotSupportedException("TODO(port): open item O12, extract_nodes_and_edges");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): extract_nodes_and_edges
+    ExtractNodesAndEdgesPrompt PromptLibrary.ExtractNodesAndEdges => throw new NotSupportedException("TODO(port): extract_nodes_and_edges");
 
-    // TODO(port): open item O12
-    DedupeEdgesPrompt PromptLibrary.DedupeEdges => throw new NotSupportedException("TODO(port): open item O12, dedupe_edges");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): dedupe_edges
+    DedupeEdgesPrompt PromptLibrary.DedupeEdges => throw new NotSupportedException("TODO(port): dedupe_edges");
 
-    // TODO(port): open item O12
-    SummarizeNodesPrompt PromptLibrary.SummarizeNodes => throw new NotSupportedException("TODO(port): open item O12, summarize_nodes");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): summarize_nodes
+    SummarizeNodesPrompt PromptLibrary.SummarizeNodes => throw new NotSupportedException("TODO(port): summarize_nodes");
 
-    // TODO(port): open item O12
-    SummarizeSagasPrompt PromptLibrary.SummarizeSagas => throw new NotSupportedException("TODO(port): open item O12, summarize_sagas");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): summarize_sagas
+    SummarizeSagasPrompt PromptLibrary.SummarizeSagas => throw new NotSupportedException("TODO(port): summarize_sagas");
 
-    // TODO(port): open item O12
-    EvalPrompt PromptLibrary.Eval => throw new NotSupportedException("TODO(port): open item O12, eval");
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): eval
+    EvalPrompt PromptLibrary.Eval => throw new NotSupportedException("TODO(port): eval");
 }
 
 internal static partial class Lib
@@ -438,10 +473,11 @@ internal static partial class Lib
     }
 
     // PORT: a module-level object that needs a call to a skeleton member, so it is a property that throws until the
-    // unit ports it (open item O12).
-    // TODO(port): open item O12, prompt_library
+    // unit ports it.
+    // PORT: R15, the form of the prompt wrappers
+    // TODO(port): prompt_library
     internal static PromptLibrary PromptLibrary =>
-        throw new NotSupportedException("TODO(port): open item O12, prompt_library");
+        throw new NotSupportedException("TODO(port): prompt_library");
 
     // PORT: the annotation of the result is ChatPromptLibrary, but the override path returns a _ComposedPromptLibrary
     // with `# type: ignore[return-value]`. The C# result is the type that both share, IPromptLibrary.

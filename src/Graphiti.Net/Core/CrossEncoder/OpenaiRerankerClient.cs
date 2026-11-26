@@ -17,6 +17,9 @@ limitations under the License.
 
 namespace Graphiti.Core.CrossEncoder;
 
+using Graphiti.Core.LlmClient;
+using Graphiti.Internal;
+
 // PORT: the module name equals the class name OpenAIRerankerClient, so the module class has the suffix Module (R2).
 internal static class OpenaiRerankerClientModule
 {
@@ -24,15 +27,21 @@ internal static class OpenaiRerankerClientModule
     internal const string DefaultModel = "gpt-4.1-mini";
 }
 
-// PORT: `self.client` is the lead seam Graphiti.Internal.LogProbabilityChat (decision D30, R19). That type does not
-// exist yet, and only the lead adds files to Internal/, so the constructor and its two attributes are not declared.
-// Their signatures by R19:
-//   internal OpenAIRerankerClient(LLMConfig? config = null, LogProbabilityChat? client = null)
-//   internal LLMConfig Config { get; set; }
-//   internal LogProbabilityChat Client { get; set; }
-// TODO(port): the type Graphiti.Internal.LogProbabilityChat (lead code), then the constructor, `config`, and `client`.
+// PORT: `self.client` is the lead seam Graphiti.Internal.LogProbabilityChat (decision D30, R19). The branches that
+// build AsyncOpenAI or unwrap an OpenAIClient are not ported, and a null client throws by the default-object rule
+// of R1.
 internal sealed class OpenAIRerankerClient : CrossEncoderClient
 {
+    // TODO(port): OpenAIRerankerClient.__init__
+    internal OpenAIRerankerClient(LLMConfig? config = null, LogProbabilityChat? client = null)
+    {
+        throw new NotSupportedException("TODO(port): OpenAIRerankerClient.__init__");
+    }
+
+    internal LLMConfig Config { get; set; }
+
+    internal LogProbabilityChat Client { get; set; }
+
     // TODO(port): OpenAIRerankerClient.rank
     internal override Task<List<(string, double)>> RankAsync(
         string query,
