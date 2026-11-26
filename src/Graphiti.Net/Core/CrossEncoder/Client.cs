@@ -17,9 +17,25 @@ limitations under the License.
 
 namespace Graphiti.Core.CrossEncoder;
 
+/// <summary>
+/// CrossEncoderClient is an abstract base class that defines the interface
+/// for cross-encoder models used for ranking passages based on their relevance to a query.
+/// It allows for different implementations of cross-encoder models to be used interchangeably.
+/// </summary>
 // PORT: an abstract method has no body, as in Python.
 internal abstract class CrossEncoderClient
 {
+    /// <summary>
+    /// Rank the given passages based on their relevance to the query.
+    ///
+    /// Args:
+    ///     query (str): The query string.
+    ///     passages (list[str]): A list of passages to rank.
+    ///
+    /// Returns:
+    ///     list[tuple[str, float]]: A list of tuples containing the passage and its score,
+    ///                              sorted in descending order of relevance.
+    /// </summary>
     internal abstract Task<List<(string, double)>> RankAsync(
         string query,
         List<string> passages,
