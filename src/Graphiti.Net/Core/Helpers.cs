@@ -17,19 +17,21 @@ limitations under the License.
 
 namespace Graphiti.Core;
 
+using System.Text;
 using System.Text.RegularExpressions;
 using Graphiti.Core.Driver;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
 
-// PORT: the pilot units search.search_filters and utils.content_chunking ported some members of this module for real
-// (RULES.md R24): SAFE_CYPHER_IDENTIFIER_PATTERN, the CHUNK_* constants, and validate_node_labels. load_dotenv() is
-// not ported (R17).
+// PORT: load_dotenv() is not ported (R17).
 internal static class Helpers
 {
     // PORT: internal, not private (R13), because nodes.py and driver/relate/operations/graph_ops.py import it.
     // Python: re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
     internal static readonly Regex SafeCypherIdentifierPattern = new(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
+
+    // Python: re.match(r'^[a-zA-Z0-9_-]+$', group_id), inside validate_group_id. A pattern inside a function is a static field (R13).
+    private static readonly Regex GroupIdPattern = new(@"^[a-zA-Z0-9_-]+$", RegexOptions.CultureInvariant);
 
     internal static readonly bool UseParallelRuntime = PyEnv.Truthy("USE_PARALLEL_RUNTIME");
 
@@ -69,77 +71,204 @@ internal static class Helpers
 
     // PORT: the parameter is `neo4j_time.DateTime | str | None`. The Neo4j project converts a driver date to PyDateTime
     // before the value enters the core (R19), so the union is PyDateTime, string, or null, which is object? (Part 3).
-    // TODO(port): parse_db_date
+    // The branch `isinstance(input_date, neo4j_time.DateTime): return input_date.to_native()` is that conversion. A
+    // PyDateTime then takes the last branch, which returns the input as it is. A value of another type cannot be the
+    // result type, so Py.AsDateTime throws InvalidCastException for it (open item O4 holds the int case).
     internal static PyDateTime? ParseDbDate(object? inputDate)
     {
-        throw new NotSupportedException("TODO(port): parse_db_date");
+        if (inputDate is string text)
+        {
+            return PyDateTime.FromIsoFormat(text);
+        }
+
+        return inputDate is null ? null : Py.AsDateTime(inputDate);
     }
 
-    // TODO(port): get_default_group_id
+    /// <summary>
+    /// This function differentiates the default group id based on the database type.
+    /// For most databases, the default group id is an empty string, while there are database types that require a specific default group id.
+    /// </summary>
     internal static string GetDefaultGroupId(GraphProvider provider)
     {
-        throw new NotSupportedException("TODO(port): get_default_group_id");
+        if (provider == GraphProvider.Falkordb)
+        {
+            return "_";
+        }
+        else
+        {
+            return string.Empty;
+        }
     }
 
-    // TODO(port): lucene_sanitize
     internal static string LuceneSanitize(string query)
     {
-        throw new NotSupportedException("TODO(port): lucene_sanitize");
+        // Escape special characters from a query before passing into Lucene
+        // + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+        // PORT: str.maketrans with translate is a loop over the code points with a switch, in the order of the Python map (R12).
+        var sanitized = new StringBuilder();
+        foreach (var ch in PyText.CodePoints(query))
+        {
+            sanitized.Append(ch switch
+            {
+                "+" => @"\+",
+                "-" => @"\-",
+                "&" => @"\&",
+                "|" => @"\|",
+                "!" => @"\!",
+                "(" => @"\(",
+                ")" => @"\)",
+                "{" => @"\{",
+                "}" => @"\}",
+                "[" => @"\[",
+                "]" => @"\]",
+                "^" => @"\^",
+                "\"" => "\\\"",
+                "~" => @"\~",
+                "*" => @"\*",
+                "?" => @"\?",
+                ":" => @"\:",
+                "\\" => @"\\",
+                "/" => @"\/",
+                "O" => @"\O",
+                "R" => @"\R",
+                "N" => @"\N",
+                "T" => @"\T",
+                "A" => @"\A",
+                "D" => @"\D",
+                _ => ch,
+            });
+        }
+
+        return sanitized.ToString();
     }
 
     // PORT: the numpy result type NDArray is List<double>, as the parameter is (R20).
-    // TODO(port): normalize_l2
     internal static List<double> NormalizeL2(List<double> embedding)
     {
-        throw new NotSupportedException("TODO(port): normalize_l2");
+        // PORT: R18 names TensorPrimitives, but no project references System.Numerics.Tensors. numpy sums the squares
+        // of a contiguous float64 array in pairs (PairwiseSum), so a plain loop in index order differs in the last bits.
+        var norm = Math.Sqrt(PairwiseSum([.. embedding.Select(x => x * x)], 0, embedding.Count));
+        if (norm == 0)
+        {
+            return embedding;
+        }
+
+        return [.. embedding.Select(x => x / norm)];
+    }
+
+    // PORT: numpy DOUBLE_pairwise_sum. A plain loop below 8 items, eight running sums up to 128 items, a split above.
+    private static double PairwiseSum(double[] a, int start, int n)
+    {
+        if (n < 8)
+        {
+            var sum = 0.0;
+            for (var i = 0; i < n; i++)
+            {
+                sum += a[start + i];
+            }
+
+            return sum;
+        }
+
+        if (n <= 128)
+        {
+            var r = new double[8];
+            for (var j = 0; j < 8; j++)
+            {
+                r[j] = a[start + j];
+            }
+
+            int k;
+            for (k = 8; k < n - (n % 8); k += 8)
+            {
+                for (var j = 0; j < 8; j++)
+                {
+                    r[j] += a[start + k + j];
+                }
+            }
+
+            var res = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]));
+            for (; k < n; k++)
+            {
+                res += a[start + k];
+            }
+
+            return res;
+        }
+
+        var half = n / 2;
+        half -= half % 8;
+        return PairwiseSum(a, start, half) + PairwiseSum(a, start + half, n - half);
     }
 
     // Use this instead of asyncio.gather() to bound coroutines
     // PORT: R8. Each call is a lambda, and the overloads follow Asyncio.SemaphoreGatherAsync. A maxCoroutines of null or
     // 0 means SemaphoreLimit.
-    // TODO(port): semaphore_gather
     internal static Task<List<T>> SemaphoreGatherAsync<T>(
         IReadOnlyList<Func<Task<T>>> coroutines,
         long? maxCoroutines = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException("TODO(port): semaphore_gather");
-    }
+        CancellationToken cancellationToken = default) =>
+        Asyncio.SemaphoreGatherAsync(coroutines, ResolveLimit(maxCoroutines), cancellationToken);
 
     // PORT: semaphore_gather for calls that return None. Python returns a list of None, which no caller reads.
-    // TODO(port): semaphore_gather
     internal static Task SemaphoreGatherAsync(
         IReadOnlyList<Func<Task>> coroutines,
         long? maxCoroutines = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException("TODO(port): semaphore_gather");
-    }
+        CancellationToken cancellationToken = default) =>
+        Asyncio.SemaphoreGatherAsync(coroutines, ResolveLimit(maxCoroutines), cancellationToken);
 
     // PORT: the one call with different result types, search/search.py:174, passes four coroutines and unpacks a
     // tuple of four (R8).
-    // TODO(port): semaphore_gather
     internal static Task<(T1, T2, T3, T4)> SemaphoreGatherAsync<T1, T2, T3, T4>(
         Func<Task<T1>> first,
         Func<Task<T2>> second,
         Func<Task<T3>> third,
         Func<Task<T4>> fourth,
         long? maxCoroutines = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException("TODO(port): semaphore_gather");
-    }
+        CancellationToken cancellationToken = default) =>
+        Asyncio.SemaphoreGatherAsync(first, second, third, fourth, ResolveLimit(maxCoroutines), cancellationToken);
 
-    // TODO(port): validate_group_id
+    // PORT: `max_coroutines or SEMAPHORE_LIMIT`.
+    private static long ResolveLimit(long? maxCoroutines) => maxCoroutines is null or 0 ? SemaphoreLimit : maxCoroutines.Value;
+
+    /// <summary>
+    /// Validate that a group_id contains only ASCII alphanumeric characters, dashes, and underscores.
+    /// </summary>
+    /// <param name="groupId">The group_id to validate.</param>
+    /// <returns>True if valid, False otherwise.</returns>
+    /// <exception cref="GroupIdValidationException">If group_id contains invalid characters.</exception>
     internal static bool ValidateGroupId(string? groupId)
     {
-        throw new NotSupportedException("TODO(port): validate_group_id");
+        // Allow empty string (default case)
+        if (string.IsNullOrEmpty(groupId))
+        {
+            return true;
+        }
+
+        // Check if string contains only ASCII alphanumeric characters, dashes, or underscores
+        // Pattern matches: letters (a-z, A-Z), digits (0-9), hyphens (-), and underscores (_)
+        if (!GroupIdPattern.IsMatch(groupId))
+        {
+            throw new GroupIdValidationException(groupId);
+        }
+
+        return true;
     }
 
-    // TODO(port): validate_group_ids
+    /// <summary>Validate a list of group ids used by search paths.</summary>
     internal static bool ValidateGroupIds(List<string>? groupIds)
     {
-        throw new NotSupportedException("TODO(port): validate_group_ids");
+        if (groupIds is null)
+        {
+            return true;
+        }
+
+        foreach (var groupId in groupIds)
+        {
+            ValidateGroupId(groupId);
+        }
+
+        return true;
     }
 
     /// <summary>Validate that node labels are safe to interpolate into Cypher label expressions.</summary>
@@ -159,12 +288,42 @@ internal static class Helpers
         return true;
     }
 
+    /// <summary>
+    /// Validate that excluded entity types are valid type names.
+    /// </summary>
+    /// <param name="excludedEntityTypes">List of entity type names to exclude.</param>
+    /// <param name="entityTypes">Dictionary of available custom entity types.</param>
+    /// <returns>True if valid.</returns>
+    /// <exception cref="ArgumentException">If any excluded type names are invalid (a Python ValueError).</exception>
     // PORT: a custom type is a GraphTypeDescriptor (R15, decision D26).
-    // TODO(port): validate_excluded_entity_types
     internal static bool ValidateExcludedEntityTypes(
         List<string>? excludedEntityTypes,
         OrderedDictionary<string, GraphTypeDescriptor>? entityTypes = null)
     {
-        throw new NotSupportedException("TODO(port): validate_excluded_entity_types");
+        if (excludedEntityTypes is null || excludedEntityTypes.Count == 0)
+        {
+            return true;
+        }
+
+        // Build set of available type names
+        HashSet<string> availableTypes = new(StringComparer.Ordinal) { "Entity" }; // Default type is always available
+        if (entityTypes is not null && entityTypes.Count > 0)
+        {
+            availableTypes.UnionWith(entityTypes.Keys);
+        }
+
+        // Check for invalid type names
+        HashSet<string> invalidTypes = new(excludedEntityTypes, StringComparer.Ordinal);
+        invalidTypes.ExceptWith(availableTypes);
+        if (invalidTypes.Count > 0)
+        {
+            // PORT: sorted() orders by code point (R12), and the f-string shows each list with repr (R11).
+            List<object?> invalidSorted = [.. invalidTypes.OrderBy(t => t, Py.StringComparer)];
+            List<object?> availableSorted = [.. availableTypes.OrderBy(t => t, Py.StringComparer)];
+            throw new ArgumentException(
+                $"Invalid excluded entity types: {Py.Repr(invalidSorted)}. Available types: {Py.Repr(availableSorted)}");
+        }
+
+        return true;
     }
 }
