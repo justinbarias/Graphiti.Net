@@ -14,7 +14,7 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 ## Queue counts
 
-182 units. 1 has the status `reviewed` (`graphiti_core.errors`), and 181 have the status `todo`. 114 are in MVP scope. See the scope table in [DECISIONS.md](DECISIONS.md).
+182 units. 2 have the status `reviewed` (`graphiti_core.errors`, `graphiti_core.search.search_filters`), and 180 have the status `todo`. Of these 180, `helpers` and `driver.driver` hold the members that rule R24 names. 114 are in MVP scope. See the scope table in [DECISIONS.md](DECISIONS.md).
 
 ## Judge
 

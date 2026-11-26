@@ -244,9 +244,9 @@
         "os",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Driver/Driver.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot ported the enum GraphProvider for real (rule R24). The other members are not ported."
     },
     {
       "order": 11,
@@ -503,9 +503,9 @@
         "re",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Helpers.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot ported validate_node_labels with SAFE_CYPHER_IDENTIFIER_PATTERN for real (rule R24). 13 of its 14 pure cases pass, and 1 answers JudgeTypeRejected (O4). The other members are not ported."
     },
     {
       "order": 24,
@@ -587,9 +587,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Search/SearchFilters.cs",
+      "status": "reviewed",
+      "notes": "Pilot unit (plan 0003, task 6). 133 pure cases and 3 schema cases: 134 pass, and 2 answer JudgeTypeRejected (open item O4). tests/Port.Evaluation/TestSearchSecurity.cs and SearchFiltersValidationTests.cs."
     },
     {
       "order": 28,
