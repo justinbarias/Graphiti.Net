@@ -72,6 +72,7 @@ The lead made these decisions under decision D39. The maintainer reads them at t
 - Layer 0 has seven packets. Five cover layers 1 to 6, and two cover layers 7 to 9. It merges as two pull requests, so that layer 1 starts after the first one.
 - The skeleton ports in full each member that has no logic to defer: an enum, an abstract class, a constant, and a body that is only `return None` or `raise NotImplementedError` (rule R24).
 - `utils.bulk_utils` moves from layer 1 to layer 7. It imports five modules of `utils.maintenance` and `ingestion.change_set`, and no unit of layers 1 to 6 imports it.
+- Two more units leave layer 1 (2026-11-27). `decorators` moves to layer 6, because it imports `search.search_config` and four of its tests need `SearchResults.merge`. `utils.ontology_utils.entity_types_utils` moves to layer 2, because it reads the fields of `EntityNode`.
 - A unit with logic delivers a recording of Python results beside the upstream tests, and each Neo4j operations unit delivers a recording through a fake executor (rule R25). The pilot showed that the upstream tests alone find few defects.
 - An implementer and a reviewer write the full report to a file, and the lead reads the file. The reply to the lead is a short summary.
 
