@@ -177,7 +177,7 @@ WITH e, edge CALL db.create.setRelationshipVectorProperty(e, "fact_embedding", e
             throw new ArgumentException($"no update query for the entity edge save query of {Py.Str(provider)}");
         }
 
-        return PyText.Replace(query, "MERGE (source)-[", "MATCH (source)-[");
+        return query.Replace("MERGE (source)-[", "MATCH (source)-[", StringComparison.Ordinal);
     }
 
     internal static string GetEntityEdgeReturnQuery(GraphProvider provider)

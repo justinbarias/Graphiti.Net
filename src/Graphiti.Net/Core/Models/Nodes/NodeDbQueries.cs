@@ -22,27 +22,14 @@ using Graphiti.PyCompat;
 
 internal static class NodeDbQueries
 {
-    // PORT: the parameter is `str | list[str]`, a union of two shapes, so it is object (RULES.md Part 3).
+    // PORT: the value comes from a node dict, which is open data, so it is object? (R6).
     private static List<string> ValidateEntityLabels(object? labels)
     {
-        var resolvedLabels = labels is string text ? PyText.Split(text, ":").Cast<object?>() : Iterate(labels);
+        var resolvedLabels = labels is string text ? PyText.Split(text, ":").Cast<object?>() : Py.Iter(labels);
         var filteredLabels = resolvedLabels.Where(Py.Truthy).Select(Py.AsString).ToList();
         Helpers.ValidateNodeLabels(filteredLabels);
         return filteredLabels;
     }
-
-    // PORT: `for x in value` and `':'.join(value)` on an open value have no rule. A str gives its code points.
-    // A value that Python cannot iterate is a TypeError (R4).
-    private static IEnumerable<object?> Iterate(object? value) => value switch
-    {
-        string text => PyText.CodePoints(text),
-        PyTuple tuple => tuple,
-        System.Collections.IDictionary dict => dict.Keys.Cast<object?>(),
-        System.Collections.IEnumerable items and not byte[] => items.Cast<object?>(),
-        _ => throw new InvalidCastException($"'{Py.TypeName(value)}' object is not iterable"),
-    };
-
-    private static string JoinLabels(object? labels) => string.Join(":", Iterate(labels).Select(Py.AsString));
 
     internal static string GetEpisodeNodeSaveQuery(GraphProvider provider)
     {
@@ -215,7 +202,7 @@ WITH n CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.na
                         }
 
                         // Apply all labels in a single query instead of one query per label.
-                        var labelExpr = Py.Truthy(node["labels"]) ? JoinLabels(node["labels"]) : "Entity";
+                        var labelExpr = Py.Truthy(node["labels"]) ? string.Join(":", Py.Iter(node["labels"]).Select(Py.AsString)) : "Entity";
                         queries.Add(
                             new PyTuple(
                                 "\n" + $$"""
@@ -239,7 +226,7 @@ WITH n CALL db.create.setNodeVectorProperty(n, "name_embedding", $entity_data.na
                     foreach (var node in nodes)
                     {
                         var labels = string.Empty;
-                        foreach (var label in Iterate(node["labels"]))
+                        foreach (var label in Py.Iter(node["labels"]))
                         {
                             labels += $" SET n:{Py.Str(label)}\n";
                         }
@@ -303,7 +290,7 @@ WITH n, node CALL db.create.setNodeVectorProperty(n, "name_embedding", node.name
                 throw new ArgumentException($"no update query for the entity node save query of {Py.Str(provider)}");
             }
 
-            return PyText.Replace(query, "MERGE (n:Entity {uuid: ", "MATCH (n:Entity {uuid: ");
+            return query.Replace("MERGE (n:Entity {uuid: ", "MATCH (n:Entity {uuid: ", StringComparison.Ordinal);
         }
 
         var queries = GetEntityNodeSaveBulkQuery(provider, nodes, hasAoss);
@@ -313,7 +300,7 @@ WITH n, node CALL db.create.setNodeVectorProperty(n, "name_embedding", node.name
         }
 
         List<object?> result = [];
-        foreach (var query in Iterate(queries))
+        foreach (var query in Py.AsList(queries))
         {
             result.Add(query is PyTuple tuple ? new PyTuple(ToUpdate(Py.AsString(tuple[0])), tuple[1]) : ToUpdate(Py.AsString(query)));
         }

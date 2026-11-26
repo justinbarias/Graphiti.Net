@@ -6,10 +6,16 @@ using Graphiti.Core.Driver;
 using Graphiti.Core.Driver.Falkordb;
 using Graphiti.PyCompat;
 
+/// <summary>
+/// Database query utilities for different graph database backends.
+///
+/// This module provides database-agnostic query generation for Neo4j and FalkorDB,
+/// supporting index creation, fulltext search, and bulk operations.
+/// </summary>
 internal static class GraphQueries
 {
     // Mapping from Neo4j fulltext index names to FalkorDB node labels
-    internal static readonly OrderedDictionary<string, string> Neo4jToFalkordbMapping = new()
+    internal static readonly Dictionary<string, string> Neo4jToFalkordbMapping = new()
     {
         ["node_name_and_summary"] = "Entity",
         ["community_name"] = "Community",
@@ -84,6 +90,8 @@ internal static class GraphQueries
             // Convert to string representation for embedding in queries
             var stopwordsStr = Py.Str(FalkordbPackage.Stopwords);
 
+            // Use type: ignore to satisfy LiteralString requirement while maintaining single source of truth
+            // PORT: the comment speaks of the Python `cast` to list[LiteralString], which C# does not need (LiteralString is str).
             return
             [
                 $$"""
