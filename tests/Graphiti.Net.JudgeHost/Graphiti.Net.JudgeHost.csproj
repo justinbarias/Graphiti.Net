@@ -6,7 +6,11 @@
     <RootNamespace>Graphiti.JudgeHost</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Port.Evaluation" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/Graphiti.Net/Graphiti.Net.csproj" />
     <ProjectReference Include="../../src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
+    <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
   </ItemGroup>
 </Project>

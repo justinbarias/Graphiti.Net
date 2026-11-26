@@ -41,7 +41,8 @@ while (await stdin.ReadLineAsync() is { } line)
         result = new JsonObject { ["host_error"] = error.GetType().Name };
     }
 
-    await stdout.WriteLineAsync(result.ToJsonString());
+    // json.dumps(result, ensure_ascii=True), as host.py writes it. A lone surrogate stays an escape.
+    await stdout.WriteLineAsync(Codec.Line(result));
 }
 
 return 0;
@@ -54,11 +55,21 @@ static async ValueTask<JsonNode> RunPureAsync(JsonElement root)
         return new JsonObject { ["error"] = Bindings.NotBound };
     }
 
-    var arguments = root.TryGetProperty("args", out var a) ? a : default;
-    var keywords = root.TryGetProperty("kwargs", out var k) ? k : default;
     try
     {
-        return new JsonObject { ["ok"] = await binding(arguments, keywords) };
+        // host.py decodes inside the same try, so an argument that does not decode gives its Python error.
+        var call = JudgeArguments.Decode(root, new ValueDecoder(Bindings.Registry));
+        return new JsonObject { ["ok"] = await binding(call) };
+    }
+    catch (JudgeNotBoundException error)
+    {
+        await Console.Error.WriteLineAsync($"judge: {name}: {error.Message}");
+        return new JsonObject { ["error"] = Bindings.NotBound };
+    }
+    catch (JudgeTypeRejectedException error)
+    {
+        await Console.Error.WriteLineAsync($"judge: {name}: {error.Message}");
+        return new JsonObject { ["error"] = Bindings.TypeRejected };
     }
 #pragma warning disable CA1031 // The exception's Python name is the result of the case.
     catch (Exception error)

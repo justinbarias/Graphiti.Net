@@ -9,13 +9,27 @@ using Graphiti.JudgeHost.Core;
 /// A binding can do three things only: decode the arguments, call the product code, and encode the result.
 /// It must not branch on the case, fill in defaults, or repair output. REVIEW.md checks this.
 /// </summary>
-public static class Bindings
+/// <example>
+/// <code>
+/// ["graphiti_core.helpers:lucene_sanitize"] = call =>
+///     Codec.Result(Helpers.LuceneSanitize(call.Signature("query").String("query"))),
+/// </code>
+/// </example>
+internal static class Bindings
 {
     public const string NotBound = "JudgeNotBound";
 
-    public static Dictionary<string, Func<JsonElement, JsonElement, ValueTask<JsonNode?>>> Pure { get; } = new(StringComparer.Ordinal)
+    public const string TypeRejected = "JudgeTypeRejected";
+
+    /// <summary>
+    /// Gets the <c>$ref</c>, <c>$enum</c>, and <c>$model</c> paths and the encoders of product types.
+    /// A ported unit registers its paths and its model types here.
+    /// </summary>
+    internal static JudgeRegistry Registry { get; } = new();
+
+    internal static Dictionary<string, Func<JudgeArguments, ValueTask<JsonNode?>>> Pure { get; } = new(StringComparer.Ordinal)
     {
-        ["judge:embed"] = (args, _) => ValueTask.FromResult<JsonNode?>(Codec.Vector(JudgeEmbedding.Embed(args[0].GetString()!))),
+        ["judge:embed"] = call => Codec.Result(Codec.Vector(JudgeEmbedding.Embed(call.Signature("text").String("text")))),
     };
 
     /// <summary>Runs a flow scenario. Not bound until the facade is ported (plan 0004, layer 9).</summary>

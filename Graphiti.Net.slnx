@@ -8,5 +8,6 @@
     <Project Path="tests/Graphiti.Net.E2E.Tests/Graphiti.Net.E2E.Tests.csproj" />
     <Project Path="tests/Graphiti.Net.JudgeHost/Graphiti.Net.JudgeHost.csproj" />
     <Project Path="tests/Graphiti.Net.Property.Tests/Graphiti.Net.Property.Tests.csproj" />
+    <Project Path="tests/Port.Evaluation/Port.Evaluation.csproj" />
   </Folder>
 </Solution>
