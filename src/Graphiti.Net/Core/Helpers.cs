@@ -145,9 +145,8 @@ internal static class Helpers
     // PORT: the numpy result type NDArray is List<double>, as the parameter is (R20).
     internal static List<double> NormalizeL2(List<double> embedding)
     {
-        // PORT: R18 names TensorPrimitives, but no project references System.Numerics.Tensors. numpy sums the squares
-        // of a contiguous float64 array in pairs (PairwiseSum), so a plain loop in index order differs in the last bits.
-        var norm = Math.Sqrt(PairwiseSum([.. embedding.Select(x => x * x)], 0, embedding.Count));
+        // PORT: numpy sums the squares in pairs, so a plain loop in index order differs in the last bits (R18).
+        var norm = Math.Sqrt(PyNumpy.AddReduce([.. embedding.Select(x => x * x)]));
         if (norm == 0)
         {
             return embedding;
@@ -156,66 +155,21 @@ internal static class Helpers
         return [.. embedding.Select(x => x / norm)];
     }
 
-    // PORT: numpy DOUBLE_pairwise_sum. A plain loop below 8 items, eight running sums up to 128 items, a split above.
-    private static double PairwiseSum(double[] a, int start, int n)
-    {
-        if (n < 8)
-        {
-            var sum = 0.0;
-            for (var i = 0; i < n; i++)
-            {
-                sum += a[start + i];
-            }
-
-            return sum;
-        }
-
-        if (n <= 128)
-        {
-            var r = new double[8];
-            for (var j = 0; j < 8; j++)
-            {
-                r[j] = a[start + j];
-            }
-
-            int k;
-            for (k = 8; k < n - (n % 8); k += 8)
-            {
-                for (var j = 0; j < 8; j++)
-                {
-                    r[j] += a[start + k + j];
-                }
-            }
-
-            var res = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]));
-            for (; k < n; k++)
-            {
-                res += a[start + k];
-            }
-
-            return res;
-        }
-
-        var half = n / 2;
-        half -= half % 8;
-        return PairwiseSum(a, start, half) + PairwiseSum(a, start + half, n - half);
-    }
-
     // Use this instead of asyncio.gather() to bound coroutines
-    // PORT: R8. Each call is a lambda, and the overloads follow Asyncio.SemaphoreGatherAsync. A maxCoroutines of null or
-    // 0 means SemaphoreLimit.
+    // PORT: R8. Each call is a lambda, and the overloads follow Asyncio.SemaphoreGatherAsync. `max_coroutines or
+    // SEMAPHORE_LIMIT`: a maxCoroutines of null or 0 means SemaphoreLimit.
     internal static Task<List<T>> SemaphoreGatherAsync<T>(
         IReadOnlyList<Func<Task<T>>> coroutines,
         long? maxCoroutines = null,
         CancellationToken cancellationToken = default) =>
-        Asyncio.SemaphoreGatherAsync(coroutines, ResolveLimit(maxCoroutines), cancellationToken);
+        Asyncio.SemaphoreGatherAsync(coroutines, maxCoroutines is null or 0 ? SemaphoreLimit : maxCoroutines.Value, cancellationToken);
 
     // PORT: semaphore_gather for calls that return None. Python returns a list of None, which no caller reads.
     internal static Task SemaphoreGatherAsync(
         IReadOnlyList<Func<Task>> coroutines,
         long? maxCoroutines = null,
         CancellationToken cancellationToken = default) =>
-        Asyncio.SemaphoreGatherAsync(coroutines, ResolveLimit(maxCoroutines), cancellationToken);
+        Asyncio.SemaphoreGatherAsync(coroutines, maxCoroutines is null or 0 ? SemaphoreLimit : maxCoroutines.Value, cancellationToken);
 
     // PORT: the one call with different result types, search/search.py:174, passes four coroutines and unpacks a
     // tuple of four (R8).
@@ -226,10 +180,7 @@ internal static class Helpers
         Func<Task<T4>> fourth,
         long? maxCoroutines = null,
         CancellationToken cancellationToken = default) =>
-        Asyncio.SemaphoreGatherAsync(first, second, third, fourth, ResolveLimit(maxCoroutines), cancellationToken);
-
-    // PORT: `max_coroutines or SEMAPHORE_LIMIT`.
-    private static long ResolveLimit(long? maxCoroutines) => maxCoroutines is null or 0 ? SemaphoreLimit : maxCoroutines.Value;
+        Asyncio.SemaphoreGatherAsync(first, second, third, fourth, maxCoroutines is null or 0 ? SemaphoreLimit : maxCoroutines.Value, cancellationToken);
 
     /// <summary>
     /// Validate that a group_id contains only ASCII alphanumeric characters, dashes, and underscores.
