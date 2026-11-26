@@ -196,7 +196,11 @@ For a flow case that needs hand-written replies:
 `tests/Graphiti.Net.JudgeHost/Bindings.cs` maps each `fn` name to the ported method.
 A binding can do three things only: decode the arguments, call the product code, and encode the result.
 A case with no binding fails with `JudgeNotBound`, which keeps it in `expected-failures.txt`.
-A case in `expected-failures.txt` can fail only with `JudgeNotBound`. If a bound case gives a wrong result, the runner reports it as `bound_wrong` and fails, even though the case is in the list.
+A case in `expected-failures.txt` can fail only with `JudgeNotBound` or `JudgeTypeRejected`. If a bound case runs and gives a wrong result, the runner reports it as `bound_wrong` and fails, even though the case is in the list.
+
+The .NET host answers `JudgeTypeRejected` if a C# parameter cannot hold an argument of the case (decision D20).
+If the golden result is `TypeError` or `AttributeError`, the case passes, because Python refused the same argument for its type.
+If the golden result is another error or a value, the case fails. It can stay in `expected-failures.txt` only if the maintainer accepts the difference by name.
 
 ## Cases mined from upstream pytest files
 
