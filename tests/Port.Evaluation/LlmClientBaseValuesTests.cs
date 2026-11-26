@@ -44,23 +44,16 @@ public class LlmClientBaseValuesTests
     public void Each_LLMConfig_keeps_the_six_attributes_of_Python()
     {
         var config = Dict(Document["config"]);
-        var constants = Dict(config["constants"]);
         var cases = Items(config["cases"]);
         Assert.True(cases.Count >= 60);
+        Assert.Empty(Dict(Dict(cases[0])["kwargs"]));
         foreach (var item in cases)
         {
             var recorded = Dict(item);
             var kwargs = Dict(recorded["kwargs"]);
             var attrs = Dict(recorded["attrs"]);
 
-            // A key that the call leaves out takes the default of Python, which is the recorded constant.
-            var actual = new LLMConfig(
-                apiKey: kwargs.TryGetValue("api_key", out var apiKey) ? (string?)apiKey : null,
-                model: kwargs.TryGetValue("model", out var model) ? (string?)model : null,
-                baseUrl: kwargs.TryGetValue("base_url", out var baseUrl) ? (string?)baseUrl : null,
-                temperature: Py.AsDouble(kwargs.TryGetValue("temperature", out var temperature) ? temperature : constants["DEFAULT_TEMPERATURE"]),
-                maxTokens: Py.AsLong(kwargs.TryGetValue("max_tokens", out var maxTokens) ? maxTokens : constants["DEFAULT_MAX_TOKENS"]),
-                smallModel: kwargs.TryGetValue("small_model", out var smallModel) ? (string?)smallModel : null);
+            var actual = LlmClientClientSupport.MakeConfig(kwargs);
 
             var label = PyJson.Dumps(kwargs);
             Assert.True(attrs["base_url"] as string == actual.BaseUrl, label);

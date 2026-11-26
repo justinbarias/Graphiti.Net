@@ -218,14 +218,27 @@ internal abstract class LLMClient
         .Build();
 
         // PORT: `except (httpx.HTTPStatusError, RateLimitError) as e: raise e` leaves the exception as it is, so it has no clause.
-        return await pipeline.ExecuteAsync(
-            async token => await Asyncio.OnLoopAsync(() =>
-            {
-                // Only splat overrides when set so third-party subclasses with the
-                // pre-existing four-param signature still work on the legacy path.
-                return PrivateGenerateResponseAsync(messages, responseModel, maxTokens, modelSize, model, token);
-            }),
-            cancellationToken);
+        var attempts = 0;
+        try
+        {
+            return await pipeline.ExecuteAsync(
+                async token => await Asyncio.OnLoopAsync(() =>
+                {
+                    attempts++;
+
+                    // Only splat overrides when set so third-party subclasses with the
+                    // pre-existing four-param signature still work on the legacy path.
+                    return PrivateGenerateResponseAsync(messages, responseModel, maxTokens, modelSize, model, token);
+                }),
+                cancellationToken);
+        }
+        catch (Exception e) when (cancellationToken.IsCancellationRequested && attempts <= 3 && Client.IsServerOrRetryError(e))
+        {
+            // PORT: a cancel that arrives while an attempt fails with a retried error lands in the sleep of tenacity
+            // (after the `after` log), and the call ends with CancelledError. Polly gives the last outcome for a canceled
+            // token. After the last attempt tenacity does not sleep, so the error stays.
+            throw new OperationCanceledException(cancellationToken);
+        }
     }
 
     // PORT: the prefix Private (R2). `_generate_response` without the underscore is the name of

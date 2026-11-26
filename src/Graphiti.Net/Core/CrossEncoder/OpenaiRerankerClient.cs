@@ -44,6 +44,16 @@ internal static partial class OpenaiRerankerClientModule
 // of R1.
 internal sealed class OpenAIRerankerClient : CrossEncoderClient
 {
+    /// <summary>
+    /// Initialize the OpenAIRerankerClient with the provided configuration and client.
+    ///
+    /// This reranker uses the OpenAI API to run a simple boolean classifier prompt concurrently
+    /// for each passage. Log-probabilities are used to rank the passages.
+    ///
+    /// Args:
+    ///     config (LLMConfig | None): The configuration for the LLM client, including API key, model, base URL, temperature, and max tokens.
+    ///     client (AsyncOpenAI | AsyncAzureOpenAI | OpenAIClient | None): An optional async client instance to use. If not provided, a new AsyncOpenAI client is created.
+    /// </summary>
     internal OpenAIRerankerClient(LLMConfig? config = null, LogProbabilityChat? client = null)
     {
         config ??= new LLMConfig();
@@ -114,9 +124,8 @@ internal sealed class OpenAIRerankerClient : CrossEncoderClient
             foreach (var response in responses)
             {
                 responsesTopLogprobs.Add(
-                    response.Choices[0].Logprobs is not null
-                    && response.Choices[0].Logprobs!.Content is not null
-                        ? response.Choices[0].Logprobs!.Content![0].TopLogprobs
+                    response.Choices[0].Logprobs is { Content: { } content }
+                        ? content[0].TopLogprobs
                         : []);
             }
 
@@ -139,19 +148,10 @@ internal sealed class OpenAIRerankerClient : CrossEncoderClient
                 }
             }
 
-            // PORT: zip(passages, scores, strict=True). Py.ZipStrict does not exist. `scores` is never longer than
-            // `passages`, so the only error is "zip() argument 2 is shorter than argument 1", and it comes before a pair is built.
-            if (scores.Count != passages.Count)
-            {
-                throw new ArgumentException(scores.Count < passages.Count
-                    ? "zip() argument 2 is shorter than argument 1"
-                    : "zip() argument 2 is longer than argument 1");
-            }
-
             var results = new List<(string, double)>();
-            for (var i = 0; i < passages.Count; i++)
+            foreach (var (passage, score) in Py.ZipStrict(passages, scores))
             {
-                results.Add((passages[i], scores[i]));
+                results.Add((passage, score));
             }
 
             Py.SortInPlace(results, x => x.Item2, reverse: true);

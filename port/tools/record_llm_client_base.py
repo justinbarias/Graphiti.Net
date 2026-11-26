@@ -47,7 +47,7 @@ MESSAGES = ['', 'x', 'The LLM refused to respond to this prompt.', 'The LLM retu
             '{braces} and %s and {0}', 'x' * 500, ' ', ' ']
 PROMPTS = ['extract_nodes.extract_message', 'dedupe_nodes', 'extract_edges', 'unknown', 'a', 'b', 'B', 'é', '日本',
            'x' * 44, 'x' * 45, 'x' * 46, 'x' * 80, '', None, 'p with space', '\U0001F600 emoji', 'Z', 'z',
-           'summarize_nodes.summarize_pair']
+           'summarize_nodes.summarize_pair', 'Ａ', '\U0001F600']
 SORT_KEYS = ['total_tokens', 'input_tokens', 'output_tokens', 'call_count', 'prompt_name', 'bogus', '', 'TOTAL_TOKENS',
              'avg_input_tokens']
 
@@ -165,16 +165,9 @@ def record_token_tracker(tt) -> dict:
             'default_summary': buf.getvalue(),
         }
 
-    for n in [0, 1, 2, 3, 5, 8, 13, 21, 40, 80, 150] * 2:
+    def make_series(calls: list) -> dict:
         tracker = tt.TokenUsageTracker()
-        calls = []
-        pool = rng.sample(PROMPTS, rng.randint(1, len(PROMPTS)))
-        for _ in range(n):
-            name = rng.choice(pool)
-            i, o = number(rng), number(rng)
-            if rng.random() < 0.2:
-                i, o = rng.choice([0, 100]), rng.choice([0, 50])  # equal counts give ties in the sort
-            calls.append([name, i, o])
+        for name, i, o in calls:
             tracker.record(name, i, o)
         case = {'calls': calls, 'after_record': state(tracker, all_keys=True)}
         copy = tracker.get_usage()
@@ -186,7 +179,22 @@ def record_token_tracker(tt) -> dict:
         case['after_reset'] = state(tracker)
         tracker.record('after_reset', 3, 4)
         case['after_reset_and_record'] = state(tracker)
-        out['series'].append(case)
+        return case
+
+    for n in [0, 1, 2, 3, 5, 8, 13, 21, 40, 80, 150] * 2:
+        calls = []
+        pool = rng.sample(PROMPTS, rng.randint(1, len(PROMPTS)))
+        for _ in range(n):
+            name = rng.choice(pool)
+            i, o = number(rng), number(rng)
+            if rng.random() < 0.2:
+                i, o = rng.choice([0, 100]), rng.choice([0, 50])  # equal counts give ties in the sort
+            calls.append([name, i, o])
+        out['series'].append(make_series(calls))
+    # print_summary('prompt_name') sorts the names by code point. U+FF21 is a BMP character above the surrogates, and
+    # U+1F600 is a surrogate pair in UTF-16, so the two orders differ for this pair.
+    out['series'].append(make_series([['\U0001F600', 1, 1], ['Ａ', 1, 1]]))
+    out['series'].append(make_series([['Ａ', 1, 1], ['\U0001F600', 2, 2], ['a', 3, 3], ['\ue000', 1, 1], ['\U00010000', 4, 4]]))
     return out
 
 

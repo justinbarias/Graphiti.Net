@@ -64,6 +64,11 @@ internal sealed class LLMCache : IDisposable
             Pooling = false,
         }.ToString());
         conn.Open();
+
+        // PORT: sqlite3.connect(db_path, check_same_thread=False) has the default timeout=5.0, which calls
+        // sqlite3_busy_timeout(db, 5000). Microsoft.Data.Sqlite retries a busy database only inside a SqliteCommand, and
+        // the statements of this class run through the raw calls, so the wait is set on the handle.
+        raw.sqlite3_busy_timeout(conn.Handle ?? throw new InvalidOperationException("Cannot operate on a closed database."), 5000);
         using var create = conn.CreateCommand();
         create.CommandText = "CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value TEXT)";
         create.ExecuteNonQuery();
@@ -73,12 +78,16 @@ internal sealed class LLMCache : IDisposable
     {
         // PORT: Microsoft.Data.Sqlite binds named parameters only, and the SQL of upstream has `?`. The statements go
         // through SQLitePCL on the handle of the connection, so that each SQL text stays as it is (R9, J7).
-        var db = Handle();
+        // PORT: sqlite3 raises ProgrammingError for a call on a closed connection.
+        var db = conn.Handle ?? throw new InvalidOperationException("Cannot operate on a closed database.");
         var rc = raw.sqlite3_prepare_v2(db, "SELECT value FROM cache WHERE key = ?", out var stmt);
         SqliteException.ThrowExceptionForRC(rc, db);
         string? text;
         try
         {
+            // PORT: sqlite3 encodes the parameters as UTF-8 and raises UnicodeEncodeError for a lone surrogate. The raw
+            // bind would replace it with U+FFFD, so the strict encoding runs first.
+            _ = PyText.EncodeUtf8(key);
             SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(stmt, 1, key), db);
             rc = raw.sqlite3_step(stmt);
             if (rc == raw.SQLITE_DONE)
@@ -103,9 +112,10 @@ internal sealed class LLMCache : IDisposable
 
         try
         {
-            // PORT: Python returns the decoded value as it is. The skeleton signature is a dict, so a JSON text that
-            // holds another type throws here.
-            return Py.AsDict(PyJson.Loads(text));
+            // PORT: Python returns the decoded value as it is. The skeleton signature is a dict or null, so a JSON text
+            // that holds another type throws here, and the text `null` gives null.
+            var loaded = PyJson.Loads(text);
+            return loaded is null ? null : Py.AsDict(loaded);
         }
         catch (JsonException)
         {
@@ -127,11 +137,13 @@ internal sealed class LLMCache : IDisposable
             return;
         }
 
-        var db = Handle();
+        // PORT: sqlite3 raises ProgrammingError for a call on a closed connection.
+        var db = conn.Handle ?? throw new InvalidOperationException("Cannot operate on a closed database.");
         var rc = raw.sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO cache (key, value) VALUES (?, ?)", out var stmt);
         SqliteException.ThrowExceptionForRC(rc, db);
         try
         {
+            _ = PyText.EncodeUtf8(key); // PORT: see Get.
             SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(stmt, 1, key), db);
             SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(stmt, 2, serialized), db);
             rc = raw.sqlite3_step(stmt);
@@ -145,10 +157,6 @@ internal sealed class LLMCache : IDisposable
             raw.sqlite3_finalize(stmt);
         }
     }
-
-    // sqlite3 raises ProgrammingError for a call on a closed connection.
-    private sqlite3 Handle() =>
-        conn.Handle ?? throw new InvalidOperationException("Cannot operate on a closed database.");
 
     internal void Close()
     {

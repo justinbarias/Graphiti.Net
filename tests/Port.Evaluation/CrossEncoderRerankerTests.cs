@@ -55,7 +55,7 @@ public class CrossEncoderRerankerTests
             await Check(recorded, input);
         }
 
-        foreach (var name in new[] { "token", "logprob", "ties", "all_equal", "empty_passages", "skip_no_logprobs", "empty_content", "rate_limit", "runtime_error", "random" })
+        foreach (var name in new[] { "token", "logprob", "ties", "ties_20", "cancel", "all_equal", "empty_passages", "skip_no_logprobs", "empty_content", "rate_limit", "runtime_error", "random" })
         {
             Assert.Contains(name, names);
         }
@@ -64,7 +64,8 @@ public class CrossEncoderRerankerTests
     private static async Task Check(OrderedDictionary<string, object?> recorded, OrderedDictionary<string, object?> input)
     {
         var label = PyJson.Dumps(input);
-        var fake = new FakeChat(Items(input["replies"]).Select(Obj).ToList());
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var fake = new FakeChat(Items(input["replies"]).Select(Obj).ToList(), cancel);
         LLMConfig? config = input.TryGetValue("model", out var model) ? new LLMConfig(model: (string?)model) : null;
         var reranker = new OpenAIRerankerClient(config, fake);
         var passages = Items(input["passages"]).Select(p => (string)p!).ToList();
@@ -77,7 +78,7 @@ public class CrossEncoderRerankerTests
         Exception? error = null;
         try
         {
-            result = await Asyncio.Run(() => reranker.RankAsync((string)input["query"]!, passages, TestContext.Current.CancellationToken));
+            result = await Asyncio.Run(() => reranker.RankAsync((string)input["query"]!, passages, cancel.Token));
         }
         catch (Exception e)
         {
@@ -129,6 +130,11 @@ public class CrossEncoderRerankerTests
         var text = (string)expectedError["text"]!;
         switch (type)
         {
+            case "CancelledError":
+                // asyncio.CancelledError is not an Exception in Python, so no log line is written.
+                Assert.IsAssignableFrom<OperationCanceledException>(error);
+                Assert.Empty(capture.Lines);
+                return;
             case "RateLimitError":
                 var rate = Assert.IsType<RateLimitException>(error);
                 Assert.Equal(text, rate.Message);
@@ -175,7 +181,7 @@ public class CrossEncoderRerankerTests
         bool Logprobs,
         long TopLogprobs);
 
-    private sealed class FakeChat(List<OrderedDictionary<string, object?>> replies) : LogProbabilityChat
+    private sealed class FakeChat(List<OrderedDictionary<string, object?>> replies, CancellationTokenSource cancel) : LogProbabilityChat
     {
         internal List<Call> Calls { get; } = [];
 
@@ -198,6 +204,10 @@ public class CrossEncoderRerankerTests
                     throw new HttpRequestException("rate limited", null, System.Net.HttpStatusCode.TooManyRequests);
                 case "runtime_error":
                     throw new InvalidOperationException((string)script["message"]!);
+                case "cancel":
+                    // The task is canceled: the token is canceled, and the call ends with the cancellation.
+                    cancel.Cancel();
+                    throw new OperationCanceledException(cancel.Token);
                 case "tokens":
                     var top = Items(script["top"]).Select(Items).Select(t => new LogProbabilityTopLogprob((string)t[0]!, Py.AsDouble(t[1]))).ToList();
                     return Task.FromResult(Response(new LogProbabilityChoiceLogprobs([new LogProbabilityContent(top)])));

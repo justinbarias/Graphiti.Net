@@ -3,6 +3,7 @@
 namespace Graphiti.Port.Evaluation;
 
 using System.Net;
+using System.Reflection;
 using Graphiti.Core;
 using Graphiti.Core.LlmClient;
 using Graphiti.Core.Prompts;
@@ -23,6 +24,45 @@ internal static class LlmClientClientSupport
     internal static OrderedDictionary<string, object?> Dict(object? value) => Py.AsDict(value);
 
     internal static List<object?> Items(object? value) => Py.AsList(value);
+
+    /// <summary>
+    /// The LLMConfig of a recorded call (`LLMConfig(**kwargs)`): the case with no keyword argument calls the constructor
+    /// with none, and each other case passes only the arguments that it names. A parameter that the call leaves out takes
+    /// the default of the C# constructor, so a wrong default shows. Reflection leaves out an argument with Type.Missing.
+    /// </summary>
+    internal static LLMConfig MakeConfig(OrderedDictionary<string, object?> kwargs)
+    {
+        var names = new Dictionary<string, string>
+        {
+            ["apiKey"] = "api_key",
+            ["model"] = "model",
+            ["baseUrl"] = "base_url",
+            ["temperature"] = "temperature",
+            ["maxTokens"] = "max_tokens",
+            ["smallModel"] = "small_model",
+        };
+        if (kwargs.Count == 0)
+        {
+            return new LLMConfig();
+        }
+
+        var constructor = typeof(LLMConfig).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Single();
+        var arguments = constructor.GetParameters().Select(p =>
+        {
+            if (!kwargs.TryGetValue(names[p.Name!], out var value))
+            {
+                return Type.Missing;
+            }
+
+            return p.Name switch
+            {
+                "temperature" => Py.AsDouble(value),
+                "maxTokens" => Py.AsLong(value),
+                _ => value,
+            };
+        }).ToArray();
+        return (LLMConfig)constructor.Invoke(BindingFlags.OptionalParamBinding, null, arguments, null);
+    }
 
     /// <summary>The Message list of a recorded list of [role, content] pairs.</summary>
     internal static List<Message> Messages(object? pairs) =>
@@ -63,7 +103,7 @@ internal static class LlmClientClientSupport
     internal sealed class PlainException(string message) : Exception(message);
 
     /// <summary>The subclass of LLMClient that the upstream test calls MockLLMClient, with a scripted reply.</summary>
-    internal sealed class ScriptedClient(string pythonName, LLMConfig? config = null) : LLMClient(config)
+    internal sealed class ScriptedClient(string pythonName, LLMConfig? config = null, bool cache = false) : LLMClient(config, cache)
     {
         internal List<RecordedCall> Calls { get; } = [];
 

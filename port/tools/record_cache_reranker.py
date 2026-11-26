@@ -81,7 +81,7 @@ def record_cache(LLMCache, logger_name: str) -> dict:
     logger.setLevel(logging.DEBUG)
     handler = Handler()
     logger.addHandler(handler)
-    out = {'sets': [], 'overwrites': [], 'missing': [], 'bad': [], 'corrupt': []}
+    out = {'sets': [], 'overwrites': [], 'missing': [], 'bad': [], 'corrupt': [], 'surrogate_keys': []}
     try:
         with tempfile.TemporaryDirectory() as tmp:
             # One cache that receives each pair: the row of the key follows each set.
@@ -151,6 +151,29 @@ def record_cache(LLMCache, logger_name: str) -> dict:
                     got = None
                     error = type(e).__name__
                 out['corrupt'].append({'key': key, 'raw': raw, 'get': got, 'error': error, 'log': list(handler.lines)})
+            # A key with a lone surrogate: sqlite3 encodes the parameter as UTF-8, and the call raises. No row is stored.
+            # With a value that is not JSON, set() logs and returns before the key is encoded.
+            for key in ['\ud800', 'lone\ud800', '\udfff', 'a\udc00b']:
+                for call in ('get', 'set', 'set_not_json'):
+                    handler.lines.clear()
+                    con = sqlite3.connect(db_path)
+                    rows_before = con.execute('SELECT count(*) FROM cache').fetchone()[0]
+                    con.close()
+                    try:
+                        if call == 'get':
+                            cache.get(key)
+                        elif call == 'set':
+                            cache.set(key, {'a': 1})
+                        else:
+                            cache.set(key, {'s': {1}})
+                        error = None
+                    except Exception as e:
+                        error = type(e).__name__
+                    con = sqlite3.connect(db_path)
+                    rows_after = con.execute('SELECT count(*) FROM cache').fetchone()[0]
+                    con.close()
+                    out['surrogate_keys'].append({'key': key, 'call': call, 'error': error, 'log': list(handler.lines),
+                                                  'rows_before': rows_before, 'rows_after': rows_after})
             cache._conn.execute('INSERT OR REPLACE INTO cache (key, value) VALUES (?, ?)', ('nullvalue', None))
             cache._conn.commit()
             try:
@@ -186,7 +209,8 @@ def record_cache(LLMCache, logger_name: str) -> dict:
 
 TOKENS = ['True', ' true', 'False', 'false', 'TRUE', 'true ', '  True  ', 'True answer', 'true story', 'truex', 'tru', '',
           ' ', '\ttrue', 'true\nfalse', 'Yes', 'no', 'FALSE', ' true', 'ＴＲＵＥ', ' True', 'True.', 'trUe', 'ſtrue',
-          ' true', 'true x', '\U0001F600', 'é']
+          ' true', 'true x', '\U0001F600', 'é',
+          '\x1ctrue', '\x1dtrue', '\x1etrue', '\x1ftrue']
 
 
 def reply(top):
@@ -290,6 +314,11 @@ def record_reranker(module) -> dict:
         replies=[reply([['True', -0.5]]), reply([['False', -0.5]]), reply([['True', -0.5]]), reply([['True', -0.1]]),
                  reply([['False', -2.0]])], model='m')
     add(name='all_equal', query='q', passages=['a', 'b', 'c', 'd'], replies=[reply([['True', -1.0]])] * 4, model='m')
+    # 20 passages that tie: a sort that is not stable moves them above 16 items.
+    add(name='ties_20', query='q', passages=[f'p{i:02d}' for i in range(20)], replies=[reply([['True', -0.5]])] * 20,
+        model='m')
+    add(name='ties_20_mixed', query='q', passages=[f'p{i:02d}' for i in range(20)],
+        replies=[reply([['True' if i % 3 else 'False', -0.5]]) for i in range(20)], model='m')
     # The model: given, empty, None, and no config.
     add(name='model_given', query='q', passages=['p'], replies=[reply([['True', -1.0]])], model='gpt-x')
     add(name='model_empty', query='q', passages=['p'], replies=[reply([['True', -1.0]])], model='')
@@ -321,6 +350,8 @@ def record_reranker(module) -> dict:
     add(name='runtime_error_text', query='q', passages=['a'], replies=[{'kind': 'runtime_error', 'message': 'é {x} %s\nline'}],
         model='m')
     add(name='runtime_error_empty', query='q', passages=['a'], replies=[{'kind': 'runtime_error', 'message': ''}], model='m')
+    # A cancel: CancelledError leaves with no log line (`except Exception` does not catch it).
+    add(name='cancel', query='q', passages=['a', 'b'], replies=[reply([['True', -0.5]]), {'kind': 'cancel'}], model='m')
     # Generated batches from the fixed seed.
     for n in range(40):
         count = rng.randint(1, 12)
@@ -355,6 +386,7 @@ def main() -> int:
     }
     text = json.dumps(data, ensure_ascii=True, allow_nan=True, separators=(',', ':')) + '\n'
     count = (len(data['cache']['sets']) + len(data['cache']['bad']) + len(data['cache']['corrupt'])
+             + len(data['cache']['surrogate_keys'])
              + len(data['reranker']['cases']))
     if '--check' in sys.argv[1:]:
         if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:

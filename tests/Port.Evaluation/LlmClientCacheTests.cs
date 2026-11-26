@@ -5,6 +5,7 @@
 // test_close_and_del calls __del__ by hand: __del__ has no member (R16), so only the second call of close() stays.
 namespace Graphiti.Port.Evaluation;
 
+using System.Text;
 using Graphiti.Core.LlmClient;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
@@ -158,6 +159,51 @@ public sealed class TestLLMCache : IDisposable
         c.Close();
     }
 
+    // sqlite3.connect(timeout=5.0) sets a busy timeout of 5 seconds. A second connection holds the write lock and commits
+    // after 300 milliseconds, and set() and get() wait for it and return with no error.
+    [Fact]
+    public async Task A_locked_database_is_waited_for_and_the_call_returns_when_the_lock_ends()
+    {
+        var db = Path.Combine(tmpPath, "test_cache", "cache.db");
+        cache.Set("k", Dict(("v", 1L)));
+        foreach (var begin in new[] { "BEGIN IMMEDIATE", "BEGIN EXCLUSIVE" })
+        {
+            using var holder = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = db, Pooling = false }.ToString());
+            holder.Open();
+            using (var start = holder.CreateCommand())
+            {
+                start.CommandText = begin;
+                start.ExecuteNonQuery();
+            }
+
+            var release = Task.Run(
+                async () =>
+                {
+                    await Task.Delay(300, TestContext.Current.CancellationToken);
+                    using var commit = holder.CreateCommand();
+                    commit.CommandText = "COMMIT";
+                    commit.ExecuteNonQuery();
+                },
+                TestContext.Current.CancellationToken);
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            if (begin == "BEGIN IMMEDIATE")
+            {
+                cache.Set("k2", Dict(("v", 2L)));
+            }
+            else
+            {
+                AssertSame(Dict(("v", 1L)), cache.Get("k"));
+            }
+
+            watch.Stop();
+            await release;
+            Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(200), $"{begin}: returned after {watch.Elapsed}");
+        }
+
+        AssertSame(Dict(("v", 2L)), cache.Get("k2"));
+    }
+
     // The SQL of the upstream test: INSERT OR REPLACE INTO cache (key, value) VALUES (?, ?). It goes through a second
     // connection, because the connection of LLMCache is private (`cache._conn` in Python).
     private static void Execute(string dbPath, string? value, string key)
@@ -189,6 +235,15 @@ public sealed class TestLLMCache : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT count(*) FROM cache WHERE key = $key";
         command.Parameters.AddWithValue("$key", key);
+        return (long)command.ExecuteScalar()!;
+    }
+
+    private static long TotalRows(string dbPath)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = dbPath, Pooling = false }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT count(*) FROM cache";
         return (long)command.ExecuteScalar()!;
     }
 
@@ -319,29 +374,59 @@ public sealed class TestLLMCache : IDisposable
                 var capture = new CaptureProvider();
                 using var factory = new CaptureFactory(capture);
                 using var scope = PortServices.Use(loggerFactory: factory);
-                var log = Items(corrupt["log"]);
                 var label = PyJson.Dumps(raw);
-                if (log.Count == 0)
+                Assert.Null(corrupt["error"]);
+
+                // The branch comes from what Python returned for the row.
+                var expected = PyJson.Loads((string)corrupt["get"]!);
+                switch (expected)
                 {
-                    // PORT: Python returns the decoded value of any JSON type. The signature of the skeleton is a dict, so a value
-                    // of another type throws InvalidCastException (reported to the lead). A dict is compared with Python.
-                    var decoded = PyJson.Loads(raw);
-                    if (decoded is OrderedDictionary<string, object?>)
-                    {
+                    case OrderedDictionary<string, object?>:
                         Assert.Equal((string)corrupt["get"]!, PyJson.Dumps(c.Get(key)));
-                    }
-                    else
-                    {
+                        break;
+                    case null:
+                        Assert.Null(c.Get(key));
+                        break;
+                    default:
+                        // PORT: Python returns the decoded value of any JSON type. The typed result of the port is a dict
+                        // or null, so the cast of the other types throws InvalidCastException.
                         Assert.Throws<InvalidCastException>(() => c.Get(key));
-                    }
-                }
-                else
-                {
-                    Assert.Null(c.Get(key));
-                    Assert.Equal("null", (string)corrupt["get"]!);
+                        break;
                 }
 
                 AssertLog(corrupt["log"], capture.Lines, label);
+            }
+
+            // A key with a lone surrogate: Python raises UnicodeEncodeError for get and for set, and stores no row.
+            foreach (var item in Items(recorded["surrogate_keys"]))
+            {
+                var surrogate = Obj(item);
+                var key = (string)surrogate["key"]!;
+                var call = (string)surrogate["call"]!;
+                var capture = new CaptureProvider();
+                using var factory = new CaptureFactory(capture);
+                using var scope = PortServices.Use(loggerFactory: factory);
+                var label = $"{PyJson.Dumps(key)} {call}";
+                Assert.Equal(Py.AsLong(surrogate["rows_before"]), TotalRows(db));
+                var error = (string?)surrogate["error"];
+                Action action = call switch
+                {
+                    "get" => () => c.Get(key),
+                    "set" => () => c.Set(key, Dict(("a", 1L))),
+                    _ => () => c.Set(key, Dict(("s", new object()))),
+                };
+                if (error is null)
+                {
+                    action();
+                }
+                else
+                {
+                    Assert.Equal("UnicodeEncodeError", error);
+                    Assert.True(Record.Exception(action) is EncoderFallbackException, label);
+                }
+
+                AssertLog(surrogate["log"], capture.Lines, label);
+                Assert.True(Py.AsLong(surrogate["rows_after"]) == TotalRows(db), label);
             }
 
             // A NULL value: json.loads(None) raises TypeError.

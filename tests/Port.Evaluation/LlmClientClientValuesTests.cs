@@ -1,15 +1,16 @@
 // Evaluation test for graphiti_core/llm_client/client.py (port/RULES.md, R23 and R25). values/llm_client.json holds what
 // port/tools/record_llm_client.py recorded from Python for generated inputs: the module-level members, _clean_input,
 // _apply_attribute_extraction_preamble, _get_cache_key (J4), _get_provider_type, _get_failed_generation_log,
-// generate_response with the cache off, and _generate_response_with_retry (J3).
-// The cache path (a hit, and the write of a response) is not recorded: LLMCache is a SQLite file and the product builds
-// LLMClient with cache=False.
+// generate_response with the cache off and with the cache on (a miss, a hit, the key with model=, and a reply that JSON
+// cannot hold, with the rows of the cache file), generate_response when the task is canceled, the attributes that the
+// constructor sets, and _generate_response_with_retry (J3).
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core.LlmClient;
 using Graphiti.Core.Prompts;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using static Graphiti.Port.Evaluation.LlmClientClientSupport;
 
@@ -239,6 +240,254 @@ public class LlmClientClientValuesTests
         }
 
         Assert.True(failures.Count == 0, $"{failures.Count} calls differ. The first ones:\n{string.Join("\n", failures.Take(3))}");
+    }
+
+    private static string LevelName(LogLevel level) => level switch
+    {
+        LogLevel.Warning => "WARNING",
+        LogLevel.Debug => "DEBUG",
+        LogLevel.Error => "ERROR",
+        LogLevel.Information => "INFO",
+        _ => level.ToString(),
+    };
+
+    private static List<object?> LogLines(CaptureFactory log) =>
+        log.Lines.Select(l => (object?)new List<object?> { LevelName(l.Level), l.Message }).ToList();
+
+    // The cache path of generate_response: the scenarios run on one client with a cache file in a temporary directory.
+    // What is compared: the call count, the result, the span events, the log lines, and the rows of the file after each call.
+    [Fact]
+    public async Task generate_response_with_the_cache_on_gives_Python_the_events_the_result_the_rows_and_the_log()
+    {
+        var scenarios = Cases("cache_path");
+        Assert.True(scenarios.Count >= 3);
+        List<string> failures = [];
+        foreach (var scenario in scenarios)
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "graphiti-client-cache-" + Guid.NewGuid().ToString("N"));
+            var cache = new LLMCache(dir);
+            try
+            {
+                var calls = Items(scenario["calls"]).Select(Dict).ToList();
+                var index = 0;
+                OrderedDictionary<string, object?>? lastReply = null;
+                var client = new ScriptedClient("MockLLMClient", new LLMConfig(model: "m")) { CacheEnabled = true, CacheDir = cache };
+                client.Script = n =>
+                {
+                    var unserializable = (string)Dict(calls[index]["spec"])["reply"]! == "unserializable";
+                    lastReply = new OrderedDictionary<string, object?> { ["content"] = unserializable ? new object() : $"reply {n + 1}" };
+                    return lastReply;
+                };
+
+                foreach (var recorded in calls)
+                {
+                    var spec = Dict(recorded["spec"]);
+                    var label = $"{scenario["name"]} call {index}";
+                    var events = new List<object?>();
+                    client.SetTracer(new RecordingTracer(events));
+                    var log = new CaptureFactory();
+                    using var scope = PortServices.Use(time: new InstantTimeProvider(), random: new PyRandom(3), loggerFactory: log);
+                    var before = client.Calls.Count;
+                    var result = await client.GenerateResponseAsync(
+                        Messages(spec["messages"]),
+                        promptName: (string?)spec["prompt_name"],
+                        model: (string?)spec["model"],
+                        cancellationToken: TestContext.Current.CancellationToken);
+
+                    if (client.Calls.Count - before != Py.AsLong(recorded["called"]))
+                    {
+                        failures.Add($"{label}: {client.Calls.Count - before} calls of _generate_response instead of {recorded["called"]}");
+                    }
+
+                    if (recorded["result"] is string recordedResult)
+                    {
+                        if (PyJson.Dumps(result) != recordedResult)
+                        {
+                            failures.Add($"{label}: the result is {PyJson.Dumps(result)} instead of {recordedResult}");
+                        }
+                    }
+                    else if (!ReferenceEquals(result, lastReply))
+                    {
+                        failures.Add($"{label}: the reply that JSON cannot hold is not returned as it is");
+                    }
+
+                    if (PyJson.Dumps(events) != PyJson.Dumps(recorded["events"]))
+                    {
+                        failures.Add($"{label}: the span events are {PyJson.Dumps(events)} instead of {PyJson.Dumps(recorded["events"])}");
+                    }
+
+                    if (PyJson.Dumps(LogLines(log)) != PyJson.Dumps(recorded["log"]))
+                    {
+                        failures.Add($"{label}: the log is {PyJson.Dumps(LogLines(log))} instead of {PyJson.Dumps(recorded["log"])}");
+                    }
+
+                    var rows = StoredRows(Path.Combine(dir, "cache.db"));
+                    if (PyJson.Dumps(rows) != PyJson.Dumps(recorded["rows"]))
+                    {
+                        failures.Add($"{label}: the rows are {PyJson.Dumps(rows)} instead of {PyJson.Dumps(recorded["rows"])}");
+                    }
+
+                    index++;
+                }
+
+                if (client.Calls.Count != Py.AsLong(scenario["received_total"]))
+                {
+                    failures.Add($"{scenario["name"]}: {client.Calls.Count} calls in all instead of {scenario["received_total"]}");
+                }
+            }
+            finally
+            {
+                cache.Close();
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        Assert.True(failures.Count == 0, $"{failures.Count} calls differ. The first ones:\n{string.Join("\n", failures.Take(3))}");
+    }
+
+    private static List<object?> StoredRows(string dbPath)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = dbPath, Pooling = false }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT key, value FROM cache ORDER BY key";
+        using var reader = command.ExecuteReader();
+        var rows = new List<object?>();
+        while (reader.Read())
+        {
+            rows.Add(new List<object?> { reader.GetString(0), reader.GetString(1) });
+        }
+
+        return rows;
+    }
+
+    // A cancel while an attempt fails with a retried error lands in the sleep of tenacity, so the call ends with the
+    // cancellation, with the log lines of the attempts that failed before, and with no status on the span. After the last
+    // attempt tenacity does not sleep, and the retried error leaves. A task that raises the cancellation itself leaves as it is.
+    [Fact]
+    public async Task generate_response_ends_as_Python_does_when_the_task_is_canceled()
+    {
+        var cases = Cases("cancel");
+        Assert.True(cases.Count >= 7);
+        foreach (var recorded in cases)
+        {
+            var spec = Dict(recorded["spec"]);
+            var mode = (string)spec["mode"]!;
+            var attempt = (int)Py.AsLong(spec["attempt"]);
+            var label = PyJson.Dumps(spec);
+            using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var client = new ScriptedClient("MockLLMClient", new LLMConfig());
+            client.Script = n =>
+            {
+                if (n + 1 < attempt)
+                {
+                    throw new RateLimitException("rate");
+                }
+
+                cancel.Cancel();
+                if (mode == "cancel_then_rate_limit")
+                {
+                    throw new RateLimitException("rate");
+                }
+
+                throw new OperationCanceledException(cancel.Token);
+            };
+            var events = new List<object?>();
+            client.SetTracer(new RecordingTracer(events));
+            var log = new CaptureFactory();
+            using var scope = PortServices.Use(time: new InstantTimeProvider(), random: new PyRandom(3), loggerFactory: log);
+
+            Exception? thrown = null;
+            try
+            {
+                await client.GenerateResponseAsync([new() { Role = "user", Content = "hi" }], cancellationToken: cancel.Token);
+            }
+            catch (Exception e)
+            {
+                thrown = e;
+            }
+
+            Assert.True(client.Calls.Count == Py.AsLong(recorded["attempts"]), $"{label}: {client.Calls.Count} attempts");
+            var outcome = Dict(recorded["outcome"]);
+            switch ((string)outcome["type"]!)
+            {
+                case "CancelledError":
+                    Assert.True(thrown is OperationCanceledException, $"{label}: {thrown}");
+                    break;
+                case "RateLimitError":
+                    Assert.True(thrown is RateLimitException { Message: var message } && message == (string)outcome["message"]!, $"{label}: {thrown}");
+                    break;
+                default:
+                    throw new InvalidOperationException(PyJson.Dumps(outcome));
+            }
+
+            Assert.True(PyJson.Dumps(LogLines(log)) == PyJson.Dumps(recorded["log"]), $"{label}: the log is {PyJson.Dumps(LogLines(log))}");
+            Assert.True(PyJson.Dumps(events) == PyJson.Dumps(recorded["events"]), $"{label}: the span events are {PyJson.Dumps(events)}");
+        }
+    }
+
+    // The attributes that LLMClient.__init__ sets, for each LLMConfig variant and for no config.
+    [Fact]
+    public void The_constructor_of_LLMClient_sets_the_attributes_of_Python()
+    {
+        var init = Dict(Document["client_init"]);
+        var cases = Items(init["cases"]).Select(Dict).ToList();
+        Assert.True(cases.Count >= 61);
+        foreach (var recorded in cases)
+        {
+            var kwargs = Dict(recorded["kwargs"]);
+            var config = MakeConfig(kwargs);
+            var client = new ScriptedClient("MockLLMClient", config);
+            Assert.Same(config, client.Config);
+            AssertAttributes(client, Dict(recorded["attrs"]), PyJson.Dumps(kwargs));
+        }
+
+        var none = new ScriptedClient("MockLLMClient", null);
+        AssertAttributes(none, Dict(init["no_config"]), "no config");
+    }
+
+    // cache=True creates ./llm_cache/cache.db in the working directory.
+    [Fact]
+    public void The_constructor_of_LLMClient_with_cache_true_makes_the_cache_file_of_Python()
+    {
+        var withCache = Dict(Dict(Document["client_init"])["with_cache"]);
+        var directory = Path.Combine(Directory.GetCurrentDirectory(), "llm_cache");
+        var existed = Directory.Exists(directory);
+        var client = new ScriptedClient("MockLLMClient", new LLMConfig(model: "m"), cache: true);
+        try
+        {
+            AssertAttributes(client, Dict(withCache["attrs"]), "cache=True");
+            Assert.Equal((bool)withCache["db_exists"]!, File.Exists(Path.Combine(directory, "cache.db")));
+        }
+        finally
+        {
+            client.CacheDir?.Close();
+            if (!existed)
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    private static void AssertAttributes(LLMClient client, OrderedDictionary<string, object?> attrs, string label)
+    {
+        Assert.True((string?)attrs["model"] == client.Model, label);
+        Assert.True((string?)attrs["small_model"] == client.SmallModel, label);
+        Assert.True(Py.AsDouble(attrs["temperature"]) == client.Temperature, label);
+        Assert.True(Py.AsLong(attrs["max_tokens"]) == client.MaxTokens, label);
+        Assert.True((bool)attrs["cache_enabled"]! == client.CacheEnabled, label);
+        Assert.True((string?)attrs["cache_dir"] == (client.CacheDir is null ? null : "LLMCache"), label);
+        Assert.True((string)attrs["tracer"]! == client.Tracer.GetType().Name, label);
+        Assert.True((string)attrs["token_tracker"]! == client.TokenTracker.GetType().Name, label);
+
+        // The config keeps its own values.
+        var config = Dict(attrs["config"]);
+        Assert.True((string?)config["base_url"] == client.Config.BaseUrl, label);
+        Assert.True((string?)config["api_key"] == client.Config.ApiKey, label);
+        Assert.True((string?)config["model"] == client.Config.Model, label);
+        Assert.True((string?)config["small_model"] == client.Config.SmallModel, label);
+        Assert.True(Py.AsDouble(config["temperature"]) == client.Config.Temperature, label);
+        Assert.True(Py.AsLong(config["max_tokens"]) == client.Config.MaxTokens, label);
     }
 
     // R23, J3. Each scenario is the list of outcomes of the attempts. The expected count of attempts, the log lines,

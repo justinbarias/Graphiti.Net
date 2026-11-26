@@ -13,6 +13,11 @@ R25), so that the port can be compared with real results:
 - _get_provider_type for class names, and _get_failed_generation_log for generated roles and outputs.
 - generate_response with the cache off: each message list that reaches _generate_response, with its other arguments,
   and the span events (name, attributes, status, exception), for generated inputs and for failing calls.
+- generate_response with the cache on (the cache path): a miss, a hit, the key with model=, and a reply that JSON cannot
+  hold, with the span events, the result, the call count, the stored rows, and the log lines of each call.
+- generate_response with a cancel: the cancel arrives while an attempt fails with a retried error (at attempt 1, 2, 3, and
+  4), and a task that raises CancelledError itself. The exception type, the attempts, the log lines, and the span calls.
+- the attributes that LLMClient.__init__ sets, for each LLMConfig variant and for no config, and with cache=True.
 - _generate_response_with_retry (gap J3): for a call that passes, for each retried error type one to four times, and
   for errors that are not retried: the number of attempts, each wait (the arguments of random.uniform, and the sleeps),
   the log lines, and the result or the exception that leaves.
@@ -23,8 +28,7 @@ R25), so that the port can be compared with real results:
 It writes tests/Port.Evaluation/values/llm_client.json. --check writes nothing and exits 1 if the file differs from
 what the run would write. The tool needs Python 3.12 and the pinned upstream. The environment variable
 GRAPHITI_UPSTREAM names the upstream checkout, and it defaults to .upstream/graphiti in the repository. The tool
-changes nothing there. Nothing here uses the network, and the cache path is not recorded: LLMCache is a SQLite file
-and the product builds LLMClient with cache=False.
+changes nothing there. Nothing here uses the network. The cache path runs on a SQLite file in a temporary directory.
 
 The recording replaces asyncio.sleep and random.uniform while it runs the retry. The replacement of random.uniform
 returns a + (b - a) * r for a scripted r, which is what the real function returns for that r, and it records a and b.
@@ -103,10 +107,14 @@ def main() -> int:
             llm_client, make_class, LLMConfig, ModelSize, Message, Tracer, dedupe_nodes, DEFAULT_MAX_TOKENS,
             RateLimitError, RefusalError),
         'retry': record_retry(llm_client, httpx, LLMConfig, Message, RateLimitError, EmptyResponseError, RefusalError),
+        'cache_path': record_cache_path(make_class, LLMConfig, ModelSize, Message, Tracer),
+        'cancel': record_cancel(make_class, LLMConfig, ModelSize, Message, Tracer, RateLimitError),
+        'client_init': record_client_init(make_class, LLMConfig),
     }
     # allow_nan keeps inf and nan in the file as the tokens that PyJson.Loads reads.
     text = json.dumps(data, ensure_ascii=True, allow_nan=True, separators=(',', ':')) + '\n'
-    count = sum(len(v) for k, v in data.items() if isinstance(v, list)) + len(data['retry']['cases'])
+    count = (sum(len(v) for k, v in data.items() if isinstance(v, list)) + len(data['retry']['cases'])
+             + len(data['client_init']['cases']))
     if '--check' in sys.argv[1:]:
         if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
             print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
@@ -383,6 +391,222 @@ def record_generate_response(llm_client, make_class, LLMConfig, ModelSize, Messa
     with patched_retry_environment([], [], 0.5):
         cases.append(run(random_spec(), {'kind': 'RateLimitError', 'message': 'slow down'}))
     return cases
+
+
+class SpanEvents:
+    """A tracer that writes each call of the span to a list, as the recording of generate_response does."""
+
+    def __init__(self, Tracer, events: list) -> None:
+        class Span:
+            def add_attributes(self, attributes):
+                events.append(['add_attributes', dict(attributes)])
+
+            def set_status(self, status, description=None):
+                events.append(['set_status', status, description])
+
+            def record_exception(self, exception):
+                events.append(['record_exception', str(exception)])
+
+        class RecordingTracer(Tracer):
+            @contextlib.contextmanager
+            def start_span(self, name):
+                events.append(['start_span', name])
+                yield Span()
+
+        self.tracer = RecordingTracer()
+
+
+class LineHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__(logging.DEBUG)
+        self.lines: list = []
+
+    def emit(self, record) -> None:
+        self.lines.append([record.levelname, record.getMessage()])
+
+
+def stored_rows(db_path: str) -> list:
+    import sqlite3
+
+    con = sqlite3.connect(db_path)
+    try:
+        return [list(r) for r in con.execute('SELECT key, value FROM cache ORDER BY key')]
+    finally:
+        con.close()
+
+
+def record_cache_path(make_class, LLMConfig, ModelSize, Message, Tracer) -> list:
+    """generate_response with cache_enabled and a cache_dir: each scenario is a list of calls on one client."""
+    import tempfile
+
+    from graphiti_core.llm_client.cache import LLMCache
+
+    sys_hi = [['system', 'You are helpful.'], ['user', 'hi']]
+    unicode_messages = [['system', 'é日本語 \U0001F600'], ['user', '']]
+    scenarios = [
+        # A miss and then a hit, with prompt_name and the model argument.
+        {'name': 'miss_then_hit', 'calls': [
+            {'messages': sys_hi, 'prompt_name': 'p', 'model': 'override', 'reply': 'dict'},
+            {'messages': sys_hi, 'prompt_name': 'p', 'model': 'override', 'reply': 'dict'}]},
+        # A miss, a hit, the key with model=, and a reply that JSON cannot hold.
+        {'name': 'five_calls', 'calls': [
+            {'messages': sys_hi, 'prompt_name': None, 'model': None, 'reply': 'dict'},
+            {'messages': sys_hi, 'prompt_name': None, 'model': None, 'reply': 'dict'},
+            {'messages': sys_hi, 'prompt_name': 'p', 'model': 'x', 'reply': 'dict'},
+            {'messages': [['user', 'other']], 'prompt_name': 'p', 'model': None, 'reply': 'unserializable'},
+            {'messages': [['user', 'other']], 'prompt_name': 'p', 'model': None, 'reply': 'dict'}]},
+        {'name': 'unicode_and_empty', 'calls': [
+            {'messages': unicode_messages, 'prompt_name': 'é', 'model': '', 'reply': 'dict'},
+            {'messages': unicode_messages, 'prompt_name': 'é', 'model': '', 'reply': 'dict'},
+            {'messages': unicode_messages, 'prompt_name': 'é', 'model': 'm2', 'reply': 'dict'}]},
+    ]
+    logger = logging.getLogger('graphiti_core.llm_client')
+    logger.setLevel(logging.DEBUG)
+    out = []
+    for scenario in scenarios:
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = LLMCache(tmp)
+            received: list = []
+            state = {'index': 0}
+
+            async def _generate_response(self, messages, response_model=None, max_tokens=16384,
+                                         model_size=ModelSize.medium, **kwargs):
+                received.append([[m.role, m.content] for m in messages])
+                spec = scenario['calls'][state['index']]
+                if spec['reply'] == 'unserializable':
+                    return {'content': {1, 2}}
+                return {'content': f'reply {len(received)}'}
+
+            cls = make_class('MockLLMClient')
+            cls._generate_response = _generate_response
+            client = cls(LLMConfig(model='m'))
+            client.cache_enabled = True
+            client.cache_dir = cache
+            calls = []
+            for index, spec in enumerate(scenario['calls']):
+                state['index'] = index
+                events: list = []
+                client.set_tracer(SpanEvents(Tracer, events).tracer)
+                handler = LineHandler()
+                logger.addHandler(handler)
+                before = len(received)
+                kwargs = {'model': spec['model']} if spec['model'] is not None else {}
+                messages = [Message(role=r, content=c) for r, c in spec['messages']]
+                try:
+                    result = asyncio.run(client.generate_response(
+                        messages, prompt_name=spec['prompt_name'], **kwargs))
+                finally:
+                    logger.removeHandler(handler)
+                json_ok = True
+                try:
+                    json.dumps(result)
+                except TypeError:
+                    json_ok = False
+                calls.append({
+                    'spec': spec,
+                    'called': len(received) - before,
+                    'result': json.dumps(result) if json_ok else None,
+                    'events': events,
+                    'log': handler.lines,
+                    'rows': stored_rows(os.path.join(tmp, 'cache.db')),
+                })
+            cache.close()
+            out.append({'name': scenario['name'], 'calls': calls, 'received_total': len(received)})
+    return out
+
+
+def record_cancel(make_class, LLMConfig, ModelSize, Message, Tracer, RateLimitError) -> list:
+    """generate_response when the task is canceled. The cancel comes while an attempt fails with a retried error, or the
+    attempt raises CancelledError itself. tenacity sleeps after a failed attempt but the last, and the cancel lands there."""
+    cases = []
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(logging.DEBUG)
+    specs = [{'mode': 'cancel_then_rate_limit', 'attempt': n} for n in (1, 2, 3, 4)]
+    specs += [{'mode': 'raise_cancelled', 'attempt': n} for n in (1, 2, 4)]
+    for spec in specs:
+        calls: list = []
+
+        async def _generate_response(self, messages, response_model=None, max_tokens=16384,
+                                     model_size=ModelSize.medium, **kwargs):
+            n = len(calls) + 1
+            calls.append(n)
+            if n < spec['attempt']:
+                raise RateLimitError('rate')
+            if spec['mode'] == 'cancel_then_rate_limit':
+                asyncio.current_task().cancel()
+                raise RateLimitError('rate')
+            raise asyncio.CancelledError()
+
+        cls = make_class('MockLLMClient')
+        cls._generate_response = _generate_response
+        client = cls(LLMConfig())
+        events: list = []
+        client.set_tracer(SpanEvents(Tracer, events).tracer)
+        handler = LineHandler()
+        logger.addHandler(handler)
+        try:
+            with patched_retry_environment([], [], 0.5):
+                try:
+                    asyncio.run(client.generate_response([Message(role='user', content='hi')]))
+                    outcome = {'type': None}
+                except BaseException as e:  # noqa: BLE001
+                    outcome = {'type': type(e).__name__, 'message': str(e)}
+        finally:
+            logger.removeHandler(handler)
+        cases.append({'spec': spec, 'attempts': len(calls), 'outcome': outcome, 'events': events, 'log': handler.lines})
+    return cases
+
+
+def record_client_init(make_class, LLMConfig) -> dict:
+    """The attributes that LLMClient.__init__ sets, for an LLMConfig and for no config."""
+    import tempfile
+
+    local = random.Random(20261129)
+    strings = ['', 'a', 'gpt-6-luna', 'gpt-4.1-mini', 'sk-test', 'é', '日本語', 'x' * 50]
+    cls = make_class('MockLLMClient')
+
+    def attrs(client) -> dict:
+        return {
+            'model': client.model,
+            'small_model': client.small_model,
+            'temperature': client.temperature,
+            'temperature_type': type(client.temperature).__name__,
+            'max_tokens': client.max_tokens,
+            'cache_enabled': client.cache_enabled,
+            'cache_dir': None if client.cache_dir is None else type(client.cache_dir).__name__,
+            'tracer': type(client.tracer).__name__,
+            'token_tracker': type(client.token_tracker).__name__,
+            'config': {
+                'base_url': client.config.base_url, 'api_key': client.config.api_key, 'model': client.config.model,
+                'small_model': client.config.small_model, 'temperature': client.config.temperature,
+                'max_tokens': client.config.max_tokens,
+            },
+        }
+
+    cases = [{'kwargs': {}, 'attrs': attrs(cls(LLMConfig()))}]
+    for _ in range(60):
+        kwargs: dict = {}
+        for name in ['api_key', 'model', 'base_url', 'small_model']:
+            if local.random() < 0.6:
+                kwargs[name] = local.choice(strings + [None])
+        if local.random() < 0.6:
+            kwargs['temperature'] = local.choice([0, 1, 2, 0.0, 0.2, 0.5, 0.7, 1.0, 1.5, -1])
+        if local.random() < 0.6:
+            kwargs['max_tokens'] = local.choice([0, 1, 100, 4096, 8192, 16384, 32768, -5])
+        cases.append({'kwargs': kwargs, 'attrs': attrs(cls(LLMConfig(**kwargs)))})
+    no_config = attrs(cls(None))
+
+    # cache=True makes ./llm_cache/cache.db in the working directory.
+    previous = os.getcwd()
+    with tempfile.TemporaryDirectory() as tmp:
+        os.chdir(tmp)
+        try:
+            client = cls(LLMConfig(model='m'), cache=True)
+            with_cache = {'attrs': attrs(client), 'db_exists': os.path.isfile(os.path.join('llm_cache', 'cache.db'))}
+            client.cache_dir.close()
+        finally:
+            os.chdir(previous)
+    return {'cases': cases, 'no_config': no_config, 'with_cache': with_cache}
 
 
 @contextlib.contextmanager

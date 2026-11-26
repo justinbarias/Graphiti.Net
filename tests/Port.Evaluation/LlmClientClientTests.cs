@@ -118,6 +118,16 @@ public class TestClient
         Assert.Empty(messages);
     }
 
+    // tests/llm_client/test_openai_generic_client.py. The code under test is is_server_or_retry_error of client.py, so this
+    // unit ports it. The other tests of that file wait for openai_generic_client.py.
+    [Fact]
+    public void test_empty_response_error_is_retryable()
+    {
+        // An empty body is treated as a transient provider hiccup (common on local/compatible
+        // endpoints), so the base retry wrapper retries it rather than failing on first try.
+        Assert.True(Client.IsServerOrRetryError(new EmptyResponseException("empty")));
+    }
+
     // R23, J3: 4 attempts in total, the retried exception types, and each wait. The fake clock never waits and keeps each
     // delay. Python draws the wait from random.uniform(5, high) with high = max(5, min(10 * 2 ** (attempt - 1), 120)),
     // so the waits of the three sleeps are in [5, 10], [5, 20], and [5, 40].

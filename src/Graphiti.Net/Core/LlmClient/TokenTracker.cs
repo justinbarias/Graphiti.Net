@@ -51,14 +51,14 @@ internal sealed record PromptTokenUsage
 /// <summary>Thread-safe tracker for LLM token usage by prompt type.</summary>
 internal sealed class TokenUsageTracker
 {
-    private readonly OrderedDictionary<string, PromptTokenUsage> Usage;
+    private readonly OrderedDictionary<string, PromptTokenUsage> usage;
 
-    private readonly Lock Lock;
+    private readonly Lock lockValue;
 
     internal TokenUsageTracker()
     {
-        Usage = [];
-        Lock = new Lock();
+        usage = [];
+        lockValue = new Lock();
     }
 
     /// <summary>
@@ -71,12 +71,12 @@ internal sealed class TokenUsageTracker
     {
         var key = !string.IsNullOrEmpty(promptName) ? promptName : "unknown";
 
-        lock (Lock)
+        lock (lockValue)
         {
-            if (!Usage.TryGetValue(key, out var entry))
+            if (!usage.TryGetValue(key, out var entry))
             {
                 entry = new PromptTokenUsage { PromptName = key };
-                Usage[key] = entry;
+                usage[key] = entry;
             }
 
             entry.CallCount += 1;
@@ -88,10 +88,10 @@ internal sealed class TokenUsageTracker
     /// <summary>Get a copy of current token usage by prompt type.</summary>
     internal OrderedDictionary<string, PromptTokenUsage> GetUsage()
     {
-        lock (Lock)
+        lock (lockValue)
         {
             var copy = new OrderedDictionary<string, PromptTokenUsage>();
-            foreach (var (k, v) in Usage)
+            foreach (var (k, v) in usage)
             {
                 copy[k] = new PromptTokenUsage
                 {
@@ -109,10 +109,10 @@ internal sealed class TokenUsageTracker
     /// <summary>Get total token usage across all prompts.</summary>
     internal TokenUsage GetTotalUsage()
     {
-        lock (Lock)
+        lock (lockValue)
         {
-            var totalInput = Usage.Values.Sum(u => u.TotalInputTokens);
-            var totalOutput = Usage.Values.Sum(u => u.TotalOutputTokens);
+            var totalInput = usage.Values.Sum(u => u.TotalInputTokens);
+            var totalOutput = usage.Values.Sum(u => u.TotalOutputTokens);
             return new TokenUsage { InputTokens = totalInput, OutputTokens = totalOutput };
         }
     }
@@ -120,9 +120,9 @@ internal sealed class TokenUsageTracker
     /// <summary>Reset all tracked usage.</summary>
     internal void Reset()
     {
-        lock (Lock)
+        lock (lockValue)
         {
-            Usage.Clear();
+            usage.Clear();
         }
     }
 
