@@ -19,29 +19,63 @@ namespace Graphiti.Core.LlmClient;
 
 using Graphiti.Core.Prompts;
 using Graphiti.Internal;
+using Graphiti.PyCompat;
 
 // PORT: the module name equals the class name LLMRuntime, so the module class has the suffix Module (R2).
 internal static class LlmRuntimeModule
 {
     // PORT: internal, because the class LLMRuntime calls it (R2).
-    // TODO(port): _wrap_builder
     internal static ChatPromptFunction WrapBuilder(ChatPromptFunction builder, string promptName)
     {
-        throw new NotSupportedException("TODO(port): _wrap_builder");
+        return context => Lib.EnsureChatPrompt(builder(context), promptName);
     }
 }
 
+/// <summary>
+/// Route prompts across one or more provider transports.
+/// The runtime uses the routed model ID for each prompt. An unrouted prompt uses the default model.
+/// <c>model_size</c> does not select a second model on this path. Route prompts that need a smaller model to that
+/// model explicitly.
+/// </summary>
 internal sealed class LLMRuntime
 {
     // PORT: `routes`, `prompt_overrides`, and `library` are keyword-only in Python.
-    // TODO(port): LLMRuntime.__init__
     internal LLMRuntime(
         LLMModel model,
         PromptRoutes? routes = null,
         LLMPromptOverrides? promptOverrides = null,
         IPromptLibrary? library = null)
     {
-        throw new NotSupportedException("TODO(port): LLMRuntime.__init__");
+        // PORT: `isinstance(model, LLMModel)`, `isinstance(routes, PromptRoutes)`, and `isinstance(prompt_overrides,
+        // LLMPromptOverrides)` are true for each typed parameter, so the three TypeErrors of Python have no C# form.
+        var resolvedRoutes = PromptConfig.FlattenRoutes(routes);
+        var resolvedOverrides = PromptConfig.FlattenOverrides(promptOverrides);
+
+        IPromptLibrary resolvedLibrary;
+        if (library is null)
+        {
+            resolvedLibrary = Lib.EnsurePromptLibraryWrapped(Lib.CreatePromptLibrary());
+        }
+        else
+        {
+            resolvedLibrary = Lib.EnsurePromptLibraryWrapped(library);
+        }
+
+        List<LLMTransport> transports = [];
+        foreach (var routedModel in resolvedRoutes.Values.Prepend(model))
+        {
+            var transport = routedModel.Transport;
+            if (!transports.Any(existing => ReferenceEquals(transport, existing)))
+            {
+                transports.Add(transport);
+            }
+        }
+
+        Transports = transports;
+        Model = model;
+        Routes = resolvedRoutes;
+        PromptOverrides = resolvedOverrides;
+        Library = resolvedLibrary;
     }
 
     // PORT: `tuple[LLMTransport[Any], ...]` (Part 3).
@@ -56,31 +90,60 @@ internal sealed class LLMRuntime
     // PORT: the result of ensure_prompt_library_wrapped (`Any`), an IPromptLibrary (R15).
     internal IPromptLibrary Library { get; set; }
 
-    // TODO(port): LLMRuntime.client
-    internal LLMClient Client => throw new NotSupportedException("TODO(port): LLMRuntime.client");
+    internal LLMClient Client => Model.Transport.Client;
 
-    // TODO(port): LLMRuntime.set_tracer
     internal void SetTracer(Tracer tracer)
     {
-        throw new NotSupportedException("TODO(port): LLMRuntime.set_tracer");
+        HashSet<LLMClient> seenClients = new(ReferenceEqualityComparer.Instance);
+        foreach (var transport in Transports)
+        {
+            var client = transport.Client;
+            if (seenClients.Contains(client))
+            {
+                continue;
+            }
+
+            seenClients.Add(client);
+            client.SetTracer(tracer);
+        }
     }
 
-    // TODO(port): LLMRuntime.resolve_model
+    /// <summary>Return the LLMModel that should run <paramref name="promptName"/>.</summary>
     internal LLMModel ResolveModel(string promptName)
     {
-        throw new NotSupportedException("TODO(port): LLMRuntime.resolve_model");
+        if (Routes.TryGetValue(promptName, out var routed))
+        {
+            return routed;
+        }
+
+        var groupName = PyText.Split(promptName, ".", 1)[0];
+        if (Routes.TryGetValue(groupName, out routed))
+        {
+            return routed;
+        }
+
+        return Model;
     }
 
-    // TODO(port): LLMRuntime.resolve_builder
+    /// <summary>Builder resolution: model override → general override → library method.</summary>
     internal ChatPromptFunction ResolveBuilder(string promptName, LLMModel model)
     {
-        throw new NotSupportedException("TODO(port): LLMRuntime.resolve_builder");
+        if (!model.FlatOverrides.TryGetValue(promptName, out var @override))
+        {
+            PromptOverrides.TryGetValue(promptName, out @override);
+        }
+
+        if (@override is not null)
+        {
+            return LlmRuntimeModule.WrapBuilder(@override, promptName);
+        }
+
+        return Lib.GetPromptBuilder(Library, promptName);
     }
 
     // PORT: `prompt_name: PromptName` is a `Literal`, so `string` (R7). The arguments after `context` are
     // keyword-only in Python.
-    // TODO(port): LLMRuntime.complete
-    internal Task<OrderedDictionary<string, object?>> CompleteAsync(
+    internal async Task<OrderedDictionary<string, object?>> CompleteAsync(
         string promptName,
         OrderedDictionary<string, object?> context,
         IResponseModel? responseModel = null,
@@ -90,6 +153,21 @@ internal sealed class LLMRuntime
         ModelSize modelSize = ModelSize.Medium,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): LLMRuntime.complete");
+        var resolvedSchema = Lib.ResolveResponseModel(promptName, responseModel);
+        var model = ResolveModel(promptName);
+        var builder = ResolveBuilder(promptName, model);
+        var messages = builder(context).AsMessages();
+        var effectiveMaxTokens = maxTokens ?? model.MaxTokens;
+
+        return await model.Transport.Client.GenerateResponseAsync(
+            messages,
+            responseModel: resolvedSchema,
+            maxTokens: effectiveMaxTokens,
+            modelSize: modelSize,
+            groupId: groupId,
+            promptName: promptName,
+            attributeExtraction: attributeExtraction,
+            model: model.Id,
+            cancellationToken: cancellationToken);
     }
 }
