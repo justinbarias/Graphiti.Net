@@ -47,13 +47,14 @@ internal sealed record GraphitiClients
 
     internal long? MaxCoroutines { get; set; }
 
+    /// <summary>
+    /// Resolve prompt text + fixed schema and call the LLM.
+    ///
+    /// Legacy path (no runtime): builder → ChatPrompt.as_messages → llm_client.generate_response.
+    /// Runtime path: LLMRuntime.complete. ``model_size`` is forwarded on both paths.
+    /// Schemas come from the immutable builtin registry, not the user library.
+    /// </summary>
     // PORT: the arguments after `context` are keyword-only in Python. `prompt_name: PromptName` is `string` (R7).
-    // PORT: the docstring of Python:
-    // Resolve prompt text + fixed schema and call the LLM.
-    //
-    // Legacy path (no runtime): builder -> ChatPrompt.as_messages -> llm_client.generate_response.
-    // Runtime path: LLMRuntime.complete. ``model_size`` is forwarded on both paths.
-    // Schemas come from the immutable builtin registry, not the user library.
     internal async Task<OrderedDictionary<string, object?>> CompletePromptAsync(
         string promptName,
         OrderedDictionary<string, object?> context,
@@ -74,7 +75,7 @@ internal sealed record GraphitiClients
                 groupId: groupId,
                 maxTokens: maxTokens,
                 modelSize: modelSize,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken);
         }
 
         var resolvedModel = Lib.ResolveResponseModel(promptName, responseModel);
@@ -90,7 +91,7 @@ internal sealed record GraphitiClients
             groupId: groupId,
             promptName: promptName,
             attributeExtraction: attributeExtraction,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
     }
 }
 
@@ -124,7 +125,6 @@ internal static partial class GraphitiTypes
     }
 }
 
-// PORT: a TypedDict (R7) with `total=False`, so each key can be absent.
 // PORT: a TypedDict with `total=False` has nullable fields, and null stands for an absent key (R7).
 // generate_prompt_response builds it as the keyword arguments of generate_response.
 internal sealed record GeneratePromptResponseKwargs
@@ -168,7 +168,7 @@ internal static partial class GraphitiTypes
                 attributeExtraction: attributeExtraction,
                 groupId: groupId,
                 maxTokens: maxTokens,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken);
         }
 
         var kwargs = new GeneratePromptResponseKwargs
@@ -205,6 +205,6 @@ internal static partial class GraphitiTypes
             groupId: kwargs.GroupId,
             promptName: kwargs.PromptName,
             attributeExtraction: kwargs.AttributeExtraction ?? false,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken);
     }
 }

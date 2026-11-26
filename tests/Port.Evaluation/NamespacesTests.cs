@@ -44,10 +44,13 @@ public class NamespacesTests
     [Fact]
     public void The_recording_holds_each_kind_of_driver_and_each_recorded_call()
     {
-        Assert.Equal(8, Cases.Count(c => What(c) == "node_namespace"));
-        Assert.Equal(8, Cases.Count(c => What(c) == "edge_namespace"));
+        // Each one of the 16 sets of node operations and each one of the 32 sets of edge operations, for 2 driver names.
+        Assert.Equal(16 * 2, Cases.Count(c => What(c) == "node_namespace"));
+        Assert.Equal(32 * 2, Cases.Count(c => What(c) == "edge_namespace"));
         var methods = Cases.Where(c => What(c) is null).Select(c => c.GetProperty("input").GetProperty("method").GetString()).Distinct().Order().ToList();
-        Assert.Equal(["delete", "delete_by_group_id", "delete_by_uuids", "load_embeddings", "load_embeddings_bulk"], methods);
+        Assert.Equal(
+            ["delete", "delete_by_group_id", "delete_by_uuids", "get_by_group_ids", "get_by_uuid", "get_by_uuids", "load_embeddings", "load_embeddings_bulk", "save_bulk"],
+            methods);
     }
 
     [Theory]
@@ -55,13 +58,7 @@ public class NamespacesTests
     public void NodeNamespace_sets_a_sub_namespace_for_each_operations_class_of_the_driver(int index)
     {
         var input = Cases[index].GetProperty("input");
-        var present = input.GetProperty("kind").GetString() switch
-        {
-            "none" => Array.Empty<string>(),
-            "entity_only" => ["entity"],
-            "episode_saga" => ["episode", "saga"],
-            _ => ["entity", "episode", "community", "saga"],
-        };
+        var present = input.GetProperty("present").EnumerateArray().Select(name => name.GetString()!).ToArray();
         var driver = new FakeDriver(input.GetProperty("driver").GetString()!, []) { Nodes = present };
         var namespaces = new NodeNamespace(driver, new FakeEmbedder());
         var output = Cases[index].GetProperty("output");
@@ -76,13 +73,7 @@ public class NamespacesTests
     public void EdgeNamespace_sets_a_sub_namespace_for_each_operations_class_of_the_driver(int index)
     {
         var input = Cases[index].GetProperty("input");
-        var present = input.GetProperty("kind").GetString() switch
-        {
-            "none" => Array.Empty<string>(),
-            "episodic_only" => ["episodic"],
-            "entity_next" => ["entity", "next_episode"],
-            _ => ["entity", "episodic", "community", "has_episode", "next_episode"],
-        };
+        var present = input.GetProperty("present").EnumerateArray().Select(name => name.GetString()!).ToArray();
         var driver = new FakeDriver(input.GetProperty("driver").GetString()!, []) { Edges = present };
         var namespaces = new EdgeNamespace(driver, new FakeEmbedder());
         var output = Cases[index].GetProperty("output");
@@ -130,9 +121,52 @@ public class NamespacesTests
                 case "load_embeddings":
                     await entity.LoadEmbeddingsAsync(node!, token);
                     break;
-                default:
-                    await entity.LoadEmbeddingsBulkAsync(nodes, cancellationToken: token);
+                case "load_embeddings_bulk":
+                    if (input.TryGetProperty("batch_size", out var bulkBatchSize))
+                    {
+                        await entity.LoadEmbeddingsBulkAsync(nodes, bulkBatchSize.GetInt64(), token);
+                    }
+                    else
+                    {
+                        await entity.LoadEmbeddingsBulkAsync(nodes, cancellationToken: token);
+                    }
+
                     break;
+                case "save_bulk":
+                    if (input.TryGetProperty("batch_size", out var saveBatchSize))
+                    {
+                        await entity.SaveBulkAsync(nodes, transaction, saveBatchSize.GetInt64(), token);
+                    }
+                    else
+                    {
+                        await entity.SaveBulkAsync(nodes, transaction, cancellationToken: token);
+                    }
+
+                    break;
+                case "get_by_uuid":
+                    await entity.GetByUuidAsync(input.GetProperty("uuid").GetString()!, token);
+                    break;
+                case "get_by_uuids":
+                    await entity.GetByUuidsAsync(uuids, token);
+                    break;
+                case "get_by_group_ids":
+                    var groupIds = input.GetProperty("group_ids").EnumerateArray().Select(g => g.GetString()!).ToList();
+                    if (input.TryGetProperty("limit", out var limit))
+                    {
+                        await entity.GetByGroupIdsAsync(
+                            groupIds,
+                            limit.ValueKind == JsonValueKind.Null ? null : limit.GetInt64(),
+                            input.GetProperty("uuid_cursor").GetString(),
+                            token);
+                    }
+                    else
+                    {
+                        await entity.GetByGroupIdsAsync(groupIds, cancellationToken: token);
+                    }
+
+                    break;
+                default:
+                    throw new InvalidOperationException($"No method {method}");
             }
         }
         catch (Exception e) when (e is NodeNotFoundException or KeyNotFoundException or ValidationException)
@@ -157,6 +191,19 @@ public class NamespacesTests
                     var other => throw new InvalidOperationException(other),
                 },
                 error.GetType());
+
+            // The message of a ported exception class is the message of Python.
+            if (error is NodeNotFoundException)
+            {
+                Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
+            }
+        }
+
+        var expectedOps = output.GetProperty("ops").EnumerateArray().ToList();
+        Assert.Equal(expectedOps.Count, driver.OpsSeen.Count);
+        for (var i = 0; i < expectedOps.Count; i++)
+        {
+            AssertSame(expectedOps[i], driver.OpsSeen[i]);
         }
 
         var calls = driver.Calls.Concat(transaction?.Calls ?? []).ToList();
@@ -209,6 +256,19 @@ public class NamespacesTests
             $"expected {expected.GetRawText()} but got {actual?.ToJsonString()}");
     }
 
+    // An argument that the namespace gives to an operations class, as record_namespaces.py encodes it.
+    private static JsonNode EncodeArg(object? value) => value switch
+    {
+        Transaction => new JsonObject { ["type"] = "transaction" },
+        EntityNode node => new JsonObject { ["type"] = "EntityNode", ["uuid"] = node.Uuid },
+        List<EntityNode> nodes => new JsonObject
+        {
+            ["type"] = "list",
+            ["items"] = new JsonArray(nodes.Select(node => (JsonNode?)EncodeArg(node)).ToArray()),
+        },
+        _ => Encode(value),
+    };
+
     private static JsonNode Encode(object? value) => value switch
     {
         null => new JsonObject { ["type"] = "none" },
@@ -216,6 +276,7 @@ public class NamespacesTests
         int or long => new JsonObject { ["type"] = "int", ["value"] = Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture) },
         double d => new JsonObject { ["type"] = "float", ["value"] = d },
         string s => new JsonObject { ["type"] = "str", ["value"] = s },
+        PyDateTime => new JsonObject { ["type"] = "datetime" },
         OrderedDictionary<string, object?> dict => new JsonObject
         {
             ["type"] = "dict",
@@ -278,6 +339,8 @@ public class NamespacesTests
 
         internal string[] Edges { get; set; } = [];
 
+        internal List<JsonNode> OpsSeen { get; } = [];
+
         internal override string PythonName => name;
 
         internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
@@ -298,7 +361,8 @@ public class NamespacesTests
         internal override Task BuildIndicesAndConstraintsAsync(bool deleteExisting = false, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException();
 
-        internal override EntityNodeOperations? EntityNodeOps => Nodes.Contains("entity") ? new Neo4jEntityNodeOperations() : null;
+        internal override EntityNodeOperations? EntityNodeOps =>
+            Nodes.Contains("entity") ? new RecordingEntityNodeOperations(new Neo4jEntityNodeOperations(), OpsSeen) : null;
 
         internal override EpisodeNodeOperations? EpisodeNodeOps => Nodes.Contains("episode") ? new Neo4jEpisodeNodeOperations() : null;
 
@@ -315,6 +379,78 @@ public class NamespacesTests
         internal override HasEpisodeEdgeOperations? HasEpisodeEdgeOps => Edges.Contains("has_episode") ? new Neo4jHasEpisodeEdgeOperations() : null;
 
         internal override NextEpisodeEdgeOperations? NextEpisodeEdgeOps => Edges.Contains("next_episode") ? new Neo4jNextEpisodeEdgeOperations() : null;
+    }
+
+    // The real operations class behind a wrapper that notes the arguments of each call and then delegates, as the
+    // recorder does in Python. The Neo4j class ignores batch_size in load_embeddings_bulk, so only the wrapper shows it.
+    private sealed class RecordingEntityNodeOperations(EntityNodeOperations inner, List<JsonNode> seen) : EntityNodeOperations
+    {
+        internal override Task SaveAsync(QueryExecutor executor, EntityNode node, Transaction? tx = null, CancellationToken cancellationToken = default)
+        {
+            Note("save", ("node", node), ("tx", tx));
+            return inner.SaveAsync(executor, node, tx, cancellationToken);
+        }
+
+        internal override Task SaveBulkAsync(QueryExecutor executor, List<EntityNode> nodes, Transaction? tx = null, long batchSize = 100, CancellationToken cancellationToken = default)
+        {
+            Note("save_bulk", ("nodes", nodes), ("tx", tx), ("batch_size", batchSize));
+            return inner.SaveBulkAsync(executor, nodes, tx, batchSize, cancellationToken);
+        }
+
+        internal override Task DeleteAsync(QueryExecutor executor, EntityNode node, Transaction? tx = null, CancellationToken cancellationToken = default)
+        {
+            Note("delete", ("node", node), ("tx", tx));
+            return inner.DeleteAsync(executor, node, tx, cancellationToken);
+        }
+
+        internal override Task DeleteByGroupIdAsync(QueryExecutor executor, string groupId, Transaction? tx = null, long batchSize = 100, CancellationToken cancellationToken = default)
+        {
+            Note("delete_by_group_id", ("group_id", groupId), ("tx", tx), ("batch_size", batchSize));
+            return inner.DeleteByGroupIdAsync(executor, groupId, tx, batchSize, cancellationToken);
+        }
+
+        internal override Task DeleteByUuidsAsync(QueryExecutor executor, List<string> uuids, Transaction? tx = null, long batchSize = 100, CancellationToken cancellationToken = default)
+        {
+            Note("delete_by_uuids", ("uuids", uuids), ("tx", tx), ("batch_size", batchSize));
+            return inner.DeleteByUuidsAsync(executor, uuids, tx, batchSize, cancellationToken);
+        }
+
+        internal override Task<EntityNode> GetByUuidAsync(QueryExecutor executor, string uuid, CancellationToken cancellationToken = default)
+        {
+            Note("get_by_uuid", ("uuid", uuid));
+            return inner.GetByUuidAsync(executor, uuid, cancellationToken);
+        }
+
+        internal override Task<List<EntityNode>> GetByUuidsAsync(QueryExecutor executor, List<string> uuids, CancellationToken cancellationToken = default)
+        {
+            Note("get_by_uuids", ("uuids", uuids));
+            return inner.GetByUuidsAsync(executor, uuids, cancellationToken);
+        }
+
+        internal override Task<List<EntityNode>> GetByGroupIdsAsync(QueryExecutor executor, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default)
+        {
+            Note("get_by_group_ids", ("group_ids", groupIds), ("limit", limit), ("uuid_cursor", uuidCursor));
+            return inner.GetByGroupIdsAsync(executor, groupIds, limit, uuidCursor, cancellationToken);
+        }
+
+        internal override Task LoadEmbeddingsAsync(QueryExecutor executor, EntityNode node, CancellationToken cancellationToken = default)
+        {
+            Note("load_embeddings", ("node", node));
+            return inner.LoadEmbeddingsAsync(executor, node, cancellationToken);
+        }
+
+        internal override Task LoadEmbeddingsBulkAsync(QueryExecutor executor, List<EntityNode> nodes, long batchSize = 100, CancellationToken cancellationToken = default)
+        {
+            Note("load_embeddings_bulk", ("nodes", nodes), ("batch_size", batchSize));
+            return inner.LoadEmbeddingsBulkAsync(executor, nodes, batchSize, cancellationToken);
+        }
+
+        private void Note(string method, params (string Name, object? Value)[] arguments) =>
+            seen.Add(new JsonObject
+            {
+                ["method"] = method,
+                ["args"] = new JsonArray(arguments.Select(argument => (JsonNode?)new JsonArray(argument.Name, EncodeArg(argument.Value))).ToArray()),
+            });
     }
 
     private sealed class FakeTransaction : Transaction

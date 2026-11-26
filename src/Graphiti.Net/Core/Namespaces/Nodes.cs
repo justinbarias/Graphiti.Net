@@ -22,17 +22,18 @@ using Graphiti.Core.Driver.Operations;
 using Graphiti.Core.Embedder;
 using Graphiti.PyCompat;
 
+/// <summary>Namespace for entity node operations. Accessed as <c>graphiti.nodes.entity</c>.</summary>
 internal sealed class EntityNodeNamespace
 {
-    private readonly GraphDriver _driver;
-    private readonly EntityNodeOperations _ops;
-    private readonly EmbedderClient _embedder;
+    private readonly GraphDriver driver;
+    private readonly EntityNodeOperations ops;
+    private readonly EmbedderClient embedder;
 
     internal EntityNodeNamespace(GraphDriver driver, EntityNodeOperations ops, EmbedderClient embedder)
     {
-        _driver = driver;
-        _ops = ops;
-        _embedder = embedder;
+        this.driver = driver;
+        this.ops = ops;
+        this.embedder = embedder;
     }
 
     internal async Task<EntityNode> SaveAsync(
@@ -40,8 +41,8 @@ internal sealed class EntityNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await node.GenerateNameEmbeddingAsync(_embedder, cancellationToken);
-        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        await node.GenerateNameEmbeddingAsync(embedder, cancellationToken);
+        await ops.SaveAsync(driver, node, tx, cancellationToken);
         return node;
     }
 
@@ -51,7 +52,7 @@ internal sealed class EntityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
+        await ops.SaveBulkAsync(driver, nodes, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteAsync(
@@ -59,7 +60,7 @@ internal sealed class EntityNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
+        await ops.DeleteAsync(driver, node, tx, cancellationToken);
     }
 
     internal async Task DeleteByGroupIdAsync(
@@ -68,7 +69,7 @@ internal sealed class EntityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
+        await ops.DeleteByGroupIdAsync(driver, groupId, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteByUuidsAsync(
@@ -77,21 +78,21 @@ internal sealed class EntityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
+        await ops.DeleteByUuidsAsync(driver, uuids, tx, batchSize, cancellationToken);
     }
 
     internal async Task<EntityNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
+        return await ops.GetByUuidAsync(driver, uuid, cancellationToken);
     }
 
     internal async Task<List<EntityNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
+        return await ops.GetByUuidsAsync(driver, uuids, cancellationToken);
     }
 
     internal async Task<List<EntityNode>> GetByGroupIdsAsync(
@@ -100,14 +101,14 @@ internal sealed class EntityNodeNamespace
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
+        return await ops.GetByGroupIdsAsync(driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
     internal async Task LoadEmbeddingsAsync(
         EntityNode node,
         CancellationToken cancellationToken = default)
     {
-        await _ops.LoadEmbeddingsAsync(_driver, node, cancellationToken);
+        await ops.LoadEmbeddingsAsync(driver, node, cancellationToken);
     }
 
     internal async Task LoadEmbeddingsBulkAsync(
@@ -115,19 +116,20 @@ internal sealed class EntityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.LoadEmbeddingsBulkAsync(_driver, nodes, batchSize, cancellationToken);
+        await ops.LoadEmbeddingsBulkAsync(driver, nodes, batchSize, cancellationToken);
     }
 }
 
+/// <summary>Namespace for episode node operations. Accessed as <c>graphiti.nodes.episode</c>.</summary>
 internal sealed class EpisodeNodeNamespace
 {
-    private readonly GraphDriver _driver;
-    private readonly EpisodeNodeOperations _ops;
+    private readonly GraphDriver driver;
+    private readonly EpisodeNodeOperations ops;
 
     internal EpisodeNodeNamespace(GraphDriver driver, EpisodeNodeOperations ops)
     {
-        _driver = driver;
-        _ops = ops;
+        this.driver = driver;
+        this.ops = ops;
     }
 
     internal async Task<EpisodicNode> SaveAsync(
@@ -135,7 +137,7 @@ internal sealed class EpisodeNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        await ops.SaveAsync(driver, node, tx, cancellationToken);
         return node;
     }
 
@@ -145,7 +147,7 @@ internal sealed class EpisodeNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
+        await ops.SaveBulkAsync(driver, nodes, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteAsync(
@@ -153,7 +155,7 @@ internal sealed class EpisodeNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
+        await ops.DeleteAsync(driver, node, tx, cancellationToken);
     }
 
     internal async Task DeleteByGroupIdAsync(
@@ -162,7 +164,7 @@ internal sealed class EpisodeNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
+        await ops.DeleteByGroupIdAsync(driver, groupId, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteByUuidsAsync(
@@ -171,21 +173,21 @@ internal sealed class EpisodeNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
+        await ops.DeleteByUuidsAsync(driver, uuids, tx, batchSize, cancellationToken);
     }
 
     internal async Task<EpisodicNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
+        return await ops.GetByUuidAsync(driver, uuid, cancellationToken);
     }
 
     internal async Task<List<EpisodicNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
+        return await ops.GetByUuidsAsync(driver, uuids, cancellationToken);
     }
 
     internal async Task<List<EpisodicNode>> GetByGroupIdsAsync(
@@ -194,14 +196,14 @@ internal sealed class EpisodeNodeNamespace
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
+        return await ops.GetByGroupIdsAsync(driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
     internal async Task<List<EpisodicNode>> GetByEntityNodeUuidAsync(
         string entityNodeUuid,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByEntityNodeUuidAsync(_driver, entityNodeUuid, cancellationToken);
+        return await ops.GetByEntityNodeUuidAsync(driver, entityNodeUuid, cancellationToken);
     }
 
     internal async Task<List<EpisodicNode>> RetrieveEpisodesAsync(
@@ -212,21 +214,22 @@ internal sealed class EpisodeNodeNamespace
         string? saga = null,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.RetrieveEpisodesAsync(_driver, referenceTime, lastN, groupIds, source, saga, cancellationToken);
+        return await ops.RetrieveEpisodesAsync(driver, referenceTime, lastN, groupIds, source, saga, cancellationToken);
     }
 }
 
+/// <summary>Namespace for community node operations. Accessed as <c>graphiti.nodes.community</c>.</summary>
 internal sealed class CommunityNodeNamespace
 {
-    private readonly GraphDriver _driver;
-    private readonly CommunityNodeOperations _ops;
-    private readonly EmbedderClient _embedder;
+    private readonly GraphDriver driver;
+    private readonly CommunityNodeOperations ops;
+    private readonly EmbedderClient embedder;
 
     internal CommunityNodeNamespace(GraphDriver driver, CommunityNodeOperations ops, EmbedderClient embedder)
     {
-        _driver = driver;
-        _ops = ops;
-        _embedder = embedder;
+        this.driver = driver;
+        this.ops = ops;
+        this.embedder = embedder;
     }
 
     internal async Task<CommunityNode> SaveAsync(
@@ -234,8 +237,8 @@ internal sealed class CommunityNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await node.GenerateNameEmbeddingAsync(_embedder, cancellationToken);
-        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        await node.GenerateNameEmbeddingAsync(embedder, cancellationToken);
+        await ops.SaveAsync(driver, node, tx, cancellationToken);
         return node;
     }
 
@@ -245,7 +248,7 @@ internal sealed class CommunityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
+        await ops.SaveBulkAsync(driver, nodes, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteAsync(
@@ -253,7 +256,7 @@ internal sealed class CommunityNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
+        await ops.DeleteAsync(driver, node, tx, cancellationToken);
     }
 
     internal async Task DeleteByGroupIdAsync(
@@ -262,7 +265,7 @@ internal sealed class CommunityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
+        await ops.DeleteByGroupIdAsync(driver, groupId, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteByUuidsAsync(
@@ -271,21 +274,21 @@ internal sealed class CommunityNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
+        await ops.DeleteByUuidsAsync(driver, uuids, tx, batchSize, cancellationToken);
     }
 
     internal async Task<CommunityNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
+        return await ops.GetByUuidAsync(driver, uuid, cancellationToken);
     }
 
     internal async Task<List<CommunityNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
+        return await ops.GetByUuidsAsync(driver, uuids, cancellationToken);
     }
 
     internal async Task<List<CommunityNode>> GetByGroupIdsAsync(
@@ -294,26 +297,27 @@ internal sealed class CommunityNodeNamespace
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
+        return await ops.GetByGroupIdsAsync(driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
     internal async Task LoadNameEmbeddingAsync(
         CommunityNode node,
         CancellationToken cancellationToken = default)
     {
-        await _ops.LoadNameEmbeddingAsync(_driver, node, cancellationToken);
+        await ops.LoadNameEmbeddingAsync(driver, node, cancellationToken);
     }
 }
 
+/// <summary>Namespace for saga node operations. Accessed as <c>graphiti.nodes.saga</c>.</summary>
 internal sealed class SagaNodeNamespace
 {
-    private readonly GraphDriver _driver;
-    private readonly SagaNodeOperations _ops;
+    private readonly GraphDriver driver;
+    private readonly SagaNodeOperations ops;
 
     internal SagaNodeNamespace(GraphDriver driver, SagaNodeOperations ops)
     {
-        _driver = driver;
-        _ops = ops;
+        this.driver = driver;
+        this.ops = ops;
     }
 
     internal async Task<SagaNode> SaveAsync(
@@ -321,7 +325,7 @@ internal sealed class SagaNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        await ops.SaveAsync(driver, node, tx, cancellationToken);
         return node;
     }
 
@@ -331,7 +335,7 @@ internal sealed class SagaNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
+        await ops.SaveBulkAsync(driver, nodes, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteAsync(
@@ -339,7 +343,7 @@ internal sealed class SagaNodeNamespace
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
+        await ops.DeleteAsync(driver, node, tx, cancellationToken);
     }
 
     internal async Task DeleteByGroupIdAsync(
@@ -348,7 +352,7 @@ internal sealed class SagaNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
+        await ops.DeleteByGroupIdAsync(driver, groupId, tx, batchSize, cancellationToken);
     }
 
     internal async Task DeleteByUuidsAsync(
@@ -357,21 +361,21 @@ internal sealed class SagaNodeNamespace
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
+        await ops.DeleteByUuidsAsync(driver, uuids, tx, batchSize, cancellationToken);
     }
 
     internal async Task<SagaNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
+        return await ops.GetByUuidAsync(driver, uuid, cancellationToken);
     }
 
     internal async Task<List<SagaNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
+        return await ops.GetByUuidsAsync(driver, uuids, cancellationToken);
     }
 
     internal async Task<List<SagaNode>> GetByGroupIdsAsync(
@@ -380,62 +384,64 @@ internal sealed class SagaNodeNamespace
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
+        return await ops.GetByGroupIdsAsync(driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 }
 
+/// <summary>
+/// Namespace for all node operations. Accessed as <c>graphiti.nodes</c>.
+///
+/// Sub-namespaces are set only when the driver provides the corresponding
+/// operations implementation.  Accessing an unset attribute raises
+/// <c>NotImplementedError</c> with a clear message.
+/// </summary>
 internal sealed class NodeNamespace
 {
-    private readonly string _driverName;
+    private readonly EntityNodeNamespace? entity;
+    private readonly EpisodeNodeNamespace? episode;
+    private readonly CommunityNodeNamespace? community;
+    private readonly SagaNodeNamespace? saga;
 
-    private readonly EntityNodeNamespace? _entity;
-    private readonly EpisodeNodeNamespace? _episode;
-    private readonly CommunityNodeNamespace? _community;
-    private readonly SagaNodeNamespace? _saga;
-
-    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
-    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    internal EntityNodeNamespace Entity => _entity ?? throw new NotImplementedException(_driverName + " does not implement entity_node_ops");
-
-    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
-    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    internal EpisodeNodeNamespace Episode => _episode ?? throw new NotImplementedException(_driverName + " does not implement episode_node_ops");
-
-    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
-    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    internal CommunityNodeNamespace Community => _community ?? throw new NotImplementedException(_driverName + " does not implement community_node_ops");
-
-    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
-    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    internal SagaNodeNamespace Saga => _saga ?? throw new NotImplementedException(_driverName + " does not implement saga_node_ops");
+    private readonly string driverName;
 
     // PORT: _driver_name is type(driver).__name__, which is PythonName (R15).
     internal NodeNamespace(GraphDriver driver, EmbedderClient embedder)
     {
-        _driverName = driver.PythonName;
+        driverName = driver.PythonName;
 
         var entityNodeOps = driver.EntityNodeOps;
         if (entityNodeOps is not null)
         {
-            _entity = new EntityNodeNamespace(driver, entityNodeOps, embedder);
+            entity = new EntityNodeNamespace(driver, entityNodeOps, embedder);
         }
 
         var episodeNodeOps = driver.EpisodeNodeOps;
         if (episodeNodeOps is not null)
         {
-            _episode = new EpisodeNodeNamespace(driver, episodeNodeOps);
+            episode = new EpisodeNodeNamespace(driver, episodeNodeOps);
         }
 
         var communityNodeOps = driver.CommunityNodeOps;
         if (communityNodeOps is not null)
         {
-            _community = new CommunityNodeNamespace(driver, communityNodeOps, embedder);
+            community = new CommunityNodeNamespace(driver, communityNodeOps, embedder);
         }
 
         var sagaNodeOps = driver.SagaNodeOps;
         if (sagaNodeOps is not null)
         {
-            _saga = new SagaNodeNamespace(driver, sagaNodeOps);
+            saga = new SagaNodeNamespace(driver, sagaNodeOps);
         }
     }
+
+    // PORT: the four properties stand for `__getattr__`, which Python defines after `__init__`. Python sets the attribute
+    // only when the driver has the operations, and `__getattr__` raises NotImplementedError for it otherwise. Each getter
+    // throws NotImplementedException in that case (R15).
+    internal EntityNodeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " does not implement entity_node_ops");
+
+    internal EpisodeNodeNamespace Episode => episode ?? throw new NotImplementedException(driverName + " does not implement episode_node_ops");
+
+    internal CommunityNodeNamespace Community => community ?? throw new NotImplementedException(driverName + " does not implement community_node_ops");
+
+    internal SagaNodeNamespace Saga => saga ?? throw new NotImplementedException(driverName + " does not implement saga_node_ops");
 }

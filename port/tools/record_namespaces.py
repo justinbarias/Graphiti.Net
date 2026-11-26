@@ -8,14 +8,18 @@ network boundary: it implements execute_query and records each query. Its operat
 Neo4j operations classes. The tool records two things:
 
 - the construction of NodeNamespace and EdgeNamespace for each set of operations that a driver can
-  give: which sub-namespaces exist, and the error that a missing one raises
+  give (each of the 16 sets of node operations and each of the 32 sets of edge operations): which
+  sub-namespaces exist, and the error that a missing one raises
 - the calls of EntityNodeNamespace that reach the executor and stop at no function of a module that
-  is not ported yet: delete, delete_by_group_id, delete_by_uuids, load_embeddings, and
-  load_embeddings_bulk, with and without a transaction
+  is not ported yet: save_bulk, delete, delete_by_group_id, delete_by_uuids, get_by_uuid,
+  get_by_uuids, get_by_group_ids, load_embeddings, and load_embeddings_bulk. Each call records
+  the queries that reach the executor and the transaction, and also the arguments that the
+  namespace gives to the operations class (the transaction, batch_size, limit, and uuid_cursor).
+  The operations class is the real Neo4j class behind a wrapper that notes each call and then
+  delegates. The Neo4j class ignores batch_size in load_embeddings_bulk, so only the wrapper shows it.
 
-save, get_by_uuid and the other calls need a skeleton function today (generate_name_embedding, the
-record parsers, the queries of node_db_queries.py, or an operations class of another layer), so they
-are not recorded.
+save and the other calls need a skeleton function today (generate_name_embedding, the record
+parser of a non-empty record, or an operations class of another layer), so they are not recorded.
 
 It writes tests/Port.Evaluation/values/namespaces.json. --check writes nothing and exits 1 if the
 file differs from what the run would write. The tool needs Python 3.12 and the pinned upstream in
@@ -24,6 +28,8 @@ file differs from what the run would write. The tool needs Python 3.12 and the p
 from __future__ import annotations
 
 import asyncio
+import inspect
+import itertools
 import json
 import os
 import sys
@@ -33,20 +39,17 @@ ROOT = Path(__file__).resolve().parents[2]
 UPSTREAM = Path(os.environ.get('GRAPHITI_UPSTREAM', ROOT / '.upstream' / 'graphiti'))
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'namespaces.json'
 
-NODE_KINDS = {
-    'none': [],
-    'entity_only': ['entity'],
-    'episode_saga': ['episode', 'saga'],
-    'all': ['entity', 'episode', 'community', 'saga'],
-}
 NODE_NAMES = ['entity', 'episode', 'community', 'saga']
-EDGE_KINDS = {
-    'none': [],
-    'episodic_only': ['episodic'],
-    'entity_next': ['entity', 'next_episode'],
-    'all': ['entity', 'episodic', 'community', 'has_episode', 'next_episode'],
-}
 EDGE_NAMES = ['entity', 'episodic', 'community', 'has_episode', 'next_episode']
+
+
+def subsets(names):
+    """Each subset of the names, in a fixed order: by size, then by position."""
+    return [list(combo) for size in range(len(names) + 1) for combo in itertools.combinations(names, size)]
+
+
+NODE_KINDS = {'+'.join(present) or 'none': present for present in subsets(NODE_NAMES)}
+EDGE_KINDS = {'+'.join(present) or 'none': present for present in subsets(EDGE_NAMES)}
 DRIVER_NAMES = ['FakeDriver', 'Zoë東京Driver']
 
 UUIDS = ['u-1', 'Zoë 東京 😀']
@@ -54,6 +57,8 @@ GROUP_IDS = ['g-1', 'grüp 東京']
 UUID_LISTS = [[], ['a'], ['a', 'b'], ['Zoë', '東京 😀']]
 BATCH_SIZES = [100, 0]
 EMBEDDINGS = [None, [0.1, 0.25], [1, 2], ['x']]
+GROUP_ID_LISTS = [['g'], ['g-1', 'grüp 東京']]
+LIMITS_AND_CURSORS = [(None, None), (5, None), (None, 'c-1'), (5, 'c-1'), (0, ''), (None, '')]
 
 
 def encode(value):
@@ -92,9 +97,24 @@ def call_cases():
         for embedding in EMBEDDINGS:
             out.append({'method': 'load_embeddings', 'uuid': uuid, 'records': [{'name_embedding': embedding}]})
     nodes = ['n-1', 'Zoë 東京']
-    out.append({'method': 'load_embeddings_bulk', 'uuids': [], 'records': []})
-    out.append({'method': 'load_embeddings_bulk', 'uuids': nodes, 'records': [{'uuid': 'Zoë 東京', 'name_embedding': [2, 3]}]})
-    out.append({'method': 'load_embeddings_bulk', 'uuids': nodes, 'records': [{'uuid': 'n-1', 'name_embedding': [1.5]}, {'uuid': 'other', 'name_embedding': [9]}]})
+    for batch_size in (None, 7, 0):
+        extra = {} if batch_size is None else {'batch_size': batch_size}
+        out.append({'method': 'load_embeddings_bulk', 'uuids': [], 'records': [], **extra})
+        out.append({'method': 'load_embeddings_bulk', 'uuids': nodes, 'records': [{'uuid': 'Zoë 東京', 'name_embedding': [2, 3]}], **extra})
+        out.append({'method': 'load_embeddings_bulk', 'uuids': nodes, 'records': [{'uuid': 'n-1', 'name_embedding': [1.5]}, {'uuid': 'other', 'name_embedding': [9]}], **extra})
+    for uuids in UUID_LISTS:
+        for batch_size in (None, 7):
+            for use_tx in (False, True):
+                extra = {} if batch_size is None else {'batch_size': batch_size}
+                out.append({'method': 'save_bulk', 'use_tx': use_tx, 'uuids': uuids, **extra})
+    for uuid in UUIDS:
+        out.append({'method': 'get_by_uuid', 'uuid': uuid})
+    for uuids in UUID_LISTS:
+        out.append({'method': 'get_by_uuids', 'uuids': uuids})
+    for group_ids in GROUP_ID_LISTS:
+        for limit, cursor in LIMITS_AND_CURSORS:
+            out.append({'method': 'get_by_group_ids', 'group_ids': group_ids, 'limit': limit, 'uuid_cursor': cursor})
+        out.append({'method': 'get_by_group_ids', 'group_ids': group_ids})
     return out
 
 
@@ -129,6 +149,36 @@ def main() -> int:
         'next_episode': Neo4jNextEpisodeEdgeOperations,
     }
 
+    def encode_arg(value):
+        """An argument that the namespace gives to an operations class."""
+        if isinstance(value, Transaction):
+            return {'type': 'transaction'}
+        if isinstance(value, EntityNode):
+            return {'type': 'EntityNode', 'uuid': value.uuid}
+        if isinstance(value, list):
+            return {'type': 'list', 'items': [encode_arg(item) for item in value]}
+        return encode(value)
+
+    class RecordingOperations:
+        """The real operations class behind a wrapper that notes each call, and then delegates."""
+
+        def __init__(self, inner, seen):
+            self.inner = inner
+            self.seen = seen
+
+        def __getattr__(self, name):
+            method = getattr(self.inner, name)
+            signature = inspect.signature(method)
+
+            async def call(*args, **kwargs):
+                bound = signature.bind(*args, **kwargs)
+                bound.apply_defaults()
+                arguments = list(bound.arguments.items())[1:]  # the first one is the executor
+                self.seen.append({'method': name, 'args': [[key, encode_arg(value)] for key, value in arguments]})
+                return await method(*args, **kwargs)
+
+            return call
+
     class FakeEmbedder(EmbedderClient):
         async def create(self, input_data):
             return [0.0]
@@ -156,6 +206,7 @@ def main() -> int:
         class Driver(Recorder, GraphDriver):
             def __init__(self):
                 Recorder.__init__(self, records)
+                self.ops_seen = []
 
             async def execute_query(self, cypher_query_, **kwargs):
                 self.note('executor', cypher_query_, kwargs)
@@ -175,7 +226,7 @@ def main() -> int:
 
             @property
             def entity_node_ops(self):
-                return node_ops['entity']() if 'entity' in node_kinds else None
+                return RecordingOperations(node_ops['entity'](), self.ops_seen) if 'entity' in node_kinds else None
 
             @property
             def episode_node_ops(self):
@@ -225,7 +276,7 @@ def main() -> int:
                     outcome[name] = {'present': True, 'type': type(sub).__name__}
                 except NotImplementedError as error:
                     outcome[name] = {'present': False, 'error': type(error).__name__, 'text': str(error)}
-            results.append({'input': {'what': 'node_namespace', 'driver': driver_name, 'kind': kind}, 'output': outcome})
+            results.append({'input': {'what': 'node_namespace', 'driver': driver_name, 'kind': kind, 'present': present}, 'output': outcome})
         for kind, present in EDGE_KINDS.items():
             namespace = EdgeNamespace(make_driver(driver_name, [], present, []), FakeEmbedder())
             outcome = {}
@@ -235,7 +286,7 @@ def main() -> int:
                     outcome[name] = {'present': True, 'type': type(sub).__name__}
                 except NotImplementedError as error:
                     outcome[name] = {'present': False, 'error': type(error).__name__, 'text': str(error)}
-            results.append({'input': {'what': 'edge_namespace', 'driver': driver_name, 'kind': kind}, 'output': outcome})
+            results.append({'input': {'what': 'edge_namespace', 'driver': driver_name, 'kind': kind, 'present': present}, 'output': outcome})
 
     for case in call_cases():
         driver = make_driver('FakeDriver', ['entity'], [], case.get('records', []))
@@ -255,12 +306,29 @@ def main() -> int:
                 asyncio.run(entity.delete_by_uuids(case['uuids'], transaction, case['batch_size']))
             elif method == 'load_embeddings':
                 asyncio.run(entity.load_embeddings(node))
+            elif method == 'load_embeddings_bulk':
+                if 'batch_size' in case:
+                    asyncio.run(entity.load_embeddings_bulk(nodes, case['batch_size']))
+                else:
+                    asyncio.run(entity.load_embeddings_bulk(nodes))
+            elif method == 'save_bulk':
+                if 'batch_size' in case:
+                    asyncio.run(entity.save_bulk(nodes, transaction, case['batch_size']))
+                else:
+                    asyncio.run(entity.save_bulk(nodes, transaction))
+            elif method == 'get_by_uuid':
+                asyncio.run(entity.get_by_uuid(case['uuid']))
+            elif method == 'get_by_uuids':
+                asyncio.run(entity.get_by_uuids(case['uuids']))
+            elif 'limit' in case:
+                asyncio.run(entity.get_by_group_ids(case['group_ids'], case['limit'], case['uuid_cursor']))
             else:
-                asyncio.run(entity.load_embeddings_bulk(nodes))
+                asyncio.run(entity.get_by_group_ids(case['group_ids']))
             outcome['error'] = None
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
             outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
         outcome['calls'] = driver.calls + (transaction.calls if transaction else [])
+        outcome['ops'] = driver.ops_seen
         if method == 'load_embeddings':
             outcome['embeddings'] = [encode(node.name_embedding)]
         elif method == 'load_embeddings_bulk':

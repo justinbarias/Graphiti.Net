@@ -21,9 +21,31 @@ public class GraphitiTypesTests
         Assert.Equal(legacyMessages, messages);
     }
 
+    // Python has no test for this branch of resolve_prompt_messages: clients that hold neither a runtime nor a prompt
+    // library take the legacy path, as no clients do. No LLM client, driver, embedder, or reranker can be built until the
+    // layers of those classes are ported (their constructors are skeleton members), and the code under test reads only
+    // llm_runtime and prompt_library, so the other fields stay null here and nothing reads them.
     [Fact]
-    public void uses_prompt_routing_is_false_without_clients()
+    public void resolve_prompt_messages_uses_legacy_prompt_when_clients_have_no_runtime_and_no_prompt_library()
     {
+        var clients = new GraphitiClients
+        {
+            Driver = null!,
+            LlmClient = null!,
+            Embedder = null!,
+            CrossEncoder = null!,
+            Tracer = new NoOpTracer(),
+        };
+        List<Message> legacyMessages = [new Message { Role = "user", Content = "legacy prompt" }];
+
+        Assert.False(GraphitiTypes.UsesPromptRouting(clients));
         Assert.False(GraphitiTypes.UsesPromptRouting(null));
+        Assert.Same(
+            legacyMessages,
+            GraphitiTypes.ResolvePromptMessages(
+                "summarize_sagas.summarize_saga",
+                _ => legacyMessages,
+                new OrderedDictionary<string, object?> { ["saga_name"] = "test saga" },
+                clients));
     }
 }

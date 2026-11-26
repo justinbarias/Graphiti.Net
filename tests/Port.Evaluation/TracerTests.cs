@@ -28,7 +28,8 @@ public class TracerTests
     }
 
     // Python: RuntimeError: generator didn't stop after throw(), with ValueError('boom') as the context. The span has
-    // the error status 'ValueError: boom' and one exception event.
+    // the error status 'ValueError: boom' and one exception event. The text of the status and the type of the event
+    // are those of .NET (decision D46), and TracerValuesTests compares them with the recording through its table D46Names.
     [Fact]
     public async Task a_body_that_raises_leaves_as_a_runtime_error_with_the_open_telemetry_tracer()
     {
@@ -43,7 +44,6 @@ public class TracerTests
         Assert.Same(error, thrown.InnerException);
         var span = Assert.Single(probe.Stopped);
         Assert.Equal(ActivityStatusCode.Error, span.Status);
-        Assert.Equal("ArgumentException: boom", span.StatusDescription);
         var recorded = Assert.Single(span.Events);
         Assert.Equal("exception", recorded.Name);
     }
@@ -122,11 +122,90 @@ public class TracerTests
         Assert.Equal("graphiti.a", Assert.Single(probe.Stopped).DisplayName);
     }
 
+    // Python: the one start_span serves both forms, and the end of the span waits for the body. A body that raises under the
+    // no-op tracer leaves as it is, and under the OpenTelemetry tracer it leaves as RuntimeError with the body error as
+    // the context. The span records the error, so the span ended after the body.
+    [Fact]
+    public async Task the_form_with_no_result_waits_for_the_body_and_lets_its_exception_leave()
+    {
+        var finished = false;
+        var error = new ArgumentException("x");
+
+        var thrown = await Assert.ThrowsAsync<ArgumentException>(() => TracerModule.CreateTracer().StartSpanAsync("op", async _ =>
+        {
+            await Task.Yield();
+            finished = true;
+            throw error;
+        }, TestContext.Current.CancellationToken));
+        Assert.Same(error, thrown);
+        Assert.True(finished);
+
+        using var probe = new SpanProbe();
+        finished = false;
+        var wrapped = await Assert.ThrowsAsync<InvalidOperationException>(() => TracerModule.CreateTracer(probe.Source).StartSpanAsync("op", async _ =>
+        {
+            await Task.Yield();
+            finished = true;
+            throw error;
+        }, TestContext.Current.CancellationToken));
+        Assert.Same(error, wrapped.InnerException);
+        Assert.True(finished);
+        Assert.Equal(ActivityStatusCode.Error, Assert.Single(probe.Stopped).Status);
+    }
+
+    // Python: CancelledError is a BaseException, so it leaves as it is from the form with no result too. The token of the
+    // call is what tells a cancellation of the caller from a failure of the body.
+    [Fact]
+    public async Task the_form_with_no_result_passes_its_token_so_that_a_cancellation_leaves_as_it_is()
+    {
+        using var probe = new SpanProbe();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await cancellation.CancelAsync();
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            TracerModule.CreateTracer(probe.Source).StartSpanAsync("op", _ => throw new OperationCanceledException(cancellation.Token), cancellation.Token));
+
+        Assert.Null(thrown.InnerException);
+        Assert.Equal(ActivityStatusCode.Unset, Assert.Single(probe.Stopped).Status);
+    }
+
+    // Python: if the end of the span raises after a body that returned, the generator yields a second time, and contextlib
+    // raises RuntimeError: generator didn't stop, with no context (U19). The recording holds the same case with a span
+    // processor that raises (tracer kind otel_fail_end). This test names the exact text and the missing inner exception.
+    [Fact]
+    public async Task a_failing_end_of_the_span_after_a_normal_body_leaves_as_a_runtime_error_with_no_context()
+    {
+        using var probe = new SpanProbe(stopped: _ => throw new ArgumentException("end failed"));
+        var tracer = TracerModule.CreateTracer(probe.Source);
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tracer.StartSpanAsync("op", _ => Task.FromResult(5L), TestContext.Current.CancellationToken));
+
+        Assert.Equal("generator didn't stop", thrown.Message);
+        Assert.Null(thrown.InnerException);
+    }
+
+    // The value model has no C# int (R6). A caller passes `(long)x.Count`. An int leaves as InvalidCastException, where a
+    // silent drop would lose each attribute of the call. NoOpSpan does nothing for it, as in Python.
+    [Fact]
+    public void an_attribute_of_the_type_int_leaves_as_an_invalid_cast_and_the_no_op_span_ignores_it()
+    {
+        var attributes = new OrderedDictionary<string, object?> { ["group_id"] = "g", ["node.count"] = 3 };
+
+        Assert.Throws<InvalidCastException>(() => new OpenTelemetrySpan(null).AddAttributes(attributes));
+        new NoOpSpan().AddAttributes(attributes);
+
+        using var probe = new SpanProbe();
+        using var activity = probe.Source.StartActivity("op");
+        new OpenTelemetrySpan(activity).AddAttributes(new OrderedDictionary<string, object?> { ["group_id"] = "g", ["node.count"] = 3L, [string.Empty] = "dropped" });
+        Assert.Equal(["group_id", "node.count"], activity!.TagObjects.Select(tag => tag.Key));
+    }
+
     private sealed class SpanProbe : IDisposable
     {
         private readonly ActivityListener _listener;
 
-        internal SpanProbe()
+        internal SpanProbe(Action<Activity>? stopped = null)
         {
             var name = "tracer-test-" + Guid.NewGuid().ToString("N");
             Source = new ActivitySource(name);
@@ -134,7 +213,7 @@ public class TracerTests
             {
                 ShouldListenTo = candidate => candidate.Name == name,
                 Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-                ActivityStopped = Stopped.Add,
+                ActivityStopped = stopped ?? Stopped.Add,
             };
             ActivitySource.AddActivityListener(_listener);
         }
