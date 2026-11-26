@@ -11955,6 +11955,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b",
+     "c"
+    ],
     "events": [
      {
       "kind": "call",
@@ -12140,6 +12145,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "x",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -12312,6 +12322,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "x",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -12461,6 +12476,11 @@
    "output": {
     "result": [],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "x",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -12593,6 +12613,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "x",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -12741,6 +12766,9 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "x"
+    ],
     "events": [
      {
       "kind": "call",
@@ -12868,6 +12896,7 @@
    "output": {
     "result": [],
     "error": null,
+    "node_uuids_after": [],
     "events": [
      {
       "kind": "call",
@@ -12949,6 +12978,10 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13092,6 +13125,10 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13269,6 +13306,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b",
+     "a"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13420,6 +13462,10 @@
    "output": {
     "result": [],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13544,6 +13590,10 @@
      "type": "ZeroDivisionError",
      "text": "division by zero"
     },
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13608,6 +13658,1743 @@
    "output": {
     "result": [],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n        UNWIND $node_uuids AS node_uuid\n        MATCH (center:Entity {uuid: $center_uuid})-[:RELATES_TO]-(n:Entity {uuid: node_uuid})\n        RETURN 1 AS score, node_uuid AS uuid\n        ",
+      "keys": [
+       "node_uuids",
+       "center_uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "x"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "b"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "node_distance_reranker",
+    "args": {
+     "node_uuids": [
+      "u00",
+      "u01",
+      "u02",
+      "u03",
+      "u04",
+      "u05",
+      "u06",
+      "u07",
+      "u08",
+      "u09",
+      "u10",
+      "u11",
+      "u12",
+      "u13",
+      "u14",
+      "u15",
+      "u16",
+      "u17",
+      "u18",
+      "u19"
+     ],
+     "center_node_uuid": "x",
+     "min_score": 0
+    },
+    "responses": [
+     [],
+     [
+      {
+       "uuid": "u00",
+       "name": "name u00",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u01",
+       "name": "name u01",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u02",
+       "name": "name u02",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u03",
+       "name": "name u03",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u04",
+       "name": "name u04",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u05",
+       "name": "name u05",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u06",
+       "name": "name u06",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u07",
+       "name": "name u07",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u08",
+       "name": "name u08",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u09",
+       "name": "name u09",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u10",
+       "name": "name u10",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u11",
+       "name": "name u11",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u12",
+       "name": "name u12",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u13",
+       "name": "name u13",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u14",
+       "name": "name u14",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u15",
+       "name": "name u15",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u16",
+       "name": "name u16",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u17",
+       "name": "name u17",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u18",
+       "name": "name u18",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u19",
+       "name": "name u19",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "u00",
+      "name": "name u00",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u01",
+      "name": "name u01",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u02",
+      "name": "name u02",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u03",
+      "name": "name u03",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u04",
+      "name": "name u04",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u05",
+      "name": "name u05",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u06",
+      "name": "name u06",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u07",
+      "name": "name u07",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u08",
+      "name": "name u08",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u09",
+      "name": "name u09",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u10",
+      "name": "name u10",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u11",
+      "name": "name u11",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u12",
+      "name": "name u12",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u13",
+      "name": "name u13",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u14",
+      "name": "name u14",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u15",
+      "name": "name u15",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u16",
+      "name": "name u16",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u17",
+      "name": "name u17",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u18",
+      "name": "name u18",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u19",
+      "name": "name u19",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "u00",
+     "u01",
+     "u02",
+     "u03",
+     "u04",
+     "u05",
+     "u06",
+     "u07",
+     "u08",
+     "u09",
+     "u10",
+     "u11",
+     "u12",
+     "u13",
+     "u14",
+     "u15",
+     "u16",
+     "u17",
+     "u18",
+     "u19"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n        UNWIND $node_uuids AS node_uuid\n        MATCH (center:Entity {uuid: $center_uuid})-[:RELATES_TO]-(n:Entity {uuid: node_uuid})\n        RETURN 1 AS score, node_uuid AS uuid\n        ",
+      "keys": [
+       "node_uuids",
+       "center_uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "u00"
+         },
+         {
+          "type": "str",
+          "value": "u01"
+         },
+         {
+          "type": "str",
+          "value": "u02"
+         },
+         {
+          "type": "str",
+          "value": "u03"
+         },
+         {
+          "type": "str",
+          "value": "u04"
+         },
+         {
+          "type": "str",
+          "value": "u05"
+         },
+         {
+          "type": "str",
+          "value": "u06"
+         },
+         {
+          "type": "str",
+          "value": "u07"
+         },
+         {
+          "type": "str",
+          "value": "u08"
+         },
+         {
+          "type": "str",
+          "value": "u09"
+         },
+         {
+          "type": "str",
+          "value": "u10"
+         },
+         {
+          "type": "str",
+          "value": "u11"
+         },
+         {
+          "type": "str",
+          "value": "u12"
+         },
+         {
+          "type": "str",
+          "value": "u13"
+         },
+         {
+          "type": "str",
+          "value": "u14"
+         },
+         {
+          "type": "str",
+          "value": "u15"
+         },
+         {
+          "type": "str",
+          "value": "u16"
+         },
+         {
+          "type": "str",
+          "value": "u17"
+         },
+         {
+          "type": "str",
+          "value": "u18"
+         },
+         {
+          "type": "str",
+          "value": "u19"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "x"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "u00"
+         },
+         {
+          "type": "str",
+          "value": "u01"
+         },
+         {
+          "type": "str",
+          "value": "u02"
+         },
+         {
+          "type": "str",
+          "value": "u03"
+         },
+         {
+          "type": "str",
+          "value": "u04"
+         },
+         {
+          "type": "str",
+          "value": "u05"
+         },
+         {
+          "type": "str",
+          "value": "u06"
+         },
+         {
+          "type": "str",
+          "value": "u07"
+         },
+         {
+          "type": "str",
+          "value": "u08"
+         },
+         {
+          "type": "str",
+          "value": "u09"
+         },
+         {
+          "type": "str",
+          "value": "u10"
+         },
+         {
+          "type": "str",
+          "value": "u11"
+         },
+         {
+          "type": "str",
+          "value": "u12"
+         },
+         {
+          "type": "str",
+          "value": "u13"
+         },
+         {
+          "type": "str",
+          "value": "u14"
+         },
+         {
+          "type": "str",
+          "value": "u15"
+         },
+         {
+          "type": "str",
+          "value": "u16"
+         },
+         {
+          "type": "str",
+          "value": "u17"
+         },
+         {
+          "type": "str",
+          "value": "u18"
+         },
+         {
+          "type": "str",
+          "value": "u19"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "node_distance_reranker",
+    "args": {
+     "node_uuids": [
+      "u00",
+      "u01",
+      "u02",
+      "u03",
+      "u04",
+      "u05",
+      "u06",
+      "u07",
+      "u08",
+      "u09",
+      "u10",
+      "u11",
+      "u12",
+      "u13",
+      "u14",
+      "u15",
+      "u16",
+      "u17",
+      "u18",
+      "u19"
+     ],
+     "center_node_uuid": "x",
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "u00",
+       "score": 1
+      },
+      {
+       "uuid": "u01",
+       "score": 1
+      },
+      {
+       "uuid": "u02",
+       "score": 1
+      },
+      {
+       "uuid": "u03",
+       "score": 1
+      },
+      {
+       "uuid": "u04",
+       "score": 1
+      },
+      {
+       "uuid": "u05",
+       "score": 1
+      },
+      {
+       "uuid": "u06",
+       "score": 1
+      },
+      {
+       "uuid": "u07",
+       "score": 1
+      },
+      {
+       "uuid": "u08",
+       "score": 1
+      },
+      {
+       "uuid": "u09",
+       "score": 1
+      },
+      {
+       "uuid": "u10",
+       "score": 1
+      },
+      {
+       "uuid": "u11",
+       "score": 1
+      },
+      {
+       "uuid": "u12",
+       "score": 1
+      },
+      {
+       "uuid": "u13",
+       "score": 1
+      },
+      {
+       "uuid": "u14",
+       "score": 1
+      },
+      {
+       "uuid": "u15",
+       "score": 1
+      },
+      {
+       "uuid": "u16",
+       "score": 1
+      },
+      {
+       "uuid": "u17",
+       "score": 1
+      },
+      {
+       "uuid": "u18",
+       "score": 1
+      },
+      {
+       "uuid": "u19",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "u00",
+       "name": "name u00",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u01",
+       "name": "name u01",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u02",
+       "name": "name u02",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u03",
+       "name": "name u03",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u04",
+       "name": "name u04",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u05",
+       "name": "name u05",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u06",
+       "name": "name u06",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u07",
+       "name": "name u07",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u08",
+       "name": "name u08",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u09",
+       "name": "name u09",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u10",
+       "name": "name u10",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u11",
+       "name": "name u11",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u12",
+       "name": "name u12",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u13",
+       "name": "name u13",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u14",
+       "name": "name u14",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u15",
+       "name": "name u15",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u16",
+       "name": "name u16",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u17",
+       "name": "name u17",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u18",
+       "name": "name u18",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u19",
+       "name": "name u19",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "u00",
+      "name": "name u00",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u01",
+      "name": "name u01",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u02",
+      "name": "name u02",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u03",
+      "name": "name u03",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u04",
+      "name": "name u04",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u05",
+      "name": "name u05",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u06",
+      "name": "name u06",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u07",
+      "name": "name u07",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u08",
+      "name": "name u08",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u09",
+      "name": "name u09",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u10",
+      "name": "name u10",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u11",
+      "name": "name u11",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u12",
+      "name": "name u12",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u13",
+      "name": "name u13",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u14",
+      "name": "name u14",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u15",
+      "name": "name u15",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u16",
+      "name": "name u16",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u17",
+      "name": "name u17",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u18",
+      "name": "name u18",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u19",
+      "name": "name u19",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "u00",
+     "u01",
+     "u02",
+     "u03",
+     "u04",
+     "u05",
+     "u06",
+     "u07",
+     "u08",
+     "u09",
+     "u10",
+     "u11",
+     "u12",
+     "u13",
+     "u14",
+     "u15",
+     "u16",
+     "u17",
+     "u18",
+     "u19"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n        UNWIND $node_uuids AS node_uuid\n        MATCH (center:Entity {uuid: $center_uuid})-[:RELATES_TO]-(n:Entity {uuid: node_uuid})\n        RETURN 1 AS score, node_uuid AS uuid\n        ",
+      "keys": [
+       "node_uuids",
+       "center_uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "u00"
+         },
+         {
+          "type": "str",
+          "value": "u01"
+         },
+         {
+          "type": "str",
+          "value": "u02"
+         },
+         {
+          "type": "str",
+          "value": "u03"
+         },
+         {
+          "type": "str",
+          "value": "u04"
+         },
+         {
+          "type": "str",
+          "value": "u05"
+         },
+         {
+          "type": "str",
+          "value": "u06"
+         },
+         {
+          "type": "str",
+          "value": "u07"
+         },
+         {
+          "type": "str",
+          "value": "u08"
+         },
+         {
+          "type": "str",
+          "value": "u09"
+         },
+         {
+          "type": "str",
+          "value": "u10"
+         },
+         {
+          "type": "str",
+          "value": "u11"
+         },
+         {
+          "type": "str",
+          "value": "u12"
+         },
+         {
+          "type": "str",
+          "value": "u13"
+         },
+         {
+          "type": "str",
+          "value": "u14"
+         },
+         {
+          "type": "str",
+          "value": "u15"
+         },
+         {
+          "type": "str",
+          "value": "u16"
+         },
+         {
+          "type": "str",
+          "value": "u17"
+         },
+         {
+          "type": "str",
+          "value": "u18"
+         },
+         {
+          "type": "str",
+          "value": "u19"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "x"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "u00"
+         },
+         {
+          "type": "str",
+          "value": "u01"
+         },
+         {
+          "type": "str",
+          "value": "u02"
+         },
+         {
+          "type": "str",
+          "value": "u03"
+         },
+         {
+          "type": "str",
+          "value": "u04"
+         },
+         {
+          "type": "str",
+          "value": "u05"
+         },
+         {
+          "type": "str",
+          "value": "u06"
+         },
+         {
+          "type": "str",
+          "value": "u07"
+         },
+         {
+          "type": "str",
+          "value": "u08"
+         },
+         {
+          "type": "str",
+          "value": "u09"
+         },
+         {
+          "type": "str",
+          "value": "u10"
+         },
+         {
+          "type": "str",
+          "value": "u11"
+         },
+         {
+          "type": "str",
+          "value": "u12"
+         },
+         {
+          "type": "str",
+          "value": "u13"
+         },
+         {
+          "type": "str",
+          "value": "u14"
+         },
+         {
+          "type": "str",
+          "value": "u15"
+         },
+         {
+          "type": "str",
+          "value": "u16"
+         },
+         {
+          "type": "str",
+          "value": "u17"
+         },
+         {
+          "type": "str",
+          "value": "u18"
+         },
+         {
+          "type": "str",
+          "value": "u19"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "node_distance_reranker",
+    "args": {
+     "node_uuids": [
+      "a",
+      "b"
+     ],
+     "center_node_uuid": "x",
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "b",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "first",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "a",
+       "name": "last",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "b",
+      "name": "name b",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "a",
+      "name": "last",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13759,6 +15546,9 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a"
+    ],
     "events": [
      {
       "kind": "call",
@@ -13816,6 +15606,135 @@
   },
   {
    "input": {
+    "method": "node_distance_reranker",
+    "args": {
+     "node_uuids": [
+      "a",
+      "b"
+     ],
+     "center_node_uuid": "x",
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "b",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "name a",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "c",
+       "name": "name c",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "x",
+       "name": "name x",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ],
+    "cancel_after": 1
+   },
+   "output": {
+    "result": null,
+    "error": {
+     "type": "CancelledError",
+     "text": ""
+    },
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n        UNWIND $node_uuids AS node_uuid\n        MATCH (center:Entity {uuid: $center_uuid})-[:RELATES_TO]-(n:Entity {uuid: node_uuid})\n        RETURN 1 AS score, node_uuid AS uuid\n        ",
+      "keys": [
+       "node_uuids",
+       "center_uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "x"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
     "method": "episode_mentions_reranker",
     "args": {
      "node_uuids": [],
@@ -13826,6 +15745,7 @@
    "output": {
     "result": [],
     "error": null,
+    "node_uuids_after": [],
     "events": []
    }
   },
@@ -13946,6 +15866,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b",
+     "c"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14120,6 +16045,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b",
+     "c"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14281,6 +16211,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b",
+     "c"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14452,6 +16387,11 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14571,6 +16511,10 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14652,6 +16596,10 @@
    "output": {
     "result": [],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14698,6 +16646,1290 @@
          {
           "type": "str",
           "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "episode_mentions_reranker",
+    "args": {
+     "node_uuids": [
+      "a"
+     ],
+     "min_score": 2
+    },
+    "responses": [
+     [
+      {
+       "uuid": "a",
+       "score": 2
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "name a",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "c",
+       "name": "name c",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "x",
+       "name": "name x",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "a",
+      "name": "name a",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "a"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n            UNWIND $node_uuids AS node_uuid\n            MATCH (episode:Episodic)-[r:MENTIONS]->(n:Entity {uuid: node_uuid})\n            RETURN count(*) AS score, n.uuid AS uuid\n            ",
+      "keys": [
+       "node_uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "episode_mentions_reranker",
+    "args": {
+     "node_uuids": [
+      "a",
+      "b"
+     ],
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "b",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "name a",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "c",
+       "name": "name c",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "x",
+       "name": "name x",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "b",
+      "name": "name b",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "a",
+      "name": "name a",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n            UNWIND $node_uuids AS node_uuid\n            MATCH (episode:Episodic)-[r:MENTIONS]->(n:Entity {uuid: node_uuid})\n            RETURN count(*) AS score, n.uuid AS uuid\n            ",
+      "keys": [
+       "node_uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "b"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "episode_mentions_reranker",
+    "args": {
+     "node_uuids": [
+      "a",
+      "b"
+     ],
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "b",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "first",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "a",
+       "name": "last",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "b",
+      "name": "name b",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "a",
+      "name": "last",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n            UNWIND $node_uuids AS node_uuid\n            MATCH (episode:Episodic)-[r:MENTIONS]->(n:Entity {uuid: node_uuid})\n            RETURN count(*) AS score, n.uuid AS uuid\n            ",
+      "keys": [
+       "node_uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "b"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "episode_mentions_reranker",
+    "args": {
+     "node_uuids": [
+      "u00",
+      "u01",
+      "u02",
+      "u03",
+      "u04",
+      "u05",
+      "u06",
+      "u07",
+      "u08",
+      "u09",
+      "u10",
+      "u11",
+      "u12",
+      "u13",
+      "u14",
+      "u15",
+      "u16",
+      "u17",
+      "u18",
+      "u19"
+     ],
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "u00",
+       "score": 1
+      },
+      {
+       "uuid": "u01",
+       "score": 1
+      },
+      {
+       "uuid": "u02",
+       "score": 1
+      },
+      {
+       "uuid": "u03",
+       "score": 1
+      },
+      {
+       "uuid": "u04",
+       "score": 1
+      },
+      {
+       "uuid": "u05",
+       "score": 1
+      },
+      {
+       "uuid": "u06",
+       "score": 1
+      },
+      {
+       "uuid": "u07",
+       "score": 1
+      },
+      {
+       "uuid": "u08",
+       "score": 1
+      },
+      {
+       "uuid": "u09",
+       "score": 1
+      },
+      {
+       "uuid": "u10",
+       "score": 1
+      },
+      {
+       "uuid": "u11",
+       "score": 1
+      },
+      {
+       "uuid": "u12",
+       "score": 1
+      },
+      {
+       "uuid": "u13",
+       "score": 1
+      },
+      {
+       "uuid": "u14",
+       "score": 1
+      },
+      {
+       "uuid": "u15",
+       "score": 1
+      },
+      {
+       "uuid": "u16",
+       "score": 1
+      },
+      {
+       "uuid": "u17",
+       "score": 1
+      },
+      {
+       "uuid": "u18",
+       "score": 1
+      },
+      {
+       "uuid": "u19",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "u00",
+       "name": "name u00",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u01",
+       "name": "name u01",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u02",
+       "name": "name u02",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u03",
+       "name": "name u03",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u04",
+       "name": "name u04",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u05",
+       "name": "name u05",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u06",
+       "name": "name u06",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u07",
+       "name": "name u07",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u08",
+       "name": "name u08",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u09",
+       "name": "name u09",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u10",
+       "name": "name u10",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u11",
+       "name": "name u11",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u12",
+       "name": "name u12",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u13",
+       "name": "name u13",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u14",
+       "name": "name u14",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u15",
+       "name": "name u15",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u16",
+       "name": "name u16",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u17",
+       "name": "name u17",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u18",
+       "name": "name u18",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "u19",
+       "name": "name u19",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "u00",
+      "name": "name u00",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u01",
+      "name": "name u01",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u02",
+      "name": "name u02",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u03",
+      "name": "name u03",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u04",
+      "name": "name u04",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u05",
+      "name": "name u05",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u06",
+      "name": "name u06",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u07",
+      "name": "name u07",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u08",
+      "name": "name u08",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u09",
+      "name": "name u09",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u10",
+      "name": "name u10",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u11",
+      "name": "name u11",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u12",
+      "name": "name u12",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u13",
+      "name": "name u13",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u14",
+      "name": "name u14",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u15",
+      "name": "name u15",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u16",
+      "name": "name u16",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u17",
+      "name": "name u17",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u18",
+      "name": "name u18",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     },
+     {
+      "class": "EntityNode",
+      "uuid": "u19",
+      "name": "name u19",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "u00",
+     "u01",
+     "u02",
+     "u03",
+     "u04",
+     "u05",
+     "u06",
+     "u07",
+     "u08",
+     "u09",
+     "u10",
+     "u11",
+     "u12",
+     "u13",
+     "u14",
+     "u15",
+     "u16",
+     "u17",
+     "u18",
+     "u19"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n            UNWIND $node_uuids AS node_uuid\n            MATCH (episode:Episodic)-[r:MENTIONS]->(n:Entity {uuid: node_uuid})\n            RETURN count(*) AS score, n.uuid AS uuid\n            ",
+      "keys": [
+       "node_uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "u00"
+         },
+         {
+          "type": "str",
+          "value": "u01"
+         },
+         {
+          "type": "str",
+          "value": "u02"
+         },
+         {
+          "type": "str",
+          "value": "u03"
+         },
+         {
+          "type": "str",
+          "value": "u04"
+         },
+         {
+          "type": "str",
+          "value": "u05"
+         },
+         {
+          "type": "str",
+          "value": "u06"
+         },
+         {
+          "type": "str",
+          "value": "u07"
+         },
+         {
+          "type": "str",
+          "value": "u08"
+         },
+         {
+          "type": "str",
+          "value": "u09"
+         },
+         {
+          "type": "str",
+          "value": "u10"
+         },
+         {
+          "type": "str",
+          "value": "u11"
+         },
+         {
+          "type": "str",
+          "value": "u12"
+         },
+         {
+          "type": "str",
+          "value": "u13"
+         },
+         {
+          "type": "str",
+          "value": "u14"
+         },
+         {
+          "type": "str",
+          "value": "u15"
+         },
+         {
+          "type": "str",
+          "value": "u16"
+         },
+         {
+          "type": "str",
+          "value": "u17"
+         },
+         {
+          "type": "str",
+          "value": "u18"
+         },
+         {
+          "type": "str",
+          "value": "u19"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "u00"
+         },
+         {
+          "type": "str",
+          "value": "u01"
+         },
+         {
+          "type": "str",
+          "value": "u02"
+         },
+         {
+          "type": "str",
+          "value": "u03"
+         },
+         {
+          "type": "str",
+          "value": "u04"
+         },
+         {
+          "type": "str",
+          "value": "u05"
+         },
+         {
+          "type": "str",
+          "value": "u06"
+         },
+         {
+          "type": "str",
+          "value": "u07"
+         },
+         {
+          "type": "str",
+          "value": "u08"
+         },
+         {
+          "type": "str",
+          "value": "u09"
+         },
+         {
+          "type": "str",
+          "value": "u10"
+         },
+         {
+          "type": "str",
+          "value": "u11"
+         },
+         {
+          "type": "str",
+          "value": "u12"
+         },
+         {
+          "type": "str",
+          "value": "u13"
+         },
+         {
+          "type": "str",
+          "value": "u14"
+         },
+         {
+          "type": "str",
+          "value": "u15"
+         },
+         {
+          "type": "str",
+          "value": "u16"
+         },
+         {
+          "type": "str",
+          "value": "u17"
+         },
+         {
+          "type": "str",
+          "value": "u18"
+         },
+         {
+          "type": "str",
+          "value": "u19"
          }
         ]
        },
@@ -14812,6 +18044,10 @@
      }
     ],
     "error": null,
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
     "events": [
      {
       "kind": "call",
@@ -14858,6 +18094,274 @@
          {
           "type": "str",
           "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "episode_mentions_reranker",
+    "args": {
+     "node_uuids": [
+      "a"
+     ]
+    },
+    "responses": [
+     [
+      {
+       "uuid": "a",
+       "score": 0
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "name a",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "c",
+       "name": "name c",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "x",
+       "name": "name x",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ]
+   },
+   "output": {
+    "result": [
+     {
+      "class": "EntityNode",
+      "uuid": "a",
+      "name": "name a",
+      "group_id": "g-1",
+      "labels": [
+       "Entity"
+      ]
+     }
+    ],
+    "error": null,
+    "node_uuids_after": [
+     "a"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n            UNWIND $node_uuids AS node_uuid\n            MATCH (episode:Episodic)-[r:MENTIONS]->(n:Entity {uuid: node_uuid})\n            RETURN count(*) AS score, n.uuid AS uuid\n            ",
+      "keys": [
+       "node_uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN\n            \n        n.uuid AS uuid,\n        n.name AS name,\n        n.group_id AS group_id,\n        n.created_at AS created_at,\n        n.summary AS summary,\n        labels(n) AS labels,\n        properties(n) AS attributes\n    ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "episode_mentions_reranker",
+    "args": {
+     "node_uuids": [
+      "a",
+      "b"
+     ],
+     "min_score": 0
+    },
+    "responses": [
+     [
+      {
+       "uuid": "b",
+       "score": 1
+      }
+     ],
+     [
+      {
+       "uuid": "a",
+       "name": "name a",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "b",
+       "name": "name b",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "c",
+       "name": "name c",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      },
+      {
+       "uuid": "x",
+       "name": "name x",
+       "group_id": "g-1",
+       "labels": [
+        "Entity"
+       ],
+       "created_at": "2025-01-02T03:04:05+00:00",
+       "summary": "Zo\u00eb \u6771\u4eac",
+       "name_embedding": [
+        0.5,
+        1
+       ],
+       "attributes": {}
+      }
+     ]
+    ],
+    "cancel_after": 1
+   },
+   "output": {
+    "result": null,
+    "error": {
+     "type": "CancelledError",
+     "text": ""
+    },
+    "node_uuids_after": [
+     "a",
+     "b"
+    ],
+    "events": [
+     {
+      "kind": "call",
+      "query": "\n            UNWIND $node_uuids AS node_uuid\n            MATCH (episode:Episodic)-[r:MENTIONS]->(n:Entity {uuid: node_uuid})\n            RETURN count(*) AS score, n.uuid AS uuid\n            ",
+      "keys": [
+       "node_uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
          }
         ]
        },
@@ -16427,6 +19931,22 @@
    "input": {
     "method": "build_fulltext_query",
     "args": {
+     "query": "w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w"
+    }
+   },
+   "output": {
+    "result": {
+     "type": "str",
+     "value": "(w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w w)"
+    },
+    "error": null,
+    "events": []
+   }
+  },
+  {
+   "input": {
+    "method": "build_fulltext_query",
+    "args": {
      "query": "a b c",
      "max_query_length": 3
     }
@@ -16522,6 +20042,168 @@
       "h"
      ],
      "max_query_length": 5
+    }
+   },
+   "output": {
+    "result": {
+     "type": "str",
+     "value": ""
+    },
+    "error": null,
+    "events": []
+   }
+  },
+  {
+   "input": {
+    "method": "_build_neo4j_fulltext_query",
+    "args": {
+     "query": "",
+     "group_ids": [
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g",
+      "g"
+     ]
+    }
+   },
+   "output": {
+    "result": {
+     "type": "str",
+     "value": ""
+    },
+    "error": null,
+    "events": []
+   }
+  },
+  {
+   "input": {
+    "method": "_build_neo4j_fulltext_query",
+    "args": {
+     "query": "a  b",
+     "max_query_length": 3
     }
    },
    "output": {

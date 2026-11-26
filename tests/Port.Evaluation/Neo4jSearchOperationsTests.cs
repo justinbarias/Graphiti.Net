@@ -41,7 +41,7 @@ public class Neo4jSearchOperationsTests
             ],
             methods);
         Assert.Equal(
-            ["GroupIdValidationError", "KeyError", "ValueError", "ZeroDivisionError"],
+            ["CancelledError", "GroupIdValidationError", "KeyError", "ValueError", "ZeroDivisionError"],
             Cases.Select(c => c.GetProperty("output").GetProperty("error"))
                 .Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => e.GetProperty("type").GetString())
@@ -58,6 +58,8 @@ public class Neo4jSearchOperationsTests
         Assert.Equal(Document.GetProperty("constants").GetProperty("MAX_QUERY_LENGTH").GetInt64(), actual);
     }
 
+    // Left out of the recording: episode_mentions_reranker(['a']) with the record {'uuid': None, 'score': 1}. Python
+    // stores the key None and returns ['a']. The port reads the uuid with Py.AsString(null), which throws.
     [Theory]
     [MemberData(nameof(CaseIndexes))]
     public async Task Each_call_the_result_and_the_log_match_Python(int index)
@@ -71,11 +73,20 @@ public class Neo4jSearchOperationsTests
             : [];
 
         var events = new List<JsonNode>();
-        var executor = new FakeExecutor(responses, events);
+        // A case with cancel_after cancels the token after that many calls, as the task of Python is canceled.
+        using var cancelSource = new CancellationTokenSource();
+        var executor = new FakeExecutor(
+            responses,
+            events,
+            input.TryGetProperty("cancel_after", out var cancelAfter) ? cancelAfter.GetInt32() : null,
+            cancelSource);
         using var factory = new CaptureFactory(events);
         using var scope = PortServices.Use(loggerFactory: factory);
         var operations = new Neo4jSearchOperations();
-        var token = TestContext.Current.CancellationToken;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken, cancelSource.Token);
+        var token = linked.Token;
+        // The list of the caller, which the case reads again after the call.
+        var callerUuids = Has("node_uuids") ? Strs("node_uuids") : null;
 
         bool Has(string name) => args.TryGetProperty(name, out _);
         string Str(string name) => args.GetProperty(name).GetString()!;
@@ -155,13 +166,13 @@ public class Neo4jSearchOperationsTests
                     break;
                 case "node_distance_reranker":
                     result = Items(defaults
-                        ? await operations.NodeDistanceRerankerAsync(executor, Strs("node_uuids"), Str("center_node_uuid"), cancellationToken: token)
-                        : await operations.NodeDistanceRerankerAsync(executor, Strs("node_uuids"), Str("center_node_uuid"), Double("min_score"), token));
+                        ? await operations.NodeDistanceRerankerAsync(executor, callerUuids!, Str("center_node_uuid"), cancellationToken: token)
+                        : await operations.NodeDistanceRerankerAsync(executor, callerUuids!, Str("center_node_uuid"), Double("min_score"), token));
                     break;
                 case "episode_mentions_reranker":
                     result = Items(defaults
-                        ? await operations.EpisodeMentionsRerankerAsync(executor, Strs("node_uuids"), cancellationToken: token)
-                        : await operations.EpisodeMentionsRerankerAsync(executor, Strs("node_uuids"), Double("min_score"), token));
+                        ? await operations.EpisodeMentionsRerankerAsync(executor, callerUuids!, cancellationToken: token)
+                        : await operations.EpisodeMentionsRerankerAsync(executor, callerUuids!, Double("min_score"), token));
                     break;
                 case "build_node_search_filters":
                     result = Encode(operations.BuildNodeSearchFilters(Filter()));
@@ -181,7 +192,7 @@ public class Neo4jSearchOperationsTests
                     break;
             }
         }
-        catch (Exception e) when (e is GroupIdValidationException or KeyNotFoundException or ArgumentException or DivideByZeroException)
+        catch (Exception e) when (e is GroupIdValidationException or KeyNotFoundException or ArgumentException or DivideByZeroException or OperationCanceledException)
         {
             error = e;
         }
@@ -203,6 +214,7 @@ public class Neo4jSearchOperationsTests
                     "KeyError" => typeof(KeyNotFoundException),
                     "ValueError" => typeof(ArgumentException),
                     "ZeroDivisionError" => typeof(DivideByZeroException),
+                    "CancelledError" => typeof(OperationCanceledException),
                     _ => throw new InvalidOperationException(type),
                 },
                 error.GetType());
@@ -210,10 +222,15 @@ public class Neo4jSearchOperationsTests
             // The text of a KeyError is the Python repr of the key, and a .NET message has other words.
             // A ZeroDivisionError of an int score says "division by zero", and the port reads each score as a float
             // by the annotation dict[str, float], so its text is "float division by zero".
-            if (type is not "KeyError" and not "ZeroDivisionError")
+            if (type is not "KeyError" and not "ZeroDivisionError" and not "CancelledError")
             {
                 Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
             }
+        }
+
+        if (output.TryGetProperty("node_uuids_after", out var after))
+        {
+            Assert.Equal(after.EnumerateArray().Select(x => x.GetString()), callerUuids);
         }
 
         var expectedEvents = output.GetProperty("events").EnumerateArray().ToList();
@@ -349,7 +366,11 @@ public class Neo4jSearchOperationsTests
         return document.RootElement.Clone();
     }
 
-    private sealed class FakeExecutor(List<List<OrderedDictionary<string, object?>>> responses, List<JsonNode> events) : QueryExecutor
+    private sealed class FakeExecutor(
+        List<List<OrderedDictionary<string, object?>>> responses,
+        List<JsonNode> events,
+        int? cancelAfter = null,
+        CancellationTokenSource? cancelSource = null) : QueryExecutor
     {
         private int calls;
 
@@ -369,6 +390,11 @@ public class Neo4jSearchOperationsTests
             });
             var records = calls < responses.Count ? responses[calls] : [];
             calls++;
+            if (calls == cancelAfter)
+            {
+                await cancelSource!.CancelAsync();
+            }
+
             return (records, null, null);
         }
     }

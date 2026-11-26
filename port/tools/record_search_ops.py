@@ -222,6 +222,18 @@ def cases():
         (['a', 'b'], 'x', 0, [[{'uuid': 'a', 'score': 0}], nodes]),
         (['a', 'b'], 'x', 0, [[{'uuid': 'a', 'score': 2.5}, {'uuid': 'b', 'score': 1}], []]),
     ]
+    twenty = [f'u{i:02d}' for i in range(20)]
+    twenty_nodes = [entity(u) for u in twenty]
+    equal_scores = [{'uuid': u, 'score': 1} for u in twenty]
+    first_a = dict(entity('a'), name='first')
+    last_a = dict(entity('a'), name='last')
+    distance += [
+        # Twenty items with equal scores: Python keeps the input order (a stable sort, and more than 16 items).
+        (twenty, 'x', 0, [[], twenty_nodes]),
+        (twenty, 'x', 0, [equal_scores, twenty_nodes]),
+        # Two records with the same uuid and different names: the last one wins.
+        (['a', 'b'], 'x', 0, [[{'uuid': 'b', 'score': 1}], [first_a, entity('b'), last_a]]),
+    ]
     for node_uuids, center, min_score, responses in distance:
         out.append(
             {
@@ -231,6 +243,15 @@ def cases():
             }
         )
     out.append({'method': 'node_distance_reranker', 'args': {'node_uuids': ['a'], 'center_node_uuid': 'x'}, 'responses': [[], nodes]})
+    # The cancel arrives after the first call, so the second call of the reranker must stop.
+    out.append(
+        {
+            'method': 'node_distance_reranker',
+            'args': {'node_uuids': ['a', 'b'], 'center_node_uuid': 'x', 'min_score': 0},
+            'responses': [[{'uuid': 'b', 'score': 1}], nodes],
+            'cancel_after': 1,
+        }
+    )
 
     mentions = [
         ([], 0, []),
@@ -240,10 +261,32 @@ def cases():
         (['a', 'a', 'b'], 0, [[{'uuid': 'a', 'score': 2}], nodes]),
         (['a', 'b'], 0, [[{'uuid': 'a', 'score': 2}, {'uuid': 'b', 'score': 2}], [entity('b')]]),
         (['a', 'b'], -1, [[{'uuid': 'a', 'score': 0}], []]),
+        # A score equal to min_score passes.
+        (['a'], 2, [[{'uuid': 'a', 'score': 2}], nodes]),
+        # The caller's list stays in its order, although b has the lower score.
+        (['a', 'b'], 0, [[{'uuid': 'b', 'score': 1}], nodes]),
+        # Two records with the same uuid and different names: the last one wins.
+        (['a', 'b'], 0, [[{'uuid': 'b', 'score': 1}], [first_a, entity('b'), last_a]]),
+        # Twenty items with equal scores keep the input order.
+        (twenty, 0, [equal_scores, twenty_nodes]),
+        # Left out: a record with {'uuid': None, 'score': 1} for node_uuids ['a'] gives ['a'] in Python (the key None
+        # is stored). The port reads the uuid with Py.AsString(null) (the annotation dict[str, float] types the key as
+        # a string), which throws InvalidCastException, so the case cannot pass. The lead decides how to record the gap.
     ]
     for node_uuids, min_score, responses in mentions:
         out.append({'method': 'episode_mentions_reranker', 'args': {'node_uuids': node_uuids, 'min_score': min_score}, 'responses': responses})
     out.append({'method': 'episode_mentions_reranker', 'args': {'node_uuids': ['a', 'b']}, 'responses': [[{'uuid': 'b', 'score': 1}], nodes]})
+    # The default min_score is 0, so a node with a score of 0 stays.
+    out.append({'method': 'episode_mentions_reranker', 'args': {'node_uuids': ['a']}, 'responses': [[{'uuid': 'a', 'score': 0}], nodes]})
+    # The cancel arrives after the first call, so the second call of the reranker must stop.
+    out.append(
+        {
+            'method': 'episode_mentions_reranker',
+            'args': {'node_uuids': ['a', 'b'], 'min_score': 0},
+            'responses': [[{'uuid': 'b', 'score': 1}], nodes],
+            'cancel_after': 1,
+        }
+    )
 
     for name in FILTERS:
         out.append({'method': 'build_node_search_filters', 'args': {'filter': name}})
@@ -251,12 +294,17 @@ def cases():
     for query in ('alice', '', 'a + b (c)', LONG_QUERY, 'café 😀 漢字'):
         for groups in GROUPS:
             out.append({'method': 'build_fulltext_query', 'args': {'query': query, 'group_ids': groups}})
+    # Between 129 and 8000 words, with the default max_query_length of 8000.
+    out.append({'method': 'build_fulltext_query', 'args': {'query': ' '.join(['w'] * 300)}})
     out.append({'method': 'build_fulltext_query', 'args': {'query': 'a b c', 'max_query_length': 3}})
     out.append({'method': 'build_fulltext_query', 'args': {'query': 'a b', 'group_ids': ['g'], 'max_query_length': 3}})
     out.append({'method': '_build_neo4j_fulltext_query', 'args': {'query': 'a b'}})
     out.append({'method': '_build_neo4j_fulltext_query', 'args': {'query': LONG_QUERY}})
     out.append({'method': '_build_neo4j_fulltext_query', 'args': {'query': 'a b c', 'group_ids': ['g'], 'max_query_length': 4}})
     out.append({'method': '_build_neo4j_fulltext_query', 'args': {'query': 'a b c', 'group_ids': ['g', 'h'], 'max_query_length': 5}})
+    # str.split(' ') of the empty text gives one item, and each double space gives an empty item.
+    out.append({'method': '_build_neo4j_fulltext_query', 'args': {'query': '', 'group_ids': ['g'] * 127}})
+    out.append({'method': '_build_neo4j_fulltext_query', 'args': {'query': 'a  b', 'max_query_length': 3}})
     return out
 
 
@@ -267,11 +315,13 @@ def main() -> int:
     from graphiti_core.search.search_filters import SearchFilters
 
     class FakeExecutor(QueryExecutor):
-        def __init__(self, responses, events):
+        def __init__(self, responses, events, cancel_after=None):
             self.responses = responses
             self.events = events
+            self.cancel_after = cancel_after
 
         async def execute_query(self, cypher_query_, **kwargs):
+            await asyncio.sleep(0)
             index = sum(1 for e in self.events if e['kind'] == 'call')
             self.events.append(
                 {
@@ -282,6 +332,9 @@ def main() -> int:
                 }
             )
             records = self.responses[index] if index < len(self.responses) else []
+            if self.cancel_after is not None and index + 1 == self.cancel_after:
+                # The cancel reaches the code at its next await, which is the next call of the executor.
+                asyncio.current_task().cancel()
             return records, None, None
 
     class Capture(logging.Handler):
@@ -302,7 +355,7 @@ def main() -> int:
     results = []
     for case in cases():
         capture.events = []
-        executor = FakeExecutor(copy.deepcopy(case.get('responses', [])), capture.events)
+        executor = FakeExecutor(copy.deepcopy(case.get('responses', [])), capture.events, case.get('cancel_after'))
         args = dict(case['args'])
         if 'filter' in args:
             args['search_filter' if not case['method'].startswith('build_') else 'search_filters'] = SearchFilters(
@@ -324,9 +377,15 @@ def main() -> int:
                 value = asyncio.run(getattr(operations, method)(executor, **args))
                 outcome['result'] = [encode_item(item) for item in value]
             outcome['error'] = None
+        except asyncio.CancelledError as error:
+            outcome['result'] = None
+            outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
             outcome['result'] = None
             outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
+        if method in ('node_distance_reranker', 'episode_mentions_reranker'):
+            # The list of the caller after the call: the reranker must not sort it.
+            outcome['node_uuids_after'] = list(args['node_uuids'])
         outcome['events'] = list(capture.events)
         results.append({'input': case, 'output': outcome})
 

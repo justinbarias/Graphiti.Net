@@ -49,7 +49,7 @@ internal static class SearchOps
 
         var luceneQuery = Helpers.LuceneSanitize(query);
         // PORT: len(group_ids or '') is 0 for None and for an empty list, and the count of the list for each other list.
-        if (luceneQuery.Split(' ').Length + (groupIds is { Count: > 0 } ? groupIds.Count : 0) >= maxQueryLength)
+        if (PyText.Split(luceneQuery, " ").Count + (groupIds is { Count: > 0 } ? groupIds.Count : 0) >= maxQueryLength)
         {
             return string.Empty;
         }
