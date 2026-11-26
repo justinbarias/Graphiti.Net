@@ -32,8 +32,26 @@
     "deny": [
       "Edit(.upstream/**)",
       "Write(.upstream/**)",
-      "Edit(port/judge/**)",
-      "Write(port/judge/**)"
+      "Edit(port/judge/README.md)",
+      "Write(port/judge/README.md)",
+      "Edit(port/judge/add_reply.py)",
+      "Write(port/judge/add_reply.py)",
+      "Edit(port/judge/cases/**)",
+      "Write(port/judge/cases/**)",
+      "Edit(port/judge/count.txt)",
+      "Write(port/judge/count.txt)",
+      "Edit(port/judge/embedder-vectors.json)",
+      "Write(port/judge/embedder-vectors.json)",
+      "Edit(port/judge/golden/**)",
+      "Write(port/judge/golden/**)",
+      "Edit(port/judge/host-python/**)",
+      "Write(port/judge/host-python/**)",
+      "Edit(port/judge/pending/**)",
+      "Write(port/judge/pending/**)",
+      "Edit(port/judge/replies/**)",
+      "Write(port/judge/replies/**)",
+      "Edit(port/judge/run.py)",
+      "Write(port/judge/run.py)"
     ]
   }
 }
