@@ -187,4 +187,34 @@ internal static partial class Py
             yield return (hasA ? ea.Current : default, hasB ? eb.Current : default);
         }
     }
+
+    /// <summary>
+    /// <c>zip(a, b, strict=True)</c>: the pairs, and then an <see cref="ArgumentException"/> (<c>ValueError</c>) with
+    /// the text of Python if one input is longer. Python raises after it gave the pairs of the shorter length, so a
+    /// loop body runs for each of them before the error. Do not compare the counts first.
+    /// </summary>
+    internal static IEnumerable<(TA First, TB Second)> ZipStrict<TA, TB>(IEnumerable<TA> a, IEnumerable<TB> b)
+    {
+        using var ea = a.GetEnumerator();
+        using var eb = b.GetEnumerator();
+        while (true)
+        {
+            if (!ea.MoveNext())
+            {
+                if (eb.MoveNext())
+                {
+                    throw new ArgumentException("zip() argument 2 is longer than argument 1");
+                }
+
+                yield break;
+            }
+
+            if (!eb.MoveNext())
+            {
+                throw new ArgumentException("zip() argument 2 is shorter than argument 1");
+            }
+
+            yield return (ea.Current, eb.Current);
+        }
+    }
 }
