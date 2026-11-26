@@ -12,11 +12,11 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | 4 | Done 2026-11-26. Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
 | 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
 | P1 | Done 2026-11-26. Add the `.editorconfig` entry that makes IDE0065 an error for each C# file. Move the `using` directives of the judge host and the end-to-end tests inside the namespace. Closes open item O8 and debt T22. | Lead, Fable 5.2, medium | A file with a directive at the top fails the build. The gate passes. Own pull request. |
-| P2 | Build the value model of `PyCompat`: `PyDict`, `PySet<T>`, `PyTuple`, `Py.Repr`, `Py.Str`, `Py.Truthy`, `Py.Len`, `Py.Get`, `Py.As*`, `Py.EnumValue`. | Workhorse, Opus 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
-| P3 | Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
-| P4 | Build `PyDateTime`. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
-| P5 | Build `PyRegex`, `PyRandom`, and `PyEnv`. | Workhorse, Sonnet 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
-| P6 | Build `Pydantic`. Needs P2 and P4. | Workhorse, Opus 5.5, medium | Property tests pass against values that pydantic recorded at the pinned version. |
+| P2 | Done 2026-11-26. Build the value model of `PyCompat`: `PyDict`, `PySet<T>`, `PyTuple`, `Py.Repr`, `Py.Str`, `Py.Truthy`, `Py.Len`, `Py.Get`, `Py.As*`, `Py.EnumValue`. | Workhorse, Opus 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
+| P3 | In progress. Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
+| P4 | Done 2026-11-26. Build `PyDateTime`. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
+| P5 | Done 2026-11-26. Build `PyRegex`, `PyRandom`, and `PyEnv`. | Workhorse, Sonnet 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
+| P6 | In progress. Build `Pydantic`. Needs P2 and P4. | Workhorse, Opus 5.5, medium | Property tests pass against values that pydantic recorded at the pinned version. |
 | P7 | Judge host: add the decoders for a `$model`, `$enum`, `$ref`, and `$dt` argument. Add the encoder for a `$type` result and the exception rows of open item O2. Write `Fixtures.cs` (R22). Needs P2 and P6. Closes O2 and debt T18. | Lead, Fable 5.2, medium | The gate passes, and the judge case count stays 1999. Own pull request. |
 | P8 | In progress. Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
 | P9 | Done 2026-11-26. Write the script in `port/tools/` that records `str(exception)` for the `errors` unit (R23, J1). The project `tests/Port.Evaluation` comes with the `errors` unit of the pilot, because a test project with no test fails the test step. | Lead, Fable 5.2, medium | The script records from `.upstream` with Python 3.12. |
@@ -441,3 +441,25 @@ Checks on the changed copy, with the real case files and golden files:
 
 Not run: the changed runner against the Python build.
 The maintainer applies the patch with `git apply port/patches/judge-type-rejected.patch` on a branch. It goes in its own pull request.
+
+### Tasks P2, P4, P5, and the `Asyncio` helpers, 2026-11-26
+
+Each group was built by one subagent in its own worktree, from a brief that pointed at the rule sections. Each group has a generator in `port/tools/` that records values from Python 3.12.13, and tests that compare the helpers with them.
+One Opus 5.5 high adversarial review ran on each group before its pull request. The value model had two, because its second half was added after the first one.
+
+| Group | Pull request | Builder | Review findings | Notes |
+| --- | --- | --- | --- | --- |
+| `PyEnv`, `PyHash`, `PyLruCache`, `PyRandom` (P5) | 11 | Sonnet 5.5, medium | 6, with 3 important | Five members that nothing calls were removed. `PyRandom` is a seeded xoshiro256** source and does not give Python's sequence (GAPS F9). |
+| `PyDateTime` (P4) | 13 | Sonnet 5.5, high | 6, with 1 important | `FromIsoFormat` matched Python on 107 extra probes of the reviewer. `StrFTime`, `StrPTime`, and subtraction were removed, because no MVP module calls them. |
+| `PyRegex`, `PyText.Replace`, `PyText.Count` (P5) | 14 | Sonnet 5.5, high | 4, with 2 important | `Word` and `Boundary` changed under `IgnoreCase`, because .NET folds case with Unicode 16. Each constant now sits in `(?-i:...)`. All 17 sites of R13 matched Python on 24,080 texts after that. |
+| `Asyncio`, `ExclusiveScheduler` (debt T23) | 15 | Opus 5.5, medium | 8, with 2 important | Exclusivity held in 100 stress runs of the reviewer. Two findings are rules and not code: R8 has them now, and open item O9 holds the one that needs the maintainer. |
+| The value model and the list helpers (P2) | 16 | Opus 5.5, medium | 9, with 1 important, then 8, with 1 important | Float text matched Python on 1,246,333 doubles. The second review found that `Py.SortInPlace` did not give Python's order for 64 or more items with `nan` keys. It is now a port of the list sort of CPython 3.12. No review ran on that port. Its evidence is 2,816 recorded sorts up to 5,000 items. |
+
+Decisions of the lead during these tasks, under decision D39:
+
+- An enum member carries `[PyEnumMember(name, value)]`. A registry needed a call before first use, and the `<Enum>Values` class of R7 was a second source of the same values. R7 has the new rule.
+- A member that no MVP module calls is not built. The rulebook rows for `strftime`, `strptime`, datetime subtraction, `\S`, `\W`, and `lstrip(chars)` say so.
+- The test project takes each `python-values*.json` file with one line.
+- A pull request merges after the CI job `check` passes. The job `mutation` is in observe mode and never blocks a merge, by the comment in `.github/workflows/ci.yml`. It took 15 min 57 s on pull request 14 (debt T27).
+
+Not done in these tasks: `PyJson`, `PyAst` (P3), and `Pydantic` (P6) are in progress. `scripts/mutate.sh` did not run on the new helpers outside CI, and task 5 (the pruning rule) waits for P3 and P6.
