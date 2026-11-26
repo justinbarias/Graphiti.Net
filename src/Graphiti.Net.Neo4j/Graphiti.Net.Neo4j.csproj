@@ -9,4 +9,8 @@
     <PackageReference Include="Neo4j.Driver" />
     <ProjectReference Include="../Graphiti.Net/Graphiti.Net.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Only the lead changes this list (port/RULES.md, R3). -->
+    <InternalsVisibleTo Include="Port.Evaluation" />
+  </ItemGroup>
 </Project>

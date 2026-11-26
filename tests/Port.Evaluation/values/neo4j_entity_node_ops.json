@@ -1,0 +1,4672 @@
+{
+ "python": "3.12.13",
+ "source": "graphiti_core/driver/neo4j/operations/entity_node_ops.py",
+ "cases": [
+  {
+   "input": {
+    "method": "delete",
+    "use_tx": false,
+    "uuid": "u-1"
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n {uuid: $uuid})\n            WHERE n:Entity OR n:Episodic OR n:Community\n            OPTIONAL MATCH (n)-[r]-()\n            WITH collect(r.uuid) AS edge_uuids, n\n            DETACH DELETE n\n            RETURN edge_uuids\n        ",
+      "keys": [
+       "uuid"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       }
+      ]
+     }
+    ],
+    "logs": [
+     {
+      "level": "DEBUG",
+      "message": "Deleted Node: u-1"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "delete",
+    "use_tx": true,
+    "uuid": "u-1"
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n {uuid: $uuid})\n            WHERE n:Entity OR n:Episodic OR n:Community\n            OPTIONAL MATCH (n)-[r]-()\n            WITH collect(r.uuid) AS edge_uuids, n\n            DETACH DELETE n\n            RETURN edge_uuids\n        ",
+      "keys": [
+       "uuid"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       }
+      ]
+     }
+    ],
+    "logs": [
+     {
+      "level": "DEBUG",
+      "message": "Deleted Node: u-1"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "delete",
+    "use_tx": false,
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n {uuid: $uuid})\n            WHERE n:Entity OR n:Episodic OR n:Community\n            OPTIONAL MATCH (n)-[r]-()\n            WITH collect(r.uuid) AS edge_uuids, n\n            DETACH DELETE n\n            RETURN edge_uuids\n        ",
+      "keys": [
+       "uuid"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       }
+      ]
+     }
+    ],
+    "logs": [
+     {
+      "level": "DEBUG",
+      "message": "Deleted Node: Zo\u00eb \u6771\u4eac \ud83d\ude00"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "delete",
+    "use_tx": true,
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n {uuid: $uuid})\n            WHERE n:Entity OR n:Episodic OR n:Community\n            OPTIONAL MATCH (n)-[r]-()\n            WITH collect(r.uuid) AS edge_uuids, n\n            DETACH DELETE n\n            RETURN edge_uuids\n        ",
+      "keys": [
+       "uuid"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       }
+      ]
+     }
+    ],
+    "logs": [
+     {
+      "level": "DEBUG",
+      "message": "Deleted Node: Zo\u00eb \u6771\u4eac \ud83d\ude00"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": false,
+    "group_id": "g-1",
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "g-1"
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": true,
+    "group_id": "g-1",
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "g-1"
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": false,
+    "group_id": "g-1",
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "g-1"
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": true,
+    "group_id": "g-1",
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "g-1"
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": false,
+    "group_id": "gr\u00fcp \u6771\u4eac",
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "gr\u00fcp \u6771\u4eac"
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": true,
+    "group_id": "gr\u00fcp \u6771\u4eac",
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "gr\u00fcp \u6771\u4eac"
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": false,
+    "group_id": "gr\u00fcp \u6771\u4eac",
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "gr\u00fcp \u6771\u4eac"
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_group_id",
+    "use_tx": true,
+    "group_id": "gr\u00fcp \u6771\u4eac",
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity {group_id: $group_id})\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "group_id",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "gr\u00fcp \u6771\u4eac"
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": []
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": []
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": []
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": []
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "a"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "a"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "a"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "a"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "a",
+     "a"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "a",
+     "a"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "a",
+     "a"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "a",
+     "a"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "a"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "a",
+     "b"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "a",
+     "b"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "a",
+     "b"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "a",
+     "b"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "a"
+         },
+         {
+          "type": "str",
+          "value": "b"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "Zo\u00eb",
+     "\u6771\u4eac \ud83d\ude00"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "Zo\u00eb"
+         },
+         {
+          "type": "str",
+          "value": "\u6771\u4eac \ud83d\ude00"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "Zo\u00eb",
+     "\u6771\u4eac \ud83d\ude00"
+    ],
+    "batch_size": 100
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "Zo\u00eb"
+         },
+         {
+          "type": "str",
+          "value": "\u6771\u4eac \ud83d\ude00"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 100
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": false,
+    "uuids": [
+     "Zo\u00eb",
+     "\u6771\u4eac \ud83d\ude00"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "Zo\u00eb"
+         },
+         {
+          "type": "str",
+          "value": "\u6771\u4eac \ud83d\ude00"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "delete_by_uuids",
+    "use_tx": true,
+    "uuids": [
+     "Zo\u00eb",
+     "\u6771\u4eac \ud83d\ude00"
+    ],
+    "batch_size": 0
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "transaction",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            CALL (n) {\n                DETACH DELETE n\n            } IN TRANSACTIONS OF $batch_size ROWS\n        ",
+      "keys": [
+       "uuids",
+       "batch_size"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "Zo\u00eb"
+         },
+         {
+          "type": "str",
+          "value": "\u6771\u4eac \ud83d\ude00"
+         }
+        ]
+       },
+       {
+        "type": "int",
+        "value": 0
+       }
+      ]
+     }
+    ],
+    "logs": []
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": []
+   },
+   "output": {
+    "error": {
+     "type": "NodeNotFoundError",
+     "text": "node u-1 not found"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {}
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "KeyError",
+     "text": "'name_embedding'"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       0.5
+      ]
+     },
+     {
+      "name_embedding": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 0.5
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": null
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": []
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": []
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       0.1,
+       0.25
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 0.1
+       },
+       {
+        "type": "float",
+        "value": 0.25
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       },
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       true,
+       false
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       },
+       {
+        "type": "float",
+        "value": 0.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       "1.5",
+       "2"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.5
+       },
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       1,
+       "x",
+       2.5,
+       "y"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "2 validation errors for EntityNode\nname_embedding.1\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing\nname_embedding.3\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='y', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": "abc"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value='abc', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": "1.5"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value='1.5', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": 5
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value=5, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": {
+       "a": 1
+      }
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value={'a': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       [
+        1.0
+       ]
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number [type=float_type, input_value=[1.0], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       null
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number [type=float_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "u-1",
+    "records": [
+     {
+      "name_embedding": [
+       1e+300,
+       -0.0
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "u-1"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1e+300
+       },
+       {
+        "type": "float",
+        "value": -0.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": []
+   },
+   "output": {
+    "error": {
+     "type": "NodeNotFoundError",
+     "text": "node Zo\u00eb \u6771\u4eac \ud83d\ude00 not found"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {}
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "KeyError",
+     "text": "'name_embedding'"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       0.5
+      ]
+     },
+     {
+      "name_embedding": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 0.5
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": null
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": []
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": []
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       0.1,
+       0.25
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 0.1
+       },
+       {
+        "type": "float",
+        "value": 0.25
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       },
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       true,
+       false
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       },
+       {
+        "type": "float",
+        "value": 0.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       "1.5",
+       "2"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.5
+       },
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       1,
+       "x",
+       2.5,
+       "y"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "2 validation errors for EntityNode\nname_embedding.1\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing\nname_embedding.3\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='y', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": "abc"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value='abc', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": "1.5"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value='1.5', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": 5
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value=5, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": {
+       "a": 1
+      }
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value={'a': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       [
+        1.0
+       ]
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number [type=float_type, input_value=[1.0], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       null
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number [type=float_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings",
+    "uuid": "Zo\u00eb \u6771\u4eac \ud83d\ude00",
+    "records": [
+     {
+      "name_embedding": [
+       1e+300,
+       -0.0
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity {uuid: $uuid})\n            RETURN n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuid",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "str",
+        "value": "Zo\u00eb \u6771\u4eac \ud83d\ude00"
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1e+300
+       },
+       {
+        "type": "float",
+        "value": -0.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [],
+    "records": []
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": []
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": []
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1"
+    ],
+    "records": []
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": []
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       2,
+       3
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 2.0
+       },
+       {
+        "type": "float",
+        "value": 3.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "n-1",
+      "name_embedding": [
+       1.5
+      ]
+     },
+     {
+      "uuid": "other",
+      "name_embedding": [
+       9
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.5
+       }
+      ]
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.5
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "n-1",
+      "name_embedding": [
+       1
+      ]
+     },
+     {
+      "uuid": "n-1",
+      "name_embedding": [
+       2
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "n-1",
+      "name_embedding": null
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": null
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": []
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": []
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       0.1,
+       0.25
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 0.1
+       },
+       {
+        "type": "float",
+        "value": 0.25
+       }
+      ]
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       },
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       true,
+       false
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       },
+       {
+        "type": "float",
+        "value": 0.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       "1.5",
+       "2"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.5
+       },
+       {
+        "type": "float",
+        "value": 2.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       1,
+       "x",
+       2.5,
+       "y"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "2 validation errors for EntityNode\nname_embedding.1\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing\nname_embedding.3\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='y', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": "abc"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value='abc', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": "1.5"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value='1.5', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": 5
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value=5, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": {
+       "a": 1
+      }
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding\n  Input should be a valid list [type=list_type, input_value={'a': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       [
+        1.0
+       ]
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number [type=float_type, input_value=[1.0], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       null
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number [type=float_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       1e+300,
+       -0.0
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": null,
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1e+300
+       },
+       {
+        "type": "float",
+        "value": -0.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "n-1",
+      "name_embedding": [
+       1
+      ]
+     },
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "list",
+      "items": [
+       {
+        "type": "float",
+        "value": 1.0
+       }
+      ]
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "n-1",
+      "name_embedding": [
+       "x"
+      ]
+     },
+     {
+      "uuid": "Zo\u00eb \u6771\u4eac",
+      "name_embedding": [
+       7
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "ValidationError",
+     "text": "1 validation error for EntityNode\nname_embedding.0\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='x', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "uuid": "n-1"
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "KeyError",
+     "text": "'name_embedding'"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  },
+  {
+   "input": {
+    "method": "load_embeddings_bulk",
+    "uuids": [
+     "n-1",
+     "Zo\u00eb \u6771\u4eac",
+     "n-1"
+    ],
+    "records": [
+     {
+      "name_embedding": [
+       1
+      ]
+     }
+    ]
+   },
+   "output": {
+    "error": {
+     "type": "KeyError",
+     "text": "'uuid'"
+    },
+    "calls": [
+     {
+      "via": "executor",
+      "query": "\n            MATCH (n:Entity)\n            WHERE n.uuid IN $uuids\n            RETURN DISTINCT n.uuid AS uuid, n.name_embedding AS name_embedding\n        ",
+      "keys": [
+       "uuids",
+       "routing_"
+      ],
+      "values": [
+       {
+        "type": "list",
+        "items": [
+         {
+          "type": "str",
+          "value": "n-1"
+         },
+         {
+          "type": "str",
+          "value": "Zo\u00eb \u6771\u4eac"
+         },
+         {
+          "type": "str",
+          "value": "n-1"
+         }
+        ]
+       },
+       {
+        "type": "str",
+        "value": "r"
+       }
+      ]
+     }
+    ],
+    "logs": [],
+    "embeddings": [
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     },
+     {
+      "type": "none"
+     }
+    ]
+   }
+  }
+ ]
+}

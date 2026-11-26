@@ -1,6 +1,6 @@
 namespace Graphiti.E2E.Tests;
 
-using Neo4j.Driver;
+using global::Neo4j.Driver;
 
 /// <summary>
 /// Guards the test environment itself. Graphiti needs vector and full-text indexes, so a sidecar
