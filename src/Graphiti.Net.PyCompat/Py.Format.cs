@@ -18,7 +18,10 @@ internal static partial class Py
     /// precisions of text count code points. Floats are rounded half to even on the exact binary value.
     /// A spec that Python rejects throws <see cref="ArgumentException"/> (<c>ValueError</c>) or
     /// <see cref="InvalidCastException"/> (<c>TypeError</c>) with Python's message. A spec that Python
-    /// accepts and this helper does not cover throws <see cref="InvalidOperationException"/>.
+    /// accepts and this helper does not cover throws <see cref="InvalidOperationException"/>. These are
+    /// not built: the types <c>e</c>, <c>E</c>, <c>g</c>, <c>G</c>, <c>%</c>, <c>n</c>, <c>c</c>, <c>b</c>,
+    /// <c>o</c>, <c>x</c>, and <c>X</c>, the options <c>#</c> and <c>z</c>, the flag <c>0</c> together with
+    /// grouping, a float with a precision and no type, and a date with a spec (<c>strftime</c>).
     /// </summary>
     internal static string Format(object? value, string spec)
     {
@@ -66,6 +69,11 @@ internal static partial class Py
                 : "Sign not allowed in string format specifier");
         }
 
+        if (f.NoNegativeZero)
+        {
+            throw new ArgumentException("Negative zero coercion (z) not allowed in string format specifier");
+        }
+
         if (f.Alternate)
         {
             throw new ArgumentException("Alternate form (#) not allowed in string format specifier");
@@ -77,7 +85,7 @@ internal static partial class Py
         }
 
         var cps = PyText.ToCodePoints(s);
-        var text = f.Precision is int p && p < cps.Length ? PyText.FromCodePoints(cps.AsSpan(0, p)) : s;
+        var text = f.Precision is long p && p < cps.Length ? PyText.FromCodePoints(cps.AsSpan(0, (int)p)) : s;
         return Pad(string.Empty, text, f with { Align = f.Align == '\0' ? '<' : f.Align });
     }
 
@@ -99,7 +107,32 @@ internal static partial class Py
             throw new ArgumentException("Precision not allowed in integer format specifier");
         }
 
-        if (f.Type != 'd' || f.Alternate || (f.Zero && f.Grouping != '\0'))
+        if (f.NoNegativeZero)
+        {
+            throw new ArgumentException("Negative zero coercion (z) not allowed in integer format specifier");
+        }
+
+        if (f.Type == 'c' && f.Sign != '\0')
+        {
+            throw new ArgumentException("Sign not allowed with integer format specifier 'c'");
+        }
+
+        if (f.Type == 'c' && f.Alternate)
+        {
+            throw new ArgumentException("Alternate form (#) not allowed with integer format specifier 'c'");
+        }
+
+        if (f.Type == 'c' && (n < long.MinValue || n > long.MaxValue))
+        {
+            throw new OverflowException("Python int too large to convert to C long");
+        }
+
+        if (f.Type == 'c' && (n < 0 || n > 0x10FFFF))
+        {
+            throw new OverflowException("%c arg not in range(0x110000)");
+        }
+
+        if (f.Type != 'd' || f.Alternate || ZeroPadGrouped(f))
         {
             throw new InvalidOperationException($"Py.Format: the spec '{spec}' for int is not supported");
         }
@@ -110,17 +143,22 @@ internal static partial class Py
 
     private static string FormatFloat(double d, FormatSpec f, string spec)
     {
-        switch (f.Type)
+        if (f.Type is not ('f' or 'F' or '\0' or 'e' or 'E' or 'g' or 'G' or 'n' or '%'))
         {
-            case 'f' or 'F' or '\0':
-                break;
-            case 'e' or 'E' or 'g' or 'G' or 'n' or '%':
-                throw new InvalidOperationException($"Py.Format: the spec '{spec}' for float is not supported");
-            default:
-                throw UnknownCode(f.Type, "float");
+            throw UnknownCode(f.Type, "float");
         }
 
-        if (f.Alternate || f.NoNegativeZero || (f.Zero && f.Grouping != '\0') || (f.Type == '\0' && f.Precision is not null))
+        if (f.Precision > int.MaxValue)
+        {
+            throw new ArgumentException("precision too big");
+        }
+
+        if (f.Type is not ('f' or 'F' or '\0'))
+        {
+            throw new InvalidOperationException($"Py.Format: the spec '{spec}' for float is not supported");
+        }
+
+        if (f.Alternate || f.NoNegativeZero || ZeroPadGrouped(f) || (f.Type == '\0' && f.Precision is not null))
         {
             throw new InvalidOperationException($"Py.Format: the spec '{spec}' for float is not supported");
         }
@@ -145,7 +183,7 @@ internal static partial class Py
         }
         else
         {
-            body = FixedText(Math.Abs(d), f.Precision ?? 6);
+            body = FixedText(Math.Abs(d), (int)(f.Precision ?? 6));
             var dot = body.IndexOf('.', StringComparison.Ordinal);
             body = dot < 0 ? Group(body, f.Grouping) : Group(body[..dot], f.Grouping) + body[dot..];
         }
@@ -221,7 +259,7 @@ internal static partial class Py
     private static string Pad(string sign, string body, FormatSpec f)
     {
         var length = (int)(Len(sign) + Len(body));
-        var missing = f.Width is int w && w > length ? w - length : 0;
+        var missing = f.Width is long w && w > length ? (int)(w - length) : 0;
         var fill = PyText.FromCodePoints([f.Fill]);
         string Fill(int n) => string.Concat(Enumerable.Repeat(fill, n));
         return (f.Align == '\0' ? '>' : f.Align) switch
@@ -232,6 +270,12 @@ internal static partial class Py
             _ => Fill(missing) + sign + body,
         };
     }
+
+    /// <summary>
+    /// True when CPython writes separators into the padding: grouping with the fill 0 and the align '='.
+    /// That form is not built.
+    /// </summary>
+    private static bool ZeroPadGrouped(FormatSpec f) => f.Grouping != '\0' && f.Fill == '0' && f.Align == '=';
 
     private static ArgumentException UnknownCode(char type, string typeName) =>
         new($"Unknown format code '{type}' for object of type '{typeName}'");
@@ -320,17 +364,24 @@ internal static partial class Py
         return f;
     }
 
-    private static int? ReadNumber(int[] cps, ref int pos)
+    /// <summary>A width or a precision. Python refuses a number above <c>PY_SSIZE_T_MAX</c>.</summary>
+    private static long? ReadNumber(int[] cps, ref int pos)
     {
         var start = pos;
         long n = 0;
         while (pos < cps.Length && cps[pos] is >= '0' and <= '9')
         {
-            n = Math.Min((n * 10) + (cps[pos] - '0'), int.MaxValue);
+            var digit = cps[pos] - '0';
+            if (n > (long.MaxValue - digit) / 10)
+            {
+                throw new ArgumentException("Too many decimal digits in format string");
+            }
+
+            n = (n * 10) + digit;
             pos++;
         }
 
-        return pos == start ? null : (int)n;
+        return pos == start ? null : n;
     }
 
     private sealed record FormatSpec
@@ -347,11 +398,11 @@ internal static partial class Py
 
         public bool Zero { get; init; }
 
-        public int? Width { get; init; }
+        public long? Width { get; init; }
 
         public char Grouping { get; init; }
 
-        public int? Precision { get; init; }
+        public long? Precision { get; init; }
 
         public char Type { get; init; }
     }

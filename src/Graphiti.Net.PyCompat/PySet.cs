@@ -7,6 +7,9 @@ using System.Collections;
 /// insertion order. Python gives no fixed order, and insertion order is one of the orders that Python
 /// can give. Items compare as keys of a Python set: by default with <see cref="PyEqualityComparer{T}"/>,
 /// which tests identity first. Adding an item that already equals an item keeps the first item.
+/// A nan item held in a <c>double</c> variable is boxed again at each call, so the set never finds it again,
+/// and the same nan added two times gives two items. .NET cannot keep the identity of an unboxed double.
+/// A nan that stays in one <c>object</c> variable keeps its identity, as a Python float object does.
 /// </summary>
 /// <typeparam name="T">The item type.</typeparam>
 internal sealed class PySet<T> : IReadOnlyCollection<T>, IPySet
@@ -66,7 +69,9 @@ internal sealed class PySet<T> : IReadOnlyCollection<T>, IPySet
         items.Remove(new Slot(item));
     }
 
-    bool IPySet.ContainsItem(object? item) => item is T t ? Contains(t) : item is null && default(T) is null && items.ContainsKey(new Slot(default));
+    // An item of another type, for example the long 1 in a PySet<double>, compares by Python ==, so that
+    // {1} == {1.0} is true as in Python. The hash of the set cannot be used across item types.
+    bool IPySet.ContainsItem(object? item) => item is T t ? Contains(t) : items.Values.Any(x => PyValueEquality.Equal(x, item));
 
     IPySet IPySet.DeepCopy(Func<object?, object?> copy)
     {

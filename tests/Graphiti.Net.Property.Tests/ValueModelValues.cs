@@ -27,29 +27,31 @@ internal static class ValueModelValues
 
     private static readonly Dictionary<string, Enum> EnumMembers = new()
     {
-        ["Color.red"] = TestColor.Red,
-        ["Color.green"] = TestColor.Green,
-        ["Color.blue"] = TestColor.Blue,
-        ["EpisodeType.message"] = TestEpisodeType.Message,
-        ["EpisodeType.json"] = TestEpisodeType.Json,
-        ["EpisodeType.text"] = TestEpisodeType.Text,
+        ["Color.red"] = Color.Red,
+        ["Color.green"] = Color.Green,
+        ["Color.blue"] = Color.Blue,
+        ["EpisodeType.message"] = EpisodeType.Message,
+        ["EpisodeType.json"] = EpisodeType.Json,
+        ["EpisodeType.text"] = EpisodeType.Text,
+        ["ComparisonOperator.equals"] = ComparisonOperator.Equals,
+        ["ComparisonOperator.not_equals"] = ComparisonOperator.NotEquals,
+        ["ComparisonOperator.greater_than"] = ComparisonOperator.GreaterThan,
+        ["ComparisonOperator.less_than"] = ComparisonOperator.LessThan,
+        ["ComparisonOperator.greater_than_equal"] = ComparisonOperator.GreaterThanEqual,
+        ["ComparisonOperator.less_than_equal"] = ComparisonOperator.LessThanEqual,
+        ["ComparisonOperator.is_null"] = ComparisonOperator.IsNull,
+        ["ComparisonOperator.is_not_null"] = ComparisonOperator.IsNotNull,
+        ["Priority.low"] = Priority.Low,
+        ["Priority.high"] = Priority.High,
+        ["Priority.huge"] = Priority.Huge,
     };
-
-    static ValueModelValues()
-    {
-        // The Python names and values of the generator's two enums.
-        PyEnum.Register("Color", (TestColor.Red, "red", "red"), (TestColor.Green, "green", 2L), (TestColor.Blue, "blue", "blé"));
-        PyEnum.Register(
-            "EpisodeType",
-            (TestEpisodeType.Message, "message", "message"),
-            (TestEpisodeType.Json, "json", "json"),
-            (TestEpisodeType.Text, "text", "text"));
-    }
 
     internal static List<JsonElement> Cases(string name) =>
         [.. Document.RootElement.GetProperty("cases").GetProperty(name).EnumerateArray()];
 
-    internal static string Text(JsonElement e) => PythonValues.FromCodePoints(e);
+    /// <summary>A text of the file: a JSON string, or a list of code points for a text with a surrogate.</summary>
+    internal static string Text(JsonElement e) =>
+        e.ValueKind == JsonValueKind.String ? e.GetString() ?? string.Empty : PythonValues.FromCodePoints(e);
 
     internal static string Text(JsonElement c, string name) => Text(c.GetProperty(name));
 
@@ -106,6 +108,12 @@ internal static class ValueModelValues
     internal sealed class Decoder
     {
         private readonly Dictionary<int, object?> ids = [];
+
+        /// <summary>
+        /// Gets or sets a value indicating whether a set whose items all have one type of long, double,
+        /// string, or bool becomes a <c>PySet</c> of that type, not a <c>PySet&lt;object?&gt;</c>.
+        /// </summary>
+        internal bool TypedSets { get; set; }
 
         internal object? Decode(JsonElement e)
         {
@@ -191,7 +199,32 @@ internal static class ValueModelValues
 
             if (e.TryGetProperty("set", out var set))
             {
-                return new PySet<object?>(set.EnumerateArray().Select(Decode)) { Frozen = e.GetProperty("frozen").GetBoolean() };
+                var items = set.EnumerateArray().Select(Decode).ToList();
+                var frozen = e.GetProperty("frozen").GetBoolean();
+                if (TypedSets && items.Count > 0)
+                {
+                    if (items.All(x => x is long))
+                    {
+                        return new PySet<long>(items.Cast<long>()) { Frozen = frozen };
+                    }
+
+                    if (items.All(x => x is double))
+                    {
+                        return new PySet<double>(items.Cast<double>()) { Frozen = frozen };
+                    }
+
+                    if (items.All(x => x is string))
+                    {
+                        return new PySet<string>(items.Cast<string>()) { Frozen = frozen };
+                    }
+
+                    if (items.All(x => x is bool))
+                    {
+                        return new PySet<bool>(items.Cast<bool>()) { Frozen = frozen };
+                    }
+                }
+
+                return new PySet<object?>(items) { Frozen = frozen };
             }
 
             if (e.TryGetProperty("date", out var date))
@@ -225,19 +258,65 @@ internal static class ValueModelValues
 }
 
 /// <summary>The test enum <c>Color</c> of the generator, with an int value in the middle.</summary>
-internal enum TestColor
+internal enum Color
 {
+    [PyEnumMember("red", "red")]
     Red,
+    [PyEnumMember("green", 2)]
     Green,
+    [PyEnumMember("blue", "bl\u00e9")]
     Blue,
 }
 
 /// <summary>A copy of the upstream enum <c>EpisodeType</c>.</summary>
-internal enum TestEpisodeType
+internal enum EpisodeType
 {
+    [PyEnumMember("message", "message")]
     Message,
+    [PyEnumMember("json", "json")]
     Json,
+    [PyEnumMember("text", "text")]
     Text,
+}
+
+/// <summary>A copy of the upstream enum <c>ComparisonOperator</c>.</summary>
+internal enum ComparisonOperator
+{
+    [PyEnumMember("equals", "=")]
+    Equals,
+    [PyEnumMember("not_equals", "<>")]
+    NotEquals,
+    [PyEnumMember("greater_than", ">")]
+    GreaterThan,
+    [PyEnumMember("less_than", "<")]
+    LessThan,
+    [PyEnumMember("greater_than_equal", ">=")]
+    GreaterThanEqual,
+    [PyEnumMember("less_than_equal", "<=")]
+    LessThanEqual,
+    [PyEnumMember("is_null", "IS NULL")]
+    IsNull,
+    [PyEnumMember("is_not_null", "IS NOT NULL")]
+    IsNotNull,
+}
+
+/// <summary>An enum with int values.</summary>
+internal enum Priority
+{
+    [PyEnumMember("low", 1)]
+    Low,
+    [PyEnumMember("high", 2)]
+    High,
+    [PyEnumMember("huge", 4611686018427387904)]
+    Huge,
+}
+
+/// <summary>An enum whose second member has no attribute.</summary>
+internal enum Unmarked
+{
+    [PyEnumMember("a", "a")]
+    A,
+    B,
 }
 
 /// <summary>The equality of upstream <c>Node</c> (nodes.py:149): equal to each <c>Node</c> with the same UUID.</summary>

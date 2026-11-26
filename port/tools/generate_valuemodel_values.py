@@ -18,14 +18,16 @@ float bit pattern or a lone surrogate:
     null, true, false      None, True, False
     {"i": "-7b"}           int, as hexadecimal text with a sign, because str() of an int has a limit
     {"f": bits}            float, the 64 bits as a signed integer
-    {"s": [code points]}   str
+    {"s": "text"}          str. A text with a surrogate code point is a list of code points instead,
+                           because JSON text cannot hold a lone surrogate. Each other text in the file
+                           follows the same rule.
     {"l": [...]}           list
     {"t": [...]}           tuple
     {"d": [[k, v], ...]}   dict
     {"set": [...], "frozen": b}   set or frozenset, items in Python's iteration order
     {"date": [y, m, d]}    datetime.date
     {"b": [bytes]}         bytes
-    {"enum": "Color.red"}  a member of a test enum
+    {"enum": "Color.red"}  a member of a test enum. The C# test enum has the same class name (R2).
     {"node": "u"}, {"edge": "u"}  an object of a test class with the __eq__ of upstream Node and Edge
 
 A list, dict, tuple, nan, node, or edge that occurs more than once in one case gets "id": n at its first
@@ -65,16 +67,36 @@ LONG_MIN, LONG_MAX = -(2**63), 2**63 - 1
 class Color(enum.Enum):
     red = 'red'
     green = 2
-    blue = 'blé'
+    blue = 'bl\u00e9'
 
 
 class EpisodeType(enum.Enum):
+    """A copy of graphiti_core.nodes.EpisodeType."""
     message = 'message'
     json = 'json'
     text = 'text'
 
 
-ENUMS = {'Color': Color, 'EpisodeType': EpisodeType}
+class ComparisonOperator(enum.Enum):
+    """A copy of graphiti_core.search.search_filters.ComparisonOperator."""
+    equals = '='
+    not_equals = '<>'
+    greater_than = '>'
+    less_than = '<'
+    greater_than_equal = '>='
+    less_than_equal = '<='
+    is_null = 'IS NULL'
+    is_not_null = 'IS NOT NULL'
+
+
+class Priority(enum.Enum):
+    """An enum with int values."""
+    low = 1
+    high = 2
+    huge = 2**62
+
+
+ENUMS = {'Color': Color, 'EpisodeType': EpisodeType, 'ComparisonOperator': ComparisonOperator, 'Priority': Priority}
 
 
 class Node:
@@ -107,8 +129,11 @@ class Edge:
         return False
 
 
-def cps(s: str) -> list[int]:
-    return [ord(c) for c in s]
+def cps(s: str) -> str | list[int]:
+    """A text for the file: the text itself, or its code points if it holds a surrogate."""
+    if any(0xD800 <= ord(c) <= 0xDFFF for c in s):
+        return [ord(c) for c in s]
+    return s
 
 
 def hex_int(n: int) -> str:
@@ -257,7 +282,7 @@ def pool() -> list:
         (), (1,), (1, 2), ((1,),), ('a', None, (2.0,)), (1, [2, 3]), ('\U0001F600',),
         {}, {'a': 1}, {'a': [1, {'b': None}], 'é': 'x', '': ()},
         {1: 'a', 'b': 2}, {(1, 2): None, None: 1.5, 2.5: True}, {True: 'x'}, {datetime.date(2024, 1, 5): 1},
-        {b'x': 1}, {Color.red: 1}, {frozenset({3}): (4,)},
+        {b'x': 1}, {Color.red: 1}, {frozenset({3}): (4,)}, {(1, frozenset({2})): 'v', (1, 2): [3]},
         set(), {1}, {'a'}, {(1, 2)}, {None}, {1, 2, 3}, frozenset(), frozenset({1}), frozenset({'a', 'b'}),
         datetime.date(2024, 1, 5), datetime.date(1, 1, 1), datetime.date(9999, 12, 31),
         b'', b'abc', b"it's", b'say "hi"', b'\'"', b'\x00\xff\n\t\r\\\x7f\x80',
@@ -341,6 +366,23 @@ def build_values() -> dict:
     def add(name: str, case: dict) -> None:
         cases.setdefault(name, []).append(case)
 
+    format_errors: set = set()
+
+    def add_format(v, spec: str) -> None:
+        if spec and isinstance(v, datetime.date):
+            return  # date.__format__ is strftime. Upstream formats no date with a spec.
+        result = text_or_error(lambda: format(v, spec))
+        if 'e' in result:
+            # One case for each distinct type, spec, and message.
+            key = (type(v).__name__, spec, str(result['msg']))
+            if key in format_errors:
+                return
+            format_errors.add(key)
+        elif unbuilt(v, spec):
+            add('format_unbuilt', {**encode_case(v=v), 'spec': cps(spec)})
+            return
+        add('format', {**encode_case(v=v), 'spec': cps(spec), **result})
+
     values = pool() + [random_value(rng) for _ in range(400)]
 
     # repr, str, bool(), len, and the typed reads.
@@ -356,11 +398,14 @@ def build_values() -> dict:
 
     # repr of floats: the boundaries, then several thousand random doubles.
     for x in FLOATS + [nan(), nan(-1)] + random_doubles(rng):
-        add('float_repr', {'x': bits(x), 'r': cps(repr(x)), 's': cps(str(x))})
+        case = {'x': bits(x), 'r': cps(repr(x))}
+        if str(x) != repr(x):
+            case['s'] = cps(str(x))
+        add('float_repr', case)
 
     # format(value, spec) for each spec that upstream uses, and more specs for the grammar.
     format_values = ([None, True, False] + INTS[:10] + [10**4300] + FLOATS + [nan(), nan(-1), 10**400]
-                     + STRINGS + ['x' * 31, 'y' * 30, '\U0001F600' * 31]
+                     + STRINGS + ['x' * 31, 'y' * 30, '\U0001F600' * 31, '\U0001F600' * 20]
                      + [[1], {'a': 1}, (1,), {1: 2}, {1}, frozenset(), datetime.date(2024, 1, 5), b'ab',
                         Color.red, Color.green, EpisodeType.message]
                      + [rng.uniform(-1e7, 1e7) for _ in range(60)] + [rng.randint(-10**8, 10**8) / 100 for _ in range(60)]
@@ -373,20 +418,32 @@ def build_values() -> dict:
                 continue  # date.__format__ is strftime. Upstream formats no date with a spec.
             if spec in ('10.3', '.3') and isinstance(v, float):
                 continue  # The general format of a float with a precision and no type. Upstream does not use it.
-            add('format', {**encode_case(v=v), 'spec': cps(spec), **text_or_error(lambda: format(v, spec))})
+            add_format(v, spec)
+
+    # Random specs of the full grammar, on one value of each kind. Python's errors must come out the same.
+    # A spec that Python accepts with an option that Py.Format does not build goes to format_unbuilt.
+    grammar_values = ['abc', '', '\u00e9\U0001F600', 0, 5, -1234567, True, 1.5, -0.0, 1234.5678, nan(), math.inf,
+                      None, [1], Color.red, 10**30]
+    for spec in random_specs(rng, 700) + ['z', 'z5', '+c', '#c', 'c', '#d', '.3000000000f', '.2147483648f',
+                                          '.99999999999999999999', '99999999999999999999', '.9223372036854775807',
+                                          '.9223372036854775808', 'z.1f', ',e', '010,', '010,d', '.3', '%', 'n']:
+        for v in grammar_values:
+            add_format(v, spec)
 
     # Exact .Nf rounding on values that are ties in binary, and on random values.
     for p in range(0, 8):
         for k in range(-40, 41):
             x = k / 2**rng.randint(1, 8)
-            add('format', {**encode_case(v=x), 'spec': cps(f'.{p}f'), 'r': cps(format(x, f'.{p}f'))})
+            add_format(x, f'.{p}f')
 
     # Key equality: (a is b or a == b), as a dict, a set, and `in` compare.
     nan_a, nan_b = math.nan, float('nan')
     keys = keys_pool(nan_a, nan_b)
     eq_values = keys + [[1, 2], [1.0, 2], (1, 2), (1.0, 2), {'a': 1}, {'a': 1.0}, {'a': 1, 'b': 2}, {'b': 2, 'a': 1},
                         {1: 'x'}, {1.0: 'x'}, {True: 'x'}, set(), {1}, {1.0}, frozenset({1}), [nan_a], [nan_b],
-                        {'k': nan_a}, b'1', Node('u1'), Edge('u1')]
+                        {'k': nan_a}, b'1', Node('u1'), Edge('u1'),
+                        {2}, {1, 2}, {1, 3}, frozenset({2}), frozenset({1, 3}), [{1}], [{2}], {'k': {1}}, {'k': {2}},
+                        [1, 2], b'\x01\x02', [frozenset({1})]]
     for a in eq_values:
         for b in eq_values:
             case = encode_case(a=a, b=b)
@@ -398,6 +455,18 @@ def build_values() -> dict:
             add('hashable', {**encode_case(v=k), 'r': True})
         except TypeError as e:
             add('hashable', {**encode_case(v=k), **err(e)})
+
+    # Sets of one item type each. The test builds PySet<long>, PySet<double>, PySet<string>, or PySet<bool>.
+    typed_sets = [({1}, {1.0}), ({1, 2}, {1.0, 2.0}), ({1}, {2.0}), ({'a'}, {'a'}), ({'a'}, {'b'}), ({1}, {'1'}),
+                  ({True}, {1.0}), ({True}, {1}), (frozenset({1.5}), {1.5}), ({2**53 + 1}, {float(2**53)}),
+                  ({2**53}, {float(2**53)}), (set(), set()), (set(), {1.0}), ({1, 2}, {2.0, 3.0}), ({0}, {-0.0})]
+    for a, b in typed_sets:
+        add('typed_set_equal', {**encode_case(a=a, b=b), 'r': a == b})
+        add('typed_set_equal', {**encode_case(a=b, b=a), 'r': b == a})
+
+    # dict.get on a dict[str, int]: the value or None (text_utils.py:98).
+    for k in ['a', 'b', 'c']:
+        add('int_dict_get', {'k': k, 'r': {'a': 1, 'b': 0}.get(k)})
 
     # dict behavior: random operation sequences on a dict with keys of any type.
     for n in range(260):
@@ -448,8 +517,124 @@ def build_values() -> dict:
     for cls in ENUMS.values():
         for m in cls:
             add('enum', {**encode_case(v=m, value=m.value), 'repr': cps(repr(m)), 'str': cps(str(m))})
+        for value in [m.value for m in cls] + [2.0, True, 1, 'x', 'red', '=', [1], None, 2**62 + 0.0]:
+            try:
+                add('enum_from_value', {'cls': name_of(cls), **encode_case(value=value, r=cls(value))})
+            except ValueError as e:
+                add('enum_from_value', {'cls': name_of(cls), **encode_case(value=value), **err(e)})
+
+    # The list helpers: in, index, count, remove, with identity first.
+    nan_c = float('nan')
+    list_items = [1, 1.0, True, 2, 'a', None, nan_c, (1, 2), [1], Node('u1'), Node('u1'), Edge('u1'), Edge('u2'), 2**64]
+    for _ in range(300):
+        xs = [rng.choice(list_items) for _ in range(rng.randint(0, 6))]
+        x = rng.choice(list_items + [float('nan'), 3, 'b'])
+        case = encode_case(xs=xs, x=x)
+        case['in'] = x in xs
+        case['count'] = xs.count(x)
+        try:
+            case['index'] = xs.index(x)
+        except ValueError as e:
+            case['index_error'] = err(e) if not isinstance(x, (Node, Edge)) else {'e': 'ValueError'}
+        after = list(xs)
+        try:
+            after.remove(x)
+            # The position of the removed item: the list after remove() is xs without that position.
+            case['removed'] = next(j for j in range(len(xs)) if xs[:j] + xs[j + 1:] == after and all(
+                a is b for a, b in zip(xs[:j] + xs[j + 1:], after)))
+        except ValueError as e:
+            case['remove_error'] = err(e)
+        add('list_ops', case)
+
+    # list.sort with a key and reverse. The result is the order of the original positions.
+    for n in range(500):
+        keys_ = sort_keys(rng)
+        for reverse in (False, True):
+            order = list(range(len(keys_)))
+            try:
+                order.sort(key=lambda i: keys_[i], reverse=reverse)
+                add('sort', {**encode_case(keys=keys_), 'reverse': reverse, 'r': order})
+            except TypeError as e:
+                add('sort', {**encode_case(keys=keys_), 'reverse': reverse, **err(e)})
 
     return {'seed': SEED, 'cases': cases}
+
+
+def name_of(cls) -> str:
+    return cls.__name__
+
+
+def random_specs(rng: random.Random, n: int) -> list[str]:
+    """Specs from the whole grammar: [[fill]align][sign][z][#][0][width][grouping][.precision][type]."""
+    out = []
+    for _ in range(n):
+        spec = ''
+        if rng.random() < 0.4:
+            spec += rng.choice(['', '', '*', '0', ' ', '\u00e9']) + rng.choice('<>=^')
+        spec += rng.choice(['', '', '', '+', '-', ' '])
+        spec += rng.choice(['', '', '', '', 'z'])
+        spec += rng.choice(['', '', '', '', '#'])
+        spec += rng.choice(['', '', '', '0'])
+        spec += rng.choice(['', '', '1', '7', '12'])
+        spec += rng.choice(['', '', '', ',', '_', ',,', ',_'])
+        spec += rng.choice(['', '', '', '.', '.0', '.2', '.10'])
+        spec += rng.choice(['', '', 's', 'd', 'f', 'F', 'e', 'g', '%', 'n', 'c', 'x', 'b', 'y', 'Z'])
+        out.append(spec)
+    return list(dict.fromkeys(out))
+
+
+def unbuilt(v, spec: str) -> bool:
+    """True for a spec that Python accepts with an option that Py.Format does not build."""
+    if not spec or isinstance(v, (str, enum.Enum)):
+        return False
+    body = spec[2:] if len(spec) >= 2 and spec[1] in '<>=^' else spec[1:] if spec[:1] in '<>=^' else spec
+    kind = body[-1:] if body[-1:].isalpha() or body[-1:] == '%' else ''
+    if kind in ('e', 'E', 'g', 'G', '%', 'n', 'c', 'b', 'o', 'x', 'X'):
+        return True
+    if '#' in body or 'z' in body:
+        return True
+    if isinstance(v, float) and kind == '' and '.' in body:
+        return True
+    # CPython puts separators into the padding when the fill is 0 and the align is '='. That happens for
+    # the flag 0 with no align, and for an explicit fill 0 with '='.
+    has_fill = len(spec) >= 2 and spec[1] in '<>=^'
+    align = spec[1] if has_fill else spec[0] if spec[:1] in '<>=^' else None
+    zero_flag = not has_fill and body.lstrip('+- ').startswith('0')
+    zero_pad = (has_fill and spec[0] == '0' and align == '=') or (zero_flag and align in (None, '='))
+    return zero_pad and (',' in body or '_' in body)
+
+
+def sort_keys(rng: random.Random) -> list:
+    """Keys of the shapes that upstream sorts by: numbers, text, tuples of two, with ties and errors."""
+    n = rng.choice([0, 1, 2, 3, 5, 8, 12, 20, 63, 64, 70])
+    shape = rng.choice(['int', 'float', 'num', 'str', 'tuple', 'bool_tuple', 'date', 'bytes', 'list', 'error', 'nan'])
+    if n > 63 and shape in ('error', 'nan'):
+        shape = 'num'  # The order of comparisons above 63 items is not CPython's (see Py.SortInPlace).
+
+    def one():
+        if shape == 'int':
+            return rng.randint(-3, 3)
+        if shape == 'float':
+            return rng.choice([0.5, -0.0, 0.0, 1.5, 2.0, -1.25])
+        if shape == 'num':
+            return rng.choice([1, 1.0, True, 2, 2.5, -1, 0, False, 2**64, float(2**64), 2**53 + 1, float(2**53)])
+        if shape == 'str':
+            return rng.choice(['a', 'B', '', '\u00e9', '\U0001F600', '\uffff', 'ab', '\ud800'])
+        if shape == 'tuple':
+            return (rng.choice([1.0, 2.0, 2]), rng.choice(['x', 'y', 'z']))
+        if shape == 'bool_tuple':
+            return (rng.random() < 0.5, rng.randint(0, 2))
+        if shape == 'date':
+            return datetime.date(2024, rng.randint(1, 2), rng.randint(1, 3))
+        if shape == 'bytes':
+            return rng.choice([b'', b'a', b'ab', b'\xff', b'b'])
+        if shape == 'list':
+            return rng.choice([[1], [1, 2], [], [0, 5], [1.0]])
+        if shape == 'nan':
+            return rng.choice([1.0, float('nan'), 0.5, 2.0])
+        return rng.choice([1, 'a', None, (1, None), (1, 2), 2.5, Color.red, [1], (1,)])
+
+    return [one() for _ in range(n)]
 
 
 def typed_reads(v) -> dict:
@@ -553,12 +738,20 @@ def paths(v, prefix=(), stack=()) -> list[tuple]:
     for i, x in enumerate(children):
         if isinstance(x, (list, tuple, dict, set, frozenset, bytes)):
             out += paths(x, prefix + (i,), stack)
+    if isinstance(v, dict):
+        # A key is step -(i + 1): deepcopy copies keys too, which a frozenset key shows.
+        for i, k in enumerate(v):
+            if isinstance(k, (tuple, frozenset, bytes)):
+                out += paths(k, prefix + (-(i + 1),), stack)
     return out
 
 
 def at(v, path):
     for i in path:
-        v = list(v.values())[i] if isinstance(v, dict) else v[i]
+        if isinstance(v, dict):
+            v = list(v)[-i - 1] if i < 0 else list(v.values())[i]
+        else:
+            v = v[i]
     return v
 
 
@@ -577,7 +770,8 @@ def deepcopy_case(v) -> dict:
 
 def main() -> int:
     check = '--check' in sys.argv[1:]
-    text = json.dumps(build_values(), separators=(',', ':'), ensure_ascii=True) + '\n'
+    # A text with a surrogate is a list of code points, so the rest can be plain UTF-8.
+    text = json.dumps(build_values(), separators=(',', ':'), ensure_ascii=False) + '\n'
     if check:
         if not VALUES_PATH.exists() or VALUES_PATH.read_text(encoding='utf-8') != text:
             print(f'stale: {VALUES_PATH.relative_to(ROOT)}')

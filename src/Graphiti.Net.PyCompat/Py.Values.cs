@@ -77,6 +77,16 @@ internal static partial class Py
         where TValue : class? =>
         d.TryGetValue(key, out var value) ? value : null;
 
+    /// <summary>
+    /// <c>d.get(key)</c> on a dict whose values are a value type, for example <c>dict[str, int]</c>: the value,
+    /// or null for <c>None</c>. <see cref="Get{TKey, TValue}(IDictionary{TKey, TValue}, TKey)"/> covers
+    /// reference values. A constraint is not part of an overload signature, so this one has its own name.
+    /// </summary>
+    internal static TValue? GetNullable<TKey, TValue>(IDictionary<TKey, TValue> d, TKey key)
+        where TKey : notnull
+        where TValue : struct =>
+        d.TryGetValue(key, out var value) ? value : null;
+
     /// <summary><c>d.get(key, default)</c>.</summary>
     internal static TValue Get<TKey, TValue>(IDictionary<TKey, TValue> d, TKey key, TValue @default)
         where TKey : notnull =>
@@ -139,7 +149,7 @@ internal static partial class Py
         where TEnum : struct, Enum => PyEnum.Value(member);
 
     /// <summary>A Python <c>bool</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static bool AsBool(object? x) => x is bool b ? b : throw WrongType("bool", x);
+    internal static bool AsBool(object? x) => x is bool b ? b : throw WrongType("bool", "bool", x);
 
     /// <summary>
     /// A Python <c>int</c> read from open data. A <c>bool</c> is an int in Python and gives 0 or 1. An int
@@ -151,7 +161,7 @@ internal static partial class Py
         long l => l,
         bool b => b ? 1 : 0,
         BigInteger => throw new OverflowException("Python int too large to convert to C long"),
-        _ => throw WrongType("int", x),
+        _ => throw WrongType("int", "long", x),
     };
 
     /// <summary>
@@ -166,34 +176,34 @@ internal static partial class Py
         long l => l,
         bool b => b ? 1 : 0,
         BigInteger big => IntToFloat(big),
-        _ => throw WrongType("float", x),
+        _ => throw WrongType("float", "double", x),
     };
 
     /// <summary>A Python <c>str</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static string AsString(object? x) => x is string s ? s : throw WrongType("str", x);
+    internal static string AsString(object? x) => x is string s ? s : throw WrongType("str", "string", x);
 
     /// <summary>A Python <c>list</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static List<object?> AsList(object? x) => x is List<object?> list ? list : throw WrongType("list", x);
+    internal static List<object?> AsList(object? x) => x is List<object?> list ? list : throw WrongType("list", "List<object?>", x);
 
     /// <summary>A Python <c>tuple</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static PyTuple AsTuple(object? x) => x is PyTuple t ? t : throw WrongType("tuple", x);
+    internal static PyTuple AsTuple(object? x) => x is PyTuple t ? t : throw WrongType("tuple", "PyTuple", x);
 
     /// <summary>A Python <c>dict</c> with string keys read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
     internal static OrderedDictionary<string, object?> AsDict(object? x) =>
-        x is OrderedDictionary<string, object?> d ? d : throw WrongType("dict", x);
+        x is OrderedDictionary<string, object?> d ? d : throw WrongType("dict", "OrderedDictionary<string, object?>", x);
 
     /// <summary>A Python <c>dict</c> with keys of any type read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static PyDict AsPyDict(object? x) => x is PyDict d ? d : throw WrongType("dict", x);
+    internal static PyDict AsPyDict(object? x) => x is PyDict d ? d : throw WrongType("dict", "PyDict", x);
 
     /// <summary>A Python <c>date</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static DateOnly AsDate(object? x) => x is DateOnly d ? d : throw WrongType("datetime.date", x);
+    internal static DateOnly AsDate(object? x) => x is DateOnly d ? d : throw WrongType("datetime.date", "DateOnly", x);
 
     /// <summary>A Python <c>bytes</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
-    internal static byte[] AsBytes(object? x) => x is byte[] b ? b : throw WrongType("bytes", x);
+    internal static byte[] AsBytes(object? x) => x is byte[] b ? b : throw WrongType("bytes", "byte[]", x);
 
     /// <summary>A member of an enum read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
     internal static TEnum AsEnum<TEnum>(object? x)
-        where TEnum : struct, Enum => x is TEnum e ? e : throw WrongType(typeof(TEnum).Name, x);
+        where TEnum : struct, Enum => x is TEnum e ? e : throw WrongType(typeof(TEnum).Name, typeof(TEnum).Name, x);
 
     /// <summary>
     /// The C name of the Python type of a value (<c>tp_name</c>), as Python's error messages show it:
@@ -544,8 +554,28 @@ internal static partial class Py
         }
     }
 
-    private static InvalidCastException WrongType(string expected, object? x) =>
-        new($"expected {expected}, got {TypeName(x)}");
+    /// <summary>
+    /// The error of a typed read. It names the Python type and the C# type on each side, because typed data
+    /// such as a <c>List&lt;string&gt;</c> is a Python list too, but it is not the open data that the read takes.
+    /// </summary>
+    private static InvalidCastException WrongType(string expected, string expectedClr, object? x) =>
+        new($"expected {expected} as {expectedClr}, got {TypeName(x)} as {ClrName(x?.GetType())}");
+
+    private static string ClrName(Type? type)
+    {
+        if (type is null)
+        {
+            return "null";
+        }
+
+        if (!type.IsGenericType)
+        {
+            return type.Name;
+        }
+
+        var name = type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)];
+        return name + "<" + string.Join(", ", type.GetGenericArguments().Select(ClrName)) + ">";
+    }
 
     private static InvalidOperationException Outside(object x, string helper) =>
         new($"Py.{helper}: the type {x.GetType().FullName} is not in the Python value model (RULES.md R6)");

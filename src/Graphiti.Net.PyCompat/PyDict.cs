@@ -8,6 +8,9 @@ using System.Collections;
 /// <c>True</c> are one key, a <c>nan</c> key is found only with the same object, and a tuple is a key by
 /// its items. A key that Python cannot hash (a list, a dict, a set) throws <see cref="InvalidCastException"/>.
 /// When a key is set again, the dict keeps the first key object and takes the new value, as Python does.
+/// A nan key held in a <c>double</c> variable is boxed again at each call, so after <c>d[x] = 1</c> the
+/// call <c>ContainsKey(x)</c> is false. .NET cannot keep the identity of an unboxed double. A nan that
+/// stays in one <c>object</c> variable keeps its identity, as a Python float object does.
 /// </summary>
 internal sealed class PyDict : IEnumerable<KeyValuePair<object?, object?>>
 {

@@ -22,7 +22,7 @@ public class ValueModelTests
         {
             var x = BitConverter.Int64BitsToDouble(c.GetProperty("x").GetInt64());
             Assert.Equal(Text(c, "r"), Py.Repr(x));
-            Assert.Equal(Text(c, "s"), Py.Str(x));
+            Assert.Equal(Text(c, c.TryGetProperty("s", out _) ? "s" : "r"), Py.Str(x));
         }
     }
 
@@ -52,7 +52,7 @@ public class ValueModelTests
             ExpectRead(c, "pydict", () => Py.AsPyDict(v), r => Assert.Same(v, r));
             ExpectRead(c, "date", () => Py.AsDate(v), r => Assert.Equal(v, r));
             ExpectRead(c, "bytes", () => Py.AsBytes(v), r => Assert.Same(v, r));
-            ExpectRead(c, "enum", () => Py.AsEnum<TestColor>(v), r => Assert.Equal(v, r));
+            ExpectRead(c, "enum", () => Py.AsEnum<Color>(v), r => Assert.Equal(v, r));
 
             var asInt = c.GetProperty("int");
             if (asInt.ValueKind == JsonValueKind.Null)
@@ -295,8 +295,10 @@ public class ValueModelTests
             var member = d.Decode(c.GetProperty("v"));
             var value = member switch
             {
-                TestColor color => Py.EnumValue(color),
-                TestEpisodeType type => Py.EnumValue(type),
+                Color color => Py.EnumValue(color),
+                EpisodeType type => Py.EnumValue(type),
+                ComparisonOperator op => Py.EnumValue(op),
+                Priority priority => Py.EnumValue(priority),
                 _ => throw new InvalidOperationException($"{member}"),
             };
             Assert.True(PyEqualityComparer<object?>.Instance.Equals(d.Decode(c.GetProperty("value")), value));
@@ -305,6 +307,142 @@ public class ValueModelTests
         }
 
         Assert.Equal("message", Py.EnumValue("message"));
+    }
+
+    [Fact]
+    public void Format_throws_for_an_option_that_is_not_built()
+    {
+        // Python accepts each of these specs. Py.Format does not build them (see its XML comment).
+        var cases = Cases("format_unbuilt");
+        Assert.NotEmpty(cases);
+        foreach (var c in cases)
+        {
+            var v = new Decoder().Decode(c.GetProperty("v"));
+            var ex = Record.Exception(() => Py.Format(v, Text(c, "spec")));
+            Assert.True(ex is InvalidOperationException, $"{c}: {ex?.GetType().Name ?? "no exception"}");
+        }
+    }
+
+    [Fact]
+    public void Sets_with_other_item_types_compare_as_Python_compares_them()
+    {
+        foreach (var c in Cases("typed_set_equal"))
+        {
+            var d = new Decoder { TypedSets = true };
+            var a = d.Decode(c.GetProperty("a"));
+            var b = d.Decode(c.GetProperty("b"));
+            Assert.True(c.GetProperty("r").GetBoolean() == PyEqualityComparer<object?>.Instance.Equals(a, b), $"{c}");
+        }
+    }
+
+    [Fact]
+    public void GetNullable_on_a_dict_with_int_values_matches_Python()
+    {
+        var d = new OrderedDictionary<string, long> { ["a"] = 1, ["b"] = 0 };
+        foreach (var c in Cases("int_dict_get"))
+        {
+            var expected = c.GetProperty("r");
+            long? want = expected.ValueKind == JsonValueKind.Null ? null : expected.GetInt64();
+            Assert.Equal(want, Py.GetNullable(d, Text(c, "k")));
+        }
+    }
+
+    [Fact]
+    public void Enum_FromValue_matches_Python()
+    {
+        foreach (var c in Cases("enum_from_value"))
+        {
+            var d = new Decoder();
+            var value = d.Decode(c.GetProperty("value"));
+            Func<object> call = c.GetProperty("cls").GetString() switch
+            {
+                "Color" => () => PyEnum.FromValue<Color>(value),
+                "EpisodeType" => () => PyEnum.FromValue<EpisodeType>(value),
+                "ComparisonOperator" => () => PyEnum.FromValue<ComparisonOperator>(value),
+                _ => () => PyEnum.FromValue<Priority>(value),
+            };
+            if (c.TryGetProperty("e", out _))
+            {
+                AssertError(c, () => call());
+            }
+            else
+            {
+                Assert.Equal(d.Decode(c.GetProperty("r")), call());
+            }
+        }
+    }
+
+    [Fact]
+    public void An_enum_member_with_no_attribute_is_named_in_the_error()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => Py.Repr(Unmarked.A));
+        Assert.Contains("Unmarked.B", ex.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidCastException>(() => Py.Len(Color.Red));
+    }
+
+    [Fact]
+    public void A_typed_read_of_typed_data_names_both_types()
+    {
+        var ex = Assert.Throws<InvalidCastException>(() => Py.AsList(new List<string>()));
+        Assert.Equal("expected list as List<object?>, got list as List<String>", ex.Message);
+    }
+
+    [Fact]
+    public void List_helpers_match_Python()
+    {
+        foreach (var c in Cases("list_ops"))
+        {
+            var d = new Decoder();
+            var xs = (List<object?>)(d.Decode(c.GetProperty("xs")) ?? new List<object?>());
+            var x = d.Decode(c.GetProperty("x"));
+            Assert.True(c.GetProperty("in").GetBoolean() == Py.Contains(xs, x), $"in {c}");
+            Assert.Equal(c.GetProperty("count").GetInt64(), Py.Count(xs, x));
+            if (c.TryGetProperty("index", out var index))
+            {
+                Assert.Equal(index.GetInt64(), Py.IndexOf(xs, x));
+            }
+            else if (c.GetProperty("index_error").TryGetProperty("msg", out _))
+            {
+                AssertError(c.GetProperty("index_error"), () => Py.IndexOf(xs, x));
+            }
+            else
+            {
+                Assert.Throws<ArgumentException>(() => Py.IndexOf(xs, x));
+            }
+
+            var after = new List<object?>(xs);
+            if (c.TryGetProperty("removed", out var removed))
+            {
+                Py.Remove(after, x);
+                var expected = new List<object?>(xs);
+                expected.RemoveAt(removed.GetInt32());
+                Assert.True(expected.Zip(after).All(p => ReferenceEquals(p.First, p.Second)) && expected.Count == after.Count, $"remove {c}");
+            }
+            else
+            {
+                AssertError(c.GetProperty("remove_error"), () => Py.Remove(after, x));
+            }
+        }
+    }
+
+    [Fact]
+    public void SortInPlace_matches_Python()
+    {
+        foreach (var c in Cases("sort"))
+        {
+            var keys = (List<object?>)(new Decoder().Decode(c.GetProperty("keys")) ?? new List<object?>());
+            var order = Enumerable.Range(0, keys.Count).ToList();
+            var reverse = c.GetProperty("reverse").GetBoolean();
+            if (c.TryGetProperty("e", out _))
+            {
+                AssertError(c, () => Py.SortInPlace(order, i => keys[i], reverse));
+            }
+            else
+            {
+                Py.SortInPlace(order, i => keys[i], reverse);
+                Assert.Equal(c.GetProperty("r").EnumerateArray().Select(x => x.GetInt32()), order);
+            }
+        }
     }
 
     // Laws that hold for any input. They do not use the Python values.
@@ -375,8 +513,8 @@ public class ValueModelTests
         {
             value = value switch
             {
-                PyDict pd => pd.Values.ElementAt(i),
-                OrderedDictionary<string, object?> dict => dict.GetAt(i).Value,
+                PyDict pd => i < 0 ? pd.Keys.ElementAt(-i - 1) : pd.Values.ElementAt(i),
+                OrderedDictionary<string, object?> dict => i < 0 ? dict.GetAt(-i - 1).Key : dict.GetAt(i).Value,
                 PyTuple t => t[i],
                 List<object?> list => list[i],
                 _ => throw new InvalidOperationException($"no item {i} in {value}"),
