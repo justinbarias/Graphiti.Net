@@ -11,7 +11,7 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | 3 | Done 2026-11-25. Create `src/Graphiti.Net.PyCompat` and `tests/Graphiti.Net.Property.Tests`. Build only the helpers that the queue needs. Generate expected values from Python into a file. | Workhorse, Sonnet 5.5, medium | CsCheck property tests pass against the Python values, including negative numbers, zero divisors, empty strings, an emoji, and a combining mark. |
 | 4 | Done 2026-11-26. Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
 | 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
-| P1 | Add the `.editorconfig` entry that makes IDE0065 an error for each C# file. Move the `using` directives of the judge host and the end-to-end tests inside the namespace. Closes open item O8 and debt T22. | Lead, Fable 5.2, medium | A file with a directive at the top fails the build. The gate passes. Own pull request. |
+| P1 | Done 2026-11-26. Add the `.editorconfig` entry that makes IDE0065 an error for each C# file. Move the `using` directives of the judge host and the end-to-end tests inside the namespace. Closes open item O8 and debt T22. | Lead, Fable 5.2, medium | A file with a directive at the top fails the build. The gate passes. Own pull request. |
 | P2 | Build the value model of `PyCompat`: `PyDict`, `PySet<T>`, `PyTuple`, `Py.Repr`, `Py.Str`, `Py.Truthy`, `Py.Len`, `Py.Get`, `Py.As*`, `Py.EnumValue`. | Workhorse, Opus 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
 | P3 | Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
 | P4 | Build `PyDateTime`. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
@@ -406,3 +406,12 @@ The maintainer decided four points on 2026-11-26. They are decisions D37 and D38
 | Open item O1 | The lead writes the runner change as a patch file outside `port/judge/`. The maintainer applies it. |
 
 Not checked: the exact `Pydantic` members that the units use, whether `entity_node_ops` needs `Asyncio`, and whether a `generate_covering_chunks` case reaches `random.sample`.
+
+### Task P1, 2026-11-26
+
+`.editorconfig` has `csharp_using_directive_placement = inside_namespace:error` and `dotnet_diagnostic.IDE0065.severity = error` for each C# file.
+`dotnet build Graphiti.Net.slnx -warnaserror` then failed with `error IDE0065` for 5 files: 2 in the end-to-end tests and 3 in the judge host.
+`dotnet format style Graphiti.Net.slnx --diagnostics IDE0065 --severity error` moved the directives, and the build passed.
+A probe file in `src/Graphiti.Net.PyCompat` with `using System.Text;` above the namespace failed the build with `error IDE0065`. The probe file is deleted.
+`Program.cs` of the judge host has top-level statements and no namespace, and the rule does not report it.
+No adversarial review ran, because the change is configuration and formatter output.
