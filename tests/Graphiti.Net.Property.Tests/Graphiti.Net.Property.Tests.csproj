@@ -10,9 +10,7 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
-    <!-- Written by port/tools/generate_pycompat_values.py from real Python. -->
-    <Content Include="python-values.json" CopyToOutputDirectory="PreserveNewest" />
-    <!-- Written by port/tools/generate_small_values.py from real Python. -->
-    <Content Include="python-values.small.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Each file is written by a generator in port/tools/ from real Python: generate_<area>_values.py. -->
+    <Content Include="python-values*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
