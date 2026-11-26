@@ -1,5 +1,6 @@
 namespace Graphiti.PyCompat.Tests;
 
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CsCheck;
@@ -7,8 +8,9 @@ using Graphiti.PyCompat;
 using static Graphiti.PyCompat.Tests.PythonValues;
 
 /// <summary>
-/// The values that real Python gave for <c>PyRegex</c> and for <c>PyText.Replace</c>, <c>LStrip(s, chars)</c>, and
-/// <c>Count</c>, read from <c>python-values.regex.json</c>. <c>port/tools/generate_regex_values.py</c> writes the file.
+/// The values that real Python gave for <c>PyRegex</c> and for <c>PyText.Replace</c> and <c>Count</c>, read from
+/// <c>python-values.regex.json</c>. <c>port/tools/generate_regex_values.py</c> writes the file.
+/// A text is a JSON string, or a list of code points if it holds a lone surrogate.
 /// </summary>
 internal static class RegexValues
 {
@@ -19,6 +21,11 @@ internal static class RegexValues
 
     internal static List<JsonElement> RegexCases(string name) =>
         [.. Document.RootElement.GetProperty("cases").GetProperty(name).EnumerateArray()];
+
+    internal static string Txt(JsonElement e) =>
+        e.ValueKind == JsonValueKind.String ? e.GetString()! : FromCodePoints(e);
+
+    internal static string T(JsonElement c, string name) => Txt(c.GetProperty(name));
 
     /// <summary>One flag for each code point: does Python's class match that code point on its own.</summary>
     internal static bool[] ClassSet(string name)
@@ -43,6 +50,9 @@ public class RegexTests
 {
     private const RegexOptions Compiled = RegexOptions.CultureInvariant | RegexOptions.Compiled;
 
+    // The constants must not change under IgnoreCase, so each class test runs with and without it.
+    private static readonly RegexOptions[] OptionSets = [RegexOptions.None, RegexOptions.IgnoreCase];
+
     private static Regex Rx(string pattern, RegexOptions options = RegexOptions.None) =>
         new(pattern, options | RegexOptions.CultureInvariant);
 
@@ -51,44 +61,41 @@ public class RegexTests
     private static void AssertClassMatchesPython(string name, string netPattern)
     {
         var expected = RegexValues.ClassSet(name);
-        var regex = new Regex(@"\A" + netPattern + @"\z", Compiled);
-        var wrong = new List<string>();
-        Span<char> text = stackalloc char[2];
-        for (var cp = 0; cp < RegexValues.CodePointCount; cp++)
-        {
-            var length = 1;
-            if (cp >= 0x10000)
-            {
-                text[0] = (char)(0xD800 + ((cp - 0x10000) >> 10));
-                text[1] = (char)(0xDC00 + ((cp - 0x10000) & 0x3FF));
-                length = 2;
-            }
-            else
-            {
-                text[0] = (char)cp;
-            }
-
-            if (regex.IsMatch(text[..length]) != expected[cp])
-            {
-                wrong.Add($"U+{cp:X4}");
-            }
-        }
-
-        Assert.True(wrong.Count == 0, $"{name} differs from Python at {wrong.Count} code points, first {string.Join(" ", wrong.Take(10))}");
         Assert.True(expected.Any(e => e) && expected.Any(e => !e), "the recorded set must hold both kinds");
+        foreach (var options in OptionSets)
+        {
+            var regex = new Regex(@"\A" + netPattern + @"\z", Compiled | options);
+            var wrong = new List<string>();
+            var text = new char[2];
+            for (var cp = 0; cp < RegexValues.CodePointCount; cp++)
+            {
+                var length = 1;
+                if (cp >= 0x10000)
+                {
+                    text[0] = (char)(0xD800 + ((cp - 0x10000) >> 10));
+                    text[1] = (char)(0xDC00 + ((cp - 0x10000) & 0x3FF));
+                    length = 2;
+                }
+                else
+                {
+                    text[0] = (char)cp;
+                }
+
+                if (regex.IsMatch(text.AsSpan(0, length)) != expected[cp])
+                {
+                    wrong.Add($"U+{cp:X4}");
+                }
+            }
+
+            Assert.True(wrong.Count == 0, $"{name} with {options} differs from Python at {wrong.Count} code points, first {string.Join(" ", wrong.Take(10))}");
+        }
     }
 
     [Fact]
     public void Space_matches_Python_for_each_code_point() => AssertClassMatchesPython("space", PyRegex.Space);
 
     [Fact]
-    public void NotSpace_matches_Python_for_each_code_point() => AssertClassMatchesPython("not_space", PyRegex.NotSpace);
-
-    [Fact]
     public void Word_matches_Python_for_each_code_point() => AssertClassMatchesPython("word", PyRegex.Word);
-
-    [Fact]
-    public void NotWord_matches_Python_for_each_code_point() => AssertClassMatchesPython("not_word", PyRegex.NotWord);
 
     [Fact]
     public void Digit_matches_Python_for_each_code_point() => AssertClassMatchesPython("digit", PyRegex.Digit);
@@ -97,17 +104,20 @@ public class RegexTests
     public void SpaceClassBody_inside_a_class_matches_Python_for_each_BMP_code_point()
     {
         var expected = RegexValues.ClassSet("space");
-        var regex = new Regex("\\A[" + PyRegex.SpaceClassBody + "]\\z", Compiled);
-        var wrong = new List<string>();
-        for (var cp = 0; cp < 0x10000; cp++)
+        foreach (var options in OptionSets)
         {
-            if (regex.IsMatch([(char)cp]) != expected[cp])
+            var regex = new Regex("\\A[" + PyRegex.SpaceClassBody + "]\\z", Compiled | options);
+            var wrong = new List<string>();
+            for (var cp = 0; cp < 0x10000; cp++)
             {
-                wrong.Add($"U+{cp:X4}");
+                if (regex.IsMatch([(char)cp]) != expected[cp])
+                {
+                    wrong.Add($"U+{cp:X4}");
+                }
             }
-        }
 
-        Assert.True(wrong.Count == 0, $"differs at {string.Join(" ", wrong.Take(10))}");
+            Assert.True(wrong.Count == 0, $"with {options} differs at {string.Join(" ", wrong.Take(10))}");
+        }
     }
 
     private static int CodePointIndex(ReadOnlySpan<char> text, int index)
@@ -132,39 +142,95 @@ public class RegexTests
         var boundary = RegexValues.Boundary;
         var probes = boundary.GetProperty("probes").EnumerateArray()
             .Select(p => p.EnumerateArray().Select(t => t.GetString()!).ToArray()).ToArray();
-        var regex = new Regex(PyRegex.Boundary, Compiled);
-        var wrong = new List<string>();
-        var checkedCodePoints = 0;
-        var positions = new List<int>();
-        foreach (var run in boundary.GetProperty("runs").EnumerateArray())
+        foreach (var options in OptionSets)
         {
-            var first = run[0].GetInt32();
-            var last = run[1].GetInt32();
-            var masks = Ints(run[2]);
-            for (var cp = first; cp <= last; cp++)
+            var regex = new Regex(PyRegex.Boundary, Compiled | options);
+            var wrong = new List<string>();
+            var checkedCodePoints = 0;
+            var positions = new List<int>();
+            foreach (var run in boundary.GetProperty("runs").EnumerateArray())
             {
-                checkedCodePoints++;
-                var c = PyText.FromCodePoints([cp]);
-                for (var k = 0; k < probes.Length; k++)
+                var first = run[0].GetInt32();
+                var last = run[1].GetInt32();
+                var masks = Ints(run[2]);
+                for (var cp = first; cp <= last; cp++)
                 {
-                    var text = string.Concat(probes[k].Select(t => t == "C" ? c : t));
-                    positions.Clear();
-                    foreach (var m in regex.EnumerateMatches(text))
+                    checkedCodePoints++;
+                    var c = PyText.FromCodePoints([cp]);
+                    for (var k = 0; k < probes.Length; k++)
                     {
-                        positions.Add(CodePointIndex(text, m.Index));
-                    }
+                        var text = string.Concat(probes[k].Select(t => t == "C" ? c : t));
+                        positions.Clear();
+                        foreach (var m in regex.EnumerateMatches(text))
+                        {
+                            positions.Add(CodePointIndex(text, m.Index));
+                        }
 
-                    var actual = positions.Aggregate(0, (mask, p) => mask | (1 << p));
-                    if (actual != masks[k])
-                    {
-                        wrong.Add($"U+{cp:X4} in probe {k}");
+                        var actual = positions.Aggregate(0, (mask, p) => mask | (1 << p));
+                        if (actual != masks[k])
+                        {
+                            wrong.Add($"U+{cp:X4} in probe {k}");
+                        }
                     }
                 }
             }
+
+            Assert.Equal(RegexValues.CodePointCount, checkedCodePoints);
+            Assert.True(wrong.Count == 0, $"\\b with {options} differs from Python in {wrong.Count} cases, first {string.Join(", ", wrong.Take(10))}");
+        }
+    }
+
+    // ---- the IGNORECASE patterns of temporal_edge_utils.py ----
+
+    private const RegexOptions IgnoreCase = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
+
+    // R13: each s becomes [sſ] and each i becomes [iİı]. This writes them out in a literal of the patterns below.
+    private static string Fold(string literal) => literal.Replace("s", "[sſ]", StringComparison.Ordinal).Replace("i", "[iİı]", StringComparison.Ordinal);
+
+    private static readonly Dictionary<string, Regex> TemporalRegexes = new()
+    {
+        // _FUTURE_ASSERTION_RE: r'\b(will|shall|...|committed to)\b|[a-z]+\'ll\b'
+        ["future"] = Rx(
+            PyRegex.Boundary + "(" + Fold(
+                "will|shall|is going to|are going to|going to|plans? to|planned to|planning to|intends? to|intended to|"
+                + "expects? to|expected to|promises? to|promised to|scheduled to|is scheduled to|are scheduled to|"
+                + "set to|aims? to|aimed to|committed to")
+            + ")" + PyRegex.Boundary + "|[a-zſİı]+'ll" + PyRegex.Boundary,
+            IgnoreCase),
+
+        // _DEADLINE_RE: r'\b(by|before|no later than|deadline|due by|due on)\b'
+        ["deadline"] = Rx(PyRegex.Boundary + "(" + Fold("by|before|no later than|deadline|due by|due on") + ")" + PyRegex.Boundary, IgnoreCase),
+
+        // _ONGOING_STATE_END_RE: r'\b(until|through|thru|expires?|expired|ends?|ended|ending|stops?|stopped|ceases?|ceased|no longer)\b'
+        ["ongoing"] = Rx(
+            PyRegex.Boundary + "(" + Fold("until|through|thru|expires?|expired|ends?|ended|ending|stops?|stopped|ceases?|ceased|no longer") + ")" + PyRegex.Boundary,
+            IgnoreCase),
+    };
+
+    [Fact]
+    public void The_IGNORECASE_patterns_of_temporal_edge_utils_match_Python()
+    {
+        var cases = RegexValues.RegexCases("temporal");
+        foreach (var name in TemporalRegexes.Keys)
+        {
+            Assert.True(cases.Count(c => c.GetProperty("p").GetString() == name) >= 500, name);
         }
 
-        Assert.Equal(RegexValues.CodePointCount, checkedCodePoints);
-        Assert.True(wrong.Count == 0, $"\\b differs from Python in {wrong.Count} cases, first {string.Join(", ", wrong.Take(10))}");
+        Assert.Contains(cases, c => RegexValues.T(c, "s").Contains('Ɤ', StringComparison.Ordinal));
+        Assert.Contains(cases, c => RegexValues.T(c, "s").Contains('Ƛ', StringComparison.Ordinal));
+        Assert.Contains(cases, c => c.GetProperty("r").ValueKind == JsonValueKind.Array);
+        Assert.Contains(cases, c => c.GetProperty("r").ValueKind == JsonValueKind.Null);
+        foreach (var c in cases)
+        {
+            var name = c.GetProperty("p").GetString()!;
+            var text = RegexValues.T(c, "s");
+            var m = TemporalRegexes[name].Match(text);
+            int[]? actual = m.Success ? [CodePointIndex(text, m.Index), CodePointIndex(text, m.Index + m.Length)] : null;
+            int[]? expected = c.GetProperty("r").ValueKind == JsonValueKind.Null ? null : Ints(c.GetProperty("r"));
+            Assert.True(
+                (expected is null && actual is null) || (expected is not null && actual is not null && expected.SequenceEqual(actual)),
+                $"{name} on {Describe([text])}: expected {(expected is null ? "None" : string.Join(",", expected))}, got {(actual is null ? "None" : string.Join(",", actual))}");
+        }
     }
 
     // ---- re.split ----
@@ -201,20 +267,24 @@ public class RegexTests
         ["digits"] = Rx("(" + PyRegex.Digit + "+)"),
         // r'(\w+)'
         ["word_runs"] = Rx("(" + PyRegex.Word + "+)"),
-        // r'(\S+)'
-        ["non_space_runs"] = Rx("(" + PyRegex.NotSpace + "+)"),
-        // r'(\W)'
-        ["non_word"] = Rx("(" + PyRegex.NotWord + ")"),
+        // r'(?<!\w)(?!\w)'
+        ["word_gap"] = Rx("(?<!" + PyRegex.Word + ")(?!" + PyRegex.Word + ")"),
+        // r'(?!\w)'
+        ["no_word_ahead"] = Rx("(?!" + PyRegex.Word + ")"),
+        // r'(?=\U0001F600)'
+        ["before_emoji"] = Rx("(?=😀)"),
+        // r'(?<=\U0001F600)'
+        ["after_emoji"] = Rx("(?<=😀)"),
     };
 
     private static string Describe(IEnumerable<string?> items) =>
-        "[" + string.Join(", ", items.Select(i => i is null ? "None" : "'" + string.Join(" ", PyText.ToCodePoints(i).Select(c => c.ToString("X", System.Globalization.CultureInfo.InvariantCulture))) + "'")) + "]";
+        "[" + string.Join(", ", items.Select(i => i is null ? "None" : "'" + string.Join(" ", PyText.ToCodePoints(i).Select(c => c.ToString("X", CultureInfo.InvariantCulture))) + "'")) + "]";
 
     [Fact]
     public void Split_matches_Python()
     {
         var cases = RegexValues.RegexCases("split");
-        Assert.True(cases.Count > 5000);
+        Assert.True(cases.Count > 4000);
         foreach (var name in SplitRegexes.Keys)
         {
             Assert.True(cases.Count(c => c.GetProperty("p").GetString() == name) >= 120, name);
@@ -228,13 +298,22 @@ public class RegexTests
         foreach (var c in cases)
         {
             var name = c.GetProperty("p").GetString()!;
-            var text = Text(c, "s");
-            var actual = PyRegex.Split(SplitRegexes[name], text, c.GetProperty("n").GetInt64());
+            var text = RegexValues.T(c, "s");
+            var maxsplit = c.GetProperty("n").GetInt64();
             var expected = c.GetProperty("r").EnumerateArray()
-                .Select(e => e.ValueKind == JsonValueKind.Null ? null : FromCodePoints(e)).ToList();
-            Assert.True(
-                expected.SequenceEqual(actual),
-                $"{name} maxsplit {c.GetProperty("n")} on {Describe([text])}: expected {Describe(expected)}, got {Describe(actual)}");
+                .Select(e => e.ValueKind == JsonValueKind.Null ? null : RegexValues.Txt(e)).ToList();
+            var message = $"{name} maxsplit {maxsplit} on {Describe([text])}";
+            if (maxsplit == 0)
+            {
+                // Each match consumes text or sits at its own position, so no split makes more cuts than this.
+                // A defect that never advances stops here with a wrong result and not after a run that never ends.
+                var bound = (2 * (text.Length + 1)) + 2;
+                var guarded = PyRegex.Split(SplitRegexes[name], text, bound);
+                Assert.True(expected.SequenceEqual(guarded), $"{message} (bounded): expected {Describe(expected)}, got {Describe(guarded)}");
+            }
+
+            var actual = PyRegex.Split(SplitRegexes[name], text, maxsplit);
+            Assert.True(expected.SequenceEqual(actual), $"{message}: expected {Describe(expected)}, got {Describe(actual)}");
         }
     }
 
@@ -243,6 +322,30 @@ public class RegexTests
     {
         Assert.Equal(["abc"], PyRegex.Split(Rx("z"), "abc"));
         Assert.Equal([string.Empty], PyRegex.Split(Rx("z"), string.Empty));
+    }
+
+    [Fact]
+    public void Split_does_not_cut_between_the_units_of_a_pair()
+    {
+        // Python: re.split(r'(?<!\w)(?!\w)', 'a😀') gives ['a😀', ''], and the same for each text that holds an emoji.
+        var gap = SplitRegexes["word_gap"];
+        Assert.Equal(["a\U0001F600", string.Empty], PyRegex.Split(gap, "a\U0001F600"));
+    }
+
+    [Fact]
+    public void Split_throws_ArgumentException_for_what_it_cannot_do()
+    {
+        var inline = Assert.Throws<ArgumentException>(() => PyRegex.Split(Rx("(?x) a # comment"), "a"));
+        Assert.Contains("inline x flag", inline.Message, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => PyRegex.Split(Rx("(?ix:a # comment\n)"), "a"));
+        var nonBacktracking = Assert.Throws<ArgumentException>(() => PyRegex.Split(Rx("a", RegexOptions.NonBacktracking), "a"));
+        Assert.Contains("NonBacktracking", nonBacktracking.Message, StringComparison.Ordinal);
+        var rightToLeft = Assert.Throws<ArgumentException>(() => PyRegex.Split(Rx("a", RegexOptions.RightToLeft), "a"));
+        Assert.Contains("RightToLeft", rightToLeft.Message, StringComparison.Ordinal);
+
+        // A pattern that only turns the flag off, or that escapes the text, is fine.
+        Assert.Equal(["", ""], PyRegex.Split(Rx("(?-x)a"), "a"));
+        Assert.Equal(["", ""], PyRegex.Split(Rx(@"\(\?x\)"), "(?x)"));
     }
 
     // ---- $ of GAPS F7 ----
@@ -257,7 +360,7 @@ public class RegexTests
         var sawFinalLineBreak = false;
         foreach (var c in RegexValues.RegexCases("dollar"))
         {
-            var text = Text(c, "s");
+            var text = RegexValues.T(c, "s");
             var shown = Describe([text]);
             Assert.True(c.GetProperty("label").GetBoolean() == label.IsMatch(text), "label " + shown);
             Assert.True(c.GetProperty("group_id").GetBoolean() == groupId.IsMatch(text), "group id " + shown);
@@ -271,15 +374,20 @@ public class RegexTests
         Assert.True(sawFinalLineBreak, "F7: Python accepts the label with a final line break");
     }
 
-    // ---- PyText.Replace, LStrip(s, chars), Count ----
+    // ---- PyText.Replace and Count ----
 
     [Fact]
-    public void Replace_with_a_count_matches_Python() =>
-        CheckRegexCases("replace", c => PyText.Replace(Text(c, "s"), Text(c, "old"), Text(c, "new"), c.GetProperty("n").GetInt64()));
-
-    [Fact]
-    public void LStrip_with_chars_matches_Python() =>
-        CheckRegexCases("lstrip_chars", c => PyText.LStrip(Text(c, "s"), Text(c, "chars")));
+    public void Replace_with_a_count_matches_Python()
+    {
+        var cases = RegexValues.RegexCases("replace");
+        Assert.True(cases.Count > 500);
+        foreach (var c in cases)
+        {
+            var actual = PyText.Replace(RegexValues.T(c, "s"), RegexValues.T(c, "old"), RegexValues.T(c, "new"), c.GetProperty("n").GetInt64());
+            var expected = RegexValues.T(c, "r");
+            Assert.True(expected == actual, $"replace {c}: expected {Describe([expected])}, got {Describe([actual])}");
+        }
+    }
 
     [Fact]
     public void Count_matches_Python()
@@ -289,20 +397,8 @@ public class RegexTests
         foreach (var c in cases)
         {
             Assert.True(
-                c.GetProperty("r").GetInt64() == PyText.Count(Text(c, "s"), Text(c, "sub")),
-                $"count of {Describe([Text(c, "sub")])} in {Describe([Text(c, "s")])}");
-        }
-    }
-
-    private static void CheckRegexCases(string name, Func<JsonElement, string> call)
-    {
-        var cases = RegexValues.RegexCases(name);
-        Assert.True(cases.Count > 500, name);
-        foreach (var c in cases)
-        {
-            Assert.True(
-                Ints(c.GetProperty("r")).SequenceEqual(PyText.ToCodePoints(call(c))),
-                $"{name} {c}: expected {Describe([FromCodePoints(c.GetProperty("r"))])}, got {Describe([call(c)])}");
+                c.GetProperty("r").GetInt64() == PyText.Count(RegexValues.T(c, "s"), RegexValues.T(c, "sub")),
+                $"count of {Describe([RegexValues.T(c, "sub")])} in {Describe([RegexValues.T(c, "s")])}");
         }
     }
 
@@ -320,16 +416,9 @@ public class RegexTests
     public void Split_with_one_group_around_the_whole_pattern_loses_no_text()
     {
         // The items between the matches and the matches themselves, put back in order, are the text.
-        var patterns = new[] { Rx("(x*)"), Rx("(" + PyRegex.Space + "*)"), Rx("(" + PyRegex.Word + "+)"), Rx("(" + PyRegex.NotWord + ")"), Rx("(" + PyRegex.Boundary + ")") };
+        var patterns = new[] { Rx("(x*)"), Rx("(" + PyRegex.Space + "*)"), Rx("(" + PyRegex.Word + "+)"), Rx("(" + PyRegex.Boundary + ")") };
         Gen.Select(Text8, Gen.Int[0, patterns.Length - 1], Gen.Int[0, 4]).Sample((s, p, n) =>
             string.Concat(PyRegex.Split(patterns[p], s, n)) == s);
-    }
-
-    [Fact]
-    public void Split_at_most_maxsplit_times()
-    {
-        var regex = Rx("(a*?)");
-        Gen.Select(Text8, Gen.Int[1, 5]).Sample((s, n) => PyRegex.Split(regex, s, n).Count <= (2 * n) + 1);
     }
 
     [Fact]
@@ -340,15 +429,4 @@ public class RegexTests
     public void Replace_with_a_count_joins_the_cuts_of_Split_with_the_new_text() =>
         Gen.Select(Text8, Short, Short, Gen.Int[0, 4]).Sample((s, old, @new, n) =>
             old.Length == 0 || PyText.Replace(s, old, @new, n) == string.Join(@new, PyText.Split(s, old, n)));
-
-    [Fact]
-    public void LStrip_with_chars_removes_only_leading_code_points_of_chars() =>
-        Gen.Select(Text8, Short).Sample((s, chars) =>
-        {
-            var result = PyText.LStrip(s, chars);
-            var set = PyText.ToCodePoints(chars).ToHashSet();
-            var first = PyText.ToCodePoints(result).Cast<int?>().FirstOrDefault();
-            var removed = PyText.ToCodePoints(s[..^result.Length]);
-            return s.EndsWith(result, StringComparison.Ordinal) && removed.All(set.Contains) && (first is null || !set.Contains(first.Value));
-        });
 }

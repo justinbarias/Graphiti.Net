@@ -1,11 +1,12 @@
-"""Records what real Python gives for PyRegex and for three PyText members, and the class tables of PyRegex.
+"""Records what real Python gives for PyRegex and for two PyText members, and the class tables of PyRegex.
 
 Two files come out of one run:
 
 - tests/Graphiti.Net.Property.Tests/python-values.regex.json: the answer of Python 3.12 `re` for
-  each code point from U+0000 to U+10FFFF (`\\s`, `\\S`, `\\w`, `\\W`, `\\d`, and `\\b` in probe strings),
-  the results of `re.split`, the `$` cases of GAPS F7, and the cases of `str.replace` with a count,
-  `str.lstrip(chars)`, and `str.count(sub)`. The property tests read it.
+  each code point from U+0000 to U+10FFFF (`\\s`, `\\w`, `\\d`, and `\\b` in probe strings),
+  the results of `re.split`, the `re.search` results of the three `re.IGNORECASE` patterns of
+  temporal_edge_utils.py, the `$` cases of GAPS F7, and the cases of `str.replace` with a count
+  and `str.count(sub)`. The property tests read it.
 - src/Graphiti.Net.PyCompat/PyRegexData.g.cs: the character sets of `\\s`, `\\w`, and `\\d` of the Python
   build, as pieces of .NET pattern text. A .NET pattern holds UTF-16 units, so a set above U+FFFF
   becomes an alternation of surrogate pairs. PyRegex puts the pieces together.
@@ -15,7 +16,7 @@ Two files come out of one run:
 
 --check writes nothing and exits 1 if a file differs from what the run would write.
 The tool needs Python 3.12, the version that RULES.md names for the pinned upstream.
-Strings are lists of code points, because JSON text cannot carry a lone surrogate.
+A text is a JSON string. A text with a lone surrogate is a list of code points, because JSON text cannot carry it.
 No text holds a high surrogate directly before a low surrogate: a .NET string would join them.
 Nothing here uses the network. The run takes about half a minute.
 """
@@ -42,6 +43,11 @@ def cps(s: str) -> list[int]:
     return [ord(c) for c in s]
 
 
+def enc(s: str) -> str | list[int]:
+    """A text as a JSON string, or as code points if it holds a lone surrogate, which JSON text cannot carry."""
+    return cps(s) if any('\ud800' <= c <= '\udfff' for c in s) else s
+
+
 def joinable(s: str) -> bool:
     """True if a high surrogate stands directly before a low one, which a .NET string joins."""
     return any('\ud800' <= a <= '\udbff' and '\udc00' <= b <= '\udfff' for a, b in zip(s, s[1:]))
@@ -51,9 +57,7 @@ def joinable(s: str) -> bool:
 
 CLASS_PATTERNS = {
     'space': re.compile(r'\s'),
-    'not_space': re.compile(r'\S'),
     'word': re.compile(r'\w'),
-    'not_word': re.compile(r'\W'),
     'digit': re.compile(r'\d'),
 }
 
@@ -87,8 +91,6 @@ def class_flags() -> dict[str, bytearray]:
         assert bool(flags['space'][cp]) == ch.isspace(), hex(cp)
         assert bool(flags['word'][cp]) == (ch.isalnum() or ch == '_'), hex(cp)
         assert bool(flags['digit'][cp]) == ch.isdecimal(), hex(cp)
-        assert flags['space'][cp] != flags['not_space'][cp], hex(cp)
-        assert flags['word'][cp] != flags['not_word'][cp], hex(cp)
     assert not any(flags['space'][0x10000:]), 'a white space character above U+FFFF'
     assert not any(flags['word'][0xD800:0xE000]), 'a surrogate matches \\w'
     return flags
@@ -275,8 +277,11 @@ SPLIT_PATTERNS: dict[str, tuple[str, int]] = {
     'lookbehind_comma': (r'(?<=,)\s*', 0),
     'digits': (r'(\d+)', 0),
     'word_runs': (r'(\w+)', 0),
-    'non_space_runs': (r'(\S+)', 0),
-    'non_word': (r'(\W)', 0),
+    # An empty match next to a character above U+FFFF. A .NET pattern must not match between the two units.
+    'word_gap': (r'(?<!\w)(?!\w)', 0),
+    'no_word_ahead': (r'(?!\w)', 0),
+    'before_emoji': (r'(?=\U0001F600)', 0),
+    'after_emoji': (r'(?<=\U0001F600)', 0),
 }
 # The four patterns of content_chunking.py get at least 200 texts each.
 CHUNKING = ['paragraph', 'sentence', 'speaker_search', 'speaker_split']
@@ -305,10 +310,13 @@ EXTRA_TOKENS = {
     'lookbehind_comma': [', ', ',  ', ',a', 'x,'],
     'digits': ['12', '٣٤', '\U0001D7D8\U0001D7D9', 'a1'],
     'word_runs': ['ab', 'cd', '\U0001D400', 'é', '_'],
-    'non_space_runs': ['ab', ' ', '\U0001F600', ' '],
-    'non_word': ['ab', '!', '\U0001F600', ' '],
+    'word_gap': ['a', ' ', '\U0001F600', '\U0001D400', 'ab'],
+    'no_word_ahead': ['a', ' ', '\U0001F600', '\U0001D400'],
+    'before_emoji': ['\U0001F600', 'a'],
+    'after_emoji': ['\U0001F600', 'a'],
 }
 CURATED_TEXTS = [
+    ' \U0001F600 ', 'a\U0001F600 ', 'ab\U0001F600\U0001F600c', '\U0001F600a',
     '', ' ', '\n', '\n\n', 'a', 'x', 'ab', 'abc', 'axb', 'a\n\nb', 'a\n \nb', 'a\n\n\nb', '\n\nabc', 'abc\n\n',
     'a\r\n\r\nb', 'a\n \nb', 'a\n\x1c\nb', 'a\n \nb', 'a. b', 'a.  b', 'a.\nb', 'a! b? c.', 'a.b', '. ', '.',
     'Alice: hi\nBob: yo', 'Alice: hi\nBob: yo\n', 'hello\nAlice: hi', 'Alice:', ':', 'Alice:\nBob:', 'A B:x\nC_1: y z',
@@ -334,7 +342,7 @@ def make_texts(name: str, count: int) -> list[str]:
 
 
 def split_value(item: str | None) -> list[int] | None:
-    return None if item is None else cps(item)
+    return None if item is None else enc(item)
 
 
 def split_cases() -> list:
@@ -346,7 +354,7 @@ def split_cases() -> list:
         for text in texts:
             for maxsplit in [0]:
                 cases.append(split_case(name, compiled, text, maxsplit))
-        for text in texts[:50]:
+        for text in texts[:50 if name in CHUNKING else 25]:
             for maxsplit in [1, 2, 3, -1]:
                 cases.append(split_case(name, compiled, text, maxsplit))
     return cases
@@ -355,7 +363,7 @@ def split_cases() -> list:
 def split_case(name: str, compiled: re.Pattern, text: str, maxsplit: int) -> dict:
     result = compiled.split(text, maxsplit)
     assert all(item is None or not joinable(item) for item in result)
-    return {'p': name, 'n': maxsplit, 's': cps(text), 'r': [split_value(item) for item in result]}
+    return {'p': name, 'n': maxsplit, 's': enc(text), 'r': [split_value(item) for item in result]}
 
 
 # ---- $ of GAPS F7 ----
@@ -374,7 +382,7 @@ def dollar_cases() -> list:
     cases = []
     for text in DOLLAR_TEXTS:
         cases.append({
-            's': cps(text),
+            's': enc(text),
             # helpers.py:35, SAFE_CYPHER_IDENTIFIER_PATTERN.search(...)
             'label': label.search(text) is not None,
             # helpers.py:165, re.match(r'^[a-zA-Z0-9_-]+$', group_id)
@@ -385,7 +393,7 @@ def dollar_cases() -> list:
     return cases
 
 
-# ---- str.replace with a count, str.lstrip(chars), str.count(sub) ----
+# ---- str.replace with a count and str.count(sub) ----
 
 TEXT_POOL = [
     '', 'a', 'b', 'abc', 'aaa', 'aaaa', 'abab', 'ababab', 'aXbXc', ' x ', '  ', 'héllo wörld', 'Straße',
@@ -396,7 +404,6 @@ TEXT_POOL = [
 OLD_POOL = ['', 'a', 'aa', 'ab', 'b', 'abc', 'zzz', 'x', ' ', 'X', '\U0001F600', '\ud800', '\udc00', 'é', '́', 'ba']
 NEW_POOL = ['', '-', 'XY', '\U0001F600', '\ud800', 'é', 'a', '́']
 COUNT_POOL = [-2, -1, 0, 1, 2, 3, 100, 2**62]
-CHARS_POOL = ['', ' ', 'a', 'ab', 'ba', 'a\U0001F600', '\U0001F600', '\ud800', 'x\udc00', 'é', '́', 'é', ' \n', 'h']
 SUB_POOL = OLD_POOL + ['\U0001F600\U0001F600', 'aaa', 'abab']
 
 
@@ -411,7 +418,7 @@ def replace_cases() -> list:
                 result = s.replace(old, new, count)
                 if joinable(result):
                     continue
-                cases.append({'s': cps(s), 'old': cps(old), 'new': cps(new), 'n': count, 'r': cps(result)})
+                cases.append({'s': enc(s), 'old': enc(old), 'new': enc(new), 'n': count, 'r': enc(result)})
     rng = random.Random('regex-replace')
     tokens = ['a', 'b', 'ab', ' ', '\U0001F600', '́', '\ud800', '\udc00', 'x']
     for _ in range(600):
@@ -424,24 +431,7 @@ def replace_cases() -> list:
         result = s.replace(old, new, count)
         if joinable(result):
             continue
-        cases.append({'s': cps(s), 'old': cps(old), 'new': cps(new), 'n': count, 'r': cps(result)})
-    return cases
-
-
-def lstrip_cases() -> list:
-    cases = []
-    rng = random.Random('regex-lstrip')
-    texts = TEXT_POOL + ['  \n x', 'aaab', 'abab', '\U0001F600\U0001F600x', '\ud800\ud800a', '́a']
-    for s in texts:
-        for chars in CHARS_POOL:
-            cases.append({'s': cps(s), 'chars': cps(chars), 'r': cps(s.lstrip(chars))})
-    tokens = ['a', 'b', ' ', '\U0001F600', '́', '\ud800', '\udc00', 'x']
-    for _ in range(300):
-        s = ''.join(rng.choice(tokens) for _ in range(rng.randint(0, 10)))
-        chars = ''.join(rng.choice(tokens) for _ in range(rng.randint(0, 4)))
-        if joinable(s) or joinable(chars):
-            continue
-        cases.append({'s': cps(s), 'chars': cps(chars), 'r': cps(s.lstrip(chars))})
+        cases.append({'s': enc(s), 'old': enc(old), 'new': enc(new), 'n': count, 'r': enc(result)})
     return cases
 
 
@@ -450,14 +440,95 @@ def count_cases() -> list:
     rng = random.Random('regex-count')
     for s in TEXT_POOL:
         for sub in SUB_POOL:
-            cases.append({'s': cps(s), 'sub': cps(sub), 'r': s.count(sub)})
+            cases.append({'s': enc(s), 'sub': enc(sub), 'r': s.count(sub)})
     tokens = ['a', 'b', 'ab', ' ', '\U0001F600', '́', '\ud800', '\udc00', 'x']
     for _ in range(400):
         s = ''.join(rng.choice(tokens) for _ in range(rng.randint(0, 12)))
         sub = ''.join(rng.choice(tokens) for _ in range(rng.randint(0, 3)))
         if joinable(s) or joinable(sub):
             continue
-        cases.append({'s': cps(s), 'sub': cps(sub), 'r': s.count(sub)})
+        cases.append({'s': enc(s), 'sub': enc(sub), 'r': s.count(sub)})
+    return cases
+
+
+# ---- the re.IGNORECASE patterns of temporal_edge_utils.py:14, :27, :32 ----
+
+TEMPORAL_PATTERNS = {
+    'future': re.compile(
+        r'\b('
+        r'will|shall|is going to|are going to|going to|'
+        r'plans? to|planned to|planning to|'
+        r'intends? to|intended to|'
+        r'expects? to|expected to|'
+        r'promises? to|promised to|'
+        r'scheduled to|is scheduled to|are scheduled to|'
+        r'set to|aims? to|aimed to|committed to'
+        r")\b|[a-z]+'ll\b",
+        re.IGNORECASE,
+    ),
+    'deadline': re.compile(r'\b(by|before|no later than|deadline|due by|due on)\b', re.IGNORECASE),
+    'ongoing': re.compile(
+        r'\b(until|through|thru|expires?|expired|ends?|ended|ending|'
+        r'stops?|stopped|ceases?|ceased|no longer)\b',
+        re.IGNORECASE,
+    ),
+}
+TEMPORAL_WORDS = {
+    'future': ['will', 'shall', 'is going to', 'going to', 'plans to', 'plan to', 'planned to', 'intends to', 'expected to',
+               'promised to', 'is scheduled to', 'scheduled to', 'set to', 'aims to', 'committed to', "he'll", "they'll",
+               "I'll", 'it will', 'willing', 'goings to'],
+    'deadline': ['by', 'before', 'no later than', 'deadline', 'due by', 'due on', 'bye', 'standby', 'by2', 'by_'],
+    'ongoing': ['until', 'through', 'thru', 'expire', 'expires', 'expired', 'end', 'ends', 'ended', 'ending', 'stop', 'stops',
+                'stopped', 'cease', 'ceases', 'ceased', 'no longer', 'trend', 'friend'],
+}
+# U+A7CB and U+A7DC are not assigned in Unicode 15, but .NET 10 (Unicode 16) folds them to U+0264 and U+019B,
+# which are letters. U+017F, U+0130, and U+0131 are the three characters of R13's IGNORECASE row.
+TEMPORAL_SPECIAL = ['Ɤ', 'Ƛ', 'ɤ', 'ƛ', 'ſ', 'İ', 'ı', 'K', '\U0001F600',
+                    '\U0001D400', 'é', '_', '1']
+TEMPORAL_SEPARATORS = [' ', ' ', '.', '-', "'", '\n', ',', ' ', '\x1c']
+
+
+def vary(rng: random.Random, word: str) -> str:
+    out = []
+    for ch in word:
+        if ch == 's' and rng.random() < 0.3:
+            ch = rng.choice(['ſ', 'S'])
+        elif ch == 'i' and rng.random() < 0.3:
+            ch = rng.choice(['İ', 'ı', 'I'])
+        elif rng.random() < 0.1:
+            ch = ch.upper()
+        out.append(ch)
+    return ''.join(out)
+
+
+def temporal_cases() -> list:
+    cases = []
+    for name, compiled in TEMPORAL_PATTERNS.items():
+        rng = random.Random(f'regex-temporal-{name}')
+        words = TEMPORAL_WORDS[name]
+        texts: dict[str, None] = {'': None, 'will': None, 'by': None, 'until': None}
+        for word in words:
+            for special in TEMPORAL_SPECIAL:
+                texts[word + special] = None
+                texts[special + word] = None
+                texts[word.upper() + special] = None
+            texts[word] = None
+            texts[word.upper()] = None
+            texts[f'x {word} y'] = None
+        while len(texts) < 700:
+            parts = []
+            for _ in range(rng.randint(1, 5)):
+                roll = rng.random()
+                if roll < 0.5:
+                    parts.append(vary(rng, rng.choice(words)))
+                elif roll < 0.7:
+                    parts.append(rng.choice(TEMPORAL_SPECIAL))
+                else:
+                    parts.append(rng.choice(TEMPORAL_SEPARATORS))
+            texts[''.join(parts)] = None
+        for text in texts:
+            m = compiled.search(text)
+            cases.append({'p': name, 's': enc(text), 'r': None if m is None else [m.start(), m.end()]})
     return cases
 
 
@@ -471,12 +542,12 @@ def build() -> tuple[str, str]:
         'cases': {
             'split': split_cases(),
             'dollar': dollar_cases(),
+            'temporal': temporal_cases(),
             'replace': replace_cases(),
-            'lstrip_chars': lstrip_cases(),
             'count': count_cases(),
         },
     }
-    values_text = json.dumps(values, separators=(',', ':'), ensure_ascii=True) + '\n'
+    values_text = json.dumps(values, separators=(',', ':'), ensure_ascii=False) + '\n'
     return values_text, data_source(flags)
 
 

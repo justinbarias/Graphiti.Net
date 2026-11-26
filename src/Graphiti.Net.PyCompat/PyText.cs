@@ -575,14 +575,7 @@ internal static class PyText
         return sb.ToString();
     }
 
-    // ---- replace, lstrip with characters, count ----
-
-    /// <summary><c>s.lstrip(chars)</c>: removes each leading code point that is in <paramref name="chars"/>.</summary>
-    internal static string LStrip(string s, string chars)
-    {
-        var set = ToCodePoints(chars).ToHashSet();
-        return StripCore(s, set.Contains, true, false);
-    }
+    // ---- replace and count ----
 
     /// <summary>
     /// <c>s.replace(old, new, count)</c>. A <paramref name="count"/> below zero replaces each match, and zero replaces none.
