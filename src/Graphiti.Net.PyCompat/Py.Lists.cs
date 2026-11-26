@@ -172,7 +172,7 @@ internal static partial class Py
     /// <summary>
     /// Python <c>a &lt; b</c> over the value model: numbers by exact value across <c>bool</c>, <c>long</c>,
     /// <c>BigInteger</c>, and <c>double</c> (false for each comparison with nan), text by code point, tuples and
-    /// lists item by item, bytes by byte, dates, sets by proper subset, and two values of one other type that
+    /// lists item by item, bytes by byte, dates, datetimes by the operators of <see cref="PyDateTime"/>, sets by proper subset, and two values of one other type that
     /// is <see cref="IComparable"/> and not an enum. Each other pair throws <see cref="InvalidCastException"/>
     /// (<c>TypeError</c>) with Python's message.
     /// </summary>
@@ -195,6 +195,9 @@ internal static partial class Py
                 return ba.AsSpan().SequenceCompareTo(bb) < 0;
             case DateOnly da when b is DateOnly db:
                 return da < db;
+            case PyDateTime ta2 when b is PyDateTime tb2:
+                // A naive value against an aware value throws InvalidCastException (TypeError) as itself.
+                return ta2 < tb2;
             case IPySet sa2 when b is IPySet sb2:
                 return sa2.Count < sb2.Count && sa2.Items.All(sb2.ContainsItem);
             case IComparable ca when a is not Enum && b is not null && a.GetType() == b.GetType():

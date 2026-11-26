@@ -26,6 +26,8 @@ float bit pattern or a lone surrogate:
     {"d": [[k, v], ...]}   dict
     {"set": [...], "frozen": b}   set or frozenset, items in Python's iteration order
     {"date": [y, m, d]}    datetime.date
+    {"dt": [y, m, d, h, mi, s, us, offset]}  datetime.datetime. The offset is in microseconds, or null
+                           for a naive value.
     {"b": [bytes]}         bytes
     {"enum": "Color.red"}  a member of a test enum. The C# test enum has the same class name (R2).
     {"node": "u"}, {"edge": "u"}  an object of a test class with the __eq__ of upstream Node and Edge
@@ -212,6 +214,10 @@ class Encoder:
             return {'d': [[self.enc(k), self.enc(x)] for k, x in v.items()]}
         if isinstance(v, (set, frozenset)):
             return {'set': [self.enc(x) for x in v], 'frozen': isinstance(v, frozenset)}
+        if isinstance(v, datetime.datetime):
+            offset = v.utcoffset()
+            micros = None if offset is None else offset // datetime.timedelta(microseconds=1)
+            return {'dt': [v.year, v.month, v.day, v.hour, v.minute, v.second, v.microsecond, micros]}
         if isinstance(v, datetime.date):
             return {'date': [v.year, v.month, v.day]}
         if isinstance(v, bytes):
@@ -258,6 +264,15 @@ INTS = [0, 1, -1, 5, -5, 42, 1234567, -1234567, 2**53 + 1, LONG_MAX, LONG_MIN, L
         10**30, -(10**30), 2**1024 - 2**970, 2**1024 - 2**971, 10**4300 - 1, -(10**4300 - 1), 10**4300]
 
 
+UTC = datetime.timezone.utc
+PLUS1 = datetime.timezone(datetime.timedelta(hours=1))
+MINUS530 = datetime.timezone(-datetime.timedelta(hours=5, minutes=30))
+DATETIMES = [datetime.datetime(2025, 1, 3, tzinfo=UTC), datetime.datetime(2025, 1, 3, 1, 0, tzinfo=PLUS1),
+             datetime.datetime(2025, 1, 3), datetime.datetime(2024, 2, 29, 23, 59, 59, 999999, tzinfo=MINUS530),
+             datetime.datetime(1, 1, 1), datetime.datetime(9999, 12, 31, 23, 59, 59, 1, tzinfo=UTC),
+             datetime.datetime(2025, 1, 3, 0, 0, 7)]
+
+
 def nan(sign: int = 1) -> float:
     return math.copysign(math.nan, sign)
 
@@ -287,6 +302,8 @@ def pool() -> list:
         datetime.date(2024, 1, 5), datetime.date(1, 1, 1), datetime.date(9999, 12, 31),
         b'', b'abc', b"it's", b'say "hi"', b'\'"', b'\x00\xff\n\t\r\\\x7f\x80',
         Color.red, Color.green, Color.blue, EpisodeType.message,
+        *DATETIMES, [DATETIMES[0], DATETIMES[2]], (DATETIMES[1],), {'valid_at': DATETIMES[3]},
+        {DATETIMES[0]: 'a', DATETIMES[2]: 'b'},
         [shared, shared], {'a': shared, 'b': [shared]}, (shared, shared),
         cyclic, cyclic_dict, holder,
         [Color.blue, {EpisodeType.json: [datetime.date(2020, 2, 29), b'\x01']}],
@@ -356,7 +373,8 @@ def keys_pool(nan_a: float, nan_b: float) -> list:
             float(2**64), LONG_MIN, 10**30, 'a', 'A', '', 'é', 'é', '\U0001F600', '\ud800',
             (), (1,), (1.0,), (True,), (1, 'a'), (1, (2, 3)), (None,), nan_a, nan_b, (nan_a,), math.inf, -math.inf,
             datetime.date(2024, 1, 5), b'a', b'', Color.red, Color.green, EpisodeType.message,
-            frozenset(), frozenset({1}), frozenset({1.0}), [1], {}, {1}, (1, [2])]
+            frozenset(), frozenset({1}), frozenset({1.0}), [1], {}, {1}, (1, [2]),
+            DATETIMES[0], DATETIMES[1], DATETIMES[2], datetime.datetime(2025, 1, 3, 0, 0), DATETIMES[6]]
 
 
 def build_values() -> dict:
@@ -407,7 +425,7 @@ def build_values() -> dict:
     format_values = ([None, True, False] + INTS[:10] + [10**4300] + FLOATS + [nan(), nan(-1), 10**400]
                      + STRINGS + ['x' * 31, 'y' * 30, '\U0001F600' * 31, '\U0001F600' * 20]
                      + [[1], {'a': 1}, (1,), {1: 2}, {1}, frozenset(), datetime.date(2024, 1, 5), b'ab',
-                        Color.red, Color.green, EpisodeType.message]
+                        Color.red, Color.green, EpisodeType.message, *DATETIMES]
                      + [rng.uniform(-1e7, 1e7) for _ in range(60)] + [rng.randint(-10**8, 10**8) / 100 for _ in range(60)]
                      + [from_bits(rng.getrandbits(63)) for _ in range(30)])
     for spec in FORMAT_SPECS_UPSTREAM + FORMAT_SPECS_MORE:
@@ -607,8 +625,9 @@ def unbuilt(v, spec: str) -> bool:
 def sort_keys(rng: random.Random) -> list:
     """Keys of the shapes that upstream sorts by: numbers, text, tuples of two, with ties and errors."""
     n = rng.choice([0, 1, 2, 3, 5, 8, 12, 20, 63, 64, 70])
-    shape = rng.choice(['int', 'float', 'num', 'str', 'tuple', 'bool_tuple', 'date', 'bytes', 'list', 'error', 'nan'])
-    if n > 63 and shape in ('error', 'nan'):
+    shape = rng.choice(['int', 'float', 'num', 'str', 'tuple', 'bool_tuple', 'date', 'bytes', 'list', 'error', 'nan',
+                        'datetime', 'naive', 'dt_tuple', 'dt_mixed', 'dt_none'])
+    if n > 63 and shape in ('error', 'nan', 'dt_mixed', 'dt_none'):
         shape = 'num'  # The order of comparisons above 63 items is not CPython's (see Py.SortInPlace).
 
     def one():
@@ -632,6 +651,17 @@ def sort_keys(rng: random.Random) -> list:
             return rng.choice([[1], [1, 2], [], [0, 5], [1.0]])
         if shape == 'nan':
             return rng.choice([1.0, float('nan'), 0.5, 2.0])
+        aware = datetime.datetime(2025, 1, rng.randint(1, 3), rng.randint(0, 1), tzinfo=rng.choice([UTC, PLUS1, MINUS530]))
+        if shape == 'datetime':
+            return aware  # sorted(episodes, key=lambda e: e.valid_at), graphiti.py:2204
+        if shape == 'naive':
+            return datetime.datetime(2025, 1, rng.randint(1, 3), rng.randint(0, 1))
+        if shape == 'dt_tuple':
+            return (aware, rng.choice(['u1', 'u2', 'u3']))  # (created_at, uuid), dedup_helpers.py:286
+        if shape == 'dt_mixed':
+            return rng.choice([aware, datetime.datetime(2025, 1, 2)])
+        if shape == 'dt_none':
+            return rng.choice([aware, None, 1.5])
         return rng.choice([1, 'a', None, (1, None), (1, 2), 2.5, Color.red, [1], (1,)])
 
     return [one() for _ in range(n)]
@@ -658,7 +688,9 @@ def typed_reads(v) -> dict:
     out['tuple'] = isinstance(v, tuple)
     out['dict'] = isinstance(v, dict) and all(isinstance(k, str) for k in v)
     out['pydict'] = isinstance(v, dict) and not all(isinstance(k, str) for k in v)
-    out['date'] = isinstance(v, datetime.date)
+    # A Python datetime is a date. Py.AsDate takes a date only, because a DateOnly would drop the time.
+    out['date'] = isinstance(v, datetime.date) and not isinstance(v, datetime.datetime)
+    out['datetime'] = isinstance(v, datetime.datetime)
     out['bytes'] = isinstance(v, bytes)
     out['enum'] = isinstance(v, Color)
     return out

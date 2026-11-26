@@ -21,7 +21,7 @@ internal static partial class Py
     /// accepts and this helper does not cover throws <see cref="InvalidOperationException"/>. These are
     /// not built: the types <c>e</c>, <c>E</c>, <c>g</c>, <c>G</c>, <c>%</c>, <c>n</c>, <c>c</c>, <c>b</c>,
     /// <c>o</c>, <c>x</c>, and <c>X</c>, the options <c>#</c> and <c>z</c>, the flag <c>0</c> together with
-    /// grouping, a float with a precision and no type, and a date with a spec (<c>strftime</c>).
+    /// grouping, a float with a precision and no type, and a date or a datetime with a spec (<c>strftime</c>).
     /// </summary>
     internal static string Format(object? value, string spec)
     {
@@ -38,6 +38,8 @@ internal static partial class Py
                 return FormatInt(value is bool b2 ? (b2 ? BigInteger.One : BigInteger.Zero) : value is long l ? l : (BigInteger)value, spec, TypeName(value));
             case double d:
                 return FormatFloat(d, ParseSpec(spec, "float", '\0'), spec);
+            case PyDateTime dt when spec.Length == 0:
+                return dt.Str();
         }
 
         if (spec.Length == 0)

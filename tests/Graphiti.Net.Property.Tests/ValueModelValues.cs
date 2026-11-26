@@ -232,6 +232,13 @@ internal static class ValueModelValues
                 return new DateOnly(date[0].GetInt32(), date[1].GetInt32(), date[2].GetInt32());
             }
 
+            if (e.TryGetProperty("dt", out var dt))
+            {
+                long? offset = dt[7].ValueKind == JsonValueKind.Null ? null : dt[7].GetInt64();
+                return new PyDateTime(
+                    dt[0].GetInt32(), dt[1].GetInt32(), dt[2].GetInt32(), dt[3].GetInt32(), dt[4].GetInt32(), dt[5].GetInt32(), dt[6].GetInt32(), offset);
+            }
+
             if (e.TryGetProperty("b", out var b))
             {
                 return b.EnumerateArray().Select(x => (byte)x.GetInt32()).ToArray();

@@ -31,6 +31,7 @@ internal static partial class Py
     internal static string Str(object? x) => x switch
     {
         string s => s,
+        PyDateTime dt => dt.Str(),
         DateOnly d => DateIso(d),
         Enum e => PyEnum.ClassName(e) + "." + PyEnum.Name(e),
         _ => Repr(x),
@@ -50,7 +51,7 @@ internal static partial class Py
         IPySet set => set.Count > 0,
         PyDict pd => pd.Count > 0,
         IDictionary or IList => ((ICollection)x).Count > 0,
-        DateOnly or Enum => true,
+        DateOnly or PyDateTime or Enum => true,
         _ => throw Outside(x, nameof(Truthy)),
     };
 
@@ -66,7 +67,7 @@ internal static partial class Py
         IPySet set => set.Count,
         PyDict pd => pd.Count,
         IDictionary or IList => ((ICollection)x).Count,
-        null or bool or long or BigInteger or double or DateOnly or Enum =>
+        null or bool or long or BigInteger or double or DateOnly or PyDateTime or Enum =>
             throw new InvalidCastException($"object of type '{TypeName(x)}' has no len()"),
         _ => throw Outside(x, nameof(Len)),
     };
@@ -198,6 +199,13 @@ internal static partial class Py
     /// <summary>A Python <c>date</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
     internal static DateOnly AsDate(object? x) => x is DateOnly d ? d : throw WrongType("datetime.date", "DateOnly", x);
 
+    /// <summary>
+    /// A Python <c>datetime</c>, aware or naive, read from open data. Another type throws
+    /// <see cref="InvalidCastException"/> (<c>TypeError</c>). <see cref="AsDate"/> does not take a datetime,
+    /// although a Python datetime is a date: a <see cref="DateOnly"/> would drop the time.
+    /// </summary>
+    internal static PyDateTime AsDateTime(object? x) => x is PyDateTime dt ? dt : throw WrongType("datetime.datetime", "PyDateTime", x);
+
     /// <summary>A Python <c>bytes</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
     internal static byte[] AsBytes(object? x) => x is byte[] b ? b : throw WrongType("bytes", "byte[]", x);
 
@@ -222,6 +230,7 @@ internal static partial class Py
         PyDict or IDictionary => "dict",
         IList => "list",
         DateOnly => "datetime.date",
+        PyDateTime => "datetime.datetime",
         Enum e => PyEnum.ClassName(e),
         _ => x.GetType().Name,
     };
@@ -371,6 +380,9 @@ internal static partial class Py
             case DateOnly date:
                 sb.Append(CultureInfo.InvariantCulture, $"datetime.date({date.Year}, {date.Month}, {date.Day})");
                 return;
+            case PyDateTime dateTime:
+                sb.Append(dateTime.Repr());
+                return;
             case Enum e:
                 sb.Append('<').Append(PyEnum.ClassName(e)).Append('.').Append(PyEnum.Name(e)).Append(": ");
                 WriteRepr(sb, PyEnum.Value(e), active);
@@ -498,6 +510,12 @@ internal static partial class Py
             // Python copies a date through its reduce protocol and gets a new object. A tuple that holds
             // a date is therefore a new tuple. A new box of the value gives the same identity result.
             return date;
+        }
+
+        if (x is PyDateTime dateTime)
+        {
+            // The same holds for a datetime: the value, in a new box.
+            return dateTime;
         }
 
         if (memo.TryGetValue(x, out var done))

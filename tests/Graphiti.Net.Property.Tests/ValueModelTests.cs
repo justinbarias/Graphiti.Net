@@ -51,6 +51,7 @@ public class ValueModelTests
             ExpectRead(c, "dict", () => Py.AsDict(v), r => Assert.Same(v, r));
             ExpectRead(c, "pydict", () => Py.AsPyDict(v), r => Assert.Same(v, r));
             ExpectRead(c, "date", () => Py.AsDate(v), r => Assert.Equal(v, r));
+            ExpectRead(c, "datetime", () => Py.AsDateTime(v), r => Assert.Equal(v, r));
             ExpectRead(c, "bytes", () => Py.AsBytes(v), r => Assert.Same(v, r));
             ExpectRead(c, "enum", () => Py.AsEnum<Color>(v), r => Assert.Equal(v, r));
 
