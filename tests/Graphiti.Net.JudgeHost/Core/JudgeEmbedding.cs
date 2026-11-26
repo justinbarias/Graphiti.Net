@@ -1,9 +1,9 @@
+namespace Graphiti.JudgeHost.Core;
+
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-
-namespace Graphiti.JudgeHost.Core;
 
 /// <summary>
 /// The judge embedder. It follows port/judge/host-python/judge_clients.py step for step, in the
