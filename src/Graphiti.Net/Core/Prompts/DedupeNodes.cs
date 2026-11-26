@@ -22,13 +22,6 @@ using Graphiti.PyCompat;
 
 internal sealed record NodeDuplicate : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("NodeDuplicate")
-        .Required("id", PydanticType.Int, "integer id of the entity")
-        .Required("name", PydanticType.Str, "Name of the entity. Should be the most complete and descriptive name of the entity. Do not include any JSON formatting in the Entity name such as {}.")
-        .Required("duplicate_candidate_id", PydanticType.Int, "candidate_id of the matching EXISTING ENTITY, or -1 if no duplicate exists.");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("NodeDuplicate", ModelJsonSchema);
-
     internal required long Id { get; set; }
 
     internal required string Name { get; set; }
@@ -51,15 +44,17 @@ internal sealed record NodeDuplicate : IPydanticModel
         Pydantic.DumpFields(json, ("id", Id), ("name", Name), ("duplicate_candidate_id", DuplicateCandidateId));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("NodeDuplicate")
+        .Required("id", PydanticType.Int, "integer id of the entity")
+        .Required("name", PydanticType.Str, "Name of the entity. Should be the most complete and descriptive name of the entity. Do not include any JSON formatting in the Entity name such as {}.")
+        .Required("duplicate_candidate_id", PydanticType.Int, "candidate_id of the matching EXISTING ENTITY, or -1 if no duplicate exists.");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("NodeDuplicate", ModelJsonSchema);
 }
 
 internal sealed record NodeResolutions : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("NodeResolutions")
-        .Required("entity_resolutions", PydanticType.List(PydanticType.Model(NodeDuplicate.ModelJsonSchema)), "List of resolved nodes");
-
-    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("NodeResolutions", ModelJsonSchema);
-
     internal required List<NodeDuplicate> EntityResolutions { get; set; }
 
     internal NodeResolutions Validate() => this;
@@ -76,24 +71,20 @@ internal sealed record NodeResolutions : IPydanticModel
         Pydantic.DumpFields(json, ("entity_resolutions", EntityResolutions));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("NodeResolutions")
+        .Required("entity_resolutions", PydanticType.List(PydanticType.Model(NodeDuplicate.ModelJsonSchema)), "List of resolved nodes");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("NodeResolutions", ModelJsonSchema);
 }
 
 internal interface DedupeNodesPrompt
 {
-    PromptVersion Node { get; set; }
+    PromptFunction Node { get; }
 
-    PromptVersion NodeList { get; set; }
+    PromptFunction NodeList { get; }
 
-    PromptVersion Nodes { get; set; }
-}
-
-internal sealed record DedupeNodesVersions
-{
-    internal required PromptFunction Node { get; set; }
-
-    internal required PromptFunction NodeList { get; set; }
-
-    internal required PromptFunction Nodes { get; set; }
+    PromptFunction Nodes { get; }
 }
 
 /// <summary>The module-level functions and the <c>versions</c> table of <c>prompts/dedupe_nodes.py</c>.</summary>
@@ -291,8 +282,20 @@ Result:
     };
 }
 
-internal abstract class DedupeNodesPrompts
+internal abstract class DedupeNodesPrompts : IPromptGroup
 {
+    public bool TryGetFunction(string name, out ChatPromptFunction? function)
+    {
+        function = name switch
+        {
+            "node" => Node,
+            "node_list" => NodeList,
+            "nodes" => Nodes,
+            _ => null,
+        };
+        return function is not null;
+    }
+
     internal abstract ChatPrompt Node(OrderedDictionary<string, object?> context);
 
     internal abstract ChatPrompt NodeList(OrderedDictionary<string, object?> context);

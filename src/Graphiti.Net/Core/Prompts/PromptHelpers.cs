@@ -46,7 +46,6 @@ internal static class PromptHelpers
     /// <returns>The JSON string.</returns>
     internal static string ToPromptJson(object? data, bool ensureAscii = false, long? indent = null)
     {
-        // PORT: PyJson.Dumps takes an int indent. A Python int is a long (R18).
-        return PyJson.Dumps(data, ensureAscii, indent is null ? null : checked((int)indent.Value));
+        return PyJson.Dumps(data, ensureAscii, indent);
     }
 }

@@ -23,10 +23,6 @@ using Graphiti.PyCompat;
 /// <summary>LLM transport message (role + content). Used by LLMClient.generate_response.</summary>
 internal sealed record Message : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("Message", "LLM transport message (role + content). Used by LLMClient.generate_response.")
-        .Required("role", PydanticType.Str)
-        .Required("content", PydanticType.Str);
-
     internal required string Role { get; set; }
 
     internal required string Content { get; set; }
@@ -46,18 +42,16 @@ internal sealed record Message : IPydanticModel
         Pydantic.DumpFields(json, ("role", Role), ("content", Content));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
-}
 
-internal delegate List<Message> PromptVersion(OrderedDictionary<string, object?> context);
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("Message", "LLM transport message (role + content). Used by LLMClient.generate_response.")
+        .Required("role", PydanticType.Str)
+        .Required("content", PydanticType.Str);
+}
 
 internal delegate List<Message> PromptFunction(OrderedDictionary<string, object?> context);
 
 internal sealed record SystemMessage : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("SystemMessage")
-        .Default("role", PydanticType.Literal("system"), "system")
-        .Required("content", PydanticType.Str);
-
     internal string Role { get; set; } = "system";
 
     internal required string Content { get; set; }
@@ -81,14 +75,14 @@ internal sealed record SystemMessage : IPydanticModel
         Pydantic.DumpFields(json, ("role", Role), ("content", Content));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("SystemMessage")
+        .Default("role", PydanticType.Literal("system"), "system")
+        .Required("content", PydanticType.Str);
 }
 
 internal sealed record UserMessage : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("UserMessage")
-        .Default("role", PydanticType.Literal("user"), "user")
-        .Required("content", PydanticType.Str);
-
     internal string Role { get; set; } = "user";
 
     internal required string Content { get; set; }
@@ -112,18 +106,38 @@ internal sealed record UserMessage : IPydanticModel
         Pydantic.DumpFields(json, ("role", Role), ("content", Content));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("UserMessage")
+        .Default("role", PydanticType.Literal("user"), "user")
+        .Required("content", PydanticType.Str);
 }
 
 /// <summary>Typed system+user prompt returned by all prompt builders.</summary>
 internal sealed record ChatPrompt : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("ChatPrompt", "Typed system+user prompt returned by all prompt builders.")
-        .Required("system", PydanticType.Model(SystemMessage.ModelJsonSchema))
-        .Required("user", PydanticType.Model(UserMessage.ModelJsonSchema));
-
     internal required SystemMessage System { get; set; }
 
     internal required UserMessage User { get; set; }
+
+    internal ChatPrompt Validate() => this;
+
+    internal static ChatPrompt ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("ChatPrompt", data);
+        var system = f.Required("system", v => Pydantic.Model(v, "SystemMessage", SystemMessage.ModelValidate));
+        var user = f.Required("user", v => Pydantic.Model(v, "UserMessage", UserMessage.ModelValidate));
+        f.ThrowIfAny();
+        return new ChatPrompt { System = system.Value, User = user.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("system", System), ("user", User));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("ChatPrompt", "Typed system+user prompt returned by all prompt builders.")
+        .Required("system", PydanticType.Model(SystemMessage.ModelJsonSchema))
+        .Required("user", PydanticType.Model(UserMessage.ModelJsonSchema));
 
     internal static ChatPrompt FromMessages(List<Message> messages)
     {
@@ -142,17 +156,6 @@ internal sealed record ChatPrompt : IPydanticModel
             System = new SystemMessage { Content = messages[0].Content }.Validate(),
             User = new UserMessage { Content = messages[1].Content }.Validate(),
         }.Validate();
-    }
-
-    internal ChatPrompt Validate() => this;
-
-    internal static ChatPrompt ModelValidate(OrderedDictionary<string, object?> data)
-    {
-        var f = new PydanticFields("ChatPrompt", data);
-        var system = f.Required("system", v => Pydantic.Model(v, "SystemMessage", SystemMessage.ModelValidate));
-        var user = f.Required("user", v => Pydantic.Model(v, "UserMessage", UserMessage.ModelValidate));
-        f.ThrowIfAny();
-        return new ChatPrompt { System = system.Value, User = user.Value }.Validate();
     }
 
     /// <summary>
@@ -177,11 +180,6 @@ internal sealed record ChatPrompt : IPydanticModel
             new Message { Role = "user", Content = User.Content }.Validate(),
         ];
     }
-
-    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
-        Pydantic.DumpFields(json, ("system", System), ("user", User));
-
-    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 }
 
 /// <summary>
@@ -203,7 +201,7 @@ internal sealed record PromptSpec : IPydanticModel
     {
         var f = new PydanticFields("PromptSpec", data);
         var name = f.Required("name", Pydantic.Str);
-        var responseModel = f.Default("response_model", v => Pydantic.Optional(v, ReadResponseModel), () => null);
+        var responseModel = f.Default("response_model", v => Pydantic.Optional(v, x => Pydantic.SubclassOf<IResponseModel>(x)), () => null);
         var dynamicSchema = f.Default("dynamic_schema", Pydantic.Bool, () => false);
         f.ThrowIfAny();
         return new PromptSpec { Name = name.Value, ResponseModel = responseModel.Value, DynamicSchema = dynamicSchema.Value }.Validate();
@@ -213,10 +211,6 @@ internal sealed record PromptSpec : IPydanticModel
         Pydantic.DumpFields(json, ("name", Name), ("response_model", ResponseModel), ("dynamic_schema", DynamicSchema));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
-
-    // PORT: pydantic checks `type[BaseModel]` with is_subclass_of. An IResponseModel stands for a model class (R7).
-    private static IResponseModel ReadResponseModel(object? value) =>
-        value as IResponseModel ?? throw ValidationException.One("is_subclass_of", "Input should be a subclass of BaseModel");
 }
 
 internal delegate ChatPrompt ChatPromptFunction(OrderedDictionary<string, object?> context);
