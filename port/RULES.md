@@ -38,8 +38,9 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 - In the Neo4j project, write `using global::Neo4j.Driver;`. Inside `namespace Graphiti.Neo4j.<Sub>;` the name `Neo4j` is `Graphiti.Neo4j`, and `using Neo4j.Driver;` fails with `error CS0234`.
 - A ported file needs no `using Graphiti;`. The exception classes and `ModelCallFailure` are visible from each `Graphiti.Core` namespace.
 - A branch that builds a default object from a module that is not ported, or the Neo4j driver from core code, is not ported. Keep the parameter, and throw in that branch: `throw new ArgumentException("<python parameter name> must be provided"); // PORT: D3, D28`. The four sites are in `Graphiti.__init__`: `Neo4jDriver(uri, user, password)` at `graphiti.py:372`, `OpenAIClient()` at `:385`, `OpenAIEmbedder()` at `:389`, and `OpenAIRerankerClient()` at `:393`. The `uri is None` test before the first one keeps its upstream message. The facade always passes the four objects.
-- A public member needs an XML comment, because the build treats a missing one as an error (CS1591). Where Python has no docstring, write `/// <summary>Initializes a new instance of the <see cref="X"/> class.</summary>` for a constructor and `/// <summary>Gets the Python attribute <c>name</c>.</summary>` for a property, with the Python attribute name. This applies to the two error files only.
+- A public member needs an XML comment, because the build treats a missing one as an error (CS1591). Where Python has no docstring, write `/// <summary>Initializes a new instance of the <see cref="X"/> class.</summary>` for a constructor, `/// <summary>Initializes a new instance of the <see cref="X"/> class with the exception that caused this one.</summary>` for the constructor with `innerException` (R4), and `/// <summary>Gets the Python attribute <c>name</c>.</summary>` for a property, with the Python attribute name. This applies to the two error files only.
 - Put `// Ported from graphiti_core/<path>.py` on the first line of each file.
+- Copy the licence text at the top of the Python file into a block comment (`/* ... */`) after that first line, with the same words.
 - Keep the definitions in the order of the Python file. One Python module is one C# file.
 - Copy each docstring into an XML doc comment with the same text.
 - Copy each code comment to the same place. A comment that explains a C# difference starts with `// PORT:`.
@@ -85,13 +86,16 @@ Each Python exception class becomes one C# class. The name ends in `Exception`, 
 | --- | --- | --- |
 | `GraphitiError` | `GraphitiException` | `Exception` |
 | `EdgeNotFoundError`, `EdgesNotFoundError`, `GroupsEdgesNotFoundError`, `GroupsNodesNotFoundError`, `NodeNotFoundError`, `SearchRerankerError`, `EntityTypeValidationError`, `IdentityPropertyValidationError`, `GroupIdValidationError`, `UnitExpiredError`, `UnitInProgressError`, `StaleCommitError` | The same name with `Exception` in place of `Error` | `GraphitiException` |
-| `NodeLabelValidationError(GraphitiError, ValueError)` | `NodeLabelValidationException` | `GraphitiException`. C# has one base class. No upstream `except ValueError` receives this class (7 sites, read on 2026-11-25). |
+| `NodeLabelValidationError(GraphitiError, ValueError)` | `NodeLabelValidationException` | `GraphitiException`. C# has one base class. No upstream `except ValueError` in hand-written code receives this class (7 sites, read on 2026-11-25). Pydantic does catch it as a `ValueError` when a field validator raises it (`nodes.py:110`, `search/search_filters.py:78`), and R7 covers those two sites with `Pydantic.Wrap<NodeLabelValidationException>`. |
 | `ChangeSetRejected` | `ChangeSetRejectedException` | `GraphitiException` |
 | `RateLimitError`, `RefusalError`, `EmptyResponseError` (`llm_client/errors.py`) | `RateLimitException`, `RefusalException`, `EmptyResponseException` | `Exception` |
 | `OpenAIDecisionsInputTooLongError`, `_OpenAIInputTooLongSignal` | `OpenAIDecisionsInputTooLongException`, `OpenAIInputTooLongSignalException`. Both stay `internal` in the file of their module (decision D32). | `Exception` |
 
-- A constructor takes the same parameters as the Python `__init__`, in the same order, with the same defaults. A class with no `__init__` of its own, for example `GraphitiError`, takes `string message`.
-- Each class also has the same constructor with one more last parameter, `Exception? innerException`, for `raise X(...) from e`.
+- The first constructor takes the same parameters as the Python `__init__`, in the same order, with the same defaults. A class with no `__init__` of its own, for example `GraphitiError`, takes `string message = ""`, because Python accepts `GraphitiError()` and its text is empty.
+- Each class also has a second constructor for `raise X(...) from e`: the same parameters with no default, and then `Exception? innerException`. Example: `ChangeSetRejectedException(string reason = "change set rejected")` and `ChangeSetRejectedException(string reason, Exception? innerException)`. A call with no argument then binds to the first constructor.
+- A call with two or more positional arguments to a class with no `__init__`, for example `GraphitiError('a', 'b')`, has no C# form. No upstream site makes such a call.
+- A `list[str]` parameter is `List<string>`, and an `int` parameter is `long` (R6).
+- If `__init__` builds the message before it calls `super().__init__`, a private static method of the class builds it, for example `BuildMessage`.
 - Build the message with the same text as Python. GAPS J1 records `str(exception)` for each class.
 - `self.message` is the `Message` property. Each other attribute, for example `group_id` on `UnitInProgressError`, is a get-only property.
 - A list inside a message is Python `repr` text: `f'... {uuids}'` is `"... " + Py.Repr(uuids)`.
@@ -229,6 +233,33 @@ Each model has these members after its properties, in this order. Add a member o
 4. `internal static readonly PydanticSchema ModelJsonSchema`. Build it with the `PydanticSchema` builder in field order, with each `description`, `default`, and `title` that Python has. The judge function `judge:schema_text` pins the text for each response model (GAPS G3).
 
 The `Pydantic.*` helpers apply the coercion of pydantic lax mode at the pinned version. Their tests compare them with values that Python recorded. Do not write a coercion by hand.
+
+How to write the members with the helpers of `PyCompat`:
+
+- A model implements `IPydanticModel`, so that `Pydantic.Dump` can dump it inside another model. Add the explicit member `OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);` after `ModelDump`.
+- `ModelValidate` creates `var f = new PydanticFields("<Python class name>", data);`. It reads each field in field order: `f.Required("<python name>", <reader>)` for a required field, and `f.Default("<python name>", <reader>, () => <default>)` for a field with a default or a default factory. It then calls `f.ThrowIfAny();`, which throws one `ValidationException` with each error, as pydantic does. Only after that call does it read `.Value` of each field, build the record, and call `.Validate()`.
+- A reader is a `Pydantic.*` member or a lambda of them: `Pydantic.Str`, `Int`, `Float`, `Bool`, `DateTime`, `Any`, `Enum<T>`, `v => Pydantic.Literal(v, "a", "b")`, `Pydantic.StrIntFloat`, `v => Pydantic.Optional(v, Pydantic.Str)` for a reference type or `Pydantic.OptionalValue` for a value type, `v => Pydantic.List(v, Pydantic.Str)`, `v => Pydantic.Dict(v, Pydantic.Any)`, `v => Pydantic.Model(v, "<Python class name>", M.ModelValidate)`, and `Pydantic.Tagged` for a discriminated union.
+- `Validate()` of a model with a constraint creates `var f = new PydanticFields("<Python class name>");` with no data, calls `f.Ge`, `f.Gt`, or `f.MaxLength` for each constraint in field order, and then `f.ThrowIfAny();`. A model with no constraint and no validator has `internal M Validate() => this;`.
+- `ModelDump` is `Pydantic.DumpFields(json, ("<python name>", Property), ...)` in field order.
+- `ModelJsonSchema` is a `PydanticSchema("<Python class name>", <docstring or null>)` with one call for each field in field order: `.Required(name, type, description)`, `.Default(name, type, value, description)`, or `.Factory(name, type, description)`. The type is a `PydanticType` member: `Str`, `Int`, `Float`, `Bool`, `DateTime`, `Any`, `Null`, `List(...)`, `Dict(...)`, `Optional(...)`, `Union(...)`, `Literal(...)`, `Enum<T>()`, and `Model(M.ModelJsonSchema)`.
+- `ModelFields`, if upstream reads `model_fields` of the model, comes after `ModelJsonSchema`: one `new PydanticField(isRequired, maxLength)` for each Python field name.
+- Worked examples: `tests/Graphiti.Net.Property.Tests/PydanticModels.cs` and `PydanticSchemas.cs` hold test copies of 17 upstream models, which the tests compare with pydantic. They show each reader and each schema form. Where a copy and this rule differ in the order of members, this rule decides.
+
+Facts that the Python class does not show, and that a schema needs:
+
+- The value of a constant that the class imports for a default, for example `DEFAULT_MIN_SCORE` or `MAX_SUMMARY_CHARS`. Use the ported constant, not a number.
+- A docstring is the text that `inspect.cleandoc` gives: no indent, and no empty first or last line. This also holds for the docstring of an enum.
+- An int default is a `long` (`0L`), also for a `float` field with the default `0`. Pydantic writes `"default": 0` there, not `0.0`.
+- `Factory` for `default_factory`, which writes no `default` key, and `Default` for each other default.
+- In a union with `None`, `Null` is the last type.
+
+Differences from pydantic that the helpers keep, each one outside what upstream can show:
+
+- `Pydantic.LoadJson` rejects more than 201 nested containers, as pydantic does.
+- The datetime reader rejects a digit text of 20 digits or more. Pydantic reads it with 64-bit arithmetic that wraps. No upstream reply field is a `datetime`.
+- An int that a `long` cannot hold throws `OverflowException` (R4), unless another field or item of the same data is not valid. In that case the reader throws the `ValidationException` that pydantic throws.
+- A validator that throws `ValidationException` keeps its own title and location. Pydantic puts the outer field in front.
+- `Pydantic.Dump` returns a value outside the value model as it is, for example a delegate. In JSON mode it throws `ArgumentException`.
 
 Validators at the pinned commit:
 
@@ -664,6 +695,11 @@ The four lookup methods that apply no group filter (`node_distance_reranker`, `e
 ### R22. Judge bindings and wrong-type cases
 
 - Each ported unit adds its bindings to `tests/Graphiti.Net.JudgeHost/Bindings.cs`. A binding decodes the arguments, calls the product code, and encodes the result. It does nothing else.
+- The usual binding names the Python parameters in order and gives the ported method: `["graphiti_core.helpers:lucene_sanitize"] = call => call.Signature("query").InvokeAsync(Helpers.LuceneSanitize),`. `InvokeAsync` converts each argument to the type of the C# parameter, takes a missing argument from the C# default, passes `CancellationToken.None` to a last token parameter, awaits a task, and encodes the result. An overloaded or generic method needs a cast to a `Func` type.
+- A constructor, a property, or a method on an instance uses the explicit reads: `call => Codec.Result(new XException(call.Signature("uuid").String("uuid")))`. For a parameter with a default, read `Has("name")` only to choose between two constructor calls that Python also tells apart. Never write a default value in a binding.
+- Add the bindings of a unit as one block at the end of the `Pure` initializer, under a comment line with the Python module path. Put a helper method of the unit after the last helper method. `.gitattributes` gives `Bindings.cs` a union merge, so two units that each add a block at the same place merge with no conflict.
+- A unit registers each `$model`, `$enum`, and `$ref` path that its cases use, and the encoder of each model type that a result holds, in `Bindings.Registry`.
+- An exception type with no row in `Codec.PythonExceptionName` gives a `host_error`. If ported code throws such a type by a rule of R4, tell the lead. Only the lead changes `tests/Graphiti.Net.JudgeHost/Core/`.
 - A `{"$ref": "fixtures:Name"}` argument is a custom type. `tests/Graphiti.Net.JudgeHost/Fixtures.cs` holds one `GraphTypeDescriptor` for each of the five classes of `port/judge/host-python/fixtures.py`, built through the public `GraphTypeDefinition`. The lead writes that file.
 - A `$model` argument is decoded with `ModelValidate` (R7). A `$enum` argument is decoded with `PyEnum.FromValue<T>`. A `$ref` to a constant or a function is decoded to the ported member.
 - A model in a result is encoded as `$type` with the Python class name and the Python field names. Use `ModelDump` if the model has it.
@@ -686,6 +722,7 @@ Cases that now pass:
 - An implementer never edits `port/judge/expected-failures.txt`. It reports the ids of the cases that now pass.
 - The lead removes only those ids from the file, in the pull request of the unit. The pull request lists each id (decision D38).
 - Each other change under `port/judge/` is a patch file that the lead writes and the maintainer applies.
+- A unit is `parity_pass` only when each covering case is out of the file, or stays in it with the host answer `JudgeTypeRejected` and a row in the wrong-type table of Part 5. The runner does not fail for a listed case that answers `JudgeTypeRejected` (decision D40), so the lead lists the covering ids of each unit and reads the answer of each one.
 
 ### R23. Surfaces that the judge cannot reach
 
@@ -746,7 +783,7 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `Py` | `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl`, `TimeSeconds` | `str(uuid4())`, `uuid4().hex`, `str(uuid5(...))`, `uuid.NAMESPACE_URL`, `time.time()` |
 | `PyText` | `Lower`, `Upper`, `Title`, `Capitalize`, `IsAlnum`, `IsAlpha`, `IsDigit`, `IsSpace`, `IsUpper`, `IsLower`, `Split`, `RSplit`, `SplitLines`, `Strip`, `LStrip`, `RStrip`, `Replace`, `Count`, `Find`, `RFind`, `Index`, `CodePoints`, `Ord`, `Chr`, `EncodeUtf8`, `DecodeUtf8`, `DropLoneSurrogates` | The `str` methods with full Unicode case mapping, Python's whitespace set, and positions in code points. A lone surrogate stays as it is. The tables come from the pinned Python build. |
 | `PyJson` | `Dumps`, `Loads` | `json.dumps` with `ensure_ascii`, `indent`, `sort_keys`, `default`, the compact separators `,` and `:`, `allow_nan`, Python float text, `NaN` and `Infinity` tokens, and keys that are not strings. `json.loads` into the value model. |
-| `PyAst` | `LiteralEval` | `ast.literal_eval` for strings, numbers, `True`, `False`, `None`, lists, tuples, and dicts |
+| `PyAst` | `LiteralEval` | `ast.literal_eval` for strings, bytes, numbers, `True`, `False`, `None`, lists, tuples, sets, and dicts. A complex number and `...` throw `ArgumentException`, where Python returns a value. A `\N{name}` escape resolves only the names of the generated table (about 400 common characters), and each other name throws `FormatException`. |
 | `PyDateTime` | A struct. `IsNaive`, `IsUtc`, `IsoFormat`, `Str`, `Repr`, `ReplaceUtc`, `ToUtc`, `ToDateTimeOffset`, the field properties, the comparison operators, equality and hashing, and the static `FromIsoFormat`, `UtcNow`, `FromDateTimeOffset` | A `datetime` of Python 3.12, aware or naive, to the microsecond |
 | `PyRegex` | `Space`, `SpaceClassBody`, `Word`, `Digit`, `Boundary`, `Split` | The character classes of `re` for `str` patterns, and `re.split` |
 | `PyTuple`, `PyDict`, `PySet<T>`, `PyEqualityComparer<T>` | Types | A tuple, a dict with keys of any type in insertion order, a set that iterates in insertion order, a comparer that tests identity first |
@@ -755,7 +792,7 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `PyRandom` | Type. `Random`, `Uniform`, `SampleRange` | The `random` functions that upstream calls, with a seed for tests. The sequence is not Python's (GAPS F9). |
 | `PyEnv` | `Str`, `Int`, `Float`, `Truthy`, `Use` | `os.getenv` with the conversions of R17. `Use` is the seam for tests. |
 | `PyHash` | `Blake2b` | `hashlib.blake2b` with a digest size |
-| `Pydantic` | Field readers for each field type, `Wrap`, `Wrap<TException>`, `PydanticField`, `ValidationException`, `PydanticSchema`, `JsonValue`, `DumpJson`, `LoadJson` | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError`, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode |
+| `Pydantic` | `Str`, `Int`, `Float`, `Bool`, `DateTime`, `Any`, `Enum<T>`, `Literal`, `StrIntFloat`, `Callable<T>`, `Optional`, `OptionalValue`, `List`, `Dict`, `Model`, `Tagged`, `Wrap`, `Wrap<TException>`, `Dump`, `DumpFields`, `JsonValue`, `DumpJson`, `LoadJson`. Also `PydanticFields` (`Required`, `Default`, `Ge`, `Gt`, `MaxLength`, `ThrowIfAny`), `PydanticField`, `IPydanticModel`, `ValidationException`, `PydanticSchema` (`Required`, `Default`, `Factory`, `ToDict`), and `PydanticType`. | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError` with pydantic's text, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode. R7 says how a model uses them. |
 | `Asyncio` | `Run`, `OnLoopAsync`, `GatherAsync`, `SemaphoreGatherAsync`, `CreateTask`, `WaitForAsync`, `ShieldAsync`, `ToThreadAsync`, `CallHostAsync`, `IsCancellation`, `IsOnLoop`, `Scheduler`, `AsyncEvent` | The asyncio calls of R8 on the exclusive scheduler. `CallHostAsync` has no Python form: it is the hop to a host service (decision D33). |
 
 There is no general regex helper. Translate each pattern by hand (R13).
@@ -765,8 +802,8 @@ Each helper throws the C# type that R4 gives for the Python error, because porte
 | Helper | Throws |
 | --- | --- |
 | `PyDateTime.FromIsoFormat`, `Py.Int`, `Py.Float` on text that does not parse | `ArgumentException` (`ValueError`) |
-| `PyJson.Dumps` for a type that JSON cannot hold, for example a datetime or a set with no `default` | `InvalidCastException` (`TypeError`) |
-| `PyJson.Loads` | `JsonException` (`JSONDecodeError`) |
+| `PyJson.Dumps` for a type that JSON cannot hold, for example a datetime, a set, or a C# enum with no `default` | `InvalidCastException` (`TypeError`) |
+| `PyJson.Loads` | `JsonException` (`JSONDecodeError`). Near the depth limit of the parser, it also throws `JsonException` where Python raises `RecursionError`. |
 | `PyAst.LiteralEval` | `FormatException` for text that is not Python syntax (`SyntaxError`), `ArgumentException` for syntax that is not a literal (`ValueError`) |
 | `PyText.EncodeUtf8` for a lone surrogate | `EncoderFallbackException` (`UnicodeEncodeError`) |
 | `PyText.DecodeUtf8` in strict mode for bytes that are not UTF-8 | `DecoderFallbackException` (`UnicodeDecodeError`) |
@@ -1010,11 +1047,11 @@ These items need the lead or the maintainer. An implementer that meets one stops
 
 | # | Item | Owner | Needed before |
 | --- | --- | --- | --- |
-| O1 | The runner does not yet accept `JudgeTypeRejected` (decision D20). The change touches `port/judge/run.py` after gate 2, so it goes in its own pull request. | The lead writes a patch file outside `port/judge/`. The maintainer applies it (decided on 2026-11-26). Plan 0003, task P8. | The pilot (plan 0003, task 6) |
-| O2 | `Codec.PythonExceptionName` lacks rows for `ValidationException`, `MissingMemberException`, `DivideByZeroException`, `OverflowException`, `JsonException`, `FormatException`, `InvalidOperationException`, `TimeoutException`, the `Neo4j.Driver` exception types, and each ported exception class of R4. Its default branch returns the C# type name. The row for `ValidationException` and the rows for other types that derive from `ArgumentException` must stand above the `ArgumentException` arm, which matches first today. `tests/Graphiti.Net.JudgeHost/Core/` changes in its own pull request. The host also has no decoder for a `$model`, `$enum`, `$ref`, or `$dt` argument and no encoder for a `$type` result. Plan 0003, task P7 adds them in the same pull request. | Lead | The pilot |
+| O1 | Closed on 2026-11-26. The runner accepts `JudgeTypeRejected` (decisions D20 and D40, pull request 21). | | |
+| O2 | Closed on 2026-11-26. The judge host has the exception rows, the decoders, and the `$type` encoder (plan 0003, task P7, pull request 19). `Fixtures.cs` comes with the first unit that needs a custom type. | | |
 | O3 | Closed on 2026-11-25. [The public surface design](../docs/design-docs/public-surface-design.md) and decisions D24 to D35 answer it: R1, R2, R3, R4, R8, R15, and R19 hold the rules. | | |
-| O4 | 23 cases with `wrong_type` in the id have a golden result that is not `TypeError` or `AttributeError`. The table below gives the proposed answer for each group. Decision D40 keeps each of these cases in `expected-failures.txt` with the answer `JudgeTypeRejected` until then. | Maintainer, by name at gate 4 | Gate 4 |
-| O5 | Decided on 2026-11-26 (D38): the lead removes a passing case from `port/judge/expected-failures.txt`. R22 holds the rule. The deny rule in `.claude/settings.json` still blocks the edit. | Maintainer narrows the deny rule | The pilot |
+| O4 | 23 cases with `wrong_type` in the id have a golden result that is not `TypeError` or `AttributeError`, and so do 23 more cases with other ids. The tables below give the proposed answer for each group. Decision D40 keeps each of these cases in `expected-failures.txt` with the answer `JudgeTypeRejected` until then. | Maintainer, by name at gate 4 | Gate 4 |
+| O5 | Closed on 2026-11-26 (D38). The lead removes a passing case from `port/judge/expected-failures.txt`, and the deny list leaves that one file open (pull request 22). R22 holds the rule. | | |
 | O6 | `utils/bulk_utils.py:192` calls `neo4j.unit_of_work` from core code to set a transaction timeout. The port needs a new member on the driver session contract for a write with a timeout. That is an interface change, so it is an ask-first item (R19). | Maintainer | Layer 7 of plan 0004 |
 | O8 | Closed on 2026-11-26. `.editorconfig` makes IDE0065 an error for each C# file, so a `using` directive above the namespace fails the build (plan 0003, task P1). | | |
 | O7 | Decision D22 holds only if each lambda that a library calls enters the scheduler again (R8). The rule depends on the implementer and on the test in `GatherAsync`. The pilot must show that this is enough. | Lead, after the pilot | Gate 3 |
@@ -1030,6 +1067,17 @@ Wrong-type cases of O4:
 | `pure.text.validate_group_id.wrong_type_zero`, `.wrong_type_false`, `pure.text.validate_group_ids.wrong_type_str`, `.wrong_type_str_invalid`, `pure.text.validate_node_labels.wrong_type_str`, `pure.text.validate_excluded_entity_types.wrong_type_str`, `pure.datetime.parse_db_date.wrong_type_int`, `pure.chunking.chunk_json_content.wrong_type_size_str` | A normal result or a domain error for a value of the wrong type | The C# type cannot hold the value. Open: the maintainer accepts each difference by name, or extends decision D20. |
 | `pure.text.normalize_l2.wrong_type_str_elems`, `.wrong_type_scalar`, `pure.text._build_directed_uuid_map.wrong_type_short_pair`, `pure.text.compress_uuid_map.wrong_type_short_pair` | `ValueError`, `AxisError`, `IndexError` | The C# type cannot hold the value. Open, as above. |
 
+The review of the judge host codec (plan 0003, task P7) found 23 more cases of this kind. The id of each one does not hold `wrong_type`. The count is a lower bound, because the review did not read the model constructors.
+
+| Cases | Argument | Proposed answer |
+| --- | --- | --- |
+| `pure.dedupe.minhash_signature.none`, `pure.filters.node_search_filter_query_constructor.provider_none`, `pure.filters.edge_search_filter_query_constructor.provider_none`, `pure.text.validate_group_ids.contains_none`, `pure.text.truncate_at_sentence.none`, `pure.queries.get_fulltext_indices.none`, `pure.queries.get_nodes_query.none_name`, `pure.queries.get_episode_node_save_query.none`, `pure.queries.get_entity_node_return_query.none`, `pure.queries.get_entity_edge_return_query.none` | `None` for a parameter that the annotation does not make nullable. Python gives a normal result. | The first row of the table above: nullable only if the Python code handles `None` by its own logic. |
+| `pure.models.EpisodeType.from_str.invalid_none`, `.invalid_int` | `None` or an int for a `str` parameter. Python raises `NotImplementedError`. | The C# type cannot hold the value. Open, as above. |
+| `pure.dedupe.hash_shingle.seed_str`, `pure.queries.get_entity_node_save_query.list_labels`, `.list_with_empty`, `.list_unsafe`, `pure.queries.get_entity_edge_save_bulk_query.neo4j_truthy_aoss` | Text for an int, a list for text, an int for a bool | The C# type cannot hold the value. Open, as above. |
+| `pure.queries.build_neo4j_fulltext_query.wrong_group_type`, `pure.ranking.rrf.inner_not_list_string`, `pure.text.validate_identity_properties.property_not_list_str`, `.property_not_list_tuple`, `pure.ranking.normalize_l2.two_dimensional_per_column`, `pure.text.normalize_l2.nested_2d` | Text or a tuple for a list, and a nested list for `list[float]` | The C# type cannot hold the value. Open, as above. |
+
+Also, 19 `pure.queries.fulltext_query.*` cases pass a `types:SimpleNamespace` object as the driver. Their answer depends on how the unit binds that `$model`, so the unit of `fulltext_query` reports them.
+
 ## Rule changes
 
 | Date | Change | Units to port again |
@@ -1042,3 +1090,4 @@ Wrong-type cases of O4:
 | 2026-11-26 | After the pre-pilot scan (plan 0003, results). R24 names the members of modules outside the pilot that a pilot unit ports for real, and R19 points to it. R22 says who removes a passing case from `expected-failures.txt`. Open item O5 is decided (D38), and O1 and O2 name tasks P8 and P7. | None. No unit is ported. |
 | 2026-11-26 | Open item O8 is closed: the build enforces the `using` placement of R1. | None. No unit is ported. |
 | 2026-11-26 | After the reviews of the `PyCompat` helpers (plan 0003, tasks P2, P4, P5). R7: an enum member carries `[PyEnumMember]`, and there is no `<Enum>Values` class. R8: cleanup after a cancellation passes `CancellationToken.None`, `WaitForAsync` takes the clock, a gather of existing tasks has its own form, and three differences from asyncio are stated. R11: no `strftime`, `strptime`, or subtraction, and `ToUtc()` throws for a naive value. R12: `PyText.Count`. R13: the `PyRegex` constants and the limits of `Split`. R14: `Py.SortInPlace` for float, datetime, and open keys. R18: `math.isnan`. Part 2 lists the members that exist. New open item O9. | None. No unit is ported. |
+| 2026-11-26 | After `PyJson`, `PyAst`, `Pydantic`, the judge host codec, and the first pilot unit (`errors`). R1: the licence text is a block comment, and the constructor with `innerException` has its own XML comment. R4: a class with no `__init__` takes `string message = ""`, each class has two constructors, and the row of `NodeLabelValidationError` names the pydantic sites. R7: how a model uses `PydanticFields`, `PydanticSchema`, and `IPydanticModel`, the schema facts that the Python class does not show, and five differences from pydantic. R22: the binding form `InvokeAsync`, the registry, and the `parity_pass` rule for a listed case. Part 2: the members of `Pydantic` and the limits of `PyAst`. Open items O1, O2, and O5 are closed, and O4 has 23 more cases. | `errors`: no. Its code already follows each new rule. |

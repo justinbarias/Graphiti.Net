@@ -13,14 +13,14 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
 | P1 | Done 2026-11-26. Add the `.editorconfig` entry that makes IDE0065 an error for each C# file. Move the `using` directives of the judge host and the end-to-end tests inside the namespace. Closes open item O8 and debt T22. | Lead, Fable 5.2, medium | A file with a directive at the top fails the build. The gate passes. Own pull request. |
 | P2 | Done 2026-11-26. Build the value model of `PyCompat`: `PyDict`, `PySet<T>`, `PyTuple`, `Py.Repr`, `Py.Str`, `Py.Truthy`, `Py.Len`, `Py.Get`, `Py.As*`, `Py.EnumValue`. | Workhorse, Opus 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
-| P3 | In progress. Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
+| P3 | Done 2026-11-26. Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
 | P4 | Done 2026-11-26. Build `PyDateTime`. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
 | P5 | Done 2026-11-26. Build `PyRegex`, `PyRandom`, and `PyEnv`. | Workhorse, Sonnet 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
-| P6 | In progress. Build `Pydantic`. Needs P2 and P4. | Workhorse, Opus 5.5, medium | Property tests pass against values that pydantic recorded at the pinned version. |
-| P7 | Judge host: add the decoders for a `$model`, `$enum`, `$ref`, and `$dt` argument. Add the encoder for a `$type` result and the exception rows of open item O2. Write `Fixtures.cs` (R22). Needs P2 and P6. Closes O2 and debt T18. | Lead, Fable 5.2, medium | The gate passes, and the judge case count stays 1999. Own pull request. |
-| P8 | In progress. Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
+| P6 | Done 2026-11-26. Build `Pydantic`. Needs P2 and P4. | Workhorse, Opus 5.5, medium | Property tests pass against values that pydantic recorded at the pinned version. |
+| P7 | Done 2026-11-26, except `Fixtures.cs` (debt T18). Judge host: add the decoders for a `$model`, `$enum`, `$ref`, and `$dt` argument. Add the encoder for a `$type` result and the exception rows of open item O2. Write `Fixtures.cs` (R22). Needs P2 and P6. Closes O2 and debt T18. | Lead, Fable 5.2, medium | The gate passes, and the judge case count stays 1999. Own pull request. |
+| P8 | Done 2026-11-26. Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
 | P9 | Done 2026-11-26. Write the script in `port/tools/` that records `str(exception)` for the `errors` unit (R23, J1). The project `tests/Port.Evaluation` comes with the `errors` unit of the pilot, because a test project with no test fails the test step. | Lead, Fable 5.2, medium | The script records from `.upstream` with Python 3.12. |
-| 6 | Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). A unit also ports the members of other modules that R24 names. Needs P1 to P9. | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering pure judge cases pass for each unit. `entity_node_ops` has no pure case: build and format only, and its 3 flow cases wait for plan 0004, layer 9. |
+| 6 | In progress. Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). A unit also ports the members of other modules that R24 names. Needs P1 to P9. | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering pure judge cases pass for each unit. `entity_node_ops` has no pure case: build and format only, and its 3 flow cases wait for plan 0004, layer 9. |
 | 7 | Review the pilot. Two fresh reviewers for each unit. If they disagree, a third reviewer decides. | Reviewers, Opus 5.5, high | Findings with inputs. Each finding that shows a missing rule changes `RULES.md`. |
 | 8 | Decide what to do with the pilot output. If a rule changed in a way that the output does not follow, delete the output. | Lead, Fable 5.2, medium | The decision, in `port/STATE.md`. |
 
@@ -462,4 +462,43 @@ Decisions of the lead during these tasks, under decision D39:
 - The test project takes each `python-values*.json` file with one line.
 - A pull request merges after the CI job `check` passes. The job `mutation` is in observe mode and never blocks a merge, by the comment in `.github/workflows/ci.yml`. It took 15 min 57 s on pull request 14 (debt T27).
 
-Not done in these tasks: `PyJson`, `PyAst` (P3), and `Pydantic` (P6) are in progress. `scripts/mutate.sh` did not run on the new helpers outside CI, and task 5 (the pruning rule) waits for P3 and P6.
+Not done in these tasks: `PyJson`, `PyAst` (P3), and `Pydantic` (P6). The next section holds them. `scripts/mutate.sh` did not run on the new helpers outside CI, and task 5 (the pruning rule) waits for P3 and P6.
+
+### Tasks P3, P6, P7, and P8, 2026-11-26
+
+One subagent built each group in its own worktree. One Opus 5.5 high adversarial review ran on each group before its pull request, and the same builder fixed the findings. No second review ran on a fix round.
+
+| Group | Pull request | Builder | Review findings | Notes |
+| --- | --- | --- | --- | --- |
+| `PyJson`, `PyAst` (P3) | 18 | Sonnet 5.5, high | 5, with 1 important | The reviewer's generator compared `Dumps` on 677,500 cases and `Loads` on 200,105 texts. A bad `\N` escape threw the wrong exception type. A complex number and `...` throw `ArgumentException`, so that the caller takes its fallback path. `PyStrEnumAttribute` was removed. 318 property tests. |
+| `Pydantic` (P6) | 20 | Opus 5.5, medium | 8, with 1 important | No difference in 17,812 random field cases, 1,100 mutated replies, and six schemas that the reviewer wrote by hand. `LoadJson` had no nesting limit, and 3000 nested objects crashed the test host. The text of each of the 49 `schema_text` judge cases matches the golden text. 366 property tests. |
+| The judge host codec (P7) | 19 | Opus 5.5, medium | 11, with 3 important | Each JSON int decoded as a `BigInteger`, and a value tuple had no encoding. By the reviewer's count, about 240 and 199 pure cases with a golden value would fail for these two reasons. The Neo4j error table followed driver 5.x and follows 6.1.0 now. The fix round added `InvokeAsync`, which the lead read. 147 tests. |
+| The runner change (P8) | 21 | Lead | None | The maintainer applied the patch. The changed runner passed each of the 1999 cases against the Python build, on a copy of the judge folder. The earlier section "Task P8" holds the other checks. |
+
+The maintainer also narrowed the deny list of `.claude/settings.json` with a script (pull request 22, decision D38).
+
+Decisions of the lead during these tasks, under decision D39:
+
+- A binding names the Python parameters and gives the ported method to `InvokeAsync`. The first codec needed one branch for each combination of defaults, or a default value in the binding, and `Bindings.cs` forbids both.
+- An exception type with no row in `Codec.PythonExceptionName` gives a `host_error`. The first codec returned the C# type name, which no golden file holds.
+- `Fixtures.cs` is not written. It needs the public type `GraphTypeDefinition`, which no merged unit has yet (debt T18).
+- The codec review found 23 more wrong-type cases for open item O4. They stay expected failures by decision D40.
+- The values file of `PyJson` is 8.5 MB. The review asked for a smaller file, and the builder cut 0.8 MB.
+
+Not done: no review ran on the fix rounds, and no review ran on the runner change.
+
+### Task 6, unit `errors`, 2026-11-26
+
+One Sonnet 5.5 medium implementer ported `graphiti_core/errors.py` to `src/Graphiti.Net/Errors.cs` (15 public classes) from the rulebook alone, with `tests/Port.Evaluation/ErrorsTests.cs`.
+The test compares the message and the base class of 172 of the 173 recorded cases. `GraphitiError('a', 'b')` has no C# form.
+Two Opus 5.5 high reviewers read the unit with no contact. Each compared its own cases with Python (306 and 30) and found no difference in behavior. Each broke the port, and a test failed each time.
+
+| Finding | Reviewer | Result |
+| --- | --- | --- |
+| R4 gave no form for a class with no `__init__` that is called with no argument, and no form for a default before `innerException`. | The implementer, and A | The lead chose D41. R4 has the two constructor forms. |
+| The reason that R4 gave for the single base class of `NodeLabelValidationException` was false: pydantic catches the class as a `ValueError` in two validators. | A and B | R4 names the two sites and points to R7. The error table of the public surface design has the exception. |
+| R1 had no XML comment text for the constructor with `innerException`, and no rule for the licence text. | B, and the implementer | R1 has both. |
+| The recording script does not record `group_id`, `unit_id`, and `seq`, and no list item that `repr` must escape. | B | Open. The lead extends the script with the unit's pull request. |
+| `port/queue.json` and `port/STATE.md` did not name the unit. | B | The lead updates both with the unit's pull request. |
+
+The unit is not merged. Its 19 judge bindings need the codec, which merged after the port.
