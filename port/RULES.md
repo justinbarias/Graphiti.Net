@@ -790,7 +790,7 @@ Cases that now pass:
 - The lead removes only those ids from the file, in the pull request of the unit. The pull request lists each id (decision D38).
 - Each other change under `port/judge/` is a patch file that the lead writes and the maintainer applies.
 - A unit is `parity_pass` only when each covering case is out of the file, or stays in it with the host answer `JudgeTypeRejected` and a row in the wrong-type table of Part 5. The runner does not fail for a listed case that answers `JudgeTypeRejected` (decision D40), so the lead lists the covering ids of each unit and reads the answer of each one.
-- The path `types:SimpleNamespace` has two uses: a driver in the 19 `pure.queries.fulltext_query.*` cases, and a prompt library in three `validate_prompt_library` cases. A path is registered one time, so the lead decides the decode with the host additions of open item O11. Until then the three ids stay in the list.
+- The path `types:SimpleNamespace` has two uses: a driver in the 19 `pure.queries.fulltext_query.*` cases, and a prompt library in three `validate_prompt_library` cases. A path is registered one time, so the lead file `Units/Types.cs` registers it. `TypesBindings.Namespace` implements `IPromptLibrary` and `IPromptGroup` over the attributes of the namespace, by the R15 rows for `hasattr` and `callable`. The unit of `fulltext_query` extends it for a driver, with the lead.
 
 ### R23. Surfaces that the judge cannot reach
 
