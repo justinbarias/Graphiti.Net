@@ -120,7 +120,7 @@ internal static class RecordParsers
             ["valid_at"] = validAt,
             ["uuid"] = record["uuid"],
             ["group_id"] = record["group_id"],
-            ["source"] = EpisodeTypeExtensions.FromStr(Py.AsString(record["source"])),
+            ["source"] = EpisodeTypeExtensions.FromStr(record["source"]),
             ["name"] = record["name"],
             ["source_description"] = record["source_description"],
             ["entity_edges"] = record["entity_edges"],

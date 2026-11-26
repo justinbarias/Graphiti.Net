@@ -22,21 +22,6 @@ using Graphiti.Internal;
 // PORT: a custom type is a GraphTypeDescriptor (R15, decision D26).
 internal static class EntityTypesUtils
 {
-    // PORT: `EntityNode.model_fields.keys()` (entity_types_utils.py:29). No rule gives the field names of a built-in
-    // model, so this list holds the keys of EntityNode.model_fields in the order of Python: the fields of Node, then
-    // the fields of EntityNode.
-    private static readonly string[] EntityNodeFieldNames =
-    [
-        "uuid",
-        "name",
-        "group_id",
-        "labels",
-        "created_at",
-        "name_embedding",
-        "summary",
-        "attributes",
-    ];
-
     internal static bool ValidateEntityTypes(OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
     {
         if (entityTypes is null)
@@ -44,14 +29,14 @@ internal static class EntityTypesUtils
             return true;
         }
 
-        var entityNodeFieldNames = EntityNodeFieldNames;
+        var entityNodeFieldNames = EntityNode.ModelFields.Keys;
 
         foreach (var (entityTypeName, entityTypeModel) in entityTypes)
         {
             var entityTypeFieldNames = entityTypeModel.ModelFields.Keys;
             foreach (var entityTypeFieldName in entityTypeFieldNames)
             {
-                if (Array.IndexOf(entityNodeFieldNames, entityTypeFieldName) >= 0)
+                if (entityNodeFieldNames.Contains(entityTypeFieldName))
                 {
                     throw new EntityTypeValidationException(entityTypeName, entityTypeFieldName);
                 }

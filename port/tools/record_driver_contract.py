@@ -10,10 +10,8 @@ Sections of the recording:
 
 - parsers: the four *_from_record functions with generated records. Each field is missing, then it
   takes each value of a pool (None, a wrong type, a date as text, as a datetime, as an int), then
-  random combinations from a fixed seed. A case that holds a value which the port cannot read with
-  the same result carries "gap": "O4" (RULES.md Part 5, open item O4): a date field that is not text,
-  None, or a datetime, and an episode source that is not text. The test then checks the type of the
-  error of the port, and nothing else.
+  random combinations from a fixed seed, and a bad label together with another field error. The test
+  compares each case with Python in full.
 - neighbor: Neighbor(**data) with each field missing and with values of a wrong type.
 - label_propagation: generated graphs. The function does not end for some inputs (upstream defect U11).
   The tool stops such a call after 0.02 seconds and counts it in "nonterminating". The test runs only
@@ -29,8 +27,7 @@ if the file differs from what the run would write. The tool needs Python 3.12 an
 
 Inputs that the port cannot reproduce by a rule are left out: a record value that is not None and
 not of the type that the code calls a method on (attributes, labels, and group_id of an entity
-record, and attributes of an edge record), a label error together with another field error of
-the same record (as for packet P2a), and an edge_count that a 64-bit integer cannot hold (R7).
+record, and attributes of an edge record), and an edge_count that a 64-bit integer cannot hold (R7).
 """
 from __future__ import annotations
 
@@ -104,10 +101,6 @@ def copy_record(record):
     return copy.deepcopy(record)
 
 
-def is_gap_date(value):
-    return value is not None and not isinstance(value, (str, datetime))
-
-
 # ---------- parsers ----------
 
 def parser_specs():
@@ -153,9 +146,6 @@ def parser_specs():
     }
 
 
-DATE_FIELDS = {'created_at', 'valid_at', 'expired_at', 'invalid_at', 'reference_time'}
-
-
 def parser_cases(rng):
     cases = []
     for function, (base, pools) in parser_specs().items():
@@ -167,6 +157,13 @@ def parser_cases(rng):
         for field, values in pools.items():
             for value in values:
                 cases.append({'function': function, 'record': {**copy_record(base), field: value}})
+        if function == 'entity_node_from_record':
+            # A bad label together with another field error: pydantic reports both, in field order.
+            for other in [{'summary': None}, {'name': None}, {'created_at': 'nope'}, {'summary': None, 'name_embedding': ['x']}, {'uuid': 5}]:
+                cases.append({'function': function, 'record': {**copy_record(base), 'labels': ['Bad Label', 'Entity_abc'], **other}})
+            missing = copy_record(base)
+            del missing['name']
+            cases.append({'function': function, 'record': {**missing, 'labels': ['Bad Label']}})
         for _ in range(40):
             record = copy_record(base)
             for field, values in pools.items():
@@ -175,9 +172,6 @@ def parser_cases(rng):
                     del record[field]
                 elif roll < 0.5:
                     record[field] = rng.choice(values)
-            if function == 'entity_node_from_record' and record.get('labels') in (['Bad Label'], ['Entity_a-b-c']):
-                # A label error together with another field error has no rule (see the header).
-                record['labels'] = ['Entity']
             cases.append({'function': function, 'record': record})
     return cases
 
@@ -187,12 +181,7 @@ def run_parser(case):
 
     record = copy_record(case['record'])
     function = case['function']
-    gap = any(is_gap_date(record.get(field)) for field in DATE_FIELDS if field in record)
-    if function == 'episodic_node_from_record' and 'source' in record and not isinstance(record['source'], str):
-        gap = True
     entry = {'function': function, 'record': encode_kwargs(case['record'])}
-    if gap:
-        entry['gap'] = 'O4'
     try:
         node = getattr(record_parsers, function)(record)
         entry['error'] = None

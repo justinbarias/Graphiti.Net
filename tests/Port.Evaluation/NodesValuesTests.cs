@@ -1,6 +1,9 @@
 // Evaluation test for graphiti_core/nodes.py (port/RULES.md, R7, R23, R25).
 // The recording is values/nodes.json, which port/tools/record_nodes.py wrote from Python.
-// The fakes are at the network boundary: the graph driver, its session, the graph operations interface, and the embedder.
+// The fakes replace the graph driver, its session, the graph operations interface, and the embedder. They are not the network
+// boundary: the judge has no case for an async method of this module, so this recording is the evidence for those methods.
+// The calls and the log lines are one list in the order of their time. Each fake method yields before it records its call,
+// so a call that the code does not await lands after the method returned and the test sees a missing call.
 namespace Graphiti.Port.Evaluation;
 
 using System.Text.Json;
@@ -200,6 +203,10 @@ public partial class NodesValuesTests
                         {
                             Assert.True(e.GetProperty("same").GetBoolean() == ReferenceEquals(((EntityNode)copy).Attributes["nested"], ((EntityNode)node).Attributes["nested"]), label);
                         }
+                        else if (field == "episode_metadata.nested")
+                        {
+                            Assert.True(e.GetProperty("same").GetBoolean() == ReferenceEquals(((EpisodicNode)copy).EpisodeMetadata!["n"], ((EpisodicNode)node).EpisodeMetadata!["n"]), label);
+                        }
                         else
                         {
                             Assert.True(e.GetProperty("same").GetBoolean() == ReferenceEquals(Field(copy, field), Field(node, field)), label);
@@ -219,7 +226,7 @@ public partial class NodesValuesTests
         var input = entry.GetProperty("input");
         var output = entry.GetProperty("output");
         var calls = new List<JsonObject>();
-        var capture = new CaptureProvider();
+        var capture = new CaptureProvider(calls);
         using var factory = new CaptureFactory(capture);
         using var scope = PortServices.Use(loggerFactory: factory);
         var token = TestContext.Current.CancellationToken;
@@ -234,17 +241,12 @@ public partial class NodesValuesTests
             var moduleError = await CatchAsync(() => Nodes.CreateEntityNodeEmbeddingsAsync(new FakeEmbedder(calls, input.GetProperty("embeddings").GetString()!), built, token));
             AssertOutcome(output.GetProperty("error"), moduleError);
             AssertCalls(output.GetProperty("calls"), calls);
-            Assert.Equal(Lines(output.GetProperty("logs")), capture.Lines);
 
-            // PORT: zip(strict=True) assigns the pairs before it finds the short or long side. Part 3 of the rulebook compares
-            // the counts first, so after an error the port assigned no embedding. The report of packet P2a names the difference.
-            if (moduleError is null)
+            // zip(strict=True) assigns each pair before it finds the short or long side, so the embeddings are compared after an error too.
+            Assert.Equal(output.GetProperty("embeddings").EnumerateArray().Count(), built.Count);
+            foreach (var (expected, entity) in output.GetProperty("embeddings").EnumerateArray().Zip(built))
             {
-                Assert.Equal(output.GetProperty("embeddings").EnumerateArray().Count(), built.Count);
-                foreach (var (expected, entity) in output.GetProperty("embeddings").EnumerateArray().Zip(built))
-                {
-                    AssertSame(expected, Encode(entity.NameEmbedding));
-                }
+                AssertSame(expected, Encode(entity.NameEmbedding));
             }
 
             return;
@@ -288,17 +290,23 @@ public partial class NodesValuesTests
                 case (_, "save"):
                     await node!.SaveAsync(driver, token);
                     break;
+                case ("Node", "delete_by_group_id") when !args.ContainsKey("batch_size"):
+                    await Node.DeleteByGroupIdAsync(driver, Str("group_id"), cancellationToken: token);
+                    break;
                 case ("Node", "delete_by_group_id"):
                     await Node.DeleteByGroupIdAsync(driver, Str("group_id"), Py.AsLong(Arg("batch_size")), token);
+                    break;
+                case ("Node", "delete_by_uuids") when !args.ContainsKey("batch_size"):
+                    await Node.DeleteByUuidsAsync(driver, Strs("uuids"), cancellationToken: token);
                     break;
                 case ("Node", "delete_by_uuids"):
                     await Node.DeleteByUuidsAsync(driver, Strs("uuids"), Py.AsLong(Arg("batch_size")), token);
                     break;
                 case ("EpisodicNode", "get_by_uuid"):
-                    result = DumpNode(await EpisodicNode.GetByUuidAsync(driver, Str("uuid"), OptStr("group_id"), token));
+                    result = DumpResult(await EpisodicNode.GetByUuidAsync(driver, Str("uuid"), OptStr("group_id"), token));
                     break;
                 case ("EpisodicNode", "get_by_uuids"):
-                    result = DumpNodes(await EpisodicNode.GetByUuidsAsync(driver, Strs("uuids"), OptStr("group_id"), Bool("require_all"), token));
+                    result = DumpResult(await EpisodicNode.GetByUuidsAsync(driver, Strs("uuids"), OptStr("group_id"), Bool("require_all"), token));
                     break;
                 case ("EpisodicNode", "get_by_group_ids"):
                     result = DumpNodes(await EpisodicNode.GetByGroupIdsAsync(driver, Strs("group_ids"), OptLong("limit"), OptStr("uuid_cursor"), token));
@@ -326,6 +334,14 @@ public partial class NodesValuesTests
                     break;
                 case ("EntityNode", "get_by_names"):
                     result = DumpNodes(await EntityNode.GetByNamesAsync(driver, Strs("names"), Strs("group_ids"), token));
+                    break;
+                case ("EntityNode", "get_by_attribute_values") when !args.ContainsKey("limit"):
+                    result = DumpNodes(await EntityNode.GetByAttributeValuesAsync(
+                        driver,
+                        Str("group_id"),
+                        Py.AsDict(Arg("attributes")),
+                        Arg("labels") is null ? null : Strs("labels"),
+                        cancellationToken: token));
                     break;
                 case ("EntityNode", "get_by_attribute_values"):
                     result = DumpNodes(await EntityNode.GetByAttributeValuesAsync(
@@ -364,7 +380,6 @@ public partial class NodesValuesTests
 
         AssertOutcome(output.GetProperty("error"), error);
         AssertCalls(output.GetProperty("calls"), calls);
-        Assert.Equal(Lines(output.GetProperty("logs")), capture.Lines);
         if (output.TryGetProperty("result", out var expectedResult))
         {
             AssertSame(expectedResult, (JsonNode?)result);
@@ -404,7 +419,7 @@ public partial class NodesValuesTests
         _ => throw new InvalidOperationException(className),
     };
 
-    // The keyword arguments of base_kwargs in the recorder, with the attributes of its copies section.
+    // The keyword arguments of base_kwargs in the recorder, with the attributes and the episode metadata of its copies section.
     private static OrderedDictionary<string, object?> BaseKwargs(string className)
     {
         var t0 = PyDateTime.FromDateTimeOffset(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -425,7 +440,10 @@ public partial class NodesValuesTests
                 d["content"] = "user: 你好 😀";
                 d["valid_at"] = t0;
                 d["entity_edges"] = new List<object?> { "e1" };
-                d["episode_metadata"] = new OrderedDictionary<string, object?> { ["k"] = "v" };
+                d["episode_metadata"] = new OrderedDictionary<string, object?>
+                {
+                    ["n"] = new OrderedDictionary<string, object?> { ["k"] = new List<object?> { 1L } },
+                };
                 break;
             case "EntityNode":
                 d["name_embedding"] = new List<object?> { 0.5, 1.0 };
@@ -520,6 +538,15 @@ public partial class NodesValuesTests
         return new JsonObject { ["class"] = node.PythonName, ["dump"] = Encode(data) };
     }
 
+    // A graph operations interface can return None, and Python returns it as it is (the else branch of get_by_uuid and get_by_uuids).
+    private static JsonNode DumpResult(object? result) => result switch
+    {
+        null => Encode(null),
+        Node node => DumpNode(node),
+        System.Collections.IEnumerable nodes => new JsonArray([.. nodes.Cast<Node>().Select(n => (JsonNode?)DumpNode(n))]),
+        _ => throw new InvalidOperationException(result.GetType().Name),
+    };
+
     private static JsonArray DumpNodes<T>(List<T> nodes)
         where T : Node => [.. nodes.Select(n => (JsonNode?)DumpNode(n))];
 
@@ -599,9 +626,6 @@ public partial class NodesValuesTests
             Assert.True(JsonNode.DeepEquals(e, actual[i]), $"call {i}: expected {e.ToJsonString()} but got {actual[i].ToJsonString()}");
         }
     }
-
-    private static List<(string?, string?)> Lines(JsonElement logs) =>
-        [.. logs.EnumerateArray().Select(l => (l.GetProperty("level").GetString(), l.GetProperty("message").GetString()))];
 
     private static void AssertSame(JsonElement expected, JsonNode? actual) =>
         Assert.True(
@@ -699,13 +723,15 @@ public partial class NodesValuesTests
 
         internal override string PythonName => "FakeDriver";
 
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(Call("executor", cypherQuery, parameters));
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>((records, null, null));
+            return (records, null, null);
         }
 
         internal override GraphDriverSession Session(string? database = null)
@@ -730,22 +756,24 @@ public partial class NodesValuesTests
 
     private sealed class FakeSession(List<JsonObject> calls) : GraphDriverSession
     {
-        public override ValueTask DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            await Task.Yield();
             calls.Add(new JsonObject { ["via"] = "session_exit" });
-            return ValueTask.CompletedTask;
         }
 
-        internal override Task RunAsync(string query, OrderedDictionary<string, object?> parameters, CancellationToken cancellationToken = default)
+        internal override async Task RunAsync(string query, OrderedDictionary<string, object?> parameters, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(Call("session", query, parameters));
-            return Task.CompletedTask;
         }
 
-        internal override Task CloseAsync(CancellationToken cancellationToken = default)
+        internal override async Task CloseAsync(CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(new JsonObject { ["via"] = "session_close" });
-            return Task.CompletedTask;
         }
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
@@ -754,22 +782,26 @@ public partial class NodesValuesTests
 
     private sealed class FakeEmbedder(List<JsonObject> calls, string mode) : EmbedderClient
     {
-        internal override Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
+        internal override async Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(Named("embedder", "create", inputData));
-            return Task.FromResult<List<double>>([(double)Py.Len(inputData[0]), 0.5]);
+            return [(double)Py.Len(inputData[0]), 0.5];
         }
 
-        internal override Task<List<List<double>>> CreateBatchAsync(List<string> inputDataList, CancellationToken cancellationToken = default)
+        internal override async Task<List<List<double>>> CreateBatchAsync(List<string> inputDataList, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(Named("embedder", "create_batch", inputDataList));
             List<List<double>> result = [.. inputDataList.Select(text => new List<double> { Py.Len(text), 1.0 })];
-            return Task.FromResult<List<List<double>>>(mode switch
+            return mode switch
             {
                 "short" => result[..^1],
                 "long" => [.. result, [9.0]],
                 _ => result,
-            });
+            };
         }
     }
 
@@ -847,16 +879,17 @@ public partial class NodesValuesTests
         internal override Task<List<SagaNode>> SagaNodeGetByGroupIdsAsync(Type? cls, GraphDriver driver, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default) =>
             Get<List<SagaNode>>("saga_node_get_by_group_ids", cls, groupIds, limit, uuidCursor);
 
-        private Task Done(string name, params object?[] args)
+        private async Task Done(string name, params object?[] args)
         {
+            await Task.Yield();
             Calls.Add(Named("ops", name, args));
-            return Task.CompletedTask;
         }
 
-        private Task<T> Get<T>(string name, params object?[] args)
+        private async Task<T> Get<T>(string name, params object?[] args)
         {
+            await Task.Yield();
             Calls.Add(Named("ops", name, args));
-            return Task.FromResult((T)Value!);
+            return (T)Value!;
         }
     }
 
@@ -873,17 +906,16 @@ public partial class NodesValuesTests
         }
     }
 
-    private sealed class CaptureProvider : ILoggerProvider
+    // A log line of the Nodes logger goes into the list of the calls, so the order of a log line and a call is checked.
+    private sealed class CaptureProvider(List<JsonObject> calls) : ILoggerProvider
     {
-        internal List<(string?, string?)> Lines { get; } = [];
-
-        public ILogger CreateLogger(string categoryName) => new CaptureLogger(categoryName == typeof(Nodes).FullName ? Lines : []);
+        public ILogger CreateLogger(string categoryName) => new CaptureLogger(categoryName == typeof(Nodes).FullName ? calls : []);
 
         public void Dispose()
         {
         }
 
-        private sealed class CaptureLogger(List<(string?, string?)> lines) : ILogger
+        private sealed class CaptureLogger(List<JsonObject> lines) : ILogger
         {
             public IDisposable? BeginScope<TState>(TState state)
                 where TState : notnull => null;
@@ -891,7 +923,12 @@ public partial class NodesValuesTests
             public bool IsEnabled(LogLevel logLevel) => true;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-                lines.Add((logLevel == LogLevel.Debug ? "DEBUG" : logLevel.ToString().ToUpperInvariant(), Elapsed().Replace(formatter(state, exception), " in <elapsed> ms")));
+                lines.Add(new JsonObject
+                {
+                    ["via"] = "log",
+                    ["level"] = logLevel == LogLevel.Debug ? "DEBUG" : logLevel.ToString().ToUpperInvariant(),
+                    ["message"] = Elapsed().Replace(formatter(state, exception), " in <elapsed> ms"),
+                });
         }
     }
 }

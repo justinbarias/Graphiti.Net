@@ -99,13 +99,15 @@ public partial class TestEpisodeGroupIsolation
 
         internal override string PythonName => "StubDriver";
 
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        // The call is recorded after a yield, so a call that the code does not await is not seen by the assertion.
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
             Calls.Add((cypherQuery, parameters));
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>((records, null, null));
+            return (records, null, null);
         }
 
         internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");
@@ -120,8 +122,10 @@ public partial class TestEpisodeGroupIsolation
 
     private sealed record ForeignEpisodeOperations : GraphOperationsInterface
     {
-        internal override Task<EpisodicNode> EpisodicNodeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new EpisodicNode
+        internal override async Task<EpisodicNode> EpisodicNodeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            return new EpisodicNode
             {
                 Uuid = uuid,
                 Name = "foreign",
@@ -130,6 +134,7 @@ public partial class TestEpisodeGroupIsolation
                 SourceDescription = "test",
                 Content = "foreign content",
                 ValidAt = PyDateTime.FromDateTimeOffset(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)),
-            }.Validate());
+            }.Validate();
+        }
     }
 }

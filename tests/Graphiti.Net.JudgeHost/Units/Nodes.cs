@@ -2,6 +2,7 @@ namespace Graphiti.JudgeHost.Units;
 
 using System.Text.Json.Nodes;
 using Graphiti.Core;
+using Graphiti.Internal;
 using Graphiti.JudgeHost.Core;
 using Graphiti.PyCompat;
 
@@ -70,6 +71,21 @@ internal static class NodesBindings
                 new("last_summarized_at", m.LastSummarizedAt),
                 new("last_summarized_episode_valid_at", m.LastSummarizedEpisodeValidAt),
             ]);
+
+        // The cases pass the model class as a custom type, and the code reads its model_fields (R22).
+        // PORT: the descriptor cannot give the kind of created_at and attributes (open item O4).
+        table.Registry.AddRef(
+            Module + ":EntityNode",
+            new GraphTypeDescriptor(
+                "EntityNode",
+                null,
+                EntityNode.ModelFields.Select(field => new GraphFieldDescriptor(
+                    field.Key,
+                    field.Key == "name_embedding" ? GraphFieldKind.Number : GraphFieldKind.String,
+                    field.Key is "labels" or "name_embedding",
+                    null,
+                    field.Value.IsRequired,
+                    null))));
 
         table.Schemas.Add(Module + ":EpisodicNode", EpisodicNode.ModelJsonSchema);
         table.Schemas.Add(Module + ":EntityNode", EntityNode.ModelJsonSchema);

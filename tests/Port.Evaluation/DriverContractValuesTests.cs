@@ -42,7 +42,7 @@ public partial class DriverContractValuesTests
             Assert.Contains(parsers, p => p.GetProperty("error") is { ValueKind: JsonValueKind.Object } e && e.GetProperty("type").GetString() == type);
         }
 
-        Assert.Contains(parsers, p => p.TryGetProperty("gap", out _));
+        Assert.Contains(parsers, p => p.GetProperty("function").GetString() == "episodic_node_from_record" && p.GetProperty("error") is { ValueKind: JsonValueKind.Object } e && e.GetProperty("type").GetString() == "NotImplementedError");
         Assert.True(Root.GetProperty("label_propagation").GetArrayLength() > 50);
     }
 
@@ -60,20 +60,6 @@ public partial class DriverContractValuesTests
             "episodic_node_from_record" => RecordParsers.EpisodicNodeFromRecord(record),
             _ => RecordParsers.CommunityNodeFromRecord(record),
         }));
-        if (entry.TryGetProperty("gap", out _))
-        {
-            // PORT: open item O4 (RULES.md Part 5). Python parse_db_date and EpisodeType.from_str pass a value of another
-            // type on, and the C# parameter is typed. The port throws InvalidCastException.
-            // A record that also has a missing key, or a None for a value that a method is called on, can fail in Python after the
-            // typed read of the date. The port fails at the date. A record where both give the same error is compared in full.
-            if (error is not InvalidCastException)
-            {
-                AssertOutcome(entry.GetProperty("error"), error);
-            }
-
-            return;
-        }
-
         AssertOutcome(entry.GetProperty("error"), error);
         if (error is null)
         {

@@ -110,13 +110,15 @@ public partial class TestIdentityProperties
 
         internal override string PythonName => "MagicMock";
 
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        // The call is recorded after a yield, so a call that the code does not await is not seen by the assertion.
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
             ExecuteQueryCalls.Add((cypherQuery, parameters));
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>(([], new List<object?>(), null));
+            return ([], new List<object?>(), null);
         }
 
         internal override GraphDriver Clone(string database)

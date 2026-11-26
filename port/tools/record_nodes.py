@@ -16,15 +16,18 @@ Sections of the recording:
   create_entity_node_embeddings. A fake driver records each call to the executor, to a session, and
   to the graph operations interface. Each method runs for each provider and in three modes: no
   graph operations interface, an interface that raises NotImplementedError, and an interface that
-  returns a value. A fake embedder stands in for the embedding client.
+  returns a value. A fake embedder stands in for the embedding client. The calls and the log lines
+  of one run are one list in the order of their time, so the order of a log line and a driver call
+  is part of the recording.
 
 The tool writes tests/Port.Evaluation/values/nodes.json. --check writes nothing and exits 1 if the
 file differs from what the run would write. The tool needs Python 3.12 and the pinned upstream in
 .upstream/graphiti. It changes nothing there. Nothing here uses the network.
 
-Inputs that the port cannot reproduce by a rule are left out, and the report of plan 0004 packet P2a
-names them: CommunityNode.save on Neptune (driver.save_to_aoss), a label error together with another
-field error, and record values that are not None and not of the type that the code calls a method on.
+Inputs that the port cannot reproduce by a rule are left out, and the reports of plan 0004 packet P2a
+and its fix round name them: CommunityNode.save on Neptune (driver.save_to_aoss), a record value that
+is not None and not of the type that the code calls a method on, and a graph operations interface that
+returns None for get_by_uuids with a group id or with require_all (Python raises TypeError there).
 """
 from __future__ import annotations
 
@@ -170,6 +173,12 @@ def pools(cls_name):
 
 
 CLASS_NAMES = ['EpisodicNode', 'EntityNode', 'CommunityNode', 'SagaNode']
+OTHER_BAD = {
+    'EpisodicNode': {'source': 'html'},
+    'EntityNode': {'summary': None},
+    'CommunityNode': {'summary': None},
+    'SagaNode': {'last_summarized_at': 'soon'},
+}
 
 
 def construct_cases(rng):
@@ -183,6 +192,12 @@ def construct_cases(rng):
             out.append({'class': cls_name, 'kwargs': missing})
             for value in values:
                 out.append({'class': cls_name, 'kwargs': {**base, field: value}})
+        # A bad label together with another field error: pydantic reports both, in field order.
+        for other in [{'name': 5}, {'name': None}, {'created_at': 'x'}, OTHER_BAD[cls_name], {'name': 5, 'created_at': 'x'}]:
+            out.append({'class': cls_name, 'kwargs': {**base, 'labels': ['Bad Label'], **other}})
+        missing = dict(base)
+        del missing['name']
+        out.append({'class': cls_name, 'kwargs': {**missing, 'labels': ['Bad Label', 'Worse Label']}})
         for _ in range(25):
             kwargs = {}
             for field, values in pools(cls_name).items():
@@ -209,7 +224,7 @@ def record_cases():
     episodic_values = {
         'created_at': [None, 'not-a-date', '2026-01-01T00:00:00', T0],
         'valid_at': [None, '2025-12-31 23:00:00+00:00'],
-        'source': ['html', 'fact_triple', 'message'],
+        'source': ['html', 'fact_triple', 'message', None, 5],
         'entity_edges': [None, 'e1', [1]],
         'uuid': [None, 5],
         'name': [None],
@@ -232,10 +247,13 @@ def record_cases():
         'name_embedding': [None, ['x'], 'abc'],
         'created_at': [None, 'nope', T1],
         'summary': [None, 5],
-        'attributes': [{}, {'k': [1, {'n': None}]}],
+        'attributes': [{}, {'k': [1, {'n': None}]}, None],
         'uuid': [5],
     }
     out.extend(variants('get_entity_node_from_record', entity, entity_values))
+    # A bad label together with another field error (the record helper passes labels only for an entity node).
+    for other in [{'summary': None}, {'name': None}, {'created_at': 'nope'}, {'summary': None, 'name_embedding': ['x']}]:
+        out.append({'function': 'get_entity_node_from_record', 'record': {**entity, 'labels': ['Bad Label', 'Entity_abc'], **other}})
     community = {
         'uuid': 'c1',
         'name': 'C',
@@ -333,9 +351,11 @@ def method_cases():
 
     specs = []
 
-    def add(cls_name, method, args, record_sets, instance=False, ops_list=False, ops_returns=True):
+    def add(cls_name, method, args, record_sets, instance=False, ops_list=False, ops_returns=True, node=None, only_return=False):
         specs.append(
             {
+                'node': node,
+                'only_return': only_return,
                 'class': cls_name,
                 'method': method,
                 'args': args,
@@ -350,6 +370,9 @@ def method_cases():
         add(cls_name, 'delete', {}, [[]], instance=True, ops_returns=False)
     add('Node', 'delete_by_group_id', {'group_id': 'g-1', 'batch_size': 100}, [[]], ops_returns=False)
     add('Node', 'delete_by_group_id', {'group_id': 'grüp', 'batch_size': 7}, [[]], ops_returns=False)
+    # No batch_size: the default of the parameter is part of the contract.
+    add('Node', 'delete_by_group_id', {'group_id': 'g-1'}, [[]], ops_returns=False)
+    add('Node', 'delete_by_uuids', {'uuids': ['a']}, [[]], ops_returns=False)
     add('Node', 'delete_by_uuids', {'uuids': ['a', 'b'], 'batch_size': 100}, [[]], ops_returns=False)
     add('Node', 'delete_by_uuids', {'uuids': [], 'batch_size': 3}, [[]], ops_returns=False)
 
@@ -366,11 +389,16 @@ def method_cases():
                 ops_list=True,
             )
     add('EpisodicNode', 'get_by_uuids', {'uuids': [], 'group_id': None, 'require_all': True}, [[]], ops_list=True)
+    # A graph operations interface that returns None: the else branch of try/except/else runs, and Python returns the value as it is.
+    add('EpisodicNode', 'get_by_uuid', {'uuid': 'ep1', 'group_id': None}, [[]], ops_returns=False, only_return=True)
+    add('EpisodicNode', 'get_by_uuid', {'uuid': 'ep1', 'group_id': 'g-1'}, [[]], ops_returns=False, only_return=True)
+    add('EpisodicNode', 'get_by_uuids', {'uuids': ['ep1'], 'group_id': None, 'require_all': False}, [[]], ops_returns=False, only_return=True)
     for limit, cursor in [(None, None), (5, 'ep9'), (0, ''), (None, 'ep9')]:
         add('EpisodicNode', 'get_by_group_ids', {'group_ids': ['g-1'], 'limit': limit, 'uuid_cursor': cursor}, [[], [episodic_record]], ops_list=True)
     add('EpisodicNode', 'get_by_entity_node_uuid', {'entity_node_uuid': 'n1'}, [[], [episodic_record, episodic_other]], ops_list=True)
 
     add('EntityNode', 'generate_name_embedding', {}, [[]], instance=True)
+    add('EntityNode', 'generate_name_embedding', {}, [[]], instance=True, node={'name': 'a\nb'})
     add('EntityNode', 'load_name_embedding', {}, [[], [{'name_embedding': [1, 2.5]}], [{'name_embedding': None}], [{'name_embedding': ['x']}], [{}], [{'name_embedding': ['1.5']}, {'name_embedding': [9]}]], instance=True, ops_returns=False)
     add('EntityNode', 'save', {}, [[]], instance=True, ops_returns=False)
     add('EntityNode', 'get_by_uuid', {'uuid': 'n1'}, [[], [entity_record]])
@@ -395,11 +423,14 @@ def method_cases():
         ({'email\n': 1}, None, 15),
     ]:
         add('EntityNode', 'get_by_attribute_values', {'group_id': 'g-1', 'attributes': attributes, 'labels': labels, 'limit': limit}, [[entity_record]], ops_list=True)
+    # No limit: the default of the parameter is NODE_DEDUP_CANDIDATE_LIMIT.
+    add('EntityNode', 'get_by_attribute_values', {'group_id': 'g-1', 'attributes': {'email': 'a@b'}, 'labels': ['Person']}, [[entity_record]], ops_list=True)
     for limit, cursor, with_embeddings in [(None, None, False), (5, 'n9', True), (None, '', True)]:
         add('EntityNode', 'get_by_group_ids', {'group_ids': ['g-1'], 'limit': limit, 'uuid_cursor': cursor, 'with_embeddings': with_embeddings}, [[], [entity_record]], ops_list=True)
 
     add('CommunityNode', 'save', {}, [[]], instance=True, ops_returns=False)
     add('CommunityNode', 'generate_name_embedding', {}, [[]], instance=True)
+    add('CommunityNode', 'generate_name_embedding', {}, [[]], instance=True, node={'name': 'a\nb'})
     add('CommunityNode', 'load_name_embedding', {}, [[], [{'name_embedding': [3]}], [{'name_embedding': 'x'}]], instance=True, ops_returns=False)
     add('CommunityNode', 'get_by_uuid', {'uuid': 'c1'}, [[], [community_record]])
     add('CommunityNode', 'get_by_uuids', {'uuids': ['c1']}, [[], [community_record]], ops_list=True)
@@ -422,6 +453,8 @@ def method_cases():
                     continue
                 if spec['class'] == 'CommunityNode' and spec['method'] == 'save' and provider == 'neptune' and mode != 'return':
                     continue
+                if spec['only_return'] and mode != 'return':
+                    continue
                 record_sets = spec['record_sets'] if mode != 'return' else [[]]
                 for records in record_sets:
                     case = {
@@ -433,7 +466,7 @@ def method_cases():
                         'records': records,
                     }
                     if spec['instance']:
-                        case['node'] = nodes[spec['class']]
+                        case['node'] = {**nodes[spec['class']], **(spec['node'] or {})}
                     if mode == 'return' and spec['ops_returns']:
                         returned = ops_nodes[spec['class']]
                         case['ops_result'] = returned if spec['ops_list'] else returned[:1]
@@ -461,15 +494,17 @@ def main() -> int:
 
     classes = {'EpisodicNode': EpisodicNode, 'EntityNode': EntityNode, 'CommunityNode': CommunityNode, 'SagaNode': SagaNode, 'Node': Node}
 
+    # The calls and the log lines of one run share this list, so that their order is recorded.
+    calls = []
+
     class Capture(logging.Handler):
         def __init__(self):
             super().__init__(logging.DEBUG)
-            self.lines = []
 
         def emit(self, record):
             message = record.getMessage()
             message = re.sub(r' in [-0-9.e+]+ ms$', ' in <elapsed> ms', message)
-            self.lines.append({'level': record.levelname, 'message': message})
+            calls.append({'via': 'log', 'level': record.levelname, 'message': message})
 
     capture = Capture()
     logger = logging.getLogger(nodes_module.__name__)
@@ -478,7 +513,7 @@ def main() -> int:
     logger.addHandler(capture)
 
     def run(make):
-        capture.lines.clear()
+        calls.clear()
         try:
             return {'value': make(), 'error': None}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -550,6 +585,8 @@ def main() -> int:
         kwargs = base_kwargs(cls_name)
         if cls_name == 'EntityNode':
             kwargs['attributes'] = {'nested': {'k': [1]}, 'n': 1}
+        if cls_name == 'EpisodicNode':
+            kwargs['episode_metadata'] = {'n': {'k': [1]}}
         for field in fields:
             value = kwargs[field]
             node = cls(**kwargs)
@@ -572,6 +609,8 @@ def main() -> int:
                 copies.append({'class': cls_name, 'field': field, 'op': op, 'same': getattr(copy, field) is getattr(node, field)})
             if cls_name == 'EntityNode':
                 copies.append({'class': cls_name, 'field': 'attributes.nested', 'op': op, 'same': copy.attributes['nested'] is node.attributes['nested']})
+            if cls_name == 'EpisodicNode':
+                copies.append({'class': cls_name, 'field': 'episode_metadata.nested', 'op': op, 'same': copy.episode_metadata['n'] is node.episode_metadata['n']})
             if cls_name == 'SagaNode':
                 copies.append(
                     {
@@ -589,8 +628,6 @@ def main() -> int:
             copies.append({'class': cls_name, 'field': 'dump', 'op': op, 'same': copy.model_dump() == node.model_dump()})
 
     # methods
-    calls = []
-
     class FakeSession(GraphDriverSession):
         async def run(self, query, **kwargs):
             calls.append({'via': 'session', 'query': query, 'keys': list(kwargs), 'values': [encode(v) for v in kwargs.values()]})
@@ -671,7 +708,6 @@ def main() -> int:
     methods = []
     for case in method_cases():
         calls.clear()
-        capture.lines.clear()
         if case['class'] == 'module':
             built = [EntityNode(uuid=f'n{i}', name=name, group_id='g', created_at=T0) for i, name in enumerate(case['names'])]
             outcome = {}
@@ -681,7 +717,6 @@ def main() -> int:
             except Exception as error:  # noqa: BLE001
                 outcome['error'] = error_of(error)
             outcome['calls'] = list(calls)
-            outcome['logs'] = list(capture.lines)
             outcome['embeddings'] = [encode(n.name_embedding) for n in built]
             methods.append({'input': {'class': 'module', 'method': case['method'], 'names': case['names'], 'embeddings': case['embeddings']}, 'output': outcome})
             continue
@@ -717,7 +752,6 @@ def main() -> int:
         except Exception as error:  # noqa: BLE001
             outcome['error'] = error_of(error)
         outcome['calls'] = list(calls)
-        outcome['logs'] = list(capture.lines)
         if node is not None:
             outcome['node'] = dump(node)
         entry = {

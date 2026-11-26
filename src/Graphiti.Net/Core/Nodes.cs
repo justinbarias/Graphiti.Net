@@ -74,29 +74,31 @@ internal enum EpisodeType
 /// <summary>The static methods of the Python class <c>EpisodeType</c> (rule R7).</summary>
 internal static class EpisodeTypeExtensions
 {
-    internal static EpisodeType FromStr(string episodeType)
+    // PORT: the Python parameter is typed str, and the body accepts each value (R22). The record helpers pass open data, so the
+    // parameter is object?, and a value that is not one of the four texts, also None or an int, takes the error path.
+    internal static EpisodeType FromStr(object? episodeType)
     {
-        if (episodeType == "message")
+        if (episodeType is "message")
         {
             return EpisodeType.Message;
         }
 
-        if (episodeType == "json")
+        if (episodeType is "json")
         {
             return EpisodeType.Json;
         }
 
-        if (episodeType == "text")
+        if (episodeType is "text")
         {
             return EpisodeType.Text;
         }
 
-        if (episodeType == "fact_triple")
+        if (episodeType is "fact_triple")
         {
             return EpisodeType.FactTriple;
         }
 
-        Nodes.Log.EpisodeTypeNotImplemented(Nodes.Logger, episodeType);
+        Nodes.Log.EpisodeTypeNotImplemented(Nodes.Logger, Py.Str(episodeType));
         throw new NotImplementedException(string.Empty);
     }
 }
@@ -124,11 +126,15 @@ internal abstract class Node
     // PORT: the pydantic error carries the name of the class of the instance (R15).
     internal abstract string PythonName { get; }
 
-    internal List<string> ValidateLabels(List<string> value, string? field = null)
+    // @field_validator('labels'). PORT: a static form that takes the class name, so that the reader of labels in each
+    // ModelValidate can call it, and pydantic keeps its error with the errors of the other fields (R7).
+    internal static List<string> ValidateLabels(List<string> value, string pythonName, string? field = null)
     {
-        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), PythonName, field);
+        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), pythonName, field);
         return value;
     }
+
+    internal List<string> ValidateLabels(List<string> value, string? field = null) => ValidateLabels(value, PythonName, field);
 
     internal abstract Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default);
 
@@ -354,8 +360,8 @@ internal sealed class EpisodicNode : Node, IPydanticModel
         var name = f.Required("name", Pydantic.Str);
         var groupId = f.Required("group_id", Pydantic.Str);
 
-        // PORT: validate_labels is an instance method (R7), so the set accessor of Labels runs it when the node is built.
-        var labels = f.Default("labels", v => Pydantic.List(v, Pydantic.Str), () => []);
+        // PORT: the reader of the field calls validate_labels, so its error stands in field order with the other errors (R7).
+        var labels = f.Default("labels", v => Node.ValidateLabels(Pydantic.List(v, Pydantic.Str), "EpisodicNode"), () => []);
         var createdAt = f.Default("created_at", Pydantic.DateTime, DatetimeUtils.UtcNow);
         var source = f.Required("source", Pydantic.Enum<EpisodeType>);
         var sourceDescription = f.Required("source_description", Pydantic.Str);
@@ -498,20 +504,25 @@ internal sealed class EpisodicNode : Node, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, else. The else block runs when the call returned, which the variable shows (Part 3).
-            EpisodicNode? episode = null;
+            // PORT: try, except, else. The flag shows that the call returned, because the result can be None (Part 3).
+            // The interface type holds no None, but Python returns the value as it is. A slot of the array keeps the result
+            // without an annotation, so the code needs no null-forgiving operator.
+            var slot = new EpisodicNode[1];
+            var returned = false;
             try
             {
-                episode = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidAsync(typeof(EpisodicNode), driver, uuid, cancellationToken);
+                slot[0] = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidAsync(typeof(EpisodicNode), driver, uuid, cancellationToken);
+                returned = true;
             }
             catch (NotImplementedException)
             {
                 // PORT: Python passes
             }
 
-            if (episode is not null)
+            if (returned)
             {
-                if (groupId is not null && episode.GroupId != groupId)
+                var episode = slot[0];
+                if (groupId is not null && Py.NotNone(episode, "group_id").GroupId != groupId)
                 {
                     throw new NodeNotFoundException(uuid);
                 }
@@ -573,19 +584,24 @@ internal sealed class EpisodicNode : Node, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, else. The else block runs when the call returned, which the variable shows (Part 3).
-            List<EpisodicNode>? found = null;
+            // PORT: try, except, else. The flag shows that the call returned, because the result can be None (Part 3).
+            // The interface type holds no None, but Python returns the value as it is. A slot of the array keeps the result
+            // without an annotation, so the code needs no null-forgiving operator.
+            var slot = new List<EpisodicNode>[1];
+            var returned = false;
             try
             {
-                found = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidsAsync(typeof(EpisodicNode), driver, uuids, cancellationToken);
+                slot[0] = await driver.GraphOperationsInterface.EpisodicNodeGetByUuidsAsync(typeof(EpisodicNode), driver, uuids, cancellationToken);
+                returned = true;
             }
             catch (NotImplementedException)
             {
                 // PORT: Python passes
             }
 
-            if (found is not null)
+            if (returned)
             {
+                var found = slot[0];
                 if (groupId is not null)
                 {
                     found = found.Where(episode => episode.GroupId == groupId).ToList();
@@ -761,8 +777,8 @@ internal sealed class EntityNode : Node, IPydanticModel
         var name = f.Required("name", Pydantic.Str);
         var groupId = f.Required("group_id", Pydantic.Str);
 
-        // PORT: validate_labels is an instance method (R7), so the set accessor of Labels runs it when the node is built.
-        var labels = f.Default("labels", v => Pydantic.List(v, Pydantic.Str), () => []);
+        // PORT: the reader of the field calls validate_labels, so its error stands in field order with the other errors (R7).
+        var labels = f.Default("labels", v => Node.ValidateLabels(Pydantic.List(v, Pydantic.Str), "EntityNode"), () => []);
         var createdAt = f.Default("created_at", Pydantic.DateTime, DatetimeUtils.UtcNow);
         var nameEmbedding = f.Default("name_embedding", v => Pydantic.Optional(v, x => Pydantic.List(x, Pydantic.Float)), () => null);
         var summary = f.Default("summary", Pydantic.Str, () => string.Empty);
@@ -803,6 +819,19 @@ internal sealed class EntityNode : Node, IPydanticModel
         .Default("name_embedding", PydanticType.Optional(PydanticType.List(PydanticType.Float)), null, "embedding of the name")
         .Factory("summary", PydanticType.Str, "regional summary of surrounding edges")
         .Default("attributes", PydanticType.Dict(PydanticType.Any), new OrderedDictionary<string, object?>(), "Additional attributes of the node. Dependent on node labels");
+
+    // M.model_fields (R7): the fields of Node first, then the fields of EntityNode. entity_types_utils.py reads the keys.
+    internal static readonly OrderedDictionary<string, PydanticField> ModelFields = new()
+    {
+        ["uuid"] = new PydanticField(false),
+        ["name"] = new PydanticField(true),
+        ["group_id"] = new PydanticField(true),
+        ["labels"] = new PydanticField(false),
+        ["created_at"] = new PydanticField(false),
+        ["name_embedding"] = new PydanticField(false),
+        ["summary"] = new PydanticField(false),
+        ["attributes"] = new PydanticField(false),
+    };
 
     internal EntityNode ModelCopy(bool deep = false)
     {
@@ -1202,8 +1231,8 @@ internal sealed class CommunityNode : Node, IPydanticModel
         var name = f.Required("name", Pydantic.Str);
         var groupId = f.Required("group_id", Pydantic.Str);
 
-        // PORT: validate_labels is an instance method (R7), so the set accessor of Labels runs it when the node is built.
-        var labels = f.Default("labels", v => Pydantic.List(v, Pydantic.Str), () => []);
+        // PORT: the reader of the field calls validate_labels, so its error stands in field order with the other errors (R7).
+        var labels = f.Default("labels", v => Node.ValidateLabels(Pydantic.List(v, Pydantic.Str), "CommunityNode"), () => []);
         var createdAt = f.Default("created_at", Pydantic.DateTime, DatetimeUtils.UtcNow);
         var nameEmbedding = f.Default("name_embedding", v => Pydantic.Optional(v, x => Pydantic.List(x, Pydantic.Float)), () => null);
         var summary = f.Default("summary", Pydantic.Str, () => string.Empty);
@@ -1512,8 +1541,8 @@ internal sealed class SagaNode : Node, IPydanticModel
         var name = f.Required("name", Pydantic.Str);
         var groupId = f.Required("group_id", Pydantic.Str);
 
-        // PORT: validate_labels is an instance method (R7), so the set accessor of Labels runs it when the node is built.
-        var labels = f.Default("labels", v => Pydantic.List(v, Pydantic.Str), () => []);
+        // PORT: the reader of the field calls validate_labels, so its error stands in field order with the other errors (R7).
+        var labels = f.Default("labels", v => Node.ValidateLabels(Pydantic.List(v, Pydantic.Str), "SagaNode"), () => []);
         var createdAt = f.Default("created_at", Pydantic.DateTime, DatetimeUtils.UtcNow);
         var summary = f.Default("summary", Pydantic.Str, () => string.Empty);
         var firstEpisodeUuid = f.Default("first_episode_uuid", v => Pydantic.Optional(v, Pydantic.Str), () => null);
@@ -1776,7 +1805,7 @@ internal static partial class Nodes
             ["valid_at"] = validAt,
             ["uuid"] = record["uuid"],
             ["group_id"] = record["group_id"],
-            ["source"] = EpisodeTypeExtensions.FromStr(Py.AsString(record["source"])),
+            ["source"] = EpisodeTypeExtensions.FromStr(record["source"]),
             ["name"] = record["name"],
             ["source_description"] = record["source_description"],
             ["entity_edges"] = record["entity_edges"],
@@ -1785,7 +1814,8 @@ internal static partial class Nodes
 
     internal static EntityNode GetEntityNodeFromRecord(OrderedDictionary<string, object?> record, GraphProvider provider)
     {
-        var attributes = Py.AsDict(record["attributes"]);
+        // PORT: attributes.pop(...) on a value from open data that can be None raises AttributeError (R4, Py.NotNone).
+        var attributes = Py.AsDict(Py.NotNone(record["attributes"], "pop"));
         attributes.Remove("uuid");
         attributes.Remove("name");
         attributes.Remove("group_id");
@@ -1869,16 +1899,8 @@ internal static partial class Nodes
 
         var nameEmbeddings = await embedder.CreateBatchAsync(filteredNodes.Select(node => node.Name).ToList(), cancellationToken);
 
-        // PORT: zip(strict=True) compares the counts first (Part 3).
-        if (filteredNodes.Count != nameEmbeddings.Count)
-        {
-            throw new ArgumentException(
-                nameEmbeddings.Count < filteredNodes.Count
-                    ? "zip() argument 2 is shorter than argument 1"
-                    : "zip() argument 2 is longer than argument 1");
-        }
-
-        foreach (var (node, nameEmbedding) in filteredNodes.Zip(nameEmbeddings))
+        // PORT: zip(strict=True) gives the pairs, and then it raises for the longer side, so the loop body runs first (Part 3, Py.ZipStrict).
+        foreach (var (node, nameEmbedding) in Py.ZipStrict(filteredNodes, nameEmbeddings))
         {
             node.NameEmbedding = nameEmbedding;
         }
