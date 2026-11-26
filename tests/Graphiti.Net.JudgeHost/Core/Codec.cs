@@ -1,7 +1,7 @@
+namespace Graphiti.JudgeHost.Core;
+
 using System.Globalization;
 using System.Text.Json.Nodes;
-
-namespace Graphiti.JudgeHost.Core;
 
 /// <summary>
 /// Encodes .NET values with the tags that port/judge/README.md defines.

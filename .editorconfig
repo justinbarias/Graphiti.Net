@@ -23,6 +23,8 @@ dotnet_diagnostic.CA2007.severity = none    # ConfigureAwait is not needed in ap
 dotnet_diagnostic.CS8600.severity = error   # null assigned to non-nullable
 dotnet_diagnostic.CS8602.severity = error   # possible null dereference
 dotnet_diagnostic.CS8604.severity = error   # possible null argument
+csharp_using_directive_placement = inside_namespace:error
+dotnet_diagnostic.IDE0065.severity = error  # a using directive goes inside the namespace (port/RULES.md, R1)
 
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none    # test names use underscores

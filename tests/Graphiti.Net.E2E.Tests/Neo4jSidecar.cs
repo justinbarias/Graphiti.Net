@@ -1,6 +1,6 @@
-using Neo4j.Driver;
-
 namespace Graphiti.E2E.Tests;
+
+using Neo4j.Driver;
 
 /// <summary>
 /// Connection to the Neo4j sidecar from docker-compose.yml. Every end-to-end test class shares it.

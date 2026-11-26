@@ -1,8 +1,8 @@
+namespace Graphiti.JudgeHost;
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Graphiti.JudgeHost.Core;
-
-namespace Graphiti.JudgeHost;
 
 /// <summary>
 /// Maps each judge function name to the ported method. A ported unit adds its entries here.
