@@ -47,9 +47,15 @@ internal sealed record GraphitiClients
 
     internal long? MaxCoroutines { get; set; }
 
+    /// <summary>
+    /// Resolve prompt text + fixed schema and call the LLM.
+    ///
+    /// Legacy path (no runtime): builder → ChatPrompt.as_messages → llm_client.generate_response.
+    /// Runtime path: LLMRuntime.complete. ``model_size`` is forwarded on both paths.
+    /// Schemas come from the immutable builtin registry, not the user library.
+    /// </summary>
     // PORT: the arguments after `context` are keyword-only in Python. `prompt_name: PromptName` is `string` (R7).
-    // TODO(port): GraphitiClients.complete_prompt
-    internal Task<OrderedDictionary<string, object?>> CompletePromptAsync(
+    internal async Task<OrderedDictionary<string, object?>> CompletePromptAsync(
         string promptName,
         OrderedDictionary<string, object?> context,
         IResponseModel? responseModel = null,
@@ -59,32 +65,66 @@ internal sealed record GraphitiClients
         long? maxTokens = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphitiClients.complete_prompt");
+        if (LlmRuntime is not null)
+        {
+            return await LlmRuntime.CompleteAsync(
+                promptName,
+                context,
+                responseModel: responseModel,
+                attributeExtraction: attributeExtraction,
+                groupId: groupId,
+                maxTokens: maxTokens,
+                modelSize: modelSize,
+                cancellationToken: cancellationToken);
+        }
+
+        var resolvedModel = Lib.ResolveResponseModel(promptName, responseModel);
+        IPromptLibrary library = PromptLibrary ?? Lib.DefaultChatPromptLibrary;
+        var builder = Lib.GetPromptBuilder(library, promptName);
+        var messages = builder(context).AsMessages();
+
+        return await LlmClient.GenerateResponseAsync(
+            messages,
+            responseModel: resolvedModel,
+            maxTokens: maxTokens,
+            modelSize: modelSize,
+            groupId: groupId,
+            promptName: promptName,
+            attributeExtraction: attributeExtraction,
+            cancellationToken: cancellationToken);
     }
 }
 
 // PORT: the module class of R2, split around the classes to keep the order of the Python file.
 internal static partial class GraphitiTypes
 {
-    // TODO(port): uses_prompt_routing
     internal static bool UsesPromptRouting(GraphitiClients? clients)
     {
-        throw new NotSupportedException("TODO(port): uses_prompt_routing");
+        return clients is not null && (clients.LlmRuntime is not null || clients.PromptLibrary is not null);
     }
 
     // PORT: `clients` is keyword-only in Python.
-    // TODO(port): resolve_prompt_messages
     internal static List<Message> ResolvePromptMessages(
         string promptName,
         PromptFunction legacyPrompt,
         OrderedDictionary<string, object?> context,
         GraphitiClients? clients = null)
     {
-        throw new NotSupportedException("TODO(port): resolve_prompt_messages");
+        if (clients is not null && clients.LlmRuntime is not null)
+        {
+            var model = clients.LlmRuntime.ResolveModel(promptName);
+            return clients.LlmRuntime.ResolveBuilder(promptName, model)(context).AsMessages();
+        }
+
+        if (clients is not null && clients.PromptLibrary is not null)
+        {
+            return Lib.GetPromptBuilder(clients.PromptLibrary, promptName)(context).AsMessages();
+        }
+
+        return legacyPrompt(context);
     }
 }
 
-// PORT: a TypedDict (R7) with `total=False`, so each key can be absent.
 // PORT: a TypedDict with `total=False` has nullable fields, and null stands for an absent key (R7).
 // generate_prompt_response builds it as the keyword arguments of generate_response.
 internal sealed record GeneratePromptResponseKwargs
@@ -105,8 +145,7 @@ internal sealed record GeneratePromptResponseKwargs
 internal static partial class GraphitiTypes
 {
     // PORT: the arguments after `context` are keyword-only in Python.
-    // TODO(port): generate_prompt_response
-    internal static Task<OrderedDictionary<string, object?>> GeneratePromptResponseAsync(
+    internal static async Task<OrderedDictionary<string, object?>> GeneratePromptResponseAsync(
         LLMClient llmClient,
         string promptName,
         PromptFunction legacyPrompt,
@@ -119,6 +158,53 @@ internal static partial class GraphitiTypes
         bool attributeExtraction = false,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): generate_prompt_response");
+        if (UsesPromptRouting(clients) && clients is not null)
+        {
+            return await clients.CompletePromptAsync(
+                promptName,
+                context,
+                responseModel: responseModel,
+                modelSize: modelSize,
+                attributeExtraction: attributeExtraction,
+                groupId: groupId,
+                maxTokens: maxTokens,
+                cancellationToken: cancellationToken);
+        }
+
+        var kwargs = new GeneratePromptResponseKwargs
+        {
+            ResponseModel = responseModel,
+            PromptName = promptName,
+        };
+        if (maxTokens is not null)
+        {
+            kwargs.MaxTokens = maxTokens;
+        }
+
+        if (modelSize != ModelSize.Medium)
+        {
+            kwargs.ModelSize = modelSize;
+        }
+
+        if (groupId is not null)
+        {
+            kwargs.GroupId = groupId;
+        }
+
+        if (attributeExtraction)
+        {
+            kwargs.AttributeExtraction = true;
+        }
+
+        // PORT: `**kwargs` is the fields that are set. A key that is absent keeps the default of generate_response (R7).
+        return await llmClient.GenerateResponseAsync(
+            legacyPrompt(context),
+            responseModel: kwargs.ResponseModel,
+            maxTokens: kwargs.MaxTokens,
+            modelSize: kwargs.ModelSize ?? ModelSize.Medium,
+            groupId: kwargs.GroupId,
+            promptName: kwargs.PromptName,
+            attributeExtraction: kwargs.AttributeExtraction ?? false,
+            cancellationToken: cancellationToken);
     }
 }

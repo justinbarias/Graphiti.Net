@@ -186,6 +186,21 @@ internal static partial class Py
     /// <summary>A Python <c>list</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
     internal static List<object?> AsList(object? x) => x is List<object?> list ? list : throw WrongType("list", "List<object?>", x);
 
+    /// <summary>
+    /// <c>for x in value</c> and <c>sep.join(value)</c> on a value from open data (RULES.md R6): the items of a list,
+    /// a tuple, or a set (in insertion order), the keys of a dict, the code points of a <c>str</c>, and the ints of <c>bytes</c>. Another
+    /// value throws <see cref="InvalidCastException"/> (<c>TypeError: 'X' object is not iterable</c>) at the call.
+    /// </summary>
+    internal static IEnumerable<object?> Iter(object? x) => x switch
+    {
+        string s => PyText.CodePoints(s),
+        byte[] bytes => bytes.Select(b => (object?)(long)b),
+        PyDict dict => dict.Keys,
+        System.Collections.IDictionary dict => dict.Keys.Cast<object?>(),
+        System.Collections.IEnumerable items => items.Cast<object?>(),
+        _ => throw new InvalidCastException($"'{TypeName(x)}' object is not iterable"),
+    };
+
     /// <summary>A Python <c>tuple</c> read from open data. Another type throws <see cref="InvalidCastException"/> (<c>TypeError</c>).</summary>
     internal static PyTuple AsTuple(object? x) => x is PyTuple t ? t : throw WrongType("tuple", "PyTuple", x);
 

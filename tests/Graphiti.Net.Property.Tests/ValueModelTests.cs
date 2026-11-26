@@ -716,4 +716,26 @@ public class ValueModelTests
             Assert.True(Text(expected, "r") == Py.Repr(call()), $"{op}: expected {Text(expected, "r")}");
         }
     }
+
+    [Fact]
+    public void Iter_gives_what_a_Python_for_loop_gives()
+    {
+        // Each expected value is what Python 3.12 gives for list(value), or the text of the TypeError of iter(value).
+        Assert.Equal(["x", 1L, null], Py.Iter(new List<object?> { "x", 1L, null }));
+        Assert.Equal(["a", "b"], Py.Iter(new List<string> { "a", "b" }));
+        Assert.Equal(["x", 1L], Py.Iter(PyTuple.From(["x", 1L])));
+        Assert.Equal(["a", "\U0001F600", "b"], Py.Iter("a\U0001F600b"));
+        Assert.Equal([65L, 66L], Py.Iter(new byte[] { 65, 66 }));
+        Assert.Empty(Py.Iter(Array.Empty<byte>()));
+        Assert.Equal(["k", "j"], Py.Iter(new OrderedDictionary<string, object?> { ["k"] = 2L, ["j"] = 1L }));
+        var dict = new PyDict();
+        dict[1L] = "a";
+        dict["k"] = 2L;
+        Assert.Equal([1L, "k"], Py.Iter(dict));
+
+        Assert.Equal("'NoneType' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(null)).Message);
+        Assert.Equal("'int' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(5L)).Message);
+        Assert.Equal("'float' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(1.5)).Message);
+        Assert.Equal("'bool' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(true)).Message);
+    }
 }

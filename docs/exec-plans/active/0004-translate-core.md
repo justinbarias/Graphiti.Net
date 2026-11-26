@@ -72,6 +72,7 @@ The lead made these decisions under decision D39. The maintainer reads them at t
 - Layer 0 has seven packets. Five cover layers 1 to 6, and two cover layers 7 to 9. It merges as two pull requests, so that layer 1 starts after the first one.
 - The skeleton ports in full each member that has no logic to defer: an enum, an abstract class, a constant, and a body that is only `return None` or `raise NotImplementedError` (rule R24).
 - `utils.bulk_utils` moves from layer 1 to layer 7. It imports five modules of `utils.maintenance` and `ingestion.change_set`, and no unit of layers 1 to 6 imports it.
+- Two more units leave layer 1 (2026-11-27). `decorators` moves to layer 6, because it imports `search.search_config` and four of its tests need `SearchResults.merge`. `utils.ontology_utils.entity_types_utils` moves to layer 2, because it reads the fields of `EntityNode`.
 - A unit with logic delivers a recording of Python results beside the upstream tests, and each Neo4j operations unit delivers a recording through a fake executor (rule R25). The pilot showed that the upstream tests alone find few defects.
 - An implementer and a reviewer write the full report to a file, and the lead reads the file. The reply to the lead is a short summary.
 
@@ -108,5 +109,53 @@ Commands at the tip, after the rebase on `main`:
 - `scan_port.py src --allow-todo`: 1,136 `TODO(port)` markers in 115 files. The other 105 findings are `NotImplementedException` sites that port a Python `raise NotImplementedError` (rule R4).
 
 Not in this pull request: the two skeleton packets for layers 7 to 9. They are outside the goal of decision D39, which ends at layer 6.
+
+### Layer 1, the foundations, 2026-11-27
+
+Five packets ported 11 modules. Two Opus 5.5 high reviewers read each packet, one against Python with its own inputs and one against the evidence with seeded defects. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Implementer | Review findings |
+| --- | --- | --- | --- |
+| P1a | `helpers`, `utils.datetime_utils`, `utils.text_utils` | Sonnet 5.5, medium | 5 important, 16 minor. 22,550 calls of one reviewer matched Python. |
+| P1b | `graph_queries`, `models.edges.edge_db_queries`, `models.nodes.node_db_queries` | Sonnet 5.5, medium | 5 important, 10 minor. The query text matched Python for each provider. |
+| P1c | `tracer` | Sonnet 5.5, high | In the P1e row |
+| P1d | `graphiti_types` | Sonnet 5.5, medium | In the P1e row |
+| P1e | `namespaces.nodes`, `namespaces.edges` | Sonnet 5.5, medium | 7 important, 17 minor, for P1c, P1d, and P1e together |
+
+What the reviews found, and the result:
+
+| Finding | Result |
+| --- | --- |
+| 13 query constants had no test that can fail: 7 of 24 seeded defects passed each check. | The recording holds each module constant by name (rule R25). |
+| A private helper of the query unit refused `bytes` labels and broke on a dict with other keys. | `Py.Iter` in `PyCompat` (rule R6). |
+| The sum of `normalize_l2` was a private copy of numpy's pairwise sum. | `PyNumpy.AddReduce` in `PyCompat`, with 140 recorded numpy results (rule R18). |
+| The binding of `parse_db_date` had a guard that hid a wrong result. | The function returns its input unchanged for another type, as Python does (rule R20). One case left open item O4. |
+| A wrong `SEMAPHORE_LIMIT` failed no test, because the test compared the port with itself. | The recording holds the constant, and the test compares the largest count of calls that ran at the same time. |
+| The telemetry of an exception has .NET names where Python has its own. | Accepted as decision D46. The maintainer decides at gate 4. |
+| Four reachable namespace methods had no test. | The recording has 177 cases, from 55. |
+
+Two units left the layer: `decorators` goes to layer 6, and `utils.ontology_utils.entity_types_utils` goes to layer 2 (see "Lead decisions").
+
+Evidence that waits for a later layer:
+
+- `graphiti_types`: no test reaches `complete_prompt`, `generate_prompt_response`, and two routes of `resolve_prompt_messages`. They stop at skeleton members of layers 3 and 4.
+- `namespaces`: the recording reaches the entity node namespace. The others wait for the Neo4j operations of layer 5.
+- `utils.text_utils`: 16 judge cases need the `EpisodicNode` model, which layer 2 registers.
+
+One Opus 5.5 adversarial pass read the whole layer and gave 7 findings (2 important). The lead fixed each one:
+
+- The binding of `utils.text_utils` did not register `MAX_SUMMARY_CHARS`, so the case `pure.prompts.const.max_summary_chars` stayed listed. It passes now.
+- `port/STATE.md` named `Py.NotNone`, which comes with layer 2.
+- The queue notes of `helpers` and `utils.datetime_utils` gave a wrong reason for 4 listed cases, and the queue did not show `driver.falkordb` as ported.
+- R18 and G17 named a `np.sum` site that upstream does not have, and left out the float32 norm of `ingestion/delta.py:56`.
+- `Py.Iter` gives a set in insertion order. R6 says so now.
+- `OpenTelemetrySpan` wrote to a span that a sampler does not record, where the `NonRecordingSpan` of Python does nothing. Each member tests `IsAllDataRequested` now, and one new test fails for the seeded defect of the reviewer.
+
+Commands at the tip:
+
+- `scripts/check.sh`: `check: passed`.
+- `dotnet test --project tests/Port.Evaluation`: 2,451 tests, 0 failed, 0 skipped.
+- The recorders with `--check`: `helpers` 1,926 cases, the query builders 2,804, `namespaces` 177, `tracer` 900, and the numpy values. Each one is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 681 passed, 0 unexpected, 0 bound and wrong. 278 ids left `expected-failures.txt`, and 1,318 stay. The pull request lists the ids.
 
 Found beside the plan: `scripts/mutate.sh` gave no result on 2026-11-26. Two tests, `PyAstTests.LiteralEval_matches_Python` and `PyAstTests.LiteralEval_of_long_and_deeply_nested_texts_matches_Python`, stop the test host in a mutated build. Stryker then runs them against each mutant, and each mutant gets the status `RuntimeError`. A probe on `PyHash.cs` with 56 mutants took 159 seconds and gave 56 errors. With the two tests skipped it took 8 seconds and killed 56. The probable cause is a stack overflow in the mutated parser. The lead fixes the two tests before the mutation run of layer 5.
