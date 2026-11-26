@@ -17,22 +17,22 @@ limitations under the License.
 
 namespace Graphiti.Core.Driver;
 
-using Graphiti.Core.Driver.GraphOperations;
 using Graphiti.Core.Driver.Operations;
 using Graphiti.PyCompat;
 
 // PORT: the module class of R2. The module logger has no log call, so it has no Logger (R5). load_dotenv() is not ported (R17).
+// PORT: os.environ.get('X', 'default') is PyEnv.Str("X") ?? "default".
 internal static class DriverModule
 {
     internal const long DefaultSize = 10;
 
-    internal static readonly string? EntityIndexName = PyEnv.Str("ENTITY_INDEX_NAME", "entities");
+    internal static readonly string EntityIndexName = PyEnv.Str("ENTITY_INDEX_NAME") ?? "entities";
 
-    internal static readonly string? EpisodeIndexName = PyEnv.Str("EPISODE_INDEX_NAME", "episodes");
+    internal static readonly string EpisodeIndexName = PyEnv.Str("EPISODE_INDEX_NAME") ?? "episodes";
 
-    internal static readonly string? CommunityIndexName = PyEnv.Str("COMMUNITY_INDEX_NAME", "communities");
+    internal static readonly string CommunityIndexName = PyEnv.Str("COMMUNITY_INDEX_NAME") ?? "communities";
 
-    internal static readonly string? EntityEdgeIndexName = PyEnv.Str("ENTITY_EDGE_INDEX_NAME", "entity_edges");
+    internal static readonly string EntityEdgeIndexName = PyEnv.Str("ENTITY_EDGE_INDEX_NAME") ?? "entity_edges";
 }
 
 // PORT: the pilot (plan 0003, task 6) ported this enum for real (RULES.md R24).
@@ -67,9 +67,10 @@ internal abstract class GraphDriverSession : IAsyncDisposable
     internal abstract Task CloseAsync(CancellationToken cancellationToken = default);
 
     // PORT: the extra arguments of Python are closed over by the lambda (R9). The work function receives the
-    // write transaction, which the upstream callers annotate as GraphDriverSession.
-    internal abstract Task<T> ExecuteWriteAsync<T>(
-        Func<GraphDriverSession, Task<T>> func,
+    // write transaction, which the upstream callers annotate as GraphDriverSession. Each upstream work function
+    // returns None, so the result is a Task.
+    internal abstract Task ExecuteWriteAsync(
+        Func<GraphDriverSession, Task> func,
         CancellationToken cancellationToken = default);
 }
 
@@ -87,8 +88,7 @@ internal abstract class GraphDriver : QueryExecutor
     internal string DefaultGroupId { get; set; } = string.Empty;
 
     // Legacy interfaces (kept for backwards compatibility during Phase 1)
-    // PORT: the namespace of the module search_interface has the name of its class, so the type is qualified.
-    internal global::Graphiti.Core.Driver.SearchInterface.SearchInterface? SearchInterface { get; set; }
+    internal SearchInterface? SearchInterface { get; set; }
 
     internal GraphOperationsInterface? GraphOperationsInterface { get; set; }
 
@@ -137,38 +137,27 @@ internal abstract class GraphDriver : QueryExecutor
         throw new NotSupportedException("TODO(port): transaction");
     }
 
-    // TODO(port): entity_node_ops
-    internal virtual EntityNodeOperations? EntityNodeOps => throw new NotSupportedException("TODO(port): entity_node_ops");
+    internal virtual EntityNodeOperations? EntityNodeOps => null;
 
-    // TODO(port): episode_node_ops
-    internal virtual EpisodeNodeOperations? EpisodeNodeOps => throw new NotSupportedException("TODO(port): episode_node_ops");
+    internal virtual EpisodeNodeOperations? EpisodeNodeOps => null;
 
-    // TODO(port): community_node_ops
-    internal virtual CommunityNodeOperations? CommunityNodeOps => throw new NotSupportedException("TODO(port): community_node_ops");
+    internal virtual CommunityNodeOperations? CommunityNodeOps => null;
 
-    // TODO(port): saga_node_ops
-    internal virtual SagaNodeOperations? SagaNodeOps => throw new NotSupportedException("TODO(port): saga_node_ops");
+    internal virtual SagaNodeOperations? SagaNodeOps => null;
 
-    // TODO(port): entity_edge_ops
-    internal virtual EntityEdgeOperations? EntityEdgeOps => throw new NotSupportedException("TODO(port): entity_edge_ops");
+    internal virtual EntityEdgeOperations? EntityEdgeOps => null;
 
-    // TODO(port): episodic_edge_ops
-    internal virtual EpisodicEdgeOperations? EpisodicEdgeOps => throw new NotSupportedException("TODO(port): episodic_edge_ops");
+    internal virtual EpisodicEdgeOperations? EpisodicEdgeOps => null;
 
-    // TODO(port): community_edge_ops
-    internal virtual CommunityEdgeOperations? CommunityEdgeOps => throw new NotSupportedException("TODO(port): community_edge_ops");
+    internal virtual CommunityEdgeOperations? CommunityEdgeOps => null;
 
-    // TODO(port): has_episode_edge_ops
-    internal virtual HasEpisodeEdgeOperations? HasEpisodeEdgeOps => throw new NotSupportedException("TODO(port): has_episode_edge_ops");
+    internal virtual HasEpisodeEdgeOperations? HasEpisodeEdgeOps => null;
 
-    // TODO(port): next_episode_edge_ops
-    internal virtual NextEpisodeEdgeOperations? NextEpisodeEdgeOps => throw new NotSupportedException("TODO(port): next_episode_edge_ops");
+    internal virtual NextEpisodeEdgeOperations? NextEpisodeEdgeOps => null;
 
-    // TODO(port): search_ops
-    internal virtual SearchOperations? SearchOps => throw new NotSupportedException("TODO(port): search_ops");
+    internal virtual SearchOperations? SearchOps => null;
 
-    // TODO(port): graph_ops
-    internal virtual GraphMaintenanceOperations? GraphOps => throw new NotSupportedException("TODO(port): graph_ops");
+    internal virtual GraphMaintenanceOperations? GraphOps => null;
 }
 
 internal sealed class SessionTransaction : Transaction

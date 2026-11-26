@@ -15,12 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-namespace Graphiti.Core.Driver.SearchInterface;
+namespace Graphiti.Core.Driver;
 
 using Graphiti.Core.Search;
 
 // PORT: a pydantic model with subclasses and no field is an abstract record (R7). A method whose
-// Python body only raises NotImplementedError is virtual and throws NotImplementedException (R4, R15).
+// Python body only raises NotImplementedError is virtual and throws NotImplementedException (R4, R15). The
+// package holds one module with its own name, so the class is in the namespace of the parent package.
 // The nested class Config sets arbitrary_types_allowed, which needs nothing (R7).
 internal abstract record SearchInterface
 {

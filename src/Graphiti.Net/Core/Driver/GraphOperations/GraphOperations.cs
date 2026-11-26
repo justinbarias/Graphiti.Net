@@ -15,13 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-namespace Graphiti.Core.Driver.GraphOperations;
+namespace Graphiti.Core.Driver;
 
 using Graphiti.Core.Search;
 using Graphiti.PyCompat;
 
 // PORT: a pydantic model with subclasses and no field is an abstract record (R7). A method whose
-// Python body only raises NotImplementedError is virtual and throws NotImplementedException (R4, R15).
+// Python body only raises NotImplementedError is virtual and throws NotImplementedException (R4, R15). The
+// package holds one module with its own name, so the class is in the namespace of the parent package.
 internal abstract record GraphOperationsInterface
 {
     // -----------------
@@ -44,7 +45,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task NodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -56,7 +56,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task NodeUpdateBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -68,7 +67,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task NodeDeleteByGroupIdAsync(
         Type? cls,
         GraphDriver driver,
@@ -79,7 +77,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task NodeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -95,7 +92,6 @@ internal abstract record GraphOperationsInterface
     // Node: Read
     // -----------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<EntityNode> NodeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -105,7 +101,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityNode>> NodeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -116,7 +111,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityNode>> NodeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -128,7 +122,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityNode>> NodeGetByNamesAsync(
         Type? cls,
         GraphDriver driver,
@@ -139,7 +132,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityNode>> NodeGetByAttributeValuesAsync(
         Type? cls,
         GraphDriver driver,
@@ -193,7 +185,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EpisodicNodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -205,7 +196,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EpisodicEdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -217,7 +207,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EpisodicNodeDeleteByGroupIdAsync(
         Type? cls,
         GraphDriver driver,
@@ -228,7 +217,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EpisodicNodeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -244,7 +232,6 @@ internal abstract record GraphOperationsInterface
     // EpisodicNode: Read
     // -----------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<EpisodicNode> EpisodicNodeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -254,7 +241,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EpisodicNode>> EpisodicNodeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -264,7 +250,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EpisodicNode>> EpisodicNodeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -308,7 +293,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task CommunityNodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -320,7 +304,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task CommunityNodeDeleteByGroupIdAsync(
         Type? cls,
         GraphDriver driver,
@@ -331,7 +314,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task CommunityNodeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -347,7 +329,6 @@ internal abstract record GraphOperationsInterface
     // CommunityNode: Read
     // -----------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<CommunityNode> CommunityNodeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -357,7 +338,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<CommunityNode>> CommunityNodeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -367,7 +347,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<CommunityNode>> CommunityNodeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -399,7 +378,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task SagaNodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -411,7 +389,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task SagaNodeDeleteByGroupIdAsync(
         Type? cls,
         GraphDriver driver,
@@ -422,7 +399,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task SagaNodeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -438,7 +414,6 @@ internal abstract record GraphOperationsInterface
     // SagaNode: Read
     // -----------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<SagaNode> SagaNodeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -448,7 +423,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<SagaNode>> SagaNodeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -458,7 +432,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<SagaNode>> SagaNodeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -513,7 +486,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -525,7 +497,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EdgeUpdateBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -537,7 +508,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EdgeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -552,7 +522,6 @@ internal abstract record GraphOperationsInterface
     // Edge: Read
     // -----------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<EntityEdge> EdgeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -562,7 +531,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityEdge>> EdgeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -572,7 +540,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityEdge>> EdgeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -625,7 +592,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task EpisodicEdgeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -640,7 +606,6 @@ internal abstract record GraphOperationsInterface
     // EpisodicEdge: Read
     // ---------------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<EpisodicEdge> EpisodicEdgeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -650,7 +615,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EpisodicEdge>> EpisodicEdgeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -660,7 +624,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EpisodicEdge>> EpisodicEdgeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -692,7 +655,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task CommunityEdgeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -707,7 +669,6 @@ internal abstract record GraphOperationsInterface
     // CommunityEdge: Read
     // ---------------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<CommunityEdge> CommunityEdgeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -717,7 +678,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<CommunityEdge>> CommunityEdgeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -727,7 +687,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<CommunityEdge>> CommunityEdgeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -759,7 +718,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task HasEpisodeEdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -771,7 +729,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task HasEpisodeEdgeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -786,7 +743,6 @@ internal abstract record GraphOperationsInterface
     // HasEpisodeEdge: Read
     // ---------------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<HasEpisodeEdge> HasEpisodeEdgeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -796,7 +752,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<HasEpisodeEdge>> HasEpisodeEdgeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -806,7 +761,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<HasEpisodeEdge>> HasEpisodeEdgeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -838,7 +792,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task NextEpisodeEdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
@@ -850,7 +803,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task NextEpisodeEdgeDeleteByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -865,7 +817,6 @@ internal abstract record GraphOperationsInterface
     // NextEpisodeEdge: Read
     // ----------------------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<NextEpisodeEdge> NextEpisodeEdgeGetByUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -875,7 +826,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<NextEpisodeEdge>> NextEpisodeEdgeGetByUuidsAsync(
         Type? cls,
         GraphDriver driver,
@@ -885,7 +835,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<NextEpisodeEdge>> NextEpisodeEdgeGetByGroupIdsAsync(
         Type? cls,
         GraphDriver driver,
@@ -957,7 +906,6 @@ internal abstract record GraphOperationsInterface
     // Additional Node Operations
     // -----------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EpisodicNode>> EpisodicNodeGetByEntityNodeUuidAsync(
         Type? cls,
         GraphDriver driver,
@@ -979,7 +927,6 @@ internal abstract record GraphOperationsInterface
     // Additional Edge Operations
     // -----------------
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityEdge>> EdgeGetBetweenNodesAsync(
         Type? cls,
         GraphDriver driver,
@@ -990,7 +937,6 @@ internal abstract record GraphOperationsInterface
         throw new NotImplementedException(string.Empty);
     }
 
-    // TODO(port): no rule for the class object parameter _cls. Callers pass cls or None.
     internal virtual Task<List<EntityEdge>> EdgeGetByNodeUuidAsync(
         Type? cls,
         GraphDriver driver,

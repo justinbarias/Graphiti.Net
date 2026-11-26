@@ -33,10 +33,10 @@ internal sealed record EmbedderConfig
 // PORT: an abstract method has no body, as in Python.
 internal abstract class EmbedderClient
 {
-    // TODO(port): no rule for the union `str | list[str] | Iterable[int] | Iterable[Iterable[int]]` of input_data.
-    // It is object, which holds a value of the value model (R6). Each upstream caller passes a list[str].
+    // PORT: the annotation is `str | list[str] | Iterable[int] | Iterable[Iterable[int]]`. Each upstream caller passes
+    // a list[str] (lead decision, plan 0004 packet S1).
     internal abstract Task<List<double>> CreateAsync(
-        object inputData,
+        List<string> inputData,
         CancellationToken cancellationToken = default);
 
     internal virtual Task<List<List<double>>> CreateBatchAsync(

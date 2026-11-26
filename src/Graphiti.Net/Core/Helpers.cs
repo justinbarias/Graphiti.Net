@@ -19,6 +19,7 @@ namespace Graphiti.Core;
 
 using System.Text.RegularExpressions;
 using Graphiti.Core.Driver;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
 
 // PORT: the pilot units search.search_filters and utils.content_chunking ported some members of this module for real
@@ -168,8 +169,12 @@ internal static class Helpers
         return true;
     }
 
-    // TODO(port): validate_excluded_entity_types is not declared. Its parameter `entity_types: dict[str, type[BaseModel]]`
-    // is OrderedDictionary<string, GraphTypeDescriptor>? (R15, decision D26), and the lead has not written
-    // Graphiti.Internal.GraphTypeDescriptor yet. The signature is:
-    // internal static bool ValidateExcludedEntityTypes(List<string>? excludedEntityTypes, OrderedDictionary<string, GraphTypeDescriptor>? entityTypes = null)
+    // PORT: a custom type is a GraphTypeDescriptor (R15, decision D26).
+    // TODO(port): validate_excluded_entity_types
+    internal static bool ValidateExcludedEntityTypes(
+        List<string>? excludedEntityTypes,
+        OrderedDictionary<string, GraphTypeDescriptor>? entityTypes = null)
+    {
+        throw new NotSupportedException("TODO(port): validate_excluded_entity_types");
+    }
 }

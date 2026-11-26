@@ -17,13 +17,22 @@ limitations under the License.
 
 namespace Graphiti.Core.Utils.OntologyUtils;
 
+using Graphiti.Internal;
+
+// PORT: a custom type is a GraphTypeDescriptor (R15, decision D26).
 internal static class EntityTypesUtils
 {
-    // TODO(port): validate_entity_types is not declared. Its parameter `entity_types: dict[str, type[BaseModel]] | None`
-    // is OrderedDictionary<string, GraphTypeDescriptor>? (R15, decision D26), and the lead has not written
-    // Graphiti.Internal.GraphTypeDescriptor yet. The signature is:
-    // internal static bool ValidateEntityTypes(OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
+    // TODO(port): validate_entity_types
+    internal static bool ValidateEntityTypes(OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
+    {
+        throw new NotSupportedException("TODO(port): validate_entity_types");
+    }
 
-    // TODO(port): validate_identity_properties is not declared, for the same reason. The signature is:
-    // internal static bool ValidateIdentityProperties(OrderedDictionary<string, List<string>>? identityProperties, OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
+    // TODO(port): validate_identity_properties
+    internal static bool ValidateIdentityProperties(
+        OrderedDictionary<string, List<string>>? identityProperties,
+        OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
+    {
+        throw new NotSupportedException("TODO(port): validate_identity_properties");
+    }
 }
