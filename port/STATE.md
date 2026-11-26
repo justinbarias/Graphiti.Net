@@ -7,10 +7,10 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 | Item | Value |
 | --- | --- |
-| Phase | 4. Plan 0003 is active. Tasks 1 to 4 are done: [RULES.md](RULES.md) is written, the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md), `PyCompat` has its scalar and text helpers, the value model, `PyDateTime`, `PyRegex`, `PyEnv`, `PyHash`, `PyLruCache`, `PyRandom`, `Asyncio`, `PyJson`, `PyAst`, and `Pydantic`, the judge host has its codec, the runner accepts `JudgeTypeRejected` (tasks P1 to P9 are done), and `scripts/mutation_survivors.py` lists the tests that the pruning rule deletes. The pilot (task 6) is in progress: the unit `errors` is ported, reviewed, and merged with the pilot base. Tasks 5, 7, and 8 are not done. |
-| Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to each file in it except `expected-failures.txt` (decision D38). Gate 3 is next: the maintainer approves `port/RULES.md` after the pilot. |
-| Last action | 2026-11-26 (tasks P3, P6, P7, P8): `PyJson`, `PyAst`, `Pydantic`, the judge host codec, and the runner change are on `main`. The maintainer applied the runner patch and narrowed the deny list. The rulebook changed in R1, R4, R7, and R22. 2026-11-26 (task 4): wrote `scripts/mutation_survivors.py` and ran Stryker two times on `PyCompat` (93.22% each). 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. 2026-11-25 (task 3): built `src/Graphiti.Net.PyCompat` (scalar and text helpers) and `tests/Graphiti.Net.Property.Tests` (55 tests against Python values). |
-| Next action | Plan 0003, task 6: the other four pilot units (`search.search_filters`, `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking`). Then task 7 (two reviews for each unit), task 8, task 5 (the pruning rule), and gate 3, which the lead passes under decision D39. |
+| Phase | 6. Plan 0003 is done except task 5 (the pruning rule), which runs now. The pilot ported five units from the rulebook alone: `errors`, `search.search_filters`, `prompts.dedupe_nodes`, `utils.content_chunking`, and `driver.neo4j.operations.entity_node_ops`. Plan 0004 is active at layer 0, the skeleton. |
+| Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to each file in it except `expected-failures.txt` (decision D38). Gate 3 passed on 2026-11-26: the lead passed it under decision D39, and the maintainer reads `port/RULES.md` at the end of the run. Gate 4 is next, after plan 0004. |
+| Last action | 2026-11-26 (tasks 6, 7, and 8): the five pilot units merged (pull requests 24, 25, 28, 29, and 30), each after two reviews and one fix round. The support code and the rule changes of the reviews merged as pull request 27. The lead passed gate 3. 2026-11-26 (tasks P3, P6, P7, P8): `PyJson`, `PyAst`, `Pydantic`, the judge host codec, and the runner change are on `main`. The maintainer applied the runner patch and narrowed the deny list. The rulebook changed in R1, R4, R7, and R22. 2026-11-26 (task 4): wrote `scripts/mutation_survivors.py` and ran Stryker two times on `PyCompat` (93.22% each). 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. 2026-11-25 (task 3): built `src/Graphiti.Net.PyCompat` (scalar and text helpers) and `tests/Graphiti.Net.Property.Tests` (55 tests against Python values). |
+| Next action | Plan 0003, task 5: apply the pruning rule to the mutation run, and move the plan to `completed`. Plan 0004, layer 0: the skeleton, in five packets for layers 1 to 6 and two packets for layers 7 to 9. Then layers 1 to 6 and the end-to-end test after layer 6, which is the end of the goal of decision D39. |
 
 ## Queue counts
 
@@ -114,6 +114,7 @@ None.
 | 2026-11-26 | After the integrated review of the pull request stack. R12 uses the `PyText` members for `split(sep)` and `strip(chars)`. R1 names the `PyCompat` project in the `using` rule. R4 has a row for `UnicodeDecodeError` and the limit of `OverflowException`. | None. No unit is ported. |
 | 2026-11-26 | After the pre-pilot scan. R24 names the members of modules outside the pilot that a pilot unit ports for real. R22 says who removes a passing case from `expected-failures.txt`. Open item O5 is decided (D38). | None. No unit is ported. |
 | 2026-11-26 | After the reviews of the `PyCompat` helpers. R7 (enum attributes), R8 (cleanup tokens, `WaitForAsync`, gather of tasks), R11, R12, R13, R14 (`Py.SortInPlace` for float, datetime, and open keys), R18, and Part 2 changed. New open item O9. The rulebook lists the changes in its own change table. | None. No unit is ported. |
+| 2026-11-26 | After the pilot: three rounds of rule changes from the reviews of the five units and of the support code. The rulebook lists them in its own change table. | `search_filters`: the member order of its three models, done in pull request 27. `content_chunking`: `.Value` on each `PyPatch<T>` read, done before its merge. No unit waits. |
 
 [GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
@@ -121,7 +122,7 @@ None.
 
 | Skill text | What this port does | Why |
 | --- | --- | --- |
-| Scaffold in phase 4 | The solution, the Neo4j sidecar test, and the tooling exist from the bootstrap. `PyCompat` was built in phase 4 (plan 0003, task 3). The core project holds no ported code yet. | The maintainer asked for the development tooling first. |
+| Scaffold in phase 4 | The solution, the Neo4j sidecar test, and the tooling exist from the bootstrap. `PyCompat` was built in phase 4 (plan 0003, task 3). | The maintainer asked for the development tooling first. |
 | Port the unit tests with each module | pytest ports live in `tests/Port.Evaluation` and are temporary. | Decision D6. |
 | Lead model is Opus | The lead session ran on Fable 5.2. | The maintainer's global rules name Fable as orchestrator. |
 | Phase 3 completes type hints in the Python source | The source is not changed. `port/tools/infer_type_hints.py` writes the signatures that pyright infers into `TYPE_HINTS.md`. | The oracle stays identical to the pinned commit. |
@@ -140,11 +141,14 @@ For the maintainer, from the public surface design (the page lists all 12 open q
 2. A library row for `Microsoft.Extensions.Http`, or an `HttpClient` that the decisions client takes directly. Needed before the decisions client unit.
 3. Does the chat adapter strip a markdown code fence from a reply? Needed before the adapter unit.
 
-For the maintainer, before the pilot (plan 0003, task 6):
+For the maintainer, from the pilot and the start of plan 0004:
 
 1. A new member on the driver session contract for a write with a timeout (`utils/bulk_utils.py:192` uses `neo4j.unit_of_work` in core code). RULES.md, open item O6. Needed before layer 7.
-2. Apply the runner change of decisions D20 and D40 with `git apply port/patches/judge-type-rejected.patch` on a branch from `main`. It goes in its own pull request. [patches/README.md](patches/README.md) gives the steps. RULES.md, open item O1. Plan 0003, task P8. Until then, no unit with a wrong-type case can be bound, and `utils.content_chunking` is the first one.
-3. Narrow the deny rule in `.claude/settings.json` so that a session can edit `port/judge/expected-failures.txt` and no other file under `port/judge/` (decision D38). Until then, no unit can reach `parity_pass`.
+2. Decision D43: accept or reject the order of the pair chunks of `generate_covering_chunks` for a chunk size of 0 or 1. Needed at gate 4.
+3. About 250 upstream test sites replace a module-level function or a method. RULES.md, open item O10. Needed before layer 7.
+4. Apply `port/patches/judge-readme-units.patch`, which names the `Units/` folder in the judge README. [patches/README.md](patches/README.md) gives the steps.
+5. The scanner of the porting skill reports each `NotImplementedException`. Rule R4 requires that type where Python raises `NotImplementedError`. Accept those sites by name at gate 4.
+6. Two pilot worktrees hold an untracked `.upstream` symbolic link that an implementer made for a recorder: `.claude/worktrees/agent-a6354ed2b2d3e0ca4` and `.claude/worktrees/agent-a289034ea91cceca3`. A delete command of one implementer was denied, and the lead did not delete the links.
 
 Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.
 Decided on 2026-11-25 for the rulebook: D20 (wrong-type cases), D21 (the Python value model), D22 (the exclusive scheduler), D23 (the ambient service holder).
@@ -156,10 +160,11 @@ Decided on 2026-11-25 for the public surface: D24 to D35. Decided on 2026-11-26 
 - The judge did not run against upstream's default `OpenAIClient` path. Decision D17 puts that path outside the contract.
 - CI does not run the judge against the Python build. Debt T13.
 - No second adversarial review ran on the changes after the first review. The maintainer closed gate 2 without one.
-- No C# code follows the rulebook yet. The pilot (plan 0003, task 6) is its first test. One adversarial review ran, and no second review ran after its fixes.
+- Five units follow the rulebook. Each one had two reviews and one fix round, and no second review ran on the fixes.
+- `Neo4jEntityNodeOperations` did not run against a database. Five of its ten methods stop at skeleton members, and the parameter conversion of rule R9 is not built (plan 0004, layer 5).
 - One adversarial review ran on the public surface design and its rule changes. No second review ran after the fixes. No code follows the design yet.
 - The `Microsoft.Extensions.AI.Abstractions` facts of the design come from Learn pages for version 10.11.0, not from the 11.0.1 assembly. Debt T21.
-- Decision D22 depends on a rule at each library boundary (RULES.md, open item O7). No code tested it.
+- Decision D22 depends on a rule at each library boundary (RULES.md, open item O7). No code tested it, and the pilot had no library callback.
 - The site lists in the rulebook (regular expressions, sets, `getattr` calls, validators) come from `grep` over the 114 MVP modules. A site that the patterns missed is not in the lists. The rulebook tells an implementer to stop at such a site.
 - Nobody applied the pruning rule. On two Stryker runs on `PyCompat`, the script listed 13 and 14 tests (plan 0003, task 5).
 - The devcontainer and the Claude cloud session hook were not started. See [docs/RELIABILITY.md](../docs/RELIABILITY.md).

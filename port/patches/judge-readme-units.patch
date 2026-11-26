@@ -1,0 +1,11 @@
+--- a/port/judge/README.md	2026-11-26 21:32:51
++++ b/port/judge/README.md	2026-11-26 21:32:51
+@@ -193,7 +193,7 @@
+ 
+ ## Bindings in the .NET host
+ 
+-`tests/Graphiti.Net.JudgeHost/Bindings.cs` maps each `fn` name to the ported method.
++Each ported module has one file in `tests/Graphiti.Net.JudgeHost/Units/` that maps its `fn` names to the ported methods. `tests/Graphiti.Net.JudgeHost/Bindings.cs` loads these files.
+ A binding can do three things only: decode the arguments, call the product code, and encode the result.
+ A case with no binding fails with `JudgeNotBound`, which keeps it in `expected-failures.txt`.
+ A case in `expected-failures.txt` can fail only with `JudgeNotBound` or `JudgeTypeRejected`. If a bound case runs and gives a wrong result, the runner reports it as `bound_wrong` and fails, even though the case is in the list.
