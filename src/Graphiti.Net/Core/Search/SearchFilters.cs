@@ -141,10 +141,17 @@ internal sealed record SearchFilters : IPydanticModel
 
     internal List<PropertyFilter>? PropertyFilters { get; set; }
 
+    // @field_validator('node_labels'): validate_node_label_filters. PydanticFields puts the field name in front of the
+    // location when ModelValidate reads the field, so the error has no field of its own here.
+    private static List<string>? ValidateNodeLabelFilters(List<string>? value)
+    {
+        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), "SearchFilters");
+        return value;
+    }
+
     internal SearchFilters Validate()
     {
-        // @field_validator('node_labels'): validate_node_label_filters
-        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(NodeLabels), "SearchFilters", "node_labels");
+        ValidateNodeLabelFilters(NodeLabels);
         return this;
     }
 
@@ -155,7 +162,7 @@ internal sealed record SearchFilters : IPydanticModel
             Pydantic.Optional(v, x => Pydantic.List(x, y => Pydantic.List(y, z => Pydantic.Model(z, "DateFilter", DateFilter.ModelValidate))));
 
         var f = new PydanticFields("SearchFilters", data);
-        var nodeLabels = f.Default("node_labels", Strs, () => null);
+        var nodeLabels = f.Default("node_labels", v => ValidateNodeLabelFilters(Strs(v)), () => null);
         var edgeTypes = f.Default("edge_types", Strs, () => null);
         var validAt = f.Default("valid_at", DateFilters, () => null);
         var invalidAt = f.Default("invalid_at", DateFilters, () => null);
