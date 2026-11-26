@@ -12,19 +12,51 @@ public class PyAstTests
     {
         var cases = Cases("literal_eval");
         Assert.True(cases.Count > 8000);
-        foreach (var c in cases)
+        OnLargeStack(() =>
         {
-            Run(c);
-        }
+            foreach (var c in cases)
+            {
+                Run(c);
+            }
+        });
     }
 
     [Fact]
     public void LiteralEval_of_long_and_deeply_nested_texts_matches_Python()
     {
-        foreach (var c in Cases("literal_eval_big"))
+        OnLargeStack(() =>
         {
-            Run(c);
-        }
+            foreach (var c in Cases("literal_eval_big"))
+            {
+                Run(c);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Runs the body on a thread with a 256 MB stack. The parser recurses to the depth that Python allows. A build
+    /// that Stryker mutates has larger stack frames, and on a default stack the deep cases overflow there and stop the
+    /// test host, so that no mutant gets a result.
+    /// </summary>
+    private static void OnLargeStack(Action body)
+    {
+        System.Runtime.ExceptionServices.ExceptionDispatchInfo? error = null;
+        var thread = new Thread(
+            () =>
+            {
+                try
+                {
+                    body();
+                }
+                catch (Exception e)
+                {
+                    error = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e);
+                }
+            },
+            256 * 1024 * 1024);
+        thread.Start();
+        thread.Join();
+        error?.Throw();
     }
 
     [Fact]
