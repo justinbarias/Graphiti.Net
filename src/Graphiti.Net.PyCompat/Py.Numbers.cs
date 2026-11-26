@@ -272,6 +272,23 @@ internal static partial class Py
     }
 
     /// <summary>
+    /// <c>int(x)</c> on a value from open data: a bool, an int, a float (cut toward zero), text, or bytes with
+    /// decimal text. Another type throws <see cref="InvalidCastException"/> with the text of Python's
+    /// <c>TypeError</c>. An int outside the range of a long throws <see cref="OverflowException"/>, where Python
+    /// returns the value (RULES.md R4).
+    /// </summary>
+    internal static long Int(object? x) => x switch
+    {
+        bool b => b ? 1 : 0,
+        long l => l,
+        BigInteger => throw new OverflowException("the value does not fit in a long"),
+        double d => Int(d),
+        string s => Int(s),
+        byte[] bytes => Int(System.Text.Encoding.Latin1.GetString(bytes)),
+        _ => throw new InvalidCastException($"int() argument must be a string, a bytes-like object or a real number, not '{TypeName(x)}'"),
+    };
+
+    /// <summary>
     /// <c>int(text)</c>: decimal text with an optional sign, underscores between digits, Unicode digits,
     /// and whitespace at both ends. Text that does not parse throws <see cref="ArgumentException"/>
     /// (<c>ValueError</c>). A value outside the range of a long throws <see cref="OverflowException"/>.

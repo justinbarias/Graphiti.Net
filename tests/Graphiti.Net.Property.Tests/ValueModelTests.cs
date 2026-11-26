@@ -747,4 +747,61 @@ public class ValueModelTests
         var error = Assert.Throws<MissingMemberException>(() => Py.NotNone<string>(null, "replace"));
         Assert.Equal("'NoneType' object has no attribute 'replace'", error.Message);
     }
+
+    // Python 3.12: x.get raises AttributeError("'<type>' object has no attribute 'get'") for each value below.
+    [Theory]
+    [InlineData("int")]
+    [InlineData("str")]
+    [InlineData("list")]
+    [InlineData("tuple")]
+    [InlineData("float")]
+    [InlineData("bool")]
+    [InlineData("NoneType")]
+    public void Receiver_returns_a_value_of_the_type_or_throws_the_AttributeError_of_Python(string type)
+    {
+        object? value = type switch
+        {
+            "int" => 5L,
+            "str" => "x",
+            "list" => new List<object?> { 1L },
+            "tuple" => new PyTuple(1L),
+            "float" => 1.5,
+            "bool" => true,
+            _ => null,
+        };
+        var error = Assert.Throws<MissingMemberException>(() => Py.Receiver<OrderedDictionary<string, object?>>(value, "get"));
+        Assert.Equal($"'{type}' object has no attribute 'get'", error.Message);
+
+        var dict = new OrderedDictionary<string, object?> { ["a"] = 1L };
+        Assert.Same(dict, Py.Receiver<OrderedDictionary<string, object?>>(dict, "get"));
+    }
+
+    [Fact]
+    public void TypeName_of_a_delegate_is_function()
+    {
+        // Python 3.12: type(f).__name__ is 'function' for a def and for a lambda.
+        Assert.Equal("function", Py.TypeName((Func<long>)(() => 0L)));
+    }
+
+    [Fact]
+    public void Int_of_an_open_value_gives_what_int_gives_in_Python()
+    {
+        // Python 3.12: int(True) 1, int(7) 7, int(7.9) 7, int(-7.9) -7, int('  12 ') 12, int(b'12') 12.
+        Assert.Equal(1L, Py.Int((object?)true));
+        Assert.Equal(7L, Py.Int((object?)7L));
+        Assert.Equal(7L, Py.Int((object?)7.9));
+        Assert.Equal(-7L, Py.Int((object?)-7.9));
+        Assert.Equal(12L, Py.Int((object?)"  12 "));
+        Assert.Equal(12L, Py.Int((object?)"12"u8.ToArray()));
+
+        // Python 3.12: int(None), int([1]), and int({'a': 1}) raise TypeError with the type name at the end.
+        foreach (var (value, name) in new (object?, string)[] { (null, "NoneType"), (new List<object?> { 1L }, "list"), (new OrderedDictionary<string, object?>(), "dict") })
+        {
+            var error = Assert.Throws<InvalidCastException>(() => Py.Int(value));
+            Assert.Equal($"int() argument must be a string, a bytes-like object or a real number, not '{name}'", error.Message);
+        }
+
+        // Python returns 2**70. A long cannot hold it (R4).
+        Assert.Throws<OverflowException>(() => Py.Int((object?)System.Numerics.BigInteger.Pow(2, 70)));
+    }
 }
