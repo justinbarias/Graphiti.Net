@@ -39,13 +39,33 @@ internal abstract class GraphMaintenanceOperations
         List<string>? groupIds = null,
         CancellationToken cancellationToken = default);
 
-    // TODO(port): remove_communities
-    internal virtual Task RemoveCommunitiesAsync(
+    /// <summary>Delete communities, optionally restricted to the provided groups.</summary>
+    internal virtual async Task RemoveCommunitiesAsync(
         QueryExecutor executor,
         List<string>? groupIds = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): remove_communities");
+        if (groupIds is { Count: > 0 })
+        {
+            await executor.ExecuteQueryAsync(
+                "\n" + """
+                MATCH (c:Community)
+                WHERE c.group_id IN $group_ids
+                DETACH DELETE c
+""" + "\n                ",
+                new OrderedDictionary<string, object?> { ["group_ids"] = groupIds },
+                cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(
+                "\n" + """
+                MATCH (c:Community)
+                DETACH DELETE c
+""" + "\n                ",
+                new(),
+                cancellationToken);
+        }
     }
 
     internal abstract Task DetermineEntityCommunityAsync(

@@ -71,4 +71,35 @@ public class SequenceAndUuidTests
                 && !s.Any(char.IsUpper) && hex.Length == 32 && hex[12] == '4' && !hex.Any(char.IsUpper);
         }, iter: 200);
     }
+
+    [Theory]
+    [InlineData(new[] { 1, 2, 3 }, new[] { 4, 5 }, 2, "zip() argument 2 is shorter than argument 1")]
+    [InlineData(new[] { 1, 2 }, new[] { 4, 5, 6 }, 2, "zip() argument 2 is longer than argument 1")]
+    [InlineData(new int[0], new[] { 1 }, 0, "zip() argument 2 is longer than argument 1")]
+    [InlineData(new[] { 1 }, new int[0], 0, "zip() argument 2 is shorter than argument 1")]
+    [InlineData(new[] { 1, 2 }, new[] { 3, 4 }, 2, null)]
+    public void ZipStrict_gives_the_pairs_and_then_the_ValueError_of_Python(int[] a, int[] b, int pairs, string? error)
+    {
+        // Each row is what Python 3.12 gives for zip(a, b, strict=True): the pairs before the error, and its text.
+        var seen = new List<(int First, int Second)>();
+        void Loop()
+        {
+            foreach (var pair in Py.ZipStrict(a, b))
+            {
+                seen.Add(pair);
+            }
+        }
+
+        if (error is null)
+        {
+            Loop();
+        }
+        else
+        {
+            Assert.Equal(error, Assert.Throws<ArgumentException>(Loop).Message);
+        }
+
+        Assert.Equal(pairs, seen.Count);
+        Assert.Equal(a.Zip(b).Take(pairs), seen);
+    }
 }

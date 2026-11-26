@@ -158,4 +158,52 @@ Commands at the tip:
 - The recorders with `--check`: `helpers` 1,926 cases, the query builders 2,804, `namespaces` 177, `tracer` 900, and the numpy values. Each one is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 681 passed, 0 unexpected, 0 bound and wrong. 278 ids left `expected-failures.txt`, and 1,318 stay. The pull request lists the ids.
 
+### Layer 2, the graph types and the driver contract, 2026-11-27
+
+Three packets ported 6 modules, and `utils.ontology_utils.entity_types_utils` came from layer 1. Two Opus 5.5 high reviewers read each packet. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Review findings |
+| --- | --- | --- |
+| P2a | `nodes` | 9 and 14 findings. 9 of the seeded defects of one reviewer passed each test before the fix round. |
+| P2b | `edges` | 6 and 12 findings. 13 of 34 seeded defects passed each test before the fix round. |
+| P2c | `driver.driver`, `driver.record_parsers`, `driver.operations.graph_utils`, `driver.operations.graph_ops` | 5 and 11 findings. 16 of 38 seeded defects passed each test before the fix round, and 1 made the test run hang. |
+
+What the reviews found, and the result:
+
+| Finding | Result |
+| --- | --- |
+| After a length error of `zip(strict=True)`, the port assigned no embedding. Python assigns each pair first. | `Py.ZipStrict` in `PyCompat` (Part 3 of the rulebook). |
+| A bad label together with another field error gave one pydantic error, not two. | The validator of an abstract base model has a static form that the field reader calls (rule R7). |
+| `EpisodeType.from_str` and `parse_db_date` threw for a record value of another type, where Python gives a result. | Both take `object?` (rules R20 and R22). Four O4 cases pass now. |
+| A method call on a record value of a wrong type threw `TypeError`, where Python raises `AttributeError`. | `Py.Receiver<T>` in `PyCompat` (rule R4). GAPS F24 names what stays different. |
+| The `else` branch of `try`/`except`/`else` used the result as its flag, so an interface that returns `None` ran the query. | A filtered catch, `catch (A) when (!returned)` (Part 3). GAPS F25 names what stays different. |
+| `GraphDriver.transaction` closed its session with a canceled token, so a canceled body left the session open. | `CancellationToken.None` in the `finally` (rule R8), with a test that fails for the old form. |
+| A fake that completes at once cannot show a missing `await`, and no test passed a canceled token. | Each fake yields first, and each unit has a canceled-token theory (rule R25). |
+| A wrong tie order in label propagation made the test run hang, because of upstream defect U11. | Each case has a time limit of 5 seconds. |
+| The recorders left out defaults, a limit of 0, an empty group id, equality, hashing, and the order of log lines and calls. | The recordings have 1,155 (`nodes`), 1,140 (`edges`), and 1,128 (driver contract) cases. |
+| Two pilot tests read each JSON integer as a float. | Fixed. A seeded reader that rejects an int now fails 4 tests. |
+
+Differences that the lead accepted by name under D39: GAPS F24, GAPS F25, the R7 row for `load_fact_embedding`, and `model_copy(update=...)` on a `validate_assignment` model. No upstream site reaches them with Neo4j.
+
+The adversarial pass over the layer (Opus 5.5, high effort) gave 3 important findings and 3 small ones. The lead fixed each one:
+
+- `get_entity_node_from_record` read `labels` before it ran `group_id.replace`. The port now keeps the order of Python, and the recording holds three records with two wrong fields.
+- `Py.Int` accepted bytes with a byte that is whitespace only in text, such as `0xA0`. It now reads bytes as Python does and gives the bytes repr in the error.
+- The text of GAPS F24 named fewer differences than the tests exempt. It now names each one: a list as `attributes`, a value that is not a list as `labels`, and a dict with keys that are not text.
+- The gate log, an O4 row, a count in `port/STATE.md`, and a sentence of rule R8 were stale. One fake did not yield.
+
+Evidence that waits for a later layer:
+
+- `driver.driver`: no test reads the four index names with their environment variables set. The port has no seam for them.
+- `utils.ontology_utils.entity_types_utils`: the cases that pass the `ExtractedEntities` class stay listed until layer 4 registers it.
+- `Py.TimeSeconds` reads the system clock, so no test compares the time text of the debug line of `generate_embedding`.
+- The Neo4j branch of each `save` and `get` method runs on a database first in layer 5.
+
+Commands at the tip:
+
+- `scripts/check.sh`: `check: passed`.
+- `dotnet test --project tests/Port.Evaluation`: 5,889 tests, 0 failed, 0 skipped.
+- The recorders with `--check`: each of the eight is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 957 passed, 0 unexpected, 0 bound and wrong. 276 ids left `expected-failures.txt`, and 1,042 stay. The pull request lists the ids.
+
 Found beside the plan: `scripts/mutate.sh` gave no result on 2026-11-26. Two tests, `PyAstTests.LiteralEval_matches_Python` and `PyAstTests.LiteralEval_of_long_and_deeply_nested_texts_matches_Python`, stop the test host in a mutated build. Stryker then runs them against each mutant, and each mutant gets the status `RuntimeError`. A probe on `PyHash.cs` with 56 mutants took 159 seconds and gave 56 errors. With the two tests skipped it took 8 seconds and killed 56. The probable cause is a stack overflow in the mutated parser. The lead fixes the two tests before the mutation run of layer 5.

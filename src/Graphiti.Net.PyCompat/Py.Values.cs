@@ -142,6 +142,29 @@ internal static partial class Py
     internal static object? DeepCopy(object? x) =>
         DeepCopy(x, new Dictionary<object, object?>(ReferenceEqualityComparer.Instance));
 
+    /// <summary>
+    /// A method call on a value that can be <c>None</c>: returns the value, or throws what Python raises for
+    /// <c>None.attribute</c>, an <c>AttributeError</c> (RULES.md R4).
+    /// </summary>
+    /// <param name="value">The value from open data.</param>
+    /// <param name="attribute">The Python name of the method or the attribute that the code reads.</param>
+    internal static T NotNone<T>(T? value, string attribute)
+        where T : class =>
+        value ?? throw new MissingMemberException($"'NoneType' object has no attribute '{attribute}'");
+
+    /// <summary>
+    /// A method call on a value from open data: <c>x.get(...)</c>, <c>x.items()</c>, <c>x.pop(...)</c>,
+    /// <c>x.replace(...)</c>. Returns the value if it has the C# type <typeparamref name="T"/> of the Python type that
+    /// has the method. For <c>None</c> and for a value of another type it throws what Python raises, an
+    /// <c>AttributeError</c> with the type name of the value (RULES.md R4).
+    /// </summary>
+    /// <typeparam name="T">The C# type that the port uses for the Python type with the method.</typeparam>
+    /// <param name="value">The value from open data.</param>
+    /// <param name="attribute">The Python name of the method that the code calls.</param>
+    internal static T Receiver<T>(object? value, string attribute)
+        where T : class =>
+        value as T ?? throw new MissingMemberException($"'{TypeName(value)}' object has no attribute '{attribute}'");
+
     /// <summary><c>value.value if hasattr(value, 'value') else value</c> for text: the text.</summary>
     internal static string EnumValue(string value) => value;
 
@@ -247,6 +270,7 @@ internal static partial class Py
         DateOnly => "datetime.date",
         PyDateTime => "datetime.datetime",
         Enum e => PyEnum.ClassName(e),
+        Delegate => "function",
         _ => x.GetType().Name,
     };
 

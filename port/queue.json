@@ -93,9 +93,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton and the docstrings of layer 2. Each member raises NotImplementedError."
     },
     {
       "order": 3,
@@ -205,9 +205,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton and the docstrings of layer 2. Each member raises NotImplementedError."
     },
     {
       "order": 10,
@@ -245,8 +245,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Driver/Driver.cs",
-      "status": "todo",
-      "notes": "The pilot ported the enum GraphProvider for real (rule R24). The other members are not ported."
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews and one fix round. No test reads the four index names with the environment variables set, because the port reads them one time and has no seam for them."
     },
     {
       "order": 11,
@@ -262,9 +262,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/CommunityEdgeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 12,
@@ -280,9 +280,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/CommunityNodeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 13,
@@ -298,9 +298,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/EntityEdgeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 14,
@@ -335,9 +335,9 @@
         "abc",
         "datetime"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/EpisodeNodeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 16,
@@ -353,9 +353,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/EpisodicEdgeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 17,
@@ -372,9 +372,9 @@
         "abc",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/GraphOps.cs",
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews and one fix round."
     },
     {
       "order": 18,
@@ -390,9 +390,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/HasEpisodeEdgeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 19,
@@ -408,9 +408,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/NextEpisodeEdgeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 20,
@@ -426,9 +426,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/SagaNodeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 21,
@@ -447,9 +447,9 @@
         "abc",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/SearchOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the skeleton (plan 0004, layer 0), which had one review. The module has abstract members only."
     },
     {
       "order": 22,
@@ -476,9 +476,9 @@
         "typing_extensions",
         "uuid"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Edges.cs",
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews and one fix round. load_fact_embedding reads the value with the reader of the field (rule R7)."
     },
     {
       "order": 23,
@@ -567,8 +567,8 @@
         "uuid"
       ],
       "target": "src/Graphiti.Net/Core/Nodes.cs",
-      "status": "todo",
-      "notes": "The pilot ported for real (rule R24): the enum EpisodeType with from_str, and on Node and EntityNode the fields, the validation of labels, __eq__, and __hash__. The R7 members and each other member are not ported. tests/Port.Evaluation/TestNodeLabelSecurity.cs holds 2 of the 4 tests of test_node_label_security.py. The other 2 wait for node_db_queries."
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews and one fix round. One TODO(port) marker stays: CommunityNode.save calls driver.save_to_aoss on Neptune, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists it."
     },
     {
       "order": 27,
@@ -833,8 +833,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Utils/TextUtils.cs",
-      "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. 17 covering cases stay listed: 16 need the EpisodicNode model, which layer 2 registers."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. The 16 cases that need the EpisodicNode model pass with layer 2. 1 covering case stays listed with the answer JudgeTypeRejected (open item O4)."
     },
     {
       "order": 41,
@@ -1357,8 +1357,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Driver/RecordParsers.cs",
-      "status": "todo",
-      "notes": "The pilot added the skeleton member entity_node_from_record (rule R24). No member is ported."
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews and one fix round. A method call on a record value uses Py.Receiver (rule R4, GAPS F24)."
     },
     {
       "order": 65,
@@ -1493,9 +1493,9 @@
         "collections",
         "pydantic"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/GraphUtils.cs",
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews and one fix round. label_propagation keeps upstream defect U11. The recording leaves out 580 graphs for which Python does not end, and each test case has a time limit."
     },
     {
       "order": 71,
@@ -2272,8 +2272,8 @@
         "pydantic"
       ],
       "target": "src/Graphiti.Net/Core/Utils/OntologyUtils/EntityTypesUtils.cs",
-      "status": "todo",
-      "notes": "Moved from layer 1 to layer 2: it reads the fields of EntityNode."
+      "status": "reviewed",
+      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. The cases that pass the ExtractedEntities class stay listed until the extract_nodes unit of layer 4 registers it."
     },
     {
       "order": 102,
@@ -2473,8 +2473,8 @@
         "neo4j"
       ],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 109,
@@ -3254,8 +3254,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 140,

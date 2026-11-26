@@ -17,30 +17,128 @@ limitations under the License.
 
 namespace Graphiti.Core.Driver;
 
+using Graphiti.PyCompat;
+
 internal static class RecordParsers
 {
     /// <summary>Parse an entity node from a database record.</summary>
-    // TODO(port): entity_node_from_record
     internal static EntityNode EntityNodeFromRecord(OrderedDictionary<string, object?> record)
     {
-        throw new NotSupportedException("TODO(port): entity_node_from_record");
+        // PORT: attributes.pop(...) on a value from open data raises AttributeError for a value without pop (R4, Py.Receiver).
+        var attributes = Py.Receiver<OrderedDictionary<string, object?>>(record["attributes"], "pop");
+        attributes.Remove("uuid");
+        attributes.Remove("name");
+        attributes.Remove("group_id");
+        attributes.Remove("name_embedding");
+        attributes.Remove("summary");
+        attributes.Remove("created_at");
+        attributes.Remove("labels");
+
+        // PORT: labels is read as open data here. The `in` test keeps the typed read (GAPS F24), and remove is a method call on it (R4, Py.Receiver).
+        var labels = Py.Get(record, "labels", (object?)new List<object?>());
+        var groupId = Py.Get(record, "group_id");
+        var dynamicLabel = "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal);
+        if (Py.Contains(Py.AsList(labels), dynamicLabel))
+        {
+            Py.Remove(Py.Receiver<List<object?>>(labels, "remove"), dynamicLabel);
+        }
+
+        // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
+        return EntityNode.ModelValidate(new OrderedDictionary<string, object?>
+        {
+            ["uuid"] = record["uuid"],
+            ["name"] = record["name"],
+            ["name_embedding"] = Py.Get(record, "name_embedding"),
+            ["group_id"] = groupId,
+            ["labels"] = labels,
+            ["created_at"] = Helpers.ParseDbDate(record["created_at"]), // type: ignore[arg-type]
+            ["summary"] = record["summary"],
+            ["attributes"] = attributes,
+        });
     }
 
-    // TODO(port): entity_edge_from_record
+    /// <summary>Parse an entity edge from a database record.</summary>
     internal static EntityEdge EntityEdgeFromRecord(OrderedDictionary<string, object?> record)
     {
-        throw new NotSupportedException("TODO(port): entity_edge_from_record");
+        // PORT: attributes.pop(...) on a value from open data raises AttributeError for a value without pop (R4, Py.Receiver).
+        var attributes = Py.Receiver<OrderedDictionary<string, object?>>(record["attributes"], "pop");
+        attributes.Remove("uuid");
+        attributes.Remove("source_node_uuid");
+        attributes.Remove("target_node_uuid");
+        attributes.Remove("fact");
+        attributes.Remove("fact_embedding");
+        attributes.Remove("name");
+        attributes.Remove("group_id");
+        attributes.Remove("episodes");
+        attributes.Remove("created_at");
+        attributes.Remove("expired_at");
+        attributes.Remove("valid_at");
+        attributes.Remove("invalid_at");
+        attributes.Remove("reference_time");
+
+        // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
+        return EntityEdge.ModelValidate(new OrderedDictionary<string, object?>
+        {
+            ["uuid"] = record["uuid"],
+            ["source_node_uuid"] = record["source_node_uuid"],
+            ["target_node_uuid"] = record["target_node_uuid"],
+            ["fact"] = record["fact"],
+            ["fact_embedding"] = Py.Get(record, "fact_embedding"),
+            ["name"] = record["name"],
+            ["group_id"] = record["group_id"],
+            ["episodes"] = record["episodes"],
+            ["created_at"] = Helpers.ParseDbDate(record["created_at"]), // type: ignore[arg-type]
+            ["expired_at"] = Helpers.ParseDbDate(record["expired_at"]),
+            ["valid_at"] = Helpers.ParseDbDate(record["valid_at"]),
+            ["invalid_at"] = Helpers.ParseDbDate(record["invalid_at"]),
+            ["reference_time"] = Helpers.ParseDbDate(Py.Get(record, "reference_time")),
+            ["attributes"] = attributes,
+        });
     }
 
-    // TODO(port): episodic_node_from_record
+    /// <summary>Parse an episodic node from a database record.</summary>
     internal static EpisodicNode EpisodicNodeFromRecord(OrderedDictionary<string, object?> record)
     {
-        throw new NotSupportedException("TODO(port): episodic_node_from_record");
+        var createdAt = Helpers.ParseDbDate(record["created_at"]);
+        var validAt = Helpers.ParseDbDate(record["valid_at"]);
+
+        if (createdAt is null)
+        {
+            throw new ArgumentException("created_at cannot be None for episode " + Py.Str(Py.Get(record, "uuid", (object?)"unknown")));
+        }
+
+        if (validAt is null)
+        {
+            throw new ArgumentException("valid_at cannot be None for episode " + Py.Str(Py.Get(record, "uuid", (object?)"unknown")));
+        }
+
+        // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
+        return EpisodicNode.ModelValidate(new OrderedDictionary<string, object?>
+        {
+            ["content"] = record["content"],
+            ["created_at"] = createdAt,
+            ["valid_at"] = validAt,
+            ["uuid"] = record["uuid"],
+            ["group_id"] = record["group_id"],
+            ["source"] = EpisodeTypeExtensions.FromStr(record["source"]),
+            ["name"] = record["name"],
+            ["source_description"] = record["source_description"],
+            ["entity_edges"] = record["entity_edges"],
+        });
     }
 
-    // TODO(port): community_node_from_record
+    /// <summary>Parse a community node from a database record.</summary>
     internal static CommunityNode CommunityNodeFromRecord(OrderedDictionary<string, object?> record)
     {
-        throw new NotSupportedException("TODO(port): community_node_from_record");
+        // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
+        return CommunityNode.ModelValidate(new OrderedDictionary<string, object?>
+        {
+            ["uuid"] = record["uuid"],
+            ["name"] = record["name"],
+            ["group_id"] = record["group_id"],
+            ["name_embedding"] = record["name_embedding"],
+            ["created_at"] = Helpers.ParseDbDate(record["created_at"]), // type: ignore[arg-type]
+            ["summary"] = record["summary"],
+        });
     }
 }
