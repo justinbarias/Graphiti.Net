@@ -22,17 +22,82 @@ using Graphiti.Internal;
 // PORT: a custom type is a GraphTypeDescriptor (R15, decision D26).
 internal static class EntityTypesUtils
 {
-    // TODO(port): validate_entity_types
+    // PORT: `EntityNode.model_fields.keys()` (entity_types_utils.py:29). No rule gives the field names of a built-in
+    // model, so this list holds the keys of EntityNode.model_fields in the order of Python: the fields of Node, then
+    // the fields of EntityNode.
+    private static readonly string[] EntityNodeFieldNames =
+    [
+        "uuid",
+        "name",
+        "group_id",
+        "labels",
+        "created_at",
+        "name_embedding",
+        "summary",
+        "attributes",
+    ];
+
     internal static bool ValidateEntityTypes(OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
     {
-        throw new NotSupportedException("TODO(port): validate_entity_types");
+        if (entityTypes is null)
+        {
+            return true;
+        }
+
+        var entityNodeFieldNames = EntityNodeFieldNames;
+
+        foreach (var (entityTypeName, entityTypeModel) in entityTypes)
+        {
+            var entityTypeFieldNames = entityTypeModel.ModelFields.Keys;
+            foreach (var entityTypeFieldName in entityTypeFieldNames)
+            {
+                if (Array.IndexOf(entityNodeFieldNames, entityTypeFieldName) >= 0)
+                {
+                    throw new EntityTypeValidationException(entityTypeName, entityTypeFieldName);
+                }
+            }
+        }
+
+        return true;
     }
 
-    // TODO(port): validate_identity_properties
     internal static bool ValidateIdentityProperties(
         OrderedDictionary<string, List<string>>? identityProperties,
         OrderedDictionary<string, GraphTypeDescriptor>? entityTypes)
     {
-        throw new NotSupportedException("TODO(port): validate_identity_properties");
+        if (identityProperties is null)
+        {
+            return true;
+        }
+
+        foreach (var (entityTypeName, propertyNames) in identityProperties)
+        {
+            if (entityTypes is null || !entityTypes.TryGetValue(entityTypeName, out var entityType))
+            {
+                throw new IdentityPropertyValidationException(
+                    entityTypeName,
+                    "entity type is not defined in entity_types");
+            }
+
+            if (propertyNames is null || propertyNames.Count == 0)
+            {
+                throw new IdentityPropertyValidationException(
+                    entityTypeName,
+                    "property list must be a non-empty list");
+            }
+
+            var entityTypeFields = entityType.ModelFields;
+            foreach (var propertyName in propertyNames)
+            {
+                if (!entityTypeFields.ContainsKey(propertyName))
+                {
+                    throw new IdentityPropertyValidationException(
+                        entityTypeName,
+                        $"{propertyName} is not a field of the entity type");
+                }
+            }
+        }
+
+        return true;
     }
 }
