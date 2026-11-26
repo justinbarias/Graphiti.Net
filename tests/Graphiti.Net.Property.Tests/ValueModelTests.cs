@@ -738,4 +738,3 @@ public class ValueModelTests
         Assert.Equal("'float' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(1.5)).Message);
         Assert.Equal("'bool' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(true)).Message);
     }
-}

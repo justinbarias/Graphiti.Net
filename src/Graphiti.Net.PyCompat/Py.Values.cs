@@ -142,6 +142,16 @@ internal static partial class Py
     internal static object? DeepCopy(object? x) =>
         DeepCopy(x, new Dictionary<object, object?>(ReferenceEqualityComparer.Instance));
 
+    /// <summary>
+    /// A method call on a value that can be <c>None</c>: returns the value, or throws what Python raises for
+    /// <c>None.attribute</c>, an <c>AttributeError</c> (RULES.md R4).
+    /// </summary>
+    /// <param name="value">The value from open data.</param>
+    /// <param name="attribute">The Python name of the method or the attribute that the code reads.</param>
+    internal static T NotNone<T>(T? value, string attribute)
+        where T : class =>
+        value ?? throw new MissingMemberException($"'NoneType' object has no attribute '{attribute}'");
+
     /// <summary><c>value.value if hasattr(value, 'value') else value</c> for text: the text.</summary>
     internal static string EnumValue(string value) => value;
 
