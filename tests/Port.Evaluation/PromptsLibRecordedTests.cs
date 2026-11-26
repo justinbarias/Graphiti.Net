@@ -17,21 +17,23 @@ public class PromptsLibRecordedTests
 
     private static readonly List<JsonElement> Cases = Load();
 
+    // Five models are no response models in upstream, so they have no ResponseModel member (R7). The recording passes
+    // each model class as an argument, so the table builds the value for them.
     private static readonly Dictionary<string, IResponseModel> Models = new()
     {
         ["ExtractedEntity"] = ExtractedEntity.ResponseModel,
         ["ExtractedEntities"] = ExtractedEntities.ResponseModel,
-        ["EntitySummary"] = EntitySummary.ResponseModel,
-        ["SummarizedEntity"] = SummarizedEntity.ResponseModel,
+        ["EntitySummary"] = new BuiltinResponseModel("EntitySummary", EntitySummary.ModelJsonSchema),
+        ["SummarizedEntity"] = new BuiltinResponseModel("SummarizedEntity", SummarizedEntity.ModelJsonSchema),
         ["SummarizedEntities"] = SummarizedEntities.ResponseModel,
         ["NodeDuplicate"] = NodeDuplicate.ResponseModel,
         ["NodeResolutions"] = NodeResolutions.ResponseModel,
-        ["Edge"] = Edge.ResponseModel,
+        ["Edge"] = new BuiltinResponseModel("Edge", Edge.ModelJsonSchema),
         ["ExtractedEdges"] = ExtractedEdges.ResponseModel,
         ["EdgeTimestamps"] = EdgeTimestamps.ResponseModel,
         ["BatchEdgeTimestamps"] = BatchEdgeTimestamps.ResponseModel,
-        ["CombinedEntity"] = CombinedEntity.ResponseModel,
-        ["CombinedFact"] = CombinedFact.ResponseModel,
+        ["CombinedEntity"] = new BuiltinResponseModel("CombinedEntity", CombinedEntity.ModelJsonSchema),
+        ["CombinedFact"] = new BuiltinResponseModel("CombinedFact", CombinedFact.ModelJsonSchema),
         ["CombinedExtraction"] = CombinedExtraction.ResponseModel,
         ["EdgeDuplicate"] = EdgeDuplicate.ResponseModel,
         ["Summary"] = Summary.ResponseModel,
