@@ -1,0 +1,2271 @@
+{
+ "python": "3.12.13",
+ "source": "graphiti_core/errors.py",
+ "cases": [
+  {
+   "class": "GraphitiError",
+   "args": [],
+   "str": "",
+   "message": null,
+   "bases": [
+    "Exception"
+   ]
+  },
+  {
+   "class": "GraphitiError",
+   "args": [
+    "abc"
+   ],
+   "str": "abc",
+   "message": null,
+   "bases": [
+    "Exception"
+   ]
+  },
+  {
+   "class": "GraphitiError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "Zo\u00eb \u6771\u4eac",
+   "message": null,
+   "bases": [
+    "Exception"
+   ]
+  },
+  {
+   "class": "GraphitiError",
+   "args": [
+    "a",
+    "b"
+   ],
+   "str": "('a', 'b')",
+   "message": null,
+   "bases": [
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "abc"
+   ],
+   "str": "edge abc not found",
+   "message": "edge abc not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    ""
+   ],
+   "str": "edge  not found",
+   "message": "edge  not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "edge Zo\u00eb \u6771\u4eac not found",
+   "message": "edge Zo\u00eb \u6771\u4eac not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "a\"b'c"
+   ],
+   "str": "edge a\"b'c not found",
+   "message": "edge a\"b'c not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "it's"
+   ],
+   "str": "edge it's not found",
+   "message": "edge it's not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "line\nbreak"
+   ],
+   "str": "edge line\nbreak not found",
+   "message": "edge line\nbreak not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "tab\there"
+   ],
+   "str": "edge tab\there not found",
+   "message": "edge tab\there not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "emoji \ud83d\ude00"
+   ],
+   "str": "edge emoji \ud83d\ude00 not found",
+   "message": "edge emoji \ud83d\ude00 not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "e\u0301"
+   ],
+   "str": "edge e\u0301 not found",
+   "message": "edge e\u0301 not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgeNotFoundError",
+   "args": [
+    "{braces} %s {0}"
+   ],
+   "str": "edge {braces} %s {0} not found",
+   "message": "edge {braces} %s {0} not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    []
+   ],
+   "str": "None of the edges for [] were found.",
+   "message": "None of the edges for [] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "a"
+    ]
+   ],
+   "str": "None of the edges for ['a'] were found.",
+   "message": "None of the edges for ['a'] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "a",
+     "b"
+    ]
+   ],
+   "str": "None of the edges for ['a', 'b'] were found.",
+   "message": "None of the edges for ['a', 'b'] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "it's",
+     "q\"x"
+    ]
+   ],
+   "str": "None of the edges for [\"it's\", 'q\"x'] were found.",
+   "message": "None of the edges for [\"it's\", 'q\"x'] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "Zo\u00eb",
+     "\u6771\u4eac"
+    ]
+   ],
+   "str": "None of the edges for ['Zo\u00eb', '\u6771\u4eac'] were found.",
+   "message": "None of the edges for ['Zo\u00eb', '\u6771\u4eac'] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "both ' and \""
+    ]
+   ],
+   "str": "None of the edges for ['both \\' and \"'] were found.",
+   "message": "None of the edges for ['both \\' and \"'] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "back\\slash",
+     "line\nbreak"
+    ]
+   ],
+   "str": "None of the edges for ['back\\\\slash', 'line\\nbreak'] were found.",
+   "message": "None of the edges for ['back\\\\slash', 'line\\nbreak'] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EdgesNotFoundError",
+   "args": [
+    [
+     "\ud83d\ude00",
+     "e\u0301",
+     ""
+    ]
+   ],
+   "str": "None of the edges for ['\ud83d\ude00', 'e\u0301', ''] were found.",
+   "message": "None of the edges for ['\ud83d\ude00', 'e\u0301', ''] were found.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    []
+   ],
+   "str": "no edges found for group ids []",
+   "message": "no edges found for group ids []",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "a"
+    ]
+   ],
+   "str": "no edges found for group ids ['a']",
+   "message": "no edges found for group ids ['a']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "a",
+     "b"
+    ]
+   ],
+   "str": "no edges found for group ids ['a', 'b']",
+   "message": "no edges found for group ids ['a', 'b']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "it's",
+     "q\"x"
+    ]
+   ],
+   "str": "no edges found for group ids [\"it's\", 'q\"x']",
+   "message": "no edges found for group ids [\"it's\", 'q\"x']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "Zo\u00eb",
+     "\u6771\u4eac"
+    ]
+   ],
+   "str": "no edges found for group ids ['Zo\u00eb', '\u6771\u4eac']",
+   "message": "no edges found for group ids ['Zo\u00eb', '\u6771\u4eac']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "both ' and \""
+    ]
+   ],
+   "str": "no edges found for group ids ['both \\' and \"']",
+   "message": "no edges found for group ids ['both \\' and \"']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "back\\slash",
+     "line\nbreak"
+    ]
+   ],
+   "str": "no edges found for group ids ['back\\\\slash', 'line\\nbreak']",
+   "message": "no edges found for group ids ['back\\\\slash', 'line\\nbreak']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsEdgesNotFoundError",
+   "args": [
+    [
+     "\ud83d\ude00",
+     "e\u0301",
+     ""
+    ]
+   ],
+   "str": "no edges found for group ids ['\ud83d\ude00', 'e\u0301', '']",
+   "message": "no edges found for group ids ['\ud83d\ude00', 'e\u0301', '']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    []
+   ],
+   "str": "no nodes found for group ids []",
+   "message": "no nodes found for group ids []",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "a"
+    ]
+   ],
+   "str": "no nodes found for group ids ['a']",
+   "message": "no nodes found for group ids ['a']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "a",
+     "b"
+    ]
+   ],
+   "str": "no nodes found for group ids ['a', 'b']",
+   "message": "no nodes found for group ids ['a', 'b']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "it's",
+     "q\"x"
+    ]
+   ],
+   "str": "no nodes found for group ids [\"it's\", 'q\"x']",
+   "message": "no nodes found for group ids [\"it's\", 'q\"x']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "Zo\u00eb",
+     "\u6771\u4eac"
+    ]
+   ],
+   "str": "no nodes found for group ids ['Zo\u00eb', '\u6771\u4eac']",
+   "message": "no nodes found for group ids ['Zo\u00eb', '\u6771\u4eac']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "both ' and \""
+    ]
+   ],
+   "str": "no nodes found for group ids ['both \\' and \"']",
+   "message": "no nodes found for group ids ['both \\' and \"']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "back\\slash",
+     "line\nbreak"
+    ]
+   ],
+   "str": "no nodes found for group ids ['back\\\\slash', 'line\\nbreak']",
+   "message": "no nodes found for group ids ['back\\\\slash', 'line\\nbreak']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupsNodesNotFoundError",
+   "args": [
+    [
+     "\ud83d\ude00",
+     "e\u0301",
+     ""
+    ]
+   ],
+   "str": "no nodes found for group ids ['\ud83d\ude00', 'e\u0301', '']",
+   "message": "no nodes found for group ids ['\ud83d\ude00', 'e\u0301', '']",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "abc"
+   ],
+   "str": "node abc not found",
+   "message": "node abc not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    ""
+   ],
+   "str": "node  not found",
+   "message": "node  not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "node Zo\u00eb \u6771\u4eac not found",
+   "message": "node Zo\u00eb \u6771\u4eac not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "a\"b'c"
+   ],
+   "str": "node a\"b'c not found",
+   "message": "node a\"b'c not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "it's"
+   ],
+   "str": "node it's not found",
+   "message": "node it's not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "line\nbreak"
+   ],
+   "str": "node line\nbreak not found",
+   "message": "node line\nbreak not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "tab\there"
+   ],
+   "str": "node tab\there not found",
+   "message": "node tab\there not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "emoji \ud83d\ude00"
+   ],
+   "str": "node emoji \ud83d\ude00 not found",
+   "message": "node emoji \ud83d\ude00 not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "e\u0301"
+   ],
+   "str": "node e\u0301 not found",
+   "message": "node e\u0301 not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeNotFoundError",
+   "args": [
+    "{braces} %s {0}"
+   ],
+   "str": "node {braces} %s {0} not found",
+   "message": "node {braces} %s {0} not found",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "abc"
+   ],
+   "str": "abc",
+   "message": "abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    ""
+   ],
+   "str": "",
+   "message": "",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "Zo\u00eb \u6771\u4eac",
+   "message": "Zo\u00eb \u6771\u4eac",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "a\"b'c"
+   ],
+   "str": "a\"b'c",
+   "message": "a\"b'c",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "it's"
+   ],
+   "str": "it's",
+   "message": "it's",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "line\nbreak"
+   ],
+   "str": "line\nbreak",
+   "message": "line\nbreak",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "tab\there"
+   ],
+   "str": "tab\there",
+   "message": "tab\there",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "emoji \ud83d\ude00"
+   ],
+   "str": "emoji \ud83d\ude00",
+   "message": "emoji \ud83d\ude00",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "e\u0301"
+   ],
+   "str": "e\u0301",
+   "message": "e\u0301",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "SearchRerankerError",
+   "args": [
+    "{braces} %s {0}"
+   ],
+   "str": "{braces} %s {0}",
+   "message": "{braces} %s {0}",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for  as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for  as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for Zo\u00eb \u6771\u4eac as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for Zo\u00eb \u6771\u4eac as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "a\"b'c",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for a\"b'c as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for a\"b'c as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "it's",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for it's as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for it's as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "line\nbreak",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for line\nbreak as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for line\nbreak as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "tab\there",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for tab\there as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for tab\there as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "emoji \ud83d\ude00",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for emoji \ud83d\ude00 as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for emoji \ud83d\ude00 as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "e\u0301",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for e\u0301 as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for e\u0301 as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "{braces} %s {0}",
+    "abc"
+   ],
+   "str": "abc cannot be used as an attribute for {braces} %s {0} as it is a protected attribute name.",
+   "message": "abc cannot be used as an attribute for {braces} %s {0} as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    ""
+   ],
+   "str": " cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": " cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "Zo\u00eb \u6771\u4eac cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "Zo\u00eb \u6771\u4eac cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "a\"b'c"
+   ],
+   "str": "a\"b'c cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "a\"b'c cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "it's"
+   ],
+   "str": "it's cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "it's cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "line\nbreak"
+   ],
+   "str": "line\nbreak cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "line\nbreak cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "tab\there"
+   ],
+   "str": "tab\there cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "tab\there cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "emoji \ud83d\ude00"
+   ],
+   "str": "emoji \ud83d\ude00 cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "emoji \ud83d\ude00 cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "e\u0301"
+   ],
+   "str": "e\u0301 cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "e\u0301 cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "EntityTypeValidationError",
+   "args": [
+    "abc",
+    "{braces} %s {0}"
+   ],
+   "str": "{braces} %s {0} cannot be used as an attribute for abc as it is a protected attribute name.",
+   "message": "{braces} %s {0} cannot be used as an attribute for abc as it is a protected attribute name.",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "abc"
+   ],
+   "str": "Invalid identity properties for abc: abc",
+   "message": "Invalid identity properties for abc: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "",
+    "abc"
+   ],
+   "str": "Invalid identity properties for : abc",
+   "message": "Invalid identity properties for : abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac",
+    "abc"
+   ],
+   "str": "Invalid identity properties for Zo\u00eb \u6771\u4eac: abc",
+   "message": "Invalid identity properties for Zo\u00eb \u6771\u4eac: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "a\"b'c",
+    "abc"
+   ],
+   "str": "Invalid identity properties for a\"b'c: abc",
+   "message": "Invalid identity properties for a\"b'c: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "it's",
+    "abc"
+   ],
+   "str": "Invalid identity properties for it's: abc",
+   "message": "Invalid identity properties for it's: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "line\nbreak",
+    "abc"
+   ],
+   "str": "Invalid identity properties for line\nbreak: abc",
+   "message": "Invalid identity properties for line\nbreak: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "tab\there",
+    "abc"
+   ],
+   "str": "Invalid identity properties for tab\there: abc",
+   "message": "Invalid identity properties for tab\there: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "emoji \ud83d\ude00",
+    "abc"
+   ],
+   "str": "Invalid identity properties for emoji \ud83d\ude00: abc",
+   "message": "Invalid identity properties for emoji \ud83d\ude00: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "e\u0301",
+    "abc"
+   ],
+   "str": "Invalid identity properties for e\u0301: abc",
+   "message": "Invalid identity properties for e\u0301: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "{braces} %s {0}",
+    "abc"
+   ],
+   "str": "Invalid identity properties for {braces} %s {0}: abc",
+   "message": "Invalid identity properties for {braces} %s {0}: abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    ""
+   ],
+   "str": "Invalid identity properties for abc: ",
+   "message": "Invalid identity properties for abc: ",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "Invalid identity properties for abc: Zo\u00eb \u6771\u4eac",
+   "message": "Invalid identity properties for abc: Zo\u00eb \u6771\u4eac",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "a\"b'c"
+   ],
+   "str": "Invalid identity properties for abc: a\"b'c",
+   "message": "Invalid identity properties for abc: a\"b'c",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "it's"
+   ],
+   "str": "Invalid identity properties for abc: it's",
+   "message": "Invalid identity properties for abc: it's",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "line\nbreak"
+   ],
+   "str": "Invalid identity properties for abc: line\nbreak",
+   "message": "Invalid identity properties for abc: line\nbreak",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "tab\there"
+   ],
+   "str": "Invalid identity properties for abc: tab\there",
+   "message": "Invalid identity properties for abc: tab\there",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "emoji \ud83d\ude00"
+   ],
+   "str": "Invalid identity properties for abc: emoji \ud83d\ude00",
+   "message": "Invalid identity properties for abc: emoji \ud83d\ude00",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "e\u0301"
+   ],
+   "str": "Invalid identity properties for abc: e\u0301",
+   "message": "Invalid identity properties for abc: e\u0301",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "IdentityPropertyValidationError",
+   "args": [
+    "abc",
+    "{braces} %s {0}"
+   ],
+   "str": "Invalid identity properties for abc: {braces} %s {0}",
+   "message": "Invalid identity properties for abc: {braces} %s {0}",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "abc"
+   ],
+   "str": "group_id \"abc\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"abc\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    ""
+   ],
+   "str": "group_id \"\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "group_id \"Zo\u00eb \u6771\u4eac\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"Zo\u00eb \u6771\u4eac\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "a\"b'c"
+   ],
+   "str": "group_id \"a\"b'c\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"a\"b'c\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "it's"
+   ],
+   "str": "group_id \"it's\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"it's\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "line\nbreak"
+   ],
+   "str": "group_id \"line\nbreak\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"line\nbreak\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "tab\there"
+   ],
+   "str": "group_id \"tab\there\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"tab\there\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "emoji \ud83d\ude00"
+   ],
+   "str": "group_id \"emoji \ud83d\ude00\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"emoji \ud83d\ude00\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "e\u0301"
+   ],
+   "str": "group_id \"e\u0301\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"e\u0301\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "GroupIdValidationError",
+   "args": [
+    "{braces} %s {0}"
+   ],
+   "str": "group_id \"{braces} %s {0}\" must contain only alphanumeric characters, dashes, or underscores",
+   "message": "group_id \"{braces} %s {0}\" must contain only alphanumeric characters, dashes, or underscores",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    []
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: ",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: ",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "a"
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"a\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"a\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "a",
+     "b"
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"a\", \"b\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"a\", \"b\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "it's",
+     "q\"x"
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"it's\", \"q\"x\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"it's\", \"q\"x\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "Zo\u00eb",
+     "\u6771\u4eac"
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"Zo\u00eb\", \"\u6771\u4eac\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"Zo\u00eb\", \"\u6771\u4eac\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "both ' and \""
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"both ' and \"\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"both ' and \"\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "back\\slash",
+     "line\nbreak"
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"back\\slash\", \"line\nbreak\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"back\\slash\", \"line\nbreak\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "NodeLabelValidationError",
+   "args": [
+    [
+     "\ud83d\ude00",
+     "e\u0301",
+     ""
+    ]
+   ],
+   "str": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"\ud83d\ude00\", \"e\u0301\", \"\"",
+   "message": "node_labels must start with a letter or underscore and contain only alphanumeric characters or underscores: \"\ud83d\ude00\", \"e\u0301\", \"\"",
+   "bases": [
+    "GraphitiError",
+    "ValueError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc is expired or failed",
+   "message": "ingestion unit 0 of group abc is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "",
+    0
+   ],
+   "str": "ingestion unit 0 of group  is expired or failed",
+   "message": "ingestion unit 0 of group  is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac",
+    0
+   ],
+   "str": "ingestion unit 0 of group Zo\u00eb \u6771\u4eac is expired or failed",
+   "message": "ingestion unit 0 of group Zo\u00eb \u6771\u4eac is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "a\"b'c",
+    0
+   ],
+   "str": "ingestion unit 0 of group a\"b'c is expired or failed",
+   "message": "ingestion unit 0 of group a\"b'c is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "it's",
+    0
+   ],
+   "str": "ingestion unit 0 of group it's is expired or failed",
+   "message": "ingestion unit 0 of group it's is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "line\nbreak",
+    0
+   ],
+   "str": "ingestion unit 0 of group line\nbreak is expired or failed",
+   "message": "ingestion unit 0 of group line\nbreak is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "tab\there",
+    0
+   ],
+   "str": "ingestion unit 0 of group tab\there is expired or failed",
+   "message": "ingestion unit 0 of group tab\there is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "emoji \ud83d\ude00",
+    0
+   ],
+   "str": "ingestion unit 0 of group emoji \ud83d\ude00 is expired or failed",
+   "message": "ingestion unit 0 of group emoji \ud83d\ude00 is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "e\u0301",
+    0
+   ],
+   "str": "ingestion unit 0 of group e\u0301 is expired or failed",
+   "message": "ingestion unit 0 of group e\u0301 is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "{braces} %s {0}",
+    0
+   ],
+   "str": "ingestion unit 0 of group {braces} %s {0} is expired or failed",
+   "message": "ingestion unit 0 of group {braces} %s {0} is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "abc",
+    7
+   ],
+   "str": "ingestion unit 7 of group abc is expired or failed",
+   "message": "ingestion unit 7 of group abc is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "abc",
+    -1
+   ],
+   "str": "ingestion unit -1 of group abc is expired or failed",
+   "message": "ingestion unit -1 of group abc is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitExpiredError",
+   "args": [
+    "abc",
+    9223372036854775807
+   ],
+   "str": "ingestion unit 9223372036854775807 of group abc is expired or failed",
+   "message": "ingestion unit 9223372036854775807 of group abc is expired or failed",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group  with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group  with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group Zo\u00eb \u6771\u4eac with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group Zo\u00eb \u6771\u4eac with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "a\"b'c",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group a\"b'c with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group a\"b'c with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "it's",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group it's with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group it's with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "line\nbreak",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group line\nbreak with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group line\nbreak with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "tab\there",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group tab\there with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group tab\there with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "emoji \ud83d\ude00",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group emoji \ud83d\ude00 with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group emoji \ud83d\ude00 with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "e\u0301",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group e\u0301 with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group e\u0301 with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "{braces} %s {0}",
+    "abc",
+    0
+   ],
+   "str": "ingestion unit 0 of group {braces} %s {0} with the unit_id abc is in progress",
+   "message": "ingestion unit 0 of group {braces} %s {0} with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id  is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id  is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "Zo\u00eb \u6771\u4eac",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id Zo\u00eb \u6771\u4eac is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id Zo\u00eb \u6771\u4eac is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "a\"b'c",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id a\"b'c is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id a\"b'c is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "it's",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id it's is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id it's is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "line\nbreak",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id line\nbreak is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id line\nbreak is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "tab\there",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id tab\there is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id tab\there is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "emoji \ud83d\ude00",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id emoji \ud83d\ude00 is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id emoji \ud83d\ude00 is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "e\u0301",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id e\u0301 is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id e\u0301 is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "{braces} %s {0}",
+    0
+   ],
+   "str": "ingestion unit 0 of group abc with the unit_id {braces} %s {0} is in progress",
+   "message": "ingestion unit 0 of group abc with the unit_id {braces} %s {0} is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "abc",
+    7
+   ],
+   "str": "ingestion unit 7 of group abc with the unit_id abc is in progress",
+   "message": "ingestion unit 7 of group abc with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "abc",
+    -1
+   ],
+   "str": "ingestion unit -1 of group abc with the unit_id abc is in progress",
+   "message": "ingestion unit -1 of group abc with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "UnitInProgressError",
+   "args": [
+    "abc",
+    "abc",
+    9223372036854775807
+   ],
+   "str": "ingestion unit 9223372036854775807 of group abc with the unit_id abc is in progress",
+   "message": "ingestion unit 9223372036854775807 of group abc with the unit_id abc is in progress",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "abc",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group abc is stale",
+   "message": "commit attempt for ingestion unit 0 of group abc is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group  is stale",
+   "message": "commit attempt for ingestion unit 0 of group  is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "Zo\u00eb \u6771\u4eac",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group Zo\u00eb \u6771\u4eac is stale",
+   "message": "commit attempt for ingestion unit 0 of group Zo\u00eb \u6771\u4eac is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "a\"b'c",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group a\"b'c is stale",
+   "message": "commit attempt for ingestion unit 0 of group a\"b'c is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "it's",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group it's is stale",
+   "message": "commit attempt for ingestion unit 0 of group it's is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "line\nbreak",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group line\nbreak is stale",
+   "message": "commit attempt for ingestion unit 0 of group line\nbreak is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "tab\there",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group tab\there is stale",
+   "message": "commit attempt for ingestion unit 0 of group tab\there is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "emoji \ud83d\ude00",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group emoji \ud83d\ude00 is stale",
+   "message": "commit attempt for ingestion unit 0 of group emoji \ud83d\ude00 is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "e\u0301",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group e\u0301 is stale",
+   "message": "commit attempt for ingestion unit 0 of group e\u0301 is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "{braces} %s {0}",
+    0
+   ],
+   "str": "commit attempt for ingestion unit 0 of group {braces} %s {0} is stale",
+   "message": "commit attempt for ingestion unit 0 of group {braces} %s {0} is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "abc",
+    7
+   ],
+   "str": "commit attempt for ingestion unit 7 of group abc is stale",
+   "message": "commit attempt for ingestion unit 7 of group abc is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "abc",
+    -1
+   ],
+   "str": "commit attempt for ingestion unit -1 of group abc is stale",
+   "message": "commit attempt for ingestion unit -1 of group abc is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "StaleCommitError",
+   "args": [
+    "abc",
+    9223372036854775807
+   ],
+   "str": "commit attempt for ingestion unit 9223372036854775807 of group abc is stale",
+   "message": "commit attempt for ingestion unit 9223372036854775807 of group abc is stale",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [],
+   "str": "change set rejected",
+   "message": "change set rejected",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "abc"
+   ],
+   "str": "abc",
+   "message": "abc",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    ""
+   ],
+   "str": "",
+   "message": "",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "Zo\u00eb \u6771\u4eac"
+   ],
+   "str": "Zo\u00eb \u6771\u4eac",
+   "message": "Zo\u00eb \u6771\u4eac",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "a\"b'c"
+   ],
+   "str": "a\"b'c",
+   "message": "a\"b'c",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "it's"
+   ],
+   "str": "it's",
+   "message": "it's",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "line\nbreak"
+   ],
+   "str": "line\nbreak",
+   "message": "line\nbreak",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "tab\there"
+   ],
+   "str": "tab\there",
+   "message": "tab\there",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "emoji \ud83d\ude00"
+   ],
+   "str": "emoji \ud83d\ude00",
+   "message": "emoji \ud83d\ude00",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "e\u0301"
+   ],
+   "str": "e\u0301",
+   "message": "e\u0301",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  },
+  {
+   "class": "ChangeSetRejected",
+   "args": [
+    "{braces} %s {0}"
+   ],
+   "str": "{braces} %s {0}",
+   "message": "{braces} %s {0}",
+   "bases": [
+    "GraphitiError",
+    "Exception"
+   ]
+  }
+ ]
+}
