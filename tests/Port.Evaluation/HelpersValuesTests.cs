@@ -15,9 +15,7 @@ public class HelpersValuesTests
     [Fact]
     public void The_port_gives_each_recorded_result_of_python()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "values", "helpers_values.json");
-        var document = (OrderedDictionary<string, object?>)PyJson.Loads(File.ReadAllText(path))!;
-        var cases = (List<object?>)document["cases"]!;
+        var cases = Cases();
         Assert.True(cases.Count >= 1700);
 
         List<string> failures = [];
@@ -25,6 +23,12 @@ public class HelpersValuesTests
         {
             var recorded = (OrderedDictionary<string, object?>)item!;
             var name = (string)recorded["f"]!;
+            if (name == "semaphore_gather")
+            {
+                // The cases of semaphore_gather are async. SemaphoreGatherTests runs them.
+                continue;
+            }
+
             var args = (List<object?>)recorded["a"]!;
             var result = (OrderedDictionary<string, object?>)recorded["r"]!;
             var label = $"{name}({Clip(PyJson.Dumps(args))})";
@@ -69,6 +73,13 @@ public class HelpersValuesTests
         Assert.True(failures.Count == 0, $"{failures.Count} recorded results differ. The first ones:\n{string.Join("\n", failures.Take(5))}");
     }
 
+    internal static List<object?> Cases()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "values", "helpers_values.json");
+        var document = (OrderedDictionary<string, object?>)PyJson.Loads(File.ReadAllText(path))!;
+        return (List<object?>)document["cases"]!;
+    }
+
     private static string Clip(string text) => text.Length > 160 ? text[..160] + "..." : text;
 
     private static Type ExpectedExceptionType(string python) => python switch
@@ -81,8 +92,26 @@ public class HelpersValuesTests
         _ => throw new InvalidOperationException($"No C# type for {python}"),
     };
 
+    // Each module-level constant that the recorder found, by name. A new constant of upstream has no row here, and the test fails.
+    private static object? Constant(string name) => name switch
+    {
+        "helpers.SAFE_CYPHER_IDENTIFIER_PATTERN" => Helpers.SafeCypherIdentifierPattern.ToString(),
+        "helpers.USE_PARALLEL_RUNTIME" => Helpers.UseParallelRuntime,
+        "helpers.DEFAULT_SEMAPHORE_LIMIT" => Helpers.DefaultSemaphoreLimit,
+        "helpers.SEMAPHORE_LIMIT" => Helpers.SemaphoreLimit,
+        "helpers.DEFAULT_PAGE_LIMIT" => Helpers.DefaultPageLimit,
+        "helpers.CHUNK_TOKEN_SIZE" => Helpers.ChunkTokenSize,
+        "helpers.CHUNK_OVERLAP_TOKENS" => Helpers.ChunkOverlapTokens,
+        "helpers.CHUNK_MIN_TOKENS" => Helpers.ChunkMinTokens.Value,
+        "helpers.CHUNK_DENSITY_THRESHOLD" => Helpers.ChunkDensityThreshold.Value,
+        "text_utils.MAX_SUMMARY_CHARS" => TextUtils.MaxSummaryChars,
+        "text_utils.SAGA_SUMMARY_MAX_CHARS" => TextUtils.SagaSummaryMaxChars,
+        _ => throw new InvalidOperationException($"No C# constant for {name}"),
+    };
+
     private static object? Invoke(string name, List<object?> a) => name switch
     {
+        "constant" => Constant((string)a[0]!),
         "lucene_sanitize" => Helpers.LuceneSanitize((string)a[0]!),
         "validate_group_id" => Helpers.ValidateGroupId((string?)a[0]),
         "validate_group_ids" => Helpers.ValidateGroupIds(Strings(a[0])),
@@ -208,10 +237,17 @@ public class HelpersValuesTests
 }
 
 // Behavior that the judge cannot pin: the limit and the order of semaphore_gather (R8, GAPS J10). The upstream tests do not cover it.
+// The recording holds, for each pair of a count of calls and max_coroutines, the results and the largest count of calls
+// that ran at the same time in Python. Each run has a time limit on its token, so a port that never starts a call fails
+// and does not hang.
 public class SemaphoreGatherTests
 {
+    private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(10);
+
     private static async Task<(List<long> Results, long MaxInFlight)> Run(long count, long? limit)
     {
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        source.CancelAfter(TimeLimit);
         long inFlight = 0;
         long maxInFlight = 0;
         List<Func<Task<long>>> calls = [];
@@ -232,8 +268,37 @@ public class SemaphoreGatherTests
             });
         }
 
-        var results = await Asyncio.Run(() => Helpers.SemaphoreGatherAsync(calls, limit));
-        return (results, maxInFlight);
+        try
+        {
+            var results = await Asyncio.Run(() => Helpers.SemaphoreGatherAsync(calls, limit, source.Token));
+            return (results, maxInFlight);
+        }
+        catch (OperationCanceledException) when (source.IsCancellationRequested && !TestContext.Current.CancellationToken.IsCancellationRequested)
+        {
+            throw Xunit.Sdk.FailException.ForFailure($"semaphore_gather({count} calls, max_coroutines={limit?.ToString() ?? "None"}) did not end in {TimeLimit.TotalSeconds} seconds");
+        }
+    }
+
+    [Fact]
+    public async Task semaphore_gather_runs_at_the_same_time_as_many_calls_as_python_does()
+    {
+        var recorded = HelpersValuesTests.Cases()
+            .Cast<OrderedDictionary<string, object?>>()
+            .Where(c => (string)c["f"]! == "semaphore_gather")
+            .ToList();
+        Assert.True(recorded.Count >= 12);
+        foreach (var item in recorded)
+        {
+            var args = (List<object?>)item["a"]!;
+            var (count, limit) = ((long)args[0]!, (long?)args[1]);
+            var expected = (OrderedDictionary<string, object?>)((OrderedDictionary<string, object?>)item["r"]!)["ok"]!;
+            var (results, maxInFlight) = await Run(count, limit);
+            var label = $"{count} calls, max_coroutines={limit?.ToString() ?? "None"}";
+            Assert.True(
+                PyJson.Dumps(expected["results"]) == PyJson.Dumps(results.Cast<object?>().ToList()),
+                $"{label}: the results differ from the ones of Python");
+            Assert.True((long)expected["peak"]! == maxInFlight, $"{label}: Python ran at most {expected["peak"]} calls at the same time, and the port ran {maxInFlight}");
+        }
     }
 
     [Fact]
@@ -244,16 +309,6 @@ public class SemaphoreGatherTests
         Assert.Equal(3, maxInFlight);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0L)]
-    public async Task semaphore_gather_uses_the_semaphore_limit_for_none_and_zero(long? limit)
-    {
-        var (results, maxInFlight) = await Run(Helpers.SemaphoreLimit + 5, limit);
-        Assert.Equal(Helpers.SemaphoreLimit + 5, results.Count);
-        Assert.Equal(Helpers.SemaphoreLimit, maxInFlight);
-    }
-
     [Fact]
     public async Task semaphore_gather_of_four_calls_returns_a_tuple()
     {
@@ -262,7 +317,8 @@ public class SemaphoreGatherTests
             () => Task.FromResult("two"),
             () => Task.FromResult(3.5),
             () => Task.FromResult(true),
-            2));
+            2,
+            TestContext.Current.CancellationToken));
         Assert.Equal(1L, a);
         Assert.Equal("two", b);
         Assert.Equal(3.5, c);
@@ -283,8 +339,69 @@ public class SemaphoreGatherTests
             });
         }
 
-        await Asyncio.Run(() => Helpers.SemaphoreGatherAsync(calls, 2));
+        await Asyncio.Run(() => Helpers.SemaphoreGatherAsync(calls, 2, TestContext.Current.CancellationToken));
         Assert.Equal(5, count);
+    }
+}
+
+// convert_datetimes_to_strings walks each dict and list, as isinstance(obj, dict) and isinstance(obj, list) accept them.
+// The expected values come from Python: convert_datetimes_to_strings of a list of datetimes, a nested dict, and a tuple
+// converts each datetime to its UTC string, and a set comes back unchanged (a set is neither a list nor a tuple).
+public class ConvertDatetimesToStringsTypedTests
+{
+    private const string Utc = "2025-01-01T11:00:00+00:00";
+
+    private static PyDateTime Plus1() => new(2025, 1, 1, 12, 0, 0, offsetMicroseconds: 3_600_000_000L);
+
+    [Fact]
+    public void A_typed_list_is_walked()
+    {
+        var result = (List<object?>)DatetimeUtils.ConvertDatetimesToStrings(new List<PyDateTime> { Plus1(), Plus1() })!;
+        Assert.Equal<object?>([Utc, Utc], result);
+    }
+
+    [Fact]
+    public void A_nested_typed_dictionary_is_walked()
+    {
+        var input = new Dictionary<string, List<Dictionary<string, PyDateTime>>>
+        {
+            ["nodes"] = [new Dictionary<string, PyDateTime> { ["created_at"] = Plus1() }],
+        };
+        var result = (OrderedDictionary<string, object?>)DatetimeUtils.ConvertDatetimesToStrings(input)!;
+        var nodes = (List<object?>)result["nodes"]!;
+        var node = (OrderedDictionary<string, object?>)nodes[0]!;
+        Assert.Equal(Utc, node["created_at"]);
+    }
+
+    [Fact]
+    public void A_tuple_gives_a_tuple()
+    {
+        var result = Assert.IsType<PyTuple>(DatetimeUtils.ConvertDatetimesToStrings(PyTuple.From([Plus1(), 7L])));
+        Assert.Equal<object?>([Utc, 7L], [.. result]);
+    }
+
+    [Fact]
+    public void A_set_is_left_as_it_is()
+    {
+        var input = new HashSet<PyDateTime> { Plus1() };
+        Assert.Same(input, DatetimeUtils.ConvertDatetimesToStrings(input));
+    }
+}
+
+// normalize_l2 never returns the list of the caller, for a zero norm too: np.where gives a new array.
+public class NormalizeL2CopyTests
+{
+    [Fact]
+    public void A_zero_norm_gives_a_new_list()
+    {
+        List<double> zero = [0.0, 0.0];
+        var result = Helpers.NormalizeL2(zero);
+        Assert.NotSame(zero, result);
+        result.Add(9.0);
+        Assert.Equal(2, zero.Count);
+
+        List<double> empty = [];
+        Assert.NotSame(empty, Helpers.NormalizeL2(empty));
     }
 }
 
@@ -546,9 +663,9 @@ public class TestConcatenateEpisodes
         Assert.DoesNotContain("[Episode", result, StringComparison.Ordinal);
     }
 
-    // TODO(port): test_multiple_episodes_with_none_valid_at. It sets valid_at to None, and EpisodicNode.ValidAt is a
-    // PyDateTime, which cannot hold null. Without a nullable property, the branch of concatenate_episodes that writes
-    // "unknown" cannot run.
+    // PORT: test_multiple_episodes_with_none_valid_at is not ported. Upstream builds the episode with a MagicMock. A valid
+    // EpisodicNode never holds None in valid_at (a required datetime, and Node has validate_assignment=True), so the
+    // 'unknown' branch of concatenate_episodes cannot run with a valid model, and ValidAt is a PyDateTime that is never null.
 }
 
 public class TestConcatenateTimeline

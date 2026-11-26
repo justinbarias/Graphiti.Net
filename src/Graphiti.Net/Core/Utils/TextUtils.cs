@@ -102,8 +102,9 @@ internal static class TextUtils
         {
             var ep = episodes[i];
 
-            // TODO(port): `if ep.valid_at else 'unknown'`. EpisodicNode.ValidAt is a PyDateTime, which cannot hold None, so
-            // the 'unknown' branch has no C# form. Upstream test_multiple_episodes_with_none_valid_at sets valid_at to None.
+            // PORT: `if ep.valid_at else 'unknown'`. EpisodicNode.valid_at is a required datetime (nodes.py), and Node has
+            // validate_assignment=True, so a valid model never holds None there and the 'unknown' branch cannot run. It is
+            // left out, because EpisodicNode.ValidAt is a PyDateTime that cannot be null, and the branch needs a `!` or a warning.
             var timestamp = ep.ValidAt.IsoFormat();
             parts.Add($"[Episode {i}] (timestamp: {timestamp})\n{ep.Content}");
         }
@@ -127,7 +128,7 @@ internal static class TextUtils
         List<string> parts = [];
         foreach (var ep in timeline)
         {
-            // TODO(port): `if ep.valid_at else 'unknown'`, as in concatenate_episodes.
+            // PORT: `if ep.valid_at else 'unknown'` is left out, as in concatenate_episodes.
             var timestamp = ep.ValidAt.IsoFormat();
             string header;
             if (!indexByUuid.TryGetValue(ep.Uuid, out var idx))

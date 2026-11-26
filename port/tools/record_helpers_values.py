@@ -14,12 +14,17 @@ nothing there. Nothing here uses the network.
 
 Each case holds the function name, the arguments, and the result: the value, or the exception class and its
 message. A datetime is {"$dt": isoformat}, a tuple is {"$tuple": [...]}, and a dict with a key that is not text is
-{"$dict": [[key, value], ...]}. An episode is {"uuid", "content", "valid_at"}.
+{"$dict": [[key, value], ...]}. An episode is {"uuid", "content", "valid_at"}. A module-level constant is the case {"f": "constant", "a": ["helpers.NAME"]}.
+A semaphore_gather case holds the count of calls and max_coroutines, and its result is the list of results and the
+largest count of calls that ran at the same time.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import random
+import re
 import sys
 import warnings
 from datetime import date, datetime, timedelta, timezone
@@ -29,6 +34,9 @@ ROOT = Path(__file__).resolve().parents[2]
 UPSTREAM = ROOT / '.upstream' / 'graphiti'
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'helpers_values.json'
 
+# The constants of helpers.py read these variables at import. The recording uses the defaults.
+ENV_NAMES = ['SEMAPHORE_LIMIT', 'USE_PARALLEL_RUNTIME', 'CHUNK_TOKEN_SIZE', 'CHUNK_OVERLAP_TOKENS', 'CHUNK_MIN_TOKENS',
+             'CHUNK_DENSITY_THRESHOLD']
 rng = random.Random(20261127)
 records: list[dict] = []
 
@@ -237,13 +245,21 @@ def record(helpers, datetime_utils, text_utils, GraphitiTypes) -> None:
         call('validate_node_labels', helpers.validate_node_labels, [labels])
 
     for _ in range(70):
-        names = ['Person', 'Organization', 'Entity', 'Zeta', 'alpha', 'Alpha', 'é', 'Éclair', '東京', 'entity', '', '\U0001F600']
+        names = ['Person', 'Organization', 'Entity', 'Zeta', 'alpha', 'Alpha', 'é', 'Éclair', '東京', 'entity', '', '\U0001F600',
+                 '\ue000', '\ufb01', '\uffff', '\U00010000', 'ﬁne']
         excluded = [rng.choice(names) for _ in range(rng.randint(0, 5))]
         r = rng.random()
         types = None if r < 0.3 else {n: object() for n in rng.sample(names, rng.randint(0, 4))}
         call('validate_excluded_entity_types', helpers.validate_excluded_entity_types, [excluded, types],
              encoded=[excluded, None if types is None else list(types)])
     call('validate_excluded_entity_types', helpers.validate_excluded_entity_types, [None, {}], encoded=[None, []])
+    # Code point order and UTF-16 order differ between U+E000 to U+FFFF and the characters above U+FFFF.
+    for excluded in (['\U0001F600', '\uffff', '\ue000'], ['\U00010000', '\ufb01', 'x'], ['\uffff', '\U0001F600'],
+                     ['\U0001F600', '\ufb01', 'Person', '\uffff']):
+        call('validate_excluded_entity_types', helpers.validate_excluded_entity_types, [excluded, None],
+             encoded=[excluded, None])
+        call('validate_excluded_entity_types', helpers.validate_excluded_entity_types, [excluded, {'\uffff': object()}],
+             encoded=[excluded, ['\uffff']])
 
     # Vectors of 0 to 11 items, 100 to 300 items (the pairwise sum splits above 128), and 1,024 items.
     sizes = [0, 1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 127, 128, 129, 130, 136, 255, 256, 257, 300, 1024, 1024, 1536]
@@ -262,6 +278,8 @@ def record(helpers, datetime_utils, text_utils, GraphitiTypes) -> None:
     for _ in range(25):
         call('parse_db_date', helpers.parse_db_date, [rand_dt()])
     call('parse_db_date', helpers.parse_db_date, [None])
+    for value in (42, 0, True, False, 2.5, [1, 'a'], {'k': 1}, [], {}):
+        call('parse_db_date', helpers.parse_db_date, [value])
 
     for _ in range(170):
         call('ensure_utc', datetime_utils.ensure_utc, [rand_dt()])
@@ -279,11 +297,52 @@ def record(helpers, datetime_utils, text_utils, GraphitiTypes) -> None:
         call('truncate_utf8_to_bytes', text_utils.truncate_utf8_to_bytes,
              [text, rng.choice([-3, 0, 1, 2, 3, 4, rng.randint(0, size + 3), rng.randint(0, size + 3), size, size - 1, 10 ** 12])])
 
+    # A lone surrogate cannot be encoded. A budget of 0 or less returns before the encode, and a budget of 1 raises.
+    for text, budget in [('\ud800', 0), ('\ud800', -1), ('\ud800', 1), ('a\udc00', 1), ('a\udc00', 0), ('\udfff', 2),
+                         ('a\ud800b', 0), ('a\ud800b', -7), ('a\ud800b', 3), ('\ud800', 10 ** 12)]:
+        call('truncate_utf8_to_bytes', text_utils.truncate_utf8_to_bytes, [text, budget])
+
+    # A cut that ends on a white space character of Python with no sentence end before it. str.rstrip removes U+001C to U+001F.
+    for ch in ['\x1c', '\x1d', '\x1e', '\x1f', '\x0b', '\x0c', '\x85', '\xa0', '\u1680', '\u2028', '\u2029', '\u3000',
+               '\u200b', '\ufeff']:
+        for text, n in [('abcd' + ch + 'efgh', 5), ('abc' + ch + ch + 'def', 5), ('ab' + ch + 'c' + ch + ch + ch + 'dd', 7),
+                        (ch + ch + 'abcdef', 2), ('abcd' + ch + 'x. yz' + ch, 5), ('é' + ch + ch + 'ab😀', 3)]:
+            call('truncate_at_sentence', text_utils.truncate_at_sentence, [text, n])
+
     for _ in range(220):
         text = rand_text(40, sentence=True)
         n = len(text)
         call('truncate_at_sentence', text_utils.truncate_at_sentence,
              [text, rng.choice([-5, -1, 0, 1, 2, 3, rng.randint(0, n + 2), rng.randint(0, n + 2), rng.randint(0, n + 2), n, n - 1, n + 10])])
+
+    # Python: SEMAPHORE_LIMIT is 20 here, and max_coroutines of None or 0 gives that limit.
+    async def run_gather(count: int, limit):
+        running = 0
+        peak = 0
+
+        async def work(i: int) -> int:
+            nonlocal running, peak
+            running += 1
+            peak = max(peak, running)
+            for _ in range(4):
+                await asyncio.sleep(0)
+            running -= 1
+            return i
+
+        results = await helpers.semaphore_gather(*(work(i) for i in range(count)), max_coroutines=limit)
+        return {'results': results, 'peak': peak}
+
+    for count, limit in [(25, None), (25, 0), (25, 1), (25, 3), (25, 40), (30, None), (21, 0), (20, None), (3, 3), (7, 2),
+                         (1, None), (0, None), (5, 1), (45, 20)]:
+        call('semaphore_gather', lambda c, lim: asyncio.run(run_gather(c, lim)), [count, limit])
+
+    for module_name, module in [('helpers', helpers), ('datetime_utils', datetime_utils), ('text_utils', text_utils)]:
+        for name, value in vars(module).items():
+            if not name.isupper() or name.startswith('__') or name == 'TYPE_CHECKING':
+                continue
+            if isinstance(value, re.Pattern):
+                value = value.pattern
+            records.append({'f': 'constant', 'a': [f'{module_name}.{name}'], 'r': {'ok': value}})
 
     def episode(content: str, valid_at: datetime, uuid: str):
         return {'uuid': uuid, 'content': content, 'valid_at': valid_at}
@@ -326,8 +385,16 @@ def main() -> int:
         return 2
     sys.path.insert(0, str(UPSTREAM))
     warnings.simplefilter('ignore')
+    for name in ENV_NAMES:
+        os.environ.pop(name, None)
     from graphiti_core import helpers
     from graphiti_core.utils import datetime_utils, text_utils
+
+    # helpers.py calls load_dotenv(), so a .env file could set a variable again.
+    for name in ENV_NAMES:
+        if name in os.environ:
+            print(f'{name} is set after the import (a .env file?). The recording needs the defaults.', file=sys.stderr)
+            return 2
 
     record(helpers, datetime_utils, text_utils, Types)
 

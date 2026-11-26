@@ -72,16 +72,16 @@ internal static class Helpers
     // PORT: the parameter is `neo4j_time.DateTime | str | None`. The Neo4j project converts a driver date to PyDateTime
     // before the value enters the core (R19), so the union is PyDateTime, string, or null, which is object? (Part 3).
     // The branch `isinstance(input_date, neo4j_time.DateTime): return input_date.to_native()` is that conversion. A
-    // PyDateTime then takes the last branch, which returns the input as it is. A value of another type cannot be the
-    // result type, so Py.AsDateTime throws InvalidCastException for it (open item O4 holds the int case).
-    internal static PyDateTime? ParseDbDate(object? inputDate)
+    // PyDateTime then takes the last branch, which returns the input as it is, as does each other value.
+    // PORT: Python returns each other value unchanged, so the result is object? (R20). A caller passes it on to a model, which reads it.
+    internal static object? ParseDbDate(object? inputDate)
     {
         if (inputDate is string text)
         {
             return PyDateTime.FromIsoFormat(text);
         }
 
-        return inputDate is null ? null : Py.AsDateTime(inputDate);
+        return inputDate;
     }
 
     /// <summary>
@@ -149,7 +149,8 @@ internal static class Helpers
         var norm = Math.Sqrt(PyNumpy.AddReduce([.. embedding.Select(x => x * x)]));
         if (norm == 0)
         {
-            return embedding;
+            // PORT: np.where returns a new array, and the caller's list stays as it is (R6).
+            return [.. embedding];
         }
 
         return [.. embedding.Select(x => x / norm)];

@@ -17,6 +17,7 @@ limitations under the License.
 
 namespace Graphiti.Core.Utils;
 
+using System.Collections;
 using System.Diagnostics;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
@@ -46,7 +47,7 @@ internal static class DatetimeUtils
         }
         else if (!value.IsUtc)
         {
-            // If datetime has a different timezone, convert it to UTC
+            // If datetime has a different timezone, convert to UTC
             return value.ToUtc();
         }
 
@@ -54,14 +55,16 @@ internal static class DatetimeUtils
     }
 
     // PORT: TYPE_HINTS.md gives Unknown for the parameter and the result. The function walks open data (R6).
+    // isinstance(obj, dict) and isinstance(obj, list) accept each Python dict and list, so the walk takes each
+    // dictionary with string keys and each list, whatever its type arguments are. A set and a byte[] stay as they are.
     internal static object? ConvertDatetimesToStrings(object? obj)
     {
-        if (obj is OrderedDictionary<string, object?> stringKeyed)
+        if (obj is IDictionary stringKeyed && stringKeyed.Keys.Cast<object?>().All(k => k is string))
         {
             OrderedDictionary<string, object?> result = new(StringComparer.Ordinal);
-            foreach (var (k, v) in stringKeyed)
+            foreach (DictionaryEntry entry in stringKeyed)
             {
-                result[k] = ConvertDatetimesToStrings(v);
+                result[(string)entry.Key] = ConvertDatetimesToStrings(entry.Value);
             }
 
             return result;
@@ -76,9 +79,9 @@ internal static class DatetimeUtils
 
             return result;
         }
-        else if (obj is List<object?> list)
+        else if (obj is IList list and not (Array or IDictionary))
         {
-            return list.Select(ConvertDatetimesToStrings).ToList();
+            return list.Cast<object?>().Select(ConvertDatetimesToStrings).ToList();
         }
         else if (obj is PyTuple tuple)
         {
