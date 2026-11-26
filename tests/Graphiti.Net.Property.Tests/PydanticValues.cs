@@ -13,7 +13,8 @@ using Graphiti.PyCompat;
 internal static class PydanticValues
 {
     private static readonly JsonDocument Document = JsonDocument.Parse(
-        File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "python-values.pydantic.json")));
+        File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "python-values.pydantic.json")),
+        new JsonDocumentOptions { MaxDepth = 1000 }); // The 201 nested objects of a load_json case use 4 levels each.
 
     private static readonly Dictionary<string, Enum> EnumMembers = BuildEnumMembers();
 

@@ -26,6 +26,11 @@ internal static partial class Pydantic
     /// rules of <c>speedate</c>, or a Unix time as an int, a float, or a text. A Unix time above 2e10 in absolute
     /// value is in milliseconds. A Unix time gives a UTC datetime. The rules differ from <c>datetime.fromisoformat</c>.
     /// </summary>
+    /// <remarks>
+    /// A known difference: speedate reads a digit text of 20 digits or more with wrapping 64-bit arithmetic, so
+    /// <c>"18446744073709551617"</c> gives <c>1970-01-01T00:00:01Z</c> in Python. The port reads such a text as no
+    /// number and throws <see cref="ValidationException"/>. No upstream reply field is a <c>datetime</c>.
+    /// </remarks>
     internal static PyDateTime DateTime(object? value) => value switch
     {
         PyDateTime dt => dt,

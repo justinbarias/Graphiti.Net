@@ -482,7 +482,7 @@ JSON_EXTRA = [
     {True: 1, False: 2}, {1.0: 'a', -0.0: 'b', float('nan'): 'c', float('inf'): 'd', 1e20: 'e', 2**70: 'f'},
     {datetime.date(2024, 1, 2): 1, aware(2024, 1, 2): 2, naive(2024, 1, 2, 3, 4, 5, 6): 3}, {(1, 2): 3, ('a', (2,)): 4},
     {b'ab': 1}, {None: 1, 'None': 2}, {ComparisonOperator.equals: 1, EpisodeType.json: 2},
-    naive(1, 1, 1, 0, 0, 0, 5), aware(2024, 1, 2, 3, 4, 5, offset_minutes=-330), aware(9999, 12, 31, 23, 59, 59, 999999),
+    naive(1, 1, 1, 0, 0, 0, 5), naive(2024, 1, 2, 3, 4, 5, 1), aware(2024, 1, 2, 3, 4, 5, 1), aware(2024, 1, 2, 3, 4, 5, offset_minutes=-330), aware(9999, 12, 31, 23, 59, 59, 999999),
     datetime.datetime(2024, 1, 2, tzinfo=datetime.timezone(datetime.timedelta(seconds=-1))),
     datetime.datetime(2024, 1, 2, tzinfo=datetime.timezone(datetime.timedelta(hours=23, minutes=59, seconds=59))),
     datetime.datetime(2024, 1, 2, tzinfo=datetime.timezone(datetime.timedelta(seconds=90, microseconds=5))),
@@ -554,7 +554,10 @@ LOAD_JSON_TEXTS = [
     '{"x": [1,]}', '{"x": 1,}', '{"x": "\\x"}', '{"x": tru}', '{"x": nan}', '{"x": "\\u00e9\\n\\t\\"\\\\\\/"}',
     '{"y": {"a": [true, null, false, {"b": []}]}}', '{"x": "a\x7f é😀"}', '{"x": "' + '1' * 5000 + '"}',
     '{"x": ' + '1' * 4300 + '}', '{"x": ' + '1' * 4301 + '}', '{"x": 1e5}', '{"x": -1}', "{'x': 1}", '{x: 1}',
-    '{"x": [1, 2, [3, [4]]]}', '{"x": {"y": {"z": 1.25}}}', '{"x": true, "y": false, "z": null}',
+    '{"x": [1, 2, [3, [4]]]}', '{"x":' * 200 + '{}' + '}' * 200, '{"x":' * 201 + '{}' + '}' * 201,
+    '{"x":' + '[' * 200 + ']' * 200 + '}', '{"x":' + '[' * 201 + ']' * 201 + '}', '{"x":' * 2999 + '{}' + '}' * 2999,
+    '{"a": "[[[[{{{{\\"[["}', '{"x": tru' + '[' * 300, '{"a": "\\"' + '[' * 300 + '"}',
+    '{"a": 1,\n "b": ' + '{"x":' * 200 + '{}' + '}' * 200 + '}', '{"x": {"y": {"z": 1.25}}}', '{"x": true, "y": false, "z": null}',
 ]
 
 
@@ -569,6 +572,8 @@ def load_json_cases() -> list:
             case['r'] = enc(dict(m.model_extra or {}))
         except ValidationError as e:
             case['errors'] = [[list(er['loc']), er['type']] for er in e.errors()]
+            if 'recursion limit' in e.errors()[0]['msg']:
+                case['msg'] = e.errors()[0]['msg']
         out.append(case)
     for b in [b'{"x": "\xff"}', b'\xff', b'{"x": "\xed\xa0\x80"}', '{"x": "é"}'.encode(), b'{"x": 1}']:
         case = {'bytes': list(b)}
@@ -644,43 +649,79 @@ def dedupe(values: list) -> list:
     return out
 
 
+TEXTS_PER_KIND = 4
+
+
 def field_cases(tp, inputs, **field) -> list:
+    """The cases of one field type. Only the first TEXTS_PER_KIND error cases keep "text", which keeps the file small."""
     model = one_field(tp, **field)
     keeps_big = 'Any' in str(tp)
-    return [field_case(model, v, keeps_big) for v in dedupe(inputs) if not isinstance(v, bytearray)]
+    out = [field_case(model, v, keeps_big) for v in dedupe(inputs) if not isinstance(v, bytearray)]
+    for case in [c for c in out if 'text' in c][TEXTS_PER_KIND:]:
+        del case['text']
+    return out
+
+
+def short(values: list) -> list:
+    """The inputs without the texts of 4300 characters and more, for a reader that does not parse a number."""
+    return [v for v in values if not (isinstance(v, str) and len(v) >= 4300)]
+
+
+# A few inputs for each `T | None` kind: None, a valid value, and errors. The plain kind has the full matrix.
+OPTIONAL_INPUTS = [None, True, 0, 1, -1, 2**64, 1.0, 1.5, float('nan'), '', '1', 'true', '2024-01-02', b'1', [], {},
+                   naive(2024, 1, 2, 3, 4, 5), datetime.date(2024, 1, 2), ComparisonOperator.equals]
+
+
+def two_field_cases() -> list:
+    """A model with two int fields: an int that a long cannot hold, with or without an error in the other field."""
+    model = create_model('Model', x=(int, ...), y=(int, ...))
+    out = []
+    for data in [{'x': 2**70, 'y': 'a'}, {'x': 'a', 'y': 2**70}, {'x': 2**70, 'y': 1}, {'x': 2**70, 'y': 2**71},
+                 {'x': 2**70}, {'x': 1, 'y': 2}]:
+        case = {'data': enc(data)}
+        try:
+            m = model.model_validate(data)
+            case['big' if contains_big(m.model_dump()) else 'r'] = enc(m.model_dump())
+        except ValidationError as e:
+            case['errors'] = errors_of(e)
+        out.append(case)
+    return out
 
 
 def build_values() -> dict:
     common = COMMON
     cases = {
-        'str': field_cases(str, common + STR_EXTRA),
+        'str': field_cases(str, short(common) + STR_EXTRA),
         'int': field_cases(int, common + INT_EXTRA),
         'float': field_cases(float, common + FLOAT_EXTRA),
         'bool': field_cases(bool, common + BOOL_EXTRA),
         'datetime': field_cases(datetime.datetime, common + DATETIME_EXTRA),
-        'any': field_cases(Any, common),
-        'enum': field_cases(ComparisonOperator, common + enum_inputs(ComparisonOperator)),
-        'enum_episode_type': field_cases(EpisodeType, common + enum_inputs(EpisodeType)),
-        'literal': field_cases(Literal['system'], common + ['system', b'system', 'SYSTEM']),
+        'any': field_cases(Any, short(common)),
+        'enum': field_cases(ComparisonOperator, short(common) + enum_inputs(ComparisonOperator)),
+        'enum_episode_type': field_cases(EpisodeType, short(common) + enum_inputs(EpisodeType)),
+        'literal': field_cases(Literal['system'], short(common) + ['system', b'system', 'SYSTEM']),
         'str_int_float_none': field_cases(str | int | float | None, common + INT_EXTRA + FLOAT_EXTRA),
-        'optional_str': field_cases(str | None, common),
-        'optional_int': field_cases(int | None, common),
-        'optional_float': field_cases(float | None, common),
-        'optional_bool': field_cases(bool | None, common),
-        'optional_datetime': field_cases(datetime.datetime | None, common),
-        'list_str': field_cases(list[str], common + [['a', 1], ['a', None, b'b'], ('a',), {'x': 1}, ['é', '\ud800']]),
-        'list_int': field_cases(list[int], common + [[1, '2', 3.0, True], [1.5, 'x', None], [2**70], [[]]]),
-        'list_float': field_cases(list[float], common + [[1, '2.5', True, float('nan')], ['x', [], None]]),
-        'list_bool': field_cases(list[bool], common + [[1, 0, 'yes', 'off'], [2, 'maybe']]),
-        'optional_list_str': field_cases(list[str] | None, common + [['a', 'b'], ['a', 2]]),
-        'list_enum': field_cases(list[EdgeSearchMethod], common + [['bm25', 'breadth_first_search'],
+        'optional_str': field_cases(str | None, OPTIONAL_INPUTS),
+        'optional_int': field_cases(int | None, OPTIONAL_INPUTS),
+        'optional_float': field_cases(float | None, OPTIONAL_INPUTS),
+        'optional_bool': field_cases(bool | None, OPTIONAL_INPUTS),
+        'optional_datetime': field_cases(datetime.datetime | None, OPTIONAL_INPUTS),
+        'list_str': field_cases(list[str], short(common) + [['a', 1], ['a', None, b'b'], ('a',), {'x': 1}, ['é', '\ud800']]),
+        'list_int': field_cases(list[int], short(common) + [[1, '2', 3.0, True], [1.5, 'x', None], [2**70], [[]],
+                                                            [2**63, 1.5], [1.5, 2**63, 'x'], [2**63, 2**64]]),
+        'list_float': field_cases(list[float], short(common) + [[1, '2.5', True, float('nan')], ['x', [], None]]),
+        'list_bool': field_cases(list[bool], short(common) + [[1, 0, 'yes', 'off'], [2, 'maybe']]),
+        'optional_list_str': field_cases(list[str] | None, OPTIONAL_INPUTS + [['a', 'b'], ['a', 2]]),
+        'list_enum': field_cases(list[EdgeSearchMethod], short(common) + [['bm25', 'breadth_first_search'],
                                                                   [EdgeSearchMethod.bfs, 'bfs', 'x']]),
-        'dict_any': field_cases(dict[str, Any], common + [{'a': 1, 'b': [1, (2,)], 'c': {'d': None}},
+        'dict_any': field_cases(dict[str, Any], short(common) + [{'a': 1, 'b': [1, (2,)], 'c': {'d': None}},
                                                           {'a': 1, 2: 'b', None: 3}, {(1,): 1}]),
-        'optional_dict_any': field_cases(dict[str, Any] | None, common),
-        'dict_str': field_cases(dict[str, str], common + [{'a': 'x', 'b': 1, 'c': None}, {1: 'x'}]),
-        'dict_float': field_cases(dict[str, float], common + [{'a': 1, 'b': '2.5', 'c': 'x'}]),
-        'dict_list_str': field_cases(dict[str, list[str]], common + [{'a': ['x'], 'b': [1], 'c': 'x', 'd': ('y',)}]),
+        'optional_dict_any': field_cases(dict[str, Any] | None, OPTIONAL_INPUTS + [{'a': 1}]),
+        'dict_str': field_cases(dict[str, str], short(common) + [{'a': 'x', 'b': 1, 'c': None}, {1: 'x'}]),
+        'dict_float': field_cases(dict[str, float], short(common) + [{'a': 1, 'b': '2.5', 'c': 'x'}]),
+        'dict_int': field_cases(dict[str, int], [{'a': 2**63, 'b': 'x'}, {'a': 'x', 'b': 2**64, 'c': 1.5}, {'a': 2**63},
+                                                 {'a': 1, 'b': '2'}, {1: 2**63}]),
+        'dict_list_str': field_cases(dict[str, list[str]], short(common) + [{'a': ['x'], 'b': [1], 'c': 'x', 'd': ('y',)}]),
         'callable': field_cases(Callable[[str], bool] | None, [None, 'x', 1, [], b'']),
         'ge_int': field_cases(int, [0, 1, 2, -1, '0', '1', True, False, 1.0, 0.0, LONG_MIN, LONG_MAX], ge=1),
         'gt_float': field_cases(float, [0, 0.0, -0.0, 5e-324, -5e-324, 1, '0', float('nan'), float('inf'),
@@ -703,6 +744,7 @@ def build_values() -> dict:
         'load_json': load_json_cases(),
         'schemas': schema_cases(),
         'wrap': wrap_cases(),
+        'two_fields': two_field_cases(),
     }
 
 

@@ -25,6 +25,7 @@ internal sealed class PydanticFields
     private readonly string title;
     private readonly OrderedDictionary<string, object?>? data;
     private readonly List<PydanticError> errors = [];
+    private OverflowException? overflow;
 
     /// <summary>Initializes a new instance of the <see cref="PydanticFields"/> class.</summary>
     /// <param name="title">The Python class name of the model, which pydantic shows as the title of the error.</param>
@@ -73,15 +74,6 @@ internal sealed class PydanticFields
         }
     }
 
-    /// <summary><c>Field(ge=limit)</c> with a float limit on a <c>float</c> field.</summary>
-    internal void Ge(string name, double value, double limit)
-    {
-        if (!(value >= limit))
-        {
-            Add(name, "greater_than_equal", $"Input should be greater than or equal to {Py.Repr(limit)}");
-        }
-    }
-
     /// <summary><c>Field(gt=limit)</c> on an <c>int</c> field.</summary>
     internal void Gt(string name, long value, long limit)
     {
@@ -93,15 +85,6 @@ internal sealed class PydanticFields
 
     /// <summary><c>Field(gt=limit)</c> with an int limit on a <c>float</c> field. A <c>nan</c> fails, as in pydantic.</summary>
     internal void Gt(string name, double value, long limit)
-    {
-        if (!(value > limit))
-        {
-            Add(name, "greater_than", $"Input should be greater than {Py.Repr(limit)}");
-        }
-    }
-
-    /// <summary><c>Field(gt=limit)</c> with a float limit on a <c>float</c> field.</summary>
-    internal void Gt(string name, double value, double limit)
     {
         if (!(value > limit))
         {
@@ -129,12 +112,19 @@ internal sealed class PydanticFields
     /// the type checks of the other fields. RULES.md R7 puts them in <c>Validate()</c>, which runs only after the
     /// field reads pass. So when one field has a type error and another field fails a constraint or a validator, the
     /// port reports the type errors only. The exception type is the same, and no upstream code reads the error list.
+    /// A field that held an int that a long cannot hold adds no error, as pydantic accepts the int. If no other field
+    /// gave an error, its <see cref="OverflowException"/> goes on (the limit of RULES.md R4, debt T25).
     /// </remarks>
     internal void ThrowIfAny()
     {
         if (errors.Count > 0)
         {
             throw new ValidationException(title, [.. errors]);
+        }
+
+        if (overflow is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(overflow);
         }
     }
 
@@ -147,6 +137,11 @@ internal sealed class PydanticFields
         catch (ValidationException e)
         {
             errors.AddRange(e.Errors.Select(error => error.Under(name)));
+            return default;
+        }
+        catch (OverflowException e)
+        {
+            overflow ??= e;
             return default;
         }
     }

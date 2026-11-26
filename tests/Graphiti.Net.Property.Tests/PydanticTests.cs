@@ -35,6 +35,7 @@ public class PydanticTests
         ["optional_dict_any"] = (v => Pydantic.Optional(v, x => Pydantic.Dict(x, Pydantic.Any)), null),
         ["dict_str"] = (v => Pydantic.Dict(v, Pydantic.Str), null),
         ["dict_float"] = (v => Pydantic.Dict(v, Pydantic.Float), null),
+        ["dict_int"] = (v => Pydantic.Dict(v, Pydantic.Int), null),
         ["dict_list_str"] = (v => Pydantic.Dict(v, x => Pydantic.List(x, Pydantic.Str)), null),
         ["callable"] = (v => Pydantic.Optional(v, Pydantic.Callable<Func<string, bool>>), null),
         ["ge_int"] = (v => Pydantic.Int(v), (f, x) => f.Ge("x", (long)(x ?? 0L), 1)),
@@ -50,9 +51,10 @@ public class PydanticTests
     {
         var recorded = Root.GetProperty("cases").EnumerateObject().Select(p => p.Name).ToList();
         Assert.Equal(recorded.Order(StringComparer.Ordinal), Readers.Keys.Order(StringComparer.Ordinal));
-        foreach (var name in recorded.Where(n => n is not ("callable" or "ge_int" or "gt_float" or "ge_float" or "max_length")))
+        // A T | None kind has a few cases. The plain kind T has the full set.
+        foreach (var name in recorded.Where(n => n is not ("callable" or "ge_int" or "gt_float" or "ge_float" or "max_length" or "dict_int")))
         {
-            Assert.True(Cases(name).Count >= 60, $"{name}: {Cases(name).Count} cases");
+            Assert.True(Cases(name).Count >= (name.StartsWith("optional_", StringComparison.Ordinal) ? 19 : 60), $"{name}: {Cases(name).Count} cases");
         }
     }
 
@@ -91,7 +93,11 @@ public class PydanticTests
                 var ex = Record.Exception(Run);
                 var vex = ex as ValidationException ?? throw new Xunit.Sdk.XunitException($"{context}: expected ValidationException, got {ex?.GetType().Name ?? "no exception"}: {ex?.Message}");
                 AssertErrors(errors, vex, context);
-                Assert.Equal(Text(c.GetProperty("text")), vex.Message);
+                if (c.TryGetProperty("text", out var text))
+                {
+                    Assert.Equal(Text(text), vex.Message);
+                }
+
                 Assert.Equal("Model", vex.Title);
             }
             else
@@ -161,6 +167,39 @@ public class PydanticTests
     }
 
     [Fact]
+    public void An_int_that_a_long_cannot_hold_gives_the_errors_of_the_other_fields()
+    {
+        // pydantic accepts the big int. The port throws OverflowException for it only if no other field has an error.
+        var cases = List("two_fields");
+        Assert.Equal(6, cases.Count);
+        ForEach(cases, c =>
+        {
+            var context = c.GetProperty("data").ToString();
+            OrderedDictionary<string, object?> Run()
+            {
+                var f = new PydanticFields("Model", new Decoder().DecodeDict(c.GetProperty("data")));
+                var x = f.Required("x", Pydantic.Int);
+                var y = f.Required("y", Pydantic.Int);
+                f.ThrowIfAny();
+                return new() { ["x"] = x.Value, ["y"] = y.Value };
+            }
+
+            if (c.TryGetProperty("big", out _))
+            {
+                Assert.IsType<OverflowException>(Record.Exception(() => Run()), exactMatch: true);
+            }
+            else if (c.TryGetProperty("errors", out var errors))
+            {
+                AssertErrors(errors, Assert.IsType<ValidationException>(Record.Exception(() => Run()), exactMatch: true), context);
+            }
+            else
+            {
+                AssertValue(new Decoder().Decode(c.GetProperty("r")), Run(), context);
+            }
+        });
+    }
+
+    [Fact]
     public void ModelFields_match_model_fields()
     {
         foreach (var model in Root.GetProperty("fields").EnumerateObject())
@@ -195,6 +234,23 @@ public class PydanticTests
         var inner = new ValidationException("M", [new PydanticError(["a"], "missing", "Field required")]);
         Assert.Same(inner, Record.Exception(() => Pydantic.Wrap(() => throw inner)));
         Assert.IsAssignableFrom<ArgumentException>(Record.Exception(() => Pydantic.Wrap(() => throw new ArgumentException("bad"))));
+
+        // Python's IndexError and TypeError are not ValueError. Their C# forms derive from ArgumentException.
+        Assert.IsType<ArgumentOutOfRangeException>(Record.Exception(() => Pydantic.Wrap(() => throw new ArgumentOutOfRangeException("i"))), exactMatch: true);
+        Assert.IsType<ArgumentNullException>(Record.Exception(() => Pydantic.Wrap(() => throw new ArgumentNullException("x"))), exactMatch: true);
+    }
+
+    [Fact]
+    public void Dump_keeps_a_value_outside_the_value_model_and_JsonValue_rejects_it()
+    {
+        // model_dump() returns an object it does not know as it is. model_dump(mode='json') raises
+        // PydanticSerializationError: "Unable to serialize unknown type".
+        var unknown = new Uri("https://example.com");
+        Assert.Same(unknown, Pydantic.Dump(unknown));
+        Assert.Same(unknown, Pydantic.DumpFields(false, ("x", unknown))["x"]);
+        var ex = Assert.IsType<ArgumentException>(Record.Exception(() => Pydantic.JsonValue(unknown)), exactMatch: true);
+        Assert.Equal("Unable to serialize unknown type: System.Uri", ex.Message);
+        Assert.IsType<ArgumentException>(Record.Exception(() => Pydantic.DumpFields(true, ("x", unknown))), exactMatch: true);
     }
 
     [Fact]

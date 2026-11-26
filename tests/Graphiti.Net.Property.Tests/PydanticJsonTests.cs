@@ -86,6 +86,10 @@ public class PydanticJsonTests
                 var vex = ex as ValidationException ?? throw new Xunit.Sdk.XunitException($"{context}: expected ValidationException, got {ex?.GetType().Name ?? "no exception"}");
                 Assert.Equal(errors.EnumerateArray().Select(e => e[1].GetString()), vex.Errors.Select(e => e.Type));
                 Assert.All(vex.Errors, e => Assert.Empty(e.Loc));
+                if (c.TryGetProperty("msg", out var msg))
+                {
+                    Assert.Equal(msg.GetString(), vex.Errors[0].Msg);
+                }
             }
             else
             {

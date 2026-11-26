@@ -40,6 +40,7 @@ internal static partial class Pydantic
     /// </summary>
     internal static OrderedDictionary<string, object?> LoadJson(string text)
     {
+        CheckJsonDepth(text);
         object? value;
         try
         {
@@ -64,6 +65,52 @@ internal static partial class Pydantic
     /// </summary>
     internal static OrderedDictionary<string, object?> LoadJson(byte[] utf8) =>
         LoadJson(DecodeStrict(utf8) ?? throw Error("json_invalid", "Invalid JSON: invalid unicode code point"));
+
+    /// <summary>
+    /// pydantic's JSON parser accepts 201 nested lists and objects (the outer object and 200 levels in it) and rejects
+    /// 202 with <c>json_invalid</c>, <c>recursion limit exceeded</c>. The check runs before the parse, so the deep text
+    /// never reaches a recursive walk.
+    /// </summary>
+    private static void CheckJsonDepth(string text)
+    {
+        const int MaxDepth = 201;
+        var depth = 0;
+        var inString = false;
+        var line = 1;
+        var column = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            column = c == '\n' ? 0 : column + 1;
+            line += c == '\n' ? 1 : 0;
+            if (inString)
+            {
+                if (c == '\\')
+                {
+                    i++;
+                    column++;
+                }
+                else if (c == '"')
+                {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"':
+                    inString = true;
+                    break;
+                case '[' or '{' when ++depth > MaxDepth:
+                    throw Error("json_invalid", $"Invalid JSON: recursion limit exceeded at line {line} column {column}");
+                case ']' or '}':
+                    depth--;
+                    break;
+            }
+        }
+    }
 
     private static bool HasLoneSurrogate(object? value) => value switch
     {

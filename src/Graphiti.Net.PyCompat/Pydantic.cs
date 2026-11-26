@@ -219,6 +219,7 @@ internal static partial class Pydantic
 
         var result = new List<T>();
         var errors = new List<PydanticError>();
+        OverflowException? overflow = null;
         var i = 0;
         foreach (var x in items)
         {
@@ -230,11 +231,16 @@ internal static partial class Pydantic
             {
                 errors.AddRange(e.Errors.Select(error => error.Under(i)));
             }
+            catch (OverflowException e)
+            {
+                overflow ??= e;
+            }
 
             i++;
         }
 
-        return errors.Count > 0 ? throw new ValidationException(null, errors) : result;
+        ThrowCollected(errors, overflow);
+        return result;
     }
 
     /// <summary>
@@ -250,6 +256,7 @@ internal static partial class Pydantic
 
         var result = new OrderedDictionary<string, T>();
         var errors = new List<PydanticError>();
+        OverflowException? overflow = null;
         foreach (var (key, x) in Py.DictEntries(value))
         {
             if (key is not string k)
@@ -270,9 +277,14 @@ internal static partial class Pydantic
             {
                 errors.AddRange(e.Errors.Select(error => error.Under(KeyLoc(key))));
             }
+            catch (OverflowException e)
+            {
+                overflow ??= e;
+            }
         }
 
-        return errors.Count > 0 ? throw new ValidationException(null, errors) : result;
+        ThrowCollected(errors, overflow);
+        return result;
     }
 
     /// <summary>
@@ -337,7 +349,10 @@ internal static partial class Pydantic
     /// Runs the code of a <c>@field_validator</c> or <c>@model_validator</c> (RULES.md R7). pydantic turns a
     /// <c>ValueError</c> that a validator raises into a <c>ValidationError</c>: this catches an
     /// <see cref="ArgumentException"/> and throws <see cref="ValidationException"/> with the caught exception inside.
-    /// A <see cref="ValidationException"/> from the validator passes through unchanged.
+    /// A <see cref="ValidationException"/> from the validator passes through unchanged. This differs from pydantic,
+    /// which gives such an error the title of the outer model and puts the field in front of its location. No upstream
+    /// validator raises one. <see cref="ArgumentOutOfRangeException"/> (Python <c>IndexError</c>, R4) and
+    /// <see cref="ArgumentNullException"/> are not caught, as pydantic lets an <c>IndexError</c> pass.
     /// </summary>
     /// <param name="validator">The validator code.</param>
     /// <param name="title">The model name for the message, as pydantic gives it. Optional.</param>
@@ -357,7 +372,7 @@ internal static partial class Pydantic
         {
             validator();
         }
-        catch (Exception e) when (e is not ValidationException && e is ArgumentException or TException)
+        catch (Exception e) when (e is not (ValidationException or ArgumentOutOfRangeException or ArgumentNullException) && e is ArgumentException or TException)
         {
             throw new ValidationException(title, [new PydanticError(field is null ? [] : [field], "value_error", "Value error, " + e.Message)], e);
         }
@@ -366,7 +381,8 @@ internal static partial class Pydantic
     /// <summary>
     /// <c>model_dump()</c> of one value: a list (also a typed list) becomes a new <c>List&lt;object?&gt;</c>, a dict
     /// with text keys a new <c>OrderedDictionary&lt;string, object?&gt;</c>, a tuple a new tuple, and a model its
-    /// <c>ModelDump</c>, each item dumped the same way. Other values stay as they are.
+    /// <c>ModelDump</c>, each item dumped the same way. Other values stay as they are, also a value outside the value
+    /// model, such as a delegate or a store object, which Python's <c>model_dump()</c> returns as it is.
     /// </summary>
     internal static object? Dump(object? value) => value switch
     {
@@ -376,7 +392,7 @@ internal static partial class Pydantic
         PyDict pd => DumpPyDict(pd),
         IDictionary d => DumpDict(d),
         IList l => l.Cast<object?>().Select(Dump).ToList(),
-        _ => throw new InvalidOperationException($"Pydantic.Dump: {value.GetType().FullName} is outside the Python value model (RULES.md R6)"),
+        _ => value,
     };
 
     /// <summary>
@@ -405,7 +421,8 @@ internal static partial class Pydantic
     /// <see cref="JsonDateTime(PyDateTime)"/>, a date <c>YYYY-MM-DD</c>, <c>bytes</c> UTF-8 text, a float
     /// <c>nan</c> or <c>inf</c> <c>None</c>, a tuple or a set a list, and a dict key a text. A model gives its
     /// <c>ModelDump(json: true)</c>. <c>bytes</c> that are not UTF-8 throw <see cref="DecoderFallbackException"/>
-    /// (<c>UnicodeDecodeError</c>).
+    /// (<c>UnicodeDecodeError</c>). A value outside the value model, such as a delegate, throws
+    /// <see cref="ArgumentException"/> (pydantic's <c>PydanticSerializationError</c>, a <c>ValueError</c>).
     /// </summary>
     internal static object? JsonValue(object? value) => value switch
     {
@@ -418,7 +435,7 @@ internal static partial class Pydantic
         IPydanticModel model => model.ModelDump(json: true),
         PyDict or IDictionary => JsonDict(value),
         PyTuple or IPySet or IList => ((IEnumerable)value).Cast<object?>().Select(JsonValue).ToList(),
-        _ => throw new InvalidOperationException($"Pydantic.JsonValue: {value.GetType().FullName} is outside the Python value model (RULES.md R6)"),
+        _ => throw new ArgumentException($"Unable to serialize unknown type: {value.GetType().FullName}"),
     };
 
     /// <summary>
@@ -490,7 +507,7 @@ internal static partial class Pydantic
         byte[] b => JsonText(b),
         System.Enum e => JsonKey(PyEnum.Value(e)),
         PyTuple t => string.Join(",", t.Select(JsonKey)),
-        _ => throw new InvalidOperationException($"Pydantic.JsonValue: a dict key of type {key.GetType().FullName}"),
+        _ => throw new ArgumentException($"Unable to serialize unknown type: {key.GetType().FullName}"),
     };
 
     private static PyDict DumpPyDict(PyDict pd)
@@ -544,6 +561,23 @@ internal static partial class Pydantic
     }
 
     private static ValidationException Error(string type, string msg) => ValidationException.One(type, msg);
+
+    /// <summary>
+    /// The end of a container read: the item errors, if any. pydantic accepts an int that a long cannot hold, so it
+    /// adds no error for it. Only if no item gave an error does the <see cref="OverflowException"/> go on (debt T25).
+    /// </summary>
+    private static void ThrowCollected(List<PydanticError> errors, OverflowException? overflow)
+    {
+        if (errors.Count > 0)
+        {
+            throw new ValidationException(null, errors);
+        }
+
+        if (overflow is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(overflow);
+        }
+    }
 
     private static OverflowException TooBig() => new("Python int too large to convert to C long");
 
