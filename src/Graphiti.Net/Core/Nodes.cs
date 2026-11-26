@@ -124,6 +124,13 @@ internal abstract class Node
     public override bool Equals(object? obj) => obj is Node other && Uuid == other.Uuid;
 }
 
+// PORT: a shell that packet S1 declares (plan 0004, layer 0). Packet S2 fills it. PythonName is the one member,
+// because the abstract base Node needs it (R7).
+internal sealed class EpisodicNode : Node
+{
+    internal override string PythonName => "EpisodicNode";
+}
+
 internal sealed class EntityNode : Node
 {
     internal List<double>? NameEmbedding { get; set; }
@@ -139,6 +146,20 @@ internal sealed class EntityNode : Node
         ValidateLabels(Labels, "labels");
         return this;
     }
+}
+
+// PORT: a shell that packet S1 declares (plan 0004, layer 0). Packet S2 fills it. PythonName is the one member,
+// because the abstract base Node needs it (R7).
+internal sealed class CommunityNode : Node
+{
+    internal override string PythonName => "CommunityNode";
+}
+
+// PORT: a shell that packet S1 declares (plan 0004, layer 0). Packet S2 fills it. PythonName is the one member,
+// because the abstract base Node needs it (R7).
+internal sealed class SagaNode : Node
+{
+    internal override string PythonName => "SagaNode";
 }
 
 internal static partial class Nodes

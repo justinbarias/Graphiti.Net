@@ -17,7 +17,6 @@ limitations under the License.
 
 namespace Graphiti.Core.Driver;
 
-// PORT: the pilot unit driver.neo4j.operations.entity_node_ops declares only the name that it uses (RULES.md R24).
 internal static class RecordParsers
 {
     /// <summary>Parse an entity node from a database record.</summary>
@@ -25,5 +24,23 @@ internal static class RecordParsers
     internal static EntityNode EntityNodeFromRecord(OrderedDictionary<string, object?> record)
     {
         throw new NotSupportedException("TODO(port): entity_node_from_record");
+    }
+
+    // TODO(port): entity_edge_from_record
+    internal static EntityEdge EntityEdgeFromRecord(OrderedDictionary<string, object?> record)
+    {
+        throw new NotSupportedException("TODO(port): entity_edge_from_record");
+    }
+
+    // TODO(port): episodic_node_from_record
+    internal static EpisodicNode EpisodicNodeFromRecord(OrderedDictionary<string, object?> record)
+    {
+        throw new NotSupportedException("TODO(port): episodic_node_from_record");
+    }
+
+    // TODO(port): community_node_from_record
+    internal static CommunityNode CommunityNodeFromRecord(OrderedDictionary<string, object?> record)
+    {
+        throw new NotSupportedException("TODO(port): community_node_from_record");
     }
 }

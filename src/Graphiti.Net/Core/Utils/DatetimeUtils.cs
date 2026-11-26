@@ -20,9 +20,22 @@ namespace Graphiti.Core.Utils;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
 
-// PORT: the pilot unit entity_node_ops ports only utc_now of this module (RULES.md R24).
+// PORT: the pilot unit entity_node_ops ported utc_now for real (RULES.md R24).
 internal static class DatetimeUtils
 {
     /// <summary>Returns the current UTC datetime with timezone information.</summary>
     internal static PyDateTime UtcNow() => PyDateTime.UtcNow(PortServices.Time);
+
+    // TODO(port): ensure_utc
+    internal static PyDateTime? EnsureUtc(PyDateTime? dt)
+    {
+        throw new NotSupportedException("TODO(port): ensure_utc");
+    }
+
+    // PORT: TYPE_HINTS.md gives Unknown for the parameter and the result. The function walks open data (R6).
+    // TODO(port): convert_datetimes_to_strings
+    internal static object? ConvertDatetimesToStrings(object? obj)
+    {
+        throw new NotSupportedException("TODO(port): convert_datetimes_to_strings");
+    }
 }

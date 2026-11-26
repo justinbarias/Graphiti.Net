@@ -17,9 +17,25 @@ limitations under the License.
 
 namespace Graphiti.Core.Driver;
 
+using Graphiti.Core.Driver.GraphOperations;
+using Graphiti.Core.Driver.Operations;
 using Graphiti.PyCompat;
 
-// PORT: the pilot (plan 0003, task 6) ports only the enum GraphProvider of this module (RULES.md R24).
+// PORT: the module class of R2. The module logger has no log call, so it has no Logger (R5). load_dotenv() is not ported (R17).
+internal static class DriverModule
+{
+    internal const long DefaultSize = 10;
+
+    internal static readonly string? EntityIndexName = PyEnv.Str("ENTITY_INDEX_NAME", "entities");
+
+    internal static readonly string? EpisodeIndexName = PyEnv.Str("EPISODE_INDEX_NAME", "episodes");
+
+    internal static readonly string? CommunityIndexName = PyEnv.Str("COMMUNITY_INDEX_NAME", "communities");
+
+    internal static readonly string? EntityEdgeIndexName = PyEnv.Str("ENTITY_EDGE_INDEX_NAME", "entity_edges");
+}
+
+// PORT: the pilot (plan 0003, task 6) ported this enum for real (RULES.md R24).
 internal enum GraphProvider
 {
     [PyEnumMember("NEO4J", "neo4j")]
@@ -30,4 +46,145 @@ internal enum GraphProvider
     Neptune,
     [PyEnumMember("RELATE", "relate")]
     Relate,
+}
+
+// PORT: an async context manager is an IAsyncDisposable (R16). `async with driver.session() as session` is
+// `await using var session = driver.Session()`. __aenter__ returns the session itself, so it has no member, and
+// DisposeAsync is __aexit__, which reads no exception.
+internal abstract class GraphDriverSession : IAsyncDisposable
+{
+    internal GraphProvider Provider { get; set; }
+
+    // No cleanup needed for Falkor, but method must exist
+    public abstract ValueTask DisposeAsync();
+
+    // PORT: **kwargs holds the query parameters (R2). No upstream site reads the result, so it is a Task (R9).
+    internal abstract Task RunAsync(
+        string query,
+        OrderedDictionary<string, object?> parameters,
+        CancellationToken cancellationToken = default);
+
+    internal abstract Task CloseAsync(CancellationToken cancellationToken = default);
+
+    // PORT: the extra arguments of Python are closed over by the lambda (R9). The work function receives the
+    // write transaction, which the upstream callers annotate as GraphDriverSession.
+    internal abstract Task<T> ExecuteWriteAsync<T>(
+        Func<GraphDriverSession, Task<T>> func,
+        CancellationToken cancellationToken = default);
+}
+
+internal abstract class GraphDriver : QueryExecutor
+{
+    internal const GraphProvider Relate = GraphProvider.Relate;
+
+    internal GraphProvider Provider { get; set; }
+
+    internal string FulltextSyntax { get; set; } = string.Empty; // Neo4j (default) syntax does not require a prefix for fulltext queries
+
+    // PORT: Python declares _database with no value. The driver constructor sets it.
+    internal string Database { get; set; } = string.Empty;
+
+    internal string DefaultGroupId { get; set; } = string.Empty;
+
+    // Legacy interfaces (kept for backwards compatibility during Phase 1)
+    // PORT: the namespace of the module search_interface has the name of its class, so the type is qualified.
+    internal global::Graphiti.Core.Driver.SearchInterface.SearchInterface? SearchInterface { get; set; }
+
+    internal GraphOperationsInterface? GraphOperationsInterface { get; set; }
+
+    internal abstract override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        string cypherQuery,
+        OrderedDictionary<string, object?> parameters,
+        CancellationToken cancellationToken = default);
+
+    internal abstract GraphDriverSession Session(string? database = null);
+
+    // PORT: Python declares close as a sync method, and each driver overrides it with an async one that callers await.
+    internal abstract Task CloseAsync(CancellationToken cancellationToken = default);
+
+    // PORT: Python declares a sync method that returns a coroutine, and callers await it.
+    internal abstract Task DeleteAllIndexesAsync(CancellationToken cancellationToken = default);
+
+    // TODO(port): with_database
+    internal GraphDriver WithDatabase(string database)
+    {
+        throw new NotSupportedException("TODO(port): with_database");
+    }
+
+    internal abstract Task BuildIndicesAndConstraintsAsync(
+        bool deleteExisting = false,
+        CancellationToken cancellationToken = default);
+
+    // TODO(port): clone
+    internal virtual GraphDriver Clone(string database)
+    {
+        throw new NotSupportedException("TODO(port): clone");
+    }
+
+    internal virtual string BuildFulltextQuery(string query, List<string>? groupIds = null, long maxQueryLength = 128)
+    {
+        throw new NotImplementedException("build_fulltext_query not implemented for " + Py.Str(Provider));
+    }
+
+    // --- New operations interfaces ---
+
+    // PORT: an async context manager that reads the exception (commit or roll back) takes the body as a lambda (R16).
+    // TODO(port): transaction
+    internal virtual Task TransactionAsync(
+        Func<Transaction, Task> body,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): transaction");
+    }
+
+    // TODO(port): entity_node_ops
+    internal virtual EntityNodeOperations? EntityNodeOps => throw new NotSupportedException("TODO(port): entity_node_ops");
+
+    // TODO(port): episode_node_ops
+    internal virtual EpisodeNodeOperations? EpisodeNodeOps => throw new NotSupportedException("TODO(port): episode_node_ops");
+
+    // TODO(port): community_node_ops
+    internal virtual CommunityNodeOperations? CommunityNodeOps => throw new NotSupportedException("TODO(port): community_node_ops");
+
+    // TODO(port): saga_node_ops
+    internal virtual SagaNodeOperations? SagaNodeOps => throw new NotSupportedException("TODO(port): saga_node_ops");
+
+    // TODO(port): entity_edge_ops
+    internal virtual EntityEdgeOperations? EntityEdgeOps => throw new NotSupportedException("TODO(port): entity_edge_ops");
+
+    // TODO(port): episodic_edge_ops
+    internal virtual EpisodicEdgeOperations? EpisodicEdgeOps => throw new NotSupportedException("TODO(port): episodic_edge_ops");
+
+    // TODO(port): community_edge_ops
+    internal virtual CommunityEdgeOperations? CommunityEdgeOps => throw new NotSupportedException("TODO(port): community_edge_ops");
+
+    // TODO(port): has_episode_edge_ops
+    internal virtual HasEpisodeEdgeOperations? HasEpisodeEdgeOps => throw new NotSupportedException("TODO(port): has_episode_edge_ops");
+
+    // TODO(port): next_episode_edge_ops
+    internal virtual NextEpisodeEdgeOperations? NextEpisodeEdgeOps => throw new NotSupportedException("TODO(port): next_episode_edge_ops");
+
+    // TODO(port): search_ops
+    internal virtual SearchOperations? SearchOps => throw new NotSupportedException("TODO(port): search_ops");
+
+    // TODO(port): graph_ops
+    internal virtual GraphMaintenanceOperations? GraphOps => throw new NotSupportedException("TODO(port): graph_ops");
+}
+
+internal sealed class SessionTransaction : Transaction
+{
+    // TODO(port): _SessionTransaction.__init__
+    internal SessionTransaction(GraphDriverSession session)
+    {
+        throw new NotSupportedException("TODO(port): _SessionTransaction.__init__");
+    }
+
+    // TODO(port): _SessionTransaction.run
+    internal override Task RunAsync(
+        string query,
+        OrderedDictionary<string, object?> parameters,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("TODO(port): _SessionTransaction.run");
+    }
 }
