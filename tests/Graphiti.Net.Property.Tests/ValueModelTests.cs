@@ -738,3 +738,13 @@ public class ValueModelTests
         Assert.Equal("'float' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(1.5)).Message);
         Assert.Equal("'bool' object is not iterable", Assert.Throws<InvalidCastException>(() => Py.Iter(true)).Message);
     }
+
+    [Fact]
+    public void NotNone_returns_the_value_or_throws_the_AttributeError_of_None()
+    {
+        // Python 3.12: None.replace('-', '') raises AttributeError("'NoneType' object has no attribute 'replace'").
+        Assert.Equal("a-b", Py.NotNone("a-b", "replace"));
+        var error = Assert.Throws<MissingMemberException>(() => Py.NotNone<string>(null, "replace"));
+        Assert.Equal("'NoneType' object has no attribute 'replace'", error.Message);
+    }
+}

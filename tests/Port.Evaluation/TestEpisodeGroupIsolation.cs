@@ -4,7 +4,7 @@ namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core.Models.Edges;
 
-public class TestEpisodeGroupIsolation
+public partial class TestEpisodeGroupIsolation
 {
     [Fact]
     public void test_saga_edge_queries_bind_both_endpoints()
