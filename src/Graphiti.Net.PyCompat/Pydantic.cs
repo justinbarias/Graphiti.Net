@@ -383,6 +383,12 @@ internal static partial class Pydantic
     /// The body of <c>ModelDump</c>: a dict of the Python field names in field order, each value passed through
     /// <see cref="Dump(object?)"/>, or through <see cref="JsonValue(object?)"/> with <paramref name="json"/>.
     /// </summary>
+    /// <remarks>
+    /// A known difference: pydantic does not validate a default, so a float field with an int default keeps the int
+    /// until a value is assigned. The one upstream site is <c>SearchConfig.reranker_min_score = Field(default=0)</c>,
+    /// which Python dumps as <c>0</c> and the port's <see cref="double"/> property as <c>0.0</c>. The judge compares
+    /// numbers with a tolerance. A text made from the dump (<see cref="DumpJson(object?)"/>, a prompt) differs.
+    /// </remarks>
     internal static OrderedDictionary<string, object?> DumpFields(bool json, params (string Name, object? Value)[] fields)
     {
         var result = new OrderedDictionary<string, object?>();

@@ -5,6 +5,11 @@ One file comes out of a run:
 - tests/Graphiti.Net.Property.Tests/python-values.pydantic.json: the result or the errors of pydantic
   lax mode for each field type that the models of the MVP modules use, for a matrix of inputs. Also
   the result or the errors of ModelValidate and ModelDump for upstream models, and their model_fields.
+  Also model_dump(mode='json') of single values (json_value), the text of dump_json (dump_json), and the
+  result or the error types of model_validate_json (load_json).
+
+The schema text of model_json_schema() is not recorded here. The test reads the judge's golden texts of the
+function judge:schema_text from port/judge/golden/pure/schemas.jsonl, which pydantic made.
 
     .upstream/graphiti/.venv/bin/python port/tools/generate_pydantic_values.py
     .upstream/graphiti/.venv/bin/python port/tools/generate_pydantic_values.py --check
@@ -38,6 +43,7 @@ import datetime
 import enum
 import json
 import math
+import random
 import re
 import sys
 from pathlib import Path
@@ -54,9 +60,9 @@ sys.path.insert(0, str(ROOT / '.upstream' / 'graphiti'))
 
 import pydantic  # noqa: E402
 import pydantic_core  # noqa: E402
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError, create_model  # noqa: E402
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, create_model  # noqa: E402
 
-from generate_valuemodel_values import Encoder, cps  # noqa: E402
+from generate_valuemodel_values import FLOATS, Encoder, cps, random_doubles  # noqa: E402
 
 from graphiti_core.ingestion.change_set import Operation  # noqa: E402
 from graphiti_core.ingestion.config import ConcurrentIngestionConfig  # noqa: E402
@@ -499,6 +505,105 @@ def json_value_cases() -> list:
     return out
 
 
+ESCAPES = ''.join(chr(c) for c in range(0x30)) + '\x7f\x80\x85\xa0  ﻿/<>&\'é\U0001F600'
+
+
+def has_duplicate_keys(text: str) -> bool:
+    found = []
+
+    def hook(pairs):
+        keys = [k for k, _ in pairs]
+        if len(keys) != len(set(keys)):
+            found.append(keys)
+        return dict(pairs)
+
+    json.loads(text, object_pairs_hook=hook)
+    return bool(found)
+
+
+def dump_json_cases() -> list:
+    """TypeAdapter(Any).dump_json(v): the text of model_dump_json() for each value, or the error."""
+    adapter = TypeAdapter(Any)
+    floats = FLOATS + random_doubles(random.Random(20261126))[::7] + [1e15, 1e16, 1e-5, 1e-6, 123456789012345680.0]
+    values = dedupe(COMMON + JSON_EXTRA) + floats + [ESCAPES, {ESCAPES: [ESCAPES]}, '\ud800', ['ok', 'x\udfff'], '\U0001F600a\udc00']
+    out = []
+    for v in values:
+        case = {'v': enc(v)}
+        try:
+            text = adapter.dump_json(v).decode()
+            if has_duplicate_keys(text):
+                # Two keys that become one text, such as nan and inf ("None"): dump_json writes the key twice, and
+                # model_dump(mode='json') keeps one. Pydantic.DumpJson takes the dump, so it writes one. No upstream
+                # dict reaches this: a dict[str, Any] field has text keys.
+                continue
+            case['r'] = text
+        except pydantic_core.PydanticSerializationError as e:
+            # The cause is a UnicodeEncodeError (a lone surrogate) or a UnicodeDecodeError (bytes that are not UTF-8).
+            case['e'] = 'UnicodeEncodeError' if 'UnicodeEncodeError' in str(e) else 'UnicodeDecodeError'
+            case['msg'] = cps(str(e))
+        out.append(case)
+    return out
+
+
+LOAD_JSON_TEXTS = [
+    '{}', ' {} ', '\t\n\r{"a":1}\n', '{"x": NaN}', '{"x": Infinity}', '{"x": -Infinity}', '{"x": 1e400}', '{"x": -1e400}',
+    '{"x": 1e-400}', '{"x": 123456789012345678901234567890}', '{"x": 9223372036854775808}', '{"x": -0}', '{"x": -0.0}',
+    '{"x": 1.0}', '{"x": 1E2}', '{"x": 0.1}', '{"x": 1.5e300}', '{"x": "\\ud800"}', '{"x": "\\udc00x"}',
+    '{"x": "\\ud83d\\ude00"}', '{"\\ud800": 1}', '{"x": ["\\udfff"]}', '{"x":1,"x":2}', '{"a":1,"b":2,"a":3}', '[]', '"s"',
+    '1', 'null', '{"x": 1} x', '', ' ', '{"x": "a\x01"}', '﻿{}', '{"x": 01}', '{"x": 1.}', '{"x": .5}',
+    '{"x": [1,]}', '{"x": 1,}', '{"x": "\\x"}', '{"x": tru}', '{"x": nan}', '{"x": "\\u00e9\\n\\t\\"\\\\\\/"}',
+    '{"y": {"a": [true, null, false, {"b": []}]}}', '{"x": "a\x7f é😀"}', '{"x": "' + '1' * 5000 + '"}',
+    '{"x": ' + '1' * 4300 + '}', '{"x": ' + '1' * 4301 + '}', '{"x": 1e5}', '{"x": -1}', "{'x': 1}", '{x: 1}',
+    '{"x": [1, 2, [3, [4]]]}', '{"x": {"y": {"z": 1.25}}}', '{"x": true, "y": false, "z": null}',
+]
+
+
+def load_json_cases() -> list:
+    """model_validate_json(text) of a model with extra='allow' and no fields: its extra dict is the parsed object."""
+    model = create_model('Model', __config__=ConfigDict(extra='allow'))
+    out = []
+    for text in LOAD_JSON_TEXTS:
+        case = {'text': cps(text)}
+        try:
+            m = model.model_validate_json(text)
+            case['r'] = enc(dict(m.model_extra or {}))
+        except ValidationError as e:
+            case['errors'] = [[list(er['loc']), er['type']] for er in e.errors()]
+        out.append(case)
+    for b in [b'{"x": "\xff"}', b'\xff', b'{"x": "\xed\xa0\x80"}', '{"x": "é"}'.encode(), b'{"x": 1}']:
+        case = {'bytes': list(b)}
+        try:
+            case['r'] = enc(dict(model.model_validate_json(b).model_extra or {}))
+        except ValidationError as e:
+            case['errors'] = [[list(er['loc']), er['type']] for er in e.errors()]
+        out.append(case)
+    return out
+
+
+class AC(BaseModel):
+    """Two nested models whose names sort apart by code point (AC before Ab) and by case (Ab before AC)."""
+
+    x: int = 1
+
+
+class Ab(BaseModel):
+    y: str
+
+
+class SchemaShapes(BaseModel):
+    """Shapes that no upstream model has: a default dict with keys out of order, and $defs order by code point."""
+
+    b: Ab
+    a: AC | None = None
+    d: dict[str, Any] = {'z': 1, 'a': [2, {'y': 3, 'b': 4}]}
+    e: EdgeReranker = EdgeReranker.mmr
+
+
+def schema_cases() -> dict:
+    """json.dumps(M.model_json_schema()) of test models with the shapes of SchemaShapes."""
+    return {cls.__name__: json.dumps(cls.model_json_schema()) for cls in [SchemaShapes, AC]}
+
+
 def model_fields() -> dict:
     return {name: [[f, info.is_required()] for f, info in cls.model_fields.items()] for name, cls in MODELS.items()}
 
@@ -594,6 +699,9 @@ def build_values() -> dict:
         'models': models,
         'fields': model_fields(),
         'json_value': json_value_cases(),
+        'dump_json': dump_json_cases(),
+        'load_json': load_json_cases(),
+        'schemas': schema_cases(),
         'wrap': wrap_cases(),
     }
 
