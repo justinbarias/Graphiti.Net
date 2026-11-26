@@ -56,11 +56,7 @@ internal abstract class Edge
     // PORT: upstream defect U12. The test is for Node, so an edge never equals an edge, also not itself (R18, R21).
     public override bool Equals(object? obj) => obj is Node other && Uuid == other.Uuid;
 
-    // PORT: the Python body is only `...`, so the classmethod returns None (R24). Each subclass declares its own.
-    internal static Task GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
-    {
-        return Task.CompletedTask;
-    }
+    // PORT: Edge.get_by_uuid has a body of "..." and each subclass replaces it. A C# static method does not override, so the base has no member.
 }
 
 internal sealed class EpisodicEdge : Edge
@@ -74,7 +70,7 @@ internal sealed class EpisodicEdge : Edge
     }
 
     // TODO(port): EpisodicEdge.get_by_uuid
-    internal static new Task<EpisodicEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<EpisodicEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): EpisodicEdge.get_by_uuid");
     }
@@ -203,7 +199,7 @@ internal sealed class CommunityEdge : Edge
     }
 
     // TODO(port): CommunityEdge.get_by_uuid
-    internal static new Task<CommunityEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<CommunityEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): CommunityEdge.get_by_uuid");
     }
@@ -246,7 +242,7 @@ internal sealed class HasEpisodeEdge : Edge
     }
 
     // TODO(port): HasEpisodeEdge.get_by_uuid
-    internal static new Task<HasEpisodeEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<HasEpisodeEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): HasEpisodeEdge.get_by_uuid");
     }
@@ -289,7 +285,7 @@ internal sealed class NextEpisodeEdge : Edge
     }
 
     // TODO(port): NextEpisodeEdge.get_by_uuid
-    internal static new Task<NextEpisodeEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<NextEpisodeEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): NextEpisodeEdge.get_by_uuid");
     }

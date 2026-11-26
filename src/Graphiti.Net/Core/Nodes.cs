@@ -158,17 +158,9 @@ internal abstract class Node
         throw new NotSupportedException("TODO(port): Node.delete_by_uuids");
     }
 
-    // PORT: the Python body is only `...`, so the classmethod returns None (R24). Each subclass declares its own.
-    internal static Task GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
-    {
-        return Task.CompletedTask;
-    }
+    // PORT: Node.get_by_uuid has a body of "..." and each subclass replaces it. A C# static method does not override, so the base has no member.
 
-    // PORT: the Python body is only `...`, so the classmethod returns None (R24). Each subclass declares its own.
-    internal static Task GetByUuidsAsync(GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default)
-    {
-        return Task.CompletedTask;
-    }
+    // PORT: Node.get_by_uuids has a body of "..." and each subclass replaces it. A C# static method does not override, so the base has no member.
 }
 
 internal sealed class EpisodicNode : Node
@@ -277,7 +269,7 @@ internal sealed class EntityNode : Node
     }
 
     // TODO(port): EntityNode.get_by_uuid
-    internal static new Task<EntityNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<EntityNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): EntityNode.get_by_uuid");
     }
@@ -360,13 +352,13 @@ internal sealed class CommunityNode : Node
     }
 
     // TODO(port): CommunityNode.get_by_uuid
-    internal static new Task<CommunityNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<CommunityNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): CommunityNode.get_by_uuid");
     }
 
     // TODO(port): CommunityNode.get_by_uuids
-    internal static new Task<List<CommunityNode>> GetByUuidsAsync(
+    internal static Task<List<CommunityNode>> GetByUuidsAsync(
         GraphDriver driver,
         List<string> uuids,
         CancellationToken cancellationToken = default)
@@ -402,7 +394,7 @@ internal sealed class SagaNode : Node
     // carries the episode-time semantics for public/temporal consumers.
     internal PyDateTime? LastSummarizedEpisodeValidAt { get; set; }
 
-    // PORT: the four pydantic PrivateAttr values are not model fields. graphiti.py sets them, so they are internal (R2).
+    // PORT: PrivateAttr. The four values are not model fields. graphiti.py sets them, so they are internal (R2).
     internal long SummaryEpisodesFetched { get; set; }
 
     internal long SummaryEpisodesSelected { get; set; }
@@ -432,13 +424,13 @@ internal sealed class SagaNode : Node
     }
 
     // TODO(port): SagaNode.get_by_uuid
-    internal static new Task<SagaNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
+    internal static Task<SagaNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): SagaNode.get_by_uuid");
     }
 
     // TODO(port): SagaNode.get_by_uuids
-    internal static new Task<List<SagaNode>> GetByUuidsAsync(
+    internal static Task<List<SagaNode>> GetByUuidsAsync(
         GraphDriver driver,
         List<string> uuids,
         CancellationToken cancellationToken = default)
