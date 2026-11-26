@@ -28,8 +28,11 @@ internal static class DateTimeValues
         return cases;
     }
 
-    internal static string Text(JsonElement codePoints) =>
-        PyText.FromCodePoints([.. codePoints.EnumerateArray().Select(e => e.GetInt32())]);
+    /// <summary>A text: a plain JSON string, or a list of code points where the text holds a lone surrogate.</summary>
+    internal static string Text(JsonElement value) =>
+        value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : PyText.FromCodePoints([.. value.EnumerateArray().Select(e => e.GetInt32())]);
 
     internal static string Text(JsonElement c, string name) => Text(c.GetProperty(name));
 
@@ -102,21 +105,7 @@ public class DateTimeTests
             (c, v) => DateTimeValues.AssertSame(c.GetProperty("r"), v, DateTimeValues.Text(c, "s")));
 
     [Fact]
-    public void StrFTime_matches_Python() =>
-        DateTimeValues.Check(
-            "strftime",
-            c => DateTimeValues.Dt(c, "dt").StrFTime(DateTimeValues.Text(c, "f")),
-            (c, v) => Assert.Equal(DateTimeValues.Text(c, "r"), v));
-
-    [Fact]
-    public void StrPTime_matches_Python() =>
-        DateTimeValues.Check(
-            "strptime",
-            c => PyDateTime.StrPTime(DateTimeValues.Text(c, "s"), DateTimeValues.Text(c, "f")),
-            (c, v) => DateTimeValues.AssertSame(c.GetProperty("r"), v, $"{DateTimeValues.Text(c, "s")} / {DateTimeValues.Text(c, "f")}"));
-
-    [Fact]
-    public void Comparison_equality_and_subtraction_match_Python()
+    public void Comparison_and_equality_match_Python()
     {
         foreach (var c in DateTimeValues.Cases("compare"))
         {
@@ -126,6 +115,9 @@ public class DateTimeTests
             Assert.True(c.GetProperty("eq").GetBoolean() == (a == b), context);
             Assert.True(c.GetProperty("ne").GetBoolean() == (a != b), context);
             Assert.True(a.Equals(b) == (a == b), context);
+            Assert.True(c.GetProperty("eq").GetBoolean() == a.Equals((object)b), context);
+            Assert.True(c.GetProperty("eq").GetBoolean() == ((object)a).Equals(b), context);
+            Assert.True(c.GetProperty("eq").GetBoolean() == object.Equals(a, b), context);
             if (a == b)
             {
                 Assert.Equal(a.GetHashCode(), b.GetHashCode());
@@ -144,15 +136,6 @@ public class DateTimeTests
                 Assert.Equal(message, Assert.Throws<InvalidCastException>(() => a > b).Message);
                 Assert.Equal(message, Assert.Throws<InvalidCastException>(() => a >= b).Message);
                 Assert.Equal(message, Assert.Throws<InvalidCastException>(() => a.CompareTo(b)).Message);
-            }
-
-            if (c.TryGetProperty("sub", out var sub))
-            {
-                Assert.True(TimeSpan.FromTicks(sub.GetInt64() * 10) == a - b, context);
-            }
-            else
-            {
-                Assert.Equal(DateTimeValues.Text(c, "sub_err"), Assert.Throws<InvalidCastException>(() => a - b).Message);
             }
         }
     }
@@ -193,8 +176,13 @@ public class DateTimeTests
         }
     }
 
+    /// <summary>
+    /// The expected values are not recorded from Python, which has no DateTimeOffset. They follow decision D36 (a naive value
+    /// is read as UTC) and the rule that an offset that DateTimeOffset cannot hold becomes UTC at the same instant. Python gives
+    /// only the UTC instant and the OverflowError at the ends of the range.
+    /// </summary>
     [Fact]
-    public void ToDateTimeOffset_reads_a_naive_value_as_UTC_and_keeps_the_instant()
+    public void ToDateTimeOffset_by_decision_D36_reads_a_naive_value_as_UTC_and_keeps_the_instant()
     {
         var epochTicks = DateTimeOffset.UnixEpoch.UtcTicks;
         foreach (var c in DateTimeValues.Cases("to_dto"))
@@ -219,20 +207,17 @@ public class DateTimeTests
     }
 
     [Fact]
-    public void UtcNow_is_aware_UTC_and_cuts_ticks_as_the_Neo4j_driver_does()
+    public void UtcNow_gives_UTC_from_any_offset_and_cuts_ticks_as_the_Neo4j_driver_does()
     {
-        var any = false;
-        foreach (var c in DateTimeValues.Cases("from_dto").Where(c => c.GetProperty("f")[7].GetInt32() == 0))
+        foreach (var c in DateTimeValues.Cases("utc_now"))
         {
-            any = true;
             var f = c.GetProperty("f").EnumerateArray().Select(e => e.GetInt32()).ToArray();
-            var now = new DateTimeOffset(f[0], f[1], f[2], f[3], f[4], f[5], TimeSpan.Zero).AddTicks(f[6]);
+            var now = new DateTimeOffset(f[0], f[1], f[2], f[3], f[4], f[5], TimeSpan.FromMinutes(f[7])).AddTicks(f[6]);
             var actual = PyDateTime.UtcNow(new FixedClock(now));
             DateTimeValues.AssertSame(c.GetProperty("r"), actual, c.ToString());
             Assert.True(actual.IsUtc);
         }
 
-        Assert.True(any);
         var before = DateTimeOffset.UtcNow;
         var live = PyDateTime.UtcNow(TimeProvider.System);
         var after = DateTimeOffset.UtcNow;
@@ -255,7 +240,6 @@ public class DateTimeTests
         Assert.True(naive.IsNaive);
         Assert.False(naive.IsUtc);
         Assert.Equal("2025-01-03T10:30:45.123456", naive.IsoFormat());
-        Assert.True(PyDateTime.StrPTime("2025-01-03", "%Y-%m-%d").IsNaive);
         Assert.True(default(PyDateTime).IsNaive);
         Assert.Equal("0001-01-01T00:00:00", default(PyDateTime).IsoFormat());
         Assert.True(naive.ReplaceUtc().IsUtc);
@@ -263,30 +247,30 @@ public class DateTimeTests
     }
 
     [Theory]
-    [InlineData("%Q", "Q")]
-    [InlineData("%-d", "-")]
-    [InlineData("%e", "e")]
-    [InlineData("%Z", "Z")]
-    [InlineData("%c", "c")]
-    [InlineData("%U", "U")]
-    public void StrFTime_throws_for_a_directive_that_is_not_built(string format, string name)
+    [InlineData(840, 840)]
+    [InlineData(841, 0)]
+    [InlineData(-840, -840)]
+    [InlineData(-841, 0)]
+    public void ToDateTimeOffset_keeps_an_offset_up_to_14_hours_and_uses_UTC_beyond(int minutes, int expectedMinutes)
     {
-        var ex = Assert.Throws<ArgumentException>(() => new PyDateTime(2025, 1, 3).StrFTime("ok " + format));
-        Assert.Contains("%" + name, ex.Message, StringComparison.Ordinal);
+        var dt = new PyDateTime(2025, 1, 3, 10, 0, 0, 0, minutes * 60_000_000L);
+        var actual = dt.ToDateTimeOffset();
+        Assert.Equal(expectedMinutes, (int)actual.Offset.TotalMinutes);
+        Assert.Equal(new DateTime(2025, 1, 3, 10, 0, 0, DateTimeKind.Utc).AddMinutes(-minutes).Ticks, actual.UtcTicks);
     }
 
-    [Theory]
-    [InlineData("%Z", "%Z")]
-    [InlineData("%w", "%w")]
-    [InlineData("%U", "%U")]
-    [InlineData("%c", "%c")]
-    [InlineData("%Od", "%Od")]
-    [InlineData("%Y %Y", "%Y")]
-    [InlineData("%d %d", "%d")]
-    public void StrPTime_throws_for_a_directive_that_is_not_built(string format, string name)
+    [Fact]
+    public void Equals_of_an_object_is_false_for_null_and_for_another_type()
     {
-        var ex = Assert.Throws<ArgumentException>(() => PyDateTime.StrPTime("2025", format));
-        Assert.Contains(name, ex.Message, StringComparison.Ordinal);
+        var dt = new PyDateTime(2025, 1, 3, 10, 0, 0, 0, 0);
+        Assert.False(dt.Equals((object?)null));
+        Assert.False(dt.Equals((object)"2025-01-03T10:00:00+00:00"));
+        Assert.False(dt.Equals((object)new DateTimeOffset(2025, 1, 3, 10, 0, 0, TimeSpan.Zero)));
+        Assert.False(dt.Equals((object)638_000_000_000_000_000L));
+        Assert.False(object.Equals(dt, null));
+        Assert.False(object.Equals(null, dt));
+        Assert.True(object.Equals(dt, new PyDateTime(2025, 1, 3, 11, 0, 0, 0, 3_600_000_000)));
+        Assert.Equal(dt.GetHashCode(), ((object)new PyDateTime(2025, 1, 3, 11, 0, 0, 0, 3_600_000_000)).GetHashCode());
     }
 
     [Fact]
@@ -339,15 +323,6 @@ public class DateTimeTests
         });
 
     [Fact]
-    public void StrPTime_reads_what_StrFTime_writes() =>
-        AnyDateTime.Sample(dt =>
-        {
-            var format = dt.IsNaive ? "%Y-%m-%d %H:%M:%S.%f" : "%Y-%m-%d %H:%M:%S.%f%z";
-            var back = PyDateTime.StrPTime(dt.StrFTime(format), format);
-            return back.Equals(dt) && back.IsNaive == dt.IsNaive && back.OffsetMicroseconds == dt.OffsetMicroseconds;
-        });
-
-    [Fact]
     public void Order_and_equality_agree_for_values_of_the_same_kind() =>
         Gen.Select(AnyDateTime, AnyDateTime).Where((a, b) => a.IsNaive == b.IsNaive).Sample((a, b) =>
         {
@@ -355,8 +330,7 @@ public class DateTimeTests
             return Math.Sign(c) == -Math.Sign(b.CompareTo(a))
                 && (a < b) == (c < 0) && (a <= b) == (c <= 0) && (a > b) == (c > 0) && (a >= b) == (c >= 0)
                 && (a == b) == (c == 0) && (a != b) == (c != 0)
-                && (c != 0 || a.GetHashCode() == b.GetHashCode())
-                && (a - b) == -(b - a) && ((a - b) == TimeSpan.Zero) == (c == 0) && Math.Sign((a - b).Ticks) == Math.Sign(c);
+                && (c != 0 || a.GetHashCode() == b.GetHashCode());
         });
 
     [Fact]
@@ -367,7 +341,6 @@ public class DateTimeTests
             Assert.True(a != b);
             Assert.Throws<InvalidCastException>(() => a < b);
             Assert.Throws<InvalidCastException>(() => b >= a);
-            Assert.Throws<InvalidCastException>(() => a - b);
         });
 
     [Fact]
