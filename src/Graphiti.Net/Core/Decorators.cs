@@ -32,7 +32,6 @@ internal static class Decorators
     // Python merges by the type of the first result. The three overloads are the three result shapes of the four
     // upstream uses (graphiti.py:1546, :2269, :2315, :2391) and of the upstream test: a list, SearchResults, and a
     // tuple of two lists. The branch `else: return results` has no typed form and no caller.
-    // TODO(port): handle_multiple_group_ids
     internal static Task<List<TItem>> HandleMultipleGroupIdsAsync<TItem>(
         GraphDriver? clientsDriver,
         long? maxCoroutines,
@@ -41,10 +40,16 @@ internal static class Decorators
         Func<List<string>?, GraphDriver?, Task<List<TItem>>> func,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): handle_multiple_group_ids");
+        return HandleMultipleGroupIdsCoreAsync(
+            clientsDriver,
+            maxCoroutines,
+            groupIds,
+            driver,
+            func,
+            results => [.. results.SelectMany(result => result)],
+            cancellationToken);
     }
 
-    // TODO(port): handle_multiple_group_ids
     internal static Task<SearchResults> HandleMultipleGroupIdsAsync(
         GraphDriver? clientsDriver,
         long? maxCoroutines,
@@ -53,10 +58,16 @@ internal static class Decorators
         Func<List<string>?, GraphDriver?, Task<SearchResults>> func,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): handle_multiple_group_ids");
+        return HandleMultipleGroupIdsCoreAsync(
+            clientsDriver,
+            maxCoroutines,
+            groupIds,
+            driver,
+            func,
+            SearchResults.Merge,
+            cancellationToken);
     }
 
-    // TODO(port): handle_multiple_group_ids
     internal static Task<(List<T1> First, List<T2> Second)> HandleMultipleGroupIdsAsync<T1, T2>(
         GraphDriver? clientsDriver,
         long? maxCoroutines,
@@ -65,13 +76,22 @@ internal static class Decorators
         Func<List<string>?, GraphDriver?, Task<(List<T1> First, List<T2> Second)>> func,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): handle_multiple_group_ids");
+        // PORT: Python merges a tuple by component, and a component that is a list is flattened.
+        return HandleMultipleGroupIdsCoreAsync(
+            clientsDriver,
+            maxCoroutines,
+            groupIds,
+            driver,
+            func,
+            results => (
+                [.. results.SelectMany(result => result.First)],
+                [.. results.SelectMany(result => result.Second)]),
+            cancellationToken);
     }
 
     // PORT: the three overloads share the branches of the Python wrapper in this one method, which takes the merge
     // of the result shape (R16 allows this one helper).
-    // TODO(port): handle_multiple_group_ids
-    private static Task<T> HandleMultipleGroupIdsCoreAsync<T>(
+    private static async Task<T> HandleMultipleGroupIdsCoreAsync<T>(
         GraphDriver? clientsDriver,
         long? maxCoroutines,
         List<string>? groupIds,
@@ -80,7 +100,43 @@ internal static class Decorators
         Func<List<T>, T> merge,
         CancellationToken cancellationToken)
     {
-        throw new NotSupportedException("TODO(port): handle_multiple_group_ids");
+        // PORT: `hasattr(self, 'clients') and hasattr(self.clients, 'driver')` is a clientsDriver that is not null (R15).
+        var isFalkor = clientsDriver is not null && clientsDriver.Provider == GraphProvider.Falkordb;
+
+        // FalkorDB: one group_id still needs the graph named after that id.
+        // Clone is call-scoped so we never reassign self.driver / self.clients.driver.
+        if (isFalkor && clientsDriver is not null && groupIds is { Count: 1 })
+        {
+            var gid = groupIds[0];
+            var falkorDriver = clientsDriver;
+            if (gid != falkorDriver.Database)
+            {
+                return await func(groupIds, falkorDriver.Clone(gid));
+            }
+
+            return await func(groupIds, driver);
+        }
+
+        // FalkorDB with multiple group_ids: run per graph and merge
+        if (isFalkor && clientsDriver is not null && groupIds is { Count: > 1 })
+        {
+            // Execute for each group_id concurrently
+            var falkorDriver = clientsDriver;
+
+            // PORT: Python binds the arguments by name for each task and rewrites group_ids and driver. The lambda
+            // receives both by name, so the rewrite is the call itself. The clone runs when the task starts, as in
+            // Python (R8).
+            var results = await Helpers.SemaphoreGatherAsync(
+                [.. groupIds.Select<string, Func<Task<T>>>(gid => () => func([gid], falkorDriver.Clone(gid)))],
+                maxCoroutines,
+                cancellationToken);
+
+            // Merge results based on type
+            return merge(results);
+        }
+
+        // Normal execution
+        return await func(groupIds, driver);
     }
 
     // PORT: get_parameter_position reads the signature of a function with inspect.signature. The explicit wrapper

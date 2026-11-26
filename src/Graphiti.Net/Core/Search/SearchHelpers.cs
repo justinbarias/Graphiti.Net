@@ -17,18 +17,68 @@ limitations under the License.
 
 namespace Graphiti.Core.Search;
 
+using Graphiti.Core.Prompts;
+using Graphiti.PyCompat;
+
 internal static class SearchHelpers
 {
-    // TODO(port): format_edge_date_range
     internal static string FormatEdgeDateRange(EntityEdge edge)
     {
         // return f"{datetime(edge.valid_at).strftime('%Y-%m-%d %H:%M:%S') if edge.valid_at else 'date unknown'} - {(edge.invalid_at.strftime('%Y-%m-%d %H:%M:%S') if edge.invalid_at else 'present')}"
-        throw new NotSupportedException("TODO(port): format_edge_date_range");
+        // PORT: a datetime is always true in Python, so the test is a test for None. `{dt}` is `str(dt)` (R11).
+        return (edge.ValidAt is { } validAt ? validAt.Str() : "date unknown") + " - " + (edge.InvalidAt is { } invalidAt ? invalidAt.Str() : "present");
     }
 
-    // TODO(port): search_results_to_context_string
+    /// <summary>Reformats a set of SearchResults into a single string to pass directly to an LLM as context</summary>
     internal static string SearchResultsToContextString(SearchResults searchResults)
     {
-        throw new NotSupportedException("TODO(port): search_results_to_context_string");
+        var factJson = searchResults.Edges
+            .Select(edge => (object?)new OrderedDictionary<string, object?>
+            {
+                ["fact"] = edge.Fact,
+                ["valid_at"] = Py.Str(edge.ValidAt),
+                // PORT: `edge.invalid_at or 'Present'`. A datetime is always true in Python.
+                ["invalid_at"] = Py.Str(edge.InvalidAt is { } invalidAt ? (object)invalidAt : "Present"),
+            })
+            .ToList();
+        var entityJson = searchResults.Nodes
+            .Select(node => (object?)new OrderedDictionary<string, object?> { ["entity_name"] = node.Name, ["summary"] = node.Summary })
+            .ToList();
+        var episodeJson = searchResults.Episodes
+            .Select(episode => (object?)new OrderedDictionary<string, object?>
+            {
+                ["source_description"] = episode.SourceDescription,
+                ["content"] = episode.Content,
+            })
+            .ToList();
+        var communityJson = searchResults.Communities
+            .Select(community => (object?)new OrderedDictionary<string, object?>
+            {
+                ["community_name"] = community.Name,
+                ["summary"] = community.Summary,
+            })
+            .ToList();
+
+        var contextString = "\n" + $$"""
+    FACTS and ENTITIES represent relevant context to the current conversation.
+    COMMUNITIES represent a cluster of closely related entities.
+
+    These are the most relevant facts and their valid and invalid dates. Facts are considered valid
+    between their valid_at and invalid_at dates. Facts with an invalid_at date of "Present" are considered valid.
+    <FACTS>
+            {{PromptHelpers.ToPromptJson(factJson)}}
+    </FACTS>
+    <ENTITIES>
+            {{PromptHelpers.ToPromptJson(entityJson)}}
+    </ENTITIES>
+    <EPISODES>
+            {{PromptHelpers.ToPromptJson(episodeJson)}}
+    </EPISODES>
+    <COMMUNITIES>
+            {{PromptHelpers.ToPromptJson(communityJson)}}
+    </COMMUNITIES>
+""" + "\n";
+
+        return contextString;
     }
 }
