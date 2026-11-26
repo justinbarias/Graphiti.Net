@@ -29,6 +29,7 @@ public sealed class BindingsTests
     [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [{\"$tuple\": [\"a\", \"b\"]}]}", "{\"ok\": [\"a\", \"b\"]}")]
     [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [5]}", "{\"error\": \"TypeError\"}")]
     [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [\"ab\"]}", "{\"host_error\": \"JudgeHostErrorException\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [{\"a\": 1}]}", "{\"host_error\": \"JudgeHostErrorException\"}")]
     [InlineData("{\"id\": \"x\", \"fn\": \"builtins:str\", \"args\": [{\"$ref\": \"no.such.module:NAME\"}]}", "{\"error\": \"JudgeNotBound\"}")]
     public async Task The_builtins_answer_as_Python_does(string line, string expected)
     {

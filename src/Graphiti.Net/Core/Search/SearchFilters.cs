@@ -42,10 +42,6 @@ internal enum ComparisonOperator
 
 internal sealed record DateFilter : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("DateFilter")
-        .Default("date", PydanticType.Optional(PydanticType.DateTime), null, "A datetime to filter on")
-        .Required("comparison_operator", PydanticType.Enum<ComparisonOperator>(), "Comparison operator for date filter");
-
     internal PyDateTime? Date { get; set; }
 
     internal required ComparisonOperator ComparisonOperator { get; set; }
@@ -65,19 +61,14 @@ internal sealed record DateFilter : IPydanticModel
         Pydantic.DumpFields(json, ("date", Date), ("comparison_operator", ComparisonOperator));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("DateFilter")
+        .Default("date", PydanticType.Optional(PydanticType.DateTime), null, "A datetime to filter on")
+        .Required("comparison_operator", PydanticType.Enum<ComparisonOperator>(), "Comparison operator for date filter");
 }
 
 internal sealed record PropertyFilter : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("PropertyFilter")
-        .Required("property_name", PydanticType.Str, "Property name")
-        .Default(
-            "property_value",
-            PydanticType.Union(PydanticType.Str, PydanticType.Int, PydanticType.Float, PydanticType.Null),
-            null,
-            "Value you want to match on for the property")
-        .Required("comparison_operator", PydanticType.Enum<ComparisonOperator>(), "Comparison operator for the property");
-
     internal required string PropertyName { get; set; }
 
     internal object? PropertyValue { get; set; }
@@ -105,22 +96,19 @@ internal sealed record PropertyFilter : IPydanticModel
         Pydantic.DumpFields(json, ("property_name", PropertyName), ("property_value", PropertyValue), ("comparison_operator", ComparisonOperator));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("PropertyFilter")
+        .Required("property_name", PydanticType.Str, "Property name")
+        .Default(
+            "property_value",
+            PydanticType.Union(PydanticType.Str, PydanticType.Int, PydanticType.Float, PydanticType.Null),
+            null,
+            "Value you want to match on for the property")
+        .Required("comparison_operator", PydanticType.Enum<ComparisonOperator>(), "Comparison operator for the property");
 }
 
 internal sealed record SearchFilters : IPydanticModel
 {
-    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("SearchFilters")
-        .Default("node_labels", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "List of node labels to filter on")
-        .Default("edge_types", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "List of edge types to filter on")
-        .Default("valid_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
-        .Default("invalid_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
-        .Default("created_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
-        .Default("expired_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
-        .Default("edge_uuids", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null)
-        .Default("edge_source_node_uuids", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "Restrict edge results to these source node UUIDs")
-        .Default("edge_target_node_uuids", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "Restrict edge results to these target node UUIDs")
-        .Default("property_filters", PydanticType.Optional(PydanticType.List(PydanticType.Model(PropertyFilter.ModelJsonSchema))), null);
-
     internal List<string>? NodeLabels { get; set; }
 
     internal List<string>? EdgeTypes { get; set; }
@@ -140,14 +128,6 @@ internal sealed record SearchFilters : IPydanticModel
     internal List<string>? EdgeTargetNodeUuids { get; set; }
 
     internal List<PropertyFilter>? PropertyFilters { get; set; }
-
-    // @field_validator('node_labels'): validate_node_label_filters. PydanticFields puts the field name in front of the
-    // location when ModelValidate reads the field, so that call gives no field. Validate() gives the field name.
-    private static List<string>? ValidateNodeLabelFilters(List<string>? value, string? field = null)
-    {
-        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), "SearchFilters", field);
-        return value;
-    }
 
     internal SearchFilters Validate()
     {
@@ -205,6 +185,26 @@ internal sealed record SearchFilters : IPydanticModel
         ("property_filters", PropertyFilters));
 
     OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("SearchFilters")
+        .Default("node_labels", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "List of node labels to filter on")
+        .Default("edge_types", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "List of edge types to filter on")
+        .Default("valid_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
+        .Default("invalid_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
+        .Default("created_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
+        .Default("expired_at", PydanticType.Optional(PydanticType.List(PydanticType.List(PydanticType.Model(DateFilter.ModelJsonSchema)))), null)
+        .Default("edge_uuids", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null)
+        .Default("edge_source_node_uuids", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "Restrict edge results to these source node UUIDs")
+        .Default("edge_target_node_uuids", PydanticType.Optional(PydanticType.List(PydanticType.Str)), null, "Restrict edge results to these target node UUIDs")
+        .Default("property_filters", PydanticType.Optional(PydanticType.List(PydanticType.Model(PropertyFilter.ModelJsonSchema))), null);
+
+    // @field_validator('node_labels'): validate_node_label_filters. PydanticFields puts the field name in front of the
+    // location when ModelValidate reads the field, so that call gives no field. Validate() gives the field name.
+    private static List<string>? ValidateNodeLabelFilters(List<string>? value, string? field = null)
+    {
+        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), "SearchFilters", field);
+        return value;
+    }
 }
 
 internal static class SearchFiltersModule

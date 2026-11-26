@@ -9,14 +9,11 @@ public class PyPatchTests
     private static readonly PyPatch<string?> Name = new(null);
 
     [Fact]
-    public void The_value_of_the_module_is_read_as_the_value_itself()
+    public void Value_reads_the_value_of_the_module()
     {
-        double threshold = Threshold;
-
-        Assert.Equal(0.15, threshold);
         Assert.Equal(0.15, Threshold.Value);
-        Assert.True(MinTokens > 999);
-        Assert.Equal(2000, MinTokens * 2);
+        Assert.True(MinTokens.Value > 999);
+        Assert.Equal(2000, MinTokens.Value * 2);
         Assert.Null(Name.Value);
     }
 
@@ -81,13 +78,46 @@ public class PyPatchTests
     }
 
     [Fact]
-    public void The_text_is_the_Python_text_of_the_value()
+    public void The_text_is_the_Python_text_of_the_value_and_a_format_reaches_the_value()
     {
         Assert.Equal("0.15", Threshold.ToString());
         Assert.Equal("1000", $"{MinTokens}");
+        Assert.Equal("0.150", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Threshold:F3}"));
         using (Threshold.Use(1.0))
         {
             Assert.Equal("1.0", Threshold.ToString());
+            Assert.Equal("1.00", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Threshold:F2}"));
         }
+    }
+
+    [Fact]
+    public void A_scope_that_is_not_the_innermost_one_cannot_end()
+    {
+        var patch = new PyPatch<long>(1000);
+        var outer = patch.Use(1);
+        var inner = patch.Use(2);
+
+        Assert.Throws<InvalidOperationException>(outer.Dispose);
+        Assert.Equal(2, patch.Value);
+
+        inner.Dispose();
+        Assert.Equal(1, patch.Value);
+        outer.Dispose();
+        Assert.Equal(1000, patch.Value);
+    }
+
+    [Fact]
+    public void A_second_dispose_of_a_scope_changes_nothing()
+    {
+        var patch = new PyPatch<long>(1000);
+        var first = patch.Use(1);
+        first.Dispose();
+        using (patch.Use(2))
+        {
+            first.Dispose();
+            Assert.Equal(2, patch.Value);
+        }
+
+        Assert.Equal(1000, patch.Value);
     }
 }

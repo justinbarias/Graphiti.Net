@@ -12,6 +12,10 @@ public class SupportTests
         Assert.Equal("5", PyJson.Dumps(5L, indent: -(1L << 40)));
         Assert.Equal("[\n1,\n[\n2\n]\n]", PyJson.Dumps(new List<object?> { 1L, new List<object?> { 2L } }, indent: -(1L << 40)));
         Assert.Equal("[\n  1\n]", PyJson.Dumps(new List<object?> { 1L }, indent: 2L));
+
+        // json.dumps(5, indent=2**63-1) raises MemoryError: Python builds the text of one level before it writes.
+        Assert.Throws<OverflowException>(() => PyJson.Dumps(5L, indent: long.MaxValue));
+        Assert.Throws<OverflowException>(() => PyJson.Dumps(5L, indent: (long)int.MaxValue + 1));
     }
 
     [Fact]
