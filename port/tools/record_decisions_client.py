@@ -15,7 +15,12 @@ with real results:
   not valid, and the token usage. The recording keeps each request (method, URL, whether the key is in the
   Authorization header, the content type, and the body text), each reply, the delays of _sleep, the usage that
   reaches the token tracker, the spans, and the result or the error of generate_response. The test of the port
-  gives the recorded replies to a fake HttpMessageHandler, one after the other.
+  gives the recorded replies to a fake HttpMessageHandler, one after the other. A reply body can be raw bytes
+  (`body_hex`) with a charset in the header, a scenario can leave a key out of the payload, and a scenario can
+  hold a transport error that the port raises through its own timer (`by_clock`).
+- openai_decisions_client, in sections of their own: the gate of `_sleep` (the next request waits for the delay),
+  a cancel while `_sleep` waits, `_generate_response`, the constructor with the default HTTP client, and a request
+  that a server on 127.0.0.1 answers with a redirect.
 
     .upstream/graphiti/.venv/bin/python port/tools/record_decisions_client.py
     .upstream/graphiti/.venv/bin/python port/tools/record_decisions_client.py --check
@@ -23,8 +28,8 @@ with real results:
 It writes tests/Port.Evaluation/values/llm_client_decisions.json. --check writes nothing and exits 1 if the file
 differs from what the run would write. The tool needs Python 3.12 and the pinned upstream. The environment
 variable GRAPHITI_UPSTREAM names the upstream checkout, and it defaults to .upstream/graphiti in the
-repository. The tool changes nothing there. Nothing here uses the network: the HTTP client has a mock transport,
-and the key is the text `test-key`.
+repository. The tool changes nothing there. Nothing here leaves the machine: the HTTP client has a mock transport,
+the one case with a real client talks to a server on 127.0.0.1 in this process, and the key is the text `test-key`.
 """
 from __future__ import annotations
 
@@ -72,8 +77,24 @@ def run(fn, *args):
     return {'ok': value}
 
 
-def typed_list(value) -> bool:
-    return isinstance(value, list) and all(isinstance(item, dict) and all(isinstance(k, str) for k in item) for item in value)
+def json_safe(value) -> bool:
+    """True if json.dumps keeps the value as it is, so that the file holds it. A dict with a key that is not a str
+    and a set are not safe: the file then holds their repr, and the test compares the repr of the port."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return True
+    if isinstance(value, (list, tuple)):
+        return all(json_safe(item) for item in value)
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and json_safe(item) for k, item in value.items())
+    return False
+
+
+def repr_result(result: dict) -> dict:
+    """A result that json.dumps cannot keep becomes {'repr': ...}. A tuple result is written as a list."""
+    if 'ok' in result and not json_safe(result['ok']):
+        value = result['ok']
+        return {'repr': repr(list(value) if isinstance(value, tuple) else value)}
+    return result
 
 
 def render_list(items: list, style: int) -> str:
@@ -173,7 +194,7 @@ def record_pure(dp) -> list:
     cases: list = []
 
     def add(name: str, *args, encode=None) -> None:
-        result = run(getattr(dp, name), *args)
+        result = repr_result(run(getattr(dp, name), *args))
         if 'ok' in result and encode is not None:
             result = {'ok': encode(result['ok'])}
         if name in ('node_n6', 'edge_e2') and 'ok' in result:
@@ -198,12 +219,17 @@ def record_pure(dp) -> list:
         add('tag', tag_text(name), name)
     add('tag', 'nothing', 'A')
 
-    # parse_list: a result that is not a list of dicts has no place in the C# type, and the test expects
-    # InvalidCastException for it.
+    # parse_list returns what json.loads or ast.literal_eval returns, so also a dict, a number, a text, or a list with
+    # items that are not dicts (R20). A result that the file cannot hold is recorded as its repr.
     texts: list = [None, '', ' \n ', '[]', '{"a": 1}', '[1, 2]', '[{"a": 1}, {"b": [true, null]}]', "[{'a': 1, 'b': True, 'c': None}]",
                    "[{'candidate_id': 0, 'name': 'it's'}, {'candidate_id': 1, 'name': 'x'}]", "[{'id': 1, 'name': 'a'}, {'id': 2, 'na",
                    "[{'idx': 4, 'fact': 'it's odd'}, {'idx': 5, 'fact': 'fine'}]", '[{"id": 1, "name": "a"},', 'garbage {no close',
-                   "[{'a': 1}, {'b': 2}]", "[{1: 'a'}]", '[{"id": 12345678901234567890}]', "{'candidate_id': 5}"]
+                   "[{'a': 1}, {'b': 2}]", "[{1: 'a'}]", '[{"id": 12345678901234567890}]', "{'candidate_id': 5}",
+                   # The results of a value that is not a list of dicts: None, a number, a text, a bool, a dict, a tuple.
+                   'null', '5', '"x"', 'true', '[{"a": 1}, 2]', "[{1: 'a'}, oops]", 'None', "(1, 2)", "'abc'", '2.5',
+                   # literal_eval raises ValueError for the whole text, and the spans have a name or a negative id.
+                   "[{'a': foo}]", "[{'id': -3, 'name': 'it's'}, x]", "[{'id': -3, 'name': 'it's'}, {'idx': -7, 'fact': 'it's'}, x]",
+                   "[{'candidate_id': -12, 'name': 'a'b'}, {'idx': 5, 'fact': 'c'd'}]"]
     for _ in range(100):
         r = rng.random()
         if r < 0.3:
@@ -221,9 +247,7 @@ def record_pure(dp) -> list:
         else:
             texts.append(sentence() + ' {' + sentence() + '} ' + sentence())
     for text in texts:
-        result = run(dp.parse_list, text)
-        if 'ok' in result and not typed_list(result['ok']):
-            result = {'untyped': repr(result['ok'])}
+        result = repr_result(run(dp.parse_list, text))
         cases.append({'f': 'parse_list', 'a': [text], 'r': result})
 
     for _ in range(50):
@@ -293,7 +317,82 @@ def record_pure(dp) -> list:
             if maybe(0.8):
                 answers[f'con{idx}'] = rng.choice([{'noul': round(rng.random(), 2)}, {'noul': 1}, {}, None, {'noul': 0.8}])
         add('assemble_edge_answers', answers, existing, contra, rng.choice([0.0, 0.5, 0.7, 1.0, 0.8, float('nan'), 2]), rng.choice([0.0, 0.5, 0.8, 1.0, float('nan')]))
+
+    record_pure_boundaries(add, cases, dp)
     return cases
+
+
+def record_pure_boundaries(add, cases: list, dp) -> None:
+    """Inputs that are written by hand: a boundary of a test, and a value that is not the shape that the caller expects.
+    They use no random number, so the cases above do not change."""
+
+    def state_of(current: str) -> str:
+        return f'<CURRENT MESSAGE>{current}</CURRENT MESSAGE>'
+
+    # shrink_state halves the CURRENT MESSAGE only when it has more than 2000 code points. An astral character is one
+    # code point and two UTF-16 units.
+    for text, count in (('a', 2000), ('a', 2001), ('\U0001F600', 2000)):
+        add('shrink_state', state_of(text * count))
+    add('shrink_state', '<PREVIOUS MESSAGES>[]</PREVIOUS MESSAGES>' + state_of('x' * 2001))
+    add('shrink_state', '<PREVIOUS MESSAGES>\n \n</PREVIOUS MESSAGES>' + state_of('x' * 2001))
+
+    # node_n6 and edge_e2 read each item of parse_list as open data: the item can be a text, a list, or a number.
+    def node(entities: str, existing: str) -> str:
+        return f'<ENTITIES>\n{entities}\n</ENTITIES>\n<EXISTING ENTITIES>\n{existing}\n</EXISTING ENTITIES>'
+
+    for existing in ('["abc"]', '["candidate_id"]', '[["candidate_id"]]', '[{"candidate_id": 3, "name": "n"}, "xyz"]', '[1]', '5', 'None',
+                     '{"candidate_id": 4}', "{'candidate_id', 'x'}", '[null]', '[true]', "[{1: 'a', 'candidate_id': 6}]", "('candidate_id',)",
+                     '"candidate_id and more"'):
+        add('node_n6', node('[{"id": 1, "name": "x"}]', existing))
+    for entities in ('[1]', '["abc"]', '{"id": 3}', '5', 'None', '[{"id": 1}, [2]]', '[{"id": 1, "entity_type": "Person"}]',
+                     '[{"id": 1, "entity_type": ["A", 2]}]', '[{"id": 1, "entity_type": {"A": 1, "B": 2}}]', '[{"id": 1, "entity_type": 3}]',
+                     '[{"id": 2, "name": null}]', '[{"name": "no id"}]', "[{1: 'a', 'id': 7}]", '[{"id": 1.5}, {"id": true}, {"id": null}]'):
+        add('node_n6', node(entities, '[]'))
+
+    def edge(existing: str, candidates: str) -> str:
+        return f'<EXISTING FACTS>\n{existing}\n</EXISTING FACTS>\n<FACT INVALIDATION CANDIDATES>\n{candidates}\n</FACT INVALIDATION CANDIDATES>\n<NEW FACT>\nnf\n</NEW FACT>'
+
+    for existing, candidates in (('["abc"]', '[]'), ('[]', '["abc"]'), ("'ab'", "'cd'"), ("'ab'", '[]'), ('[1]', '[]'), ('5', '[]'), ('[]', 'None'),
+                                 ('[{"idx": 1, "fact": "f"}]', "({'idx': 2},)"), ("({'idx': 1},)", "({'idx': 2},)"), ('{"idx": 1}', '{"idx": 2}'),
+                                 ('[{"idx": 1}]', '"x"'), ('[{"fact": "no idx"}]', '[]'), ('[]', '[{"fact": "no idx"}]'), ('[null]', '[]'),
+                                 ('[{"idx": 1, "raw": "r"}, {"idx": 1, "fact": "dup"}]', '[{"idx": 2}]'), ("[{1: 'a', 'idx': 5, 'fact': 'k'}]", '[]'),
+                                 ('[[1]]', '[]'), ('true', '[]')):
+        add('edge_e2', edge(existing, candidates))
+    for f in ('x', ['idx'], 5, None, {'fact': 'a'}, {'idx': None}):
+        add('_contra_strict', 'nf', f)
+
+    # assemble_node_answers: an answer that is truthy and not a dict, probabilities that are truthy and not a dict, and a
+    # choice that is not a text. A number that int() takes: a bool, a float, and an int.
+    entities = [{'id': 0, 'name': 'a'}]
+    for answer in ('str', ['a'], 7, {'probabilities': ['a']}, {'probabilities': 'text'}, {'probabilities': 5}, {'probabilities': {'1': 'x'}},
+                   {'probabilities': {'1': 0.5, '2': 'x'}}, {'choice': 2.9}, {'choice': True}, {'choice': False}, {'choice': 7}, {'choice': [1]},
+                   {'choice': {'a': 1}}, {'choice': -3.9}, {'choice': ''}, {'choice': 'none'}, {'choice': float('nan')},
+                   {'choice': float('inf')}, {'probabilities': {'3': 0.1, '4': 0.7}, 'choice': '9'}, {'probabilities': {'1': True, '2': 2}},
+                   {'probabilities': {'1': None, '2': None}}, 0, '', [], False):
+        add('assemble_node_answers', {'e0': answer}, entities)
+    add('assemble_node_answers', {}, ['x'])
+    add('assemble_node_answers', {}, [None])
+    add('assemble_node_answers', {}, [{'name': 'no id'}])
+    add('assemble_node_answers', {}, [{'id': 1}, 5])
+    add('assemble_node_answers', {}, 'ab')
+    add('assemble_node_answers', {}, {'id': 1})
+    add('assemble_node_answers', {}, 5)
+    add('assemble_node_answers', {}, None)
+    add('assemble_node_answers', {'e1': {'choice': '4'}}, ({'id': 1, 'name': 'tuple'},))
+    add('assemble_node_answers', {'e1': {'choice': '4'}}, [{'id': 1}, {'id': 1, 'name': 'again'}])
+    # int() of a number that does not fit in a long returns the value in Python, and the port throws OverflowException
+    # (the limit of R4). The test expects that exception for `limit`.
+    cases.append({'f': 'assemble_node_answers', 'a': [{'e0': {'choice': 123456789012345678901234567890}}, entities],
+                  'r': dict(run(dp.assemble_node_answers, {'e0': {'choice': 123456789012345678901234567890}}, entities), limit='OverflowException')})
+    cases.append({'f': 'assemble_node_answers', 'a': [{'e0': {'choice': 1e300}}, entities],
+                  'r': dict(run(dp.assemble_node_answers, {'e0': {'choice': 1e300}}, entities), limit='OverflowException')})
+
+    # assemble_edge_answers: noul that is a bool, a text, or None, and an answer that is truthy and not a dict.
+    for answer in ({'noul': True}, {'noul': False}, {'noul': 'x'}, {'noul': None}, {'noul': [1]}, {'noul': 1}, {'noul': 0.7}, 'str', ['a'], 7,
+                   {'noul': 0.7, 'other': 1}, {'noul': float('nan')}, {'noul': float('inf')}, {'noul': -1}, 0, '', False):
+        add('assemble_edge_answers', {'dup1': answer, 'con2': answer}, [1], [2], 0.7, 0.8)
+    add('assemble_edge_answers', {'dup1': {'noul': 0.7}, 'dup3': {'noul': 0.9}}, [3, 1], [], 0.7, 0.8)
+    add('assemble_edge_answers', {'dup-1': {'noul': 1}}, [-1], [-1], 0.5, 0.5)
 
 
 def record_builders(dp) -> list:
@@ -555,6 +654,8 @@ async def run_scenario(sc: dict, odc, LLMConfig, Message, httpx) -> dict:
             if 'usage' in entry:
                 payload['usage'] = entry['usage']
             return {'status': 200, 'body': json.dumps(payload, ensure_ascii=False), 'content_type': 'application/json'}
+        if 'body_hex' in entry:
+            return {'status': entry['status'], 'body_hex': entry['body_hex'], 'content_type': entry['content_type']}
         return {'status': entry['status'], 'body': entry['body'], 'content_type': 'text/plain'}
 
     def handler(request):
@@ -580,7 +681,8 @@ async def run_scenario(sc: dict, odc, LLMConfig, Message, httpx) -> dict:
         })
         if 'raise' in reply:
             raise getattr(httpx, reply['raise'])(reply['message'])
-        return httpx.Response(reply['status'], content=reply['body'].encode('utf-8'), headers={'Content-Type': reply['content_type']})
+        content = bytes.fromhex(reply['body_hex']) if 'body_hex' in reply else reply['body'].encode('utf-8')
+        return httpx.Response(reply['status'], content=content, headers={'Content-Type': reply['content_type']})
 
     async def no_wait(delay) -> None:
         delays.append(delay)
@@ -589,16 +691,20 @@ async def run_scenario(sc: dict, odc, LLMConfig, Message, httpx) -> dict:
     odc._sleep = no_wait
     http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     try:
+        extra = {'timeout_seconds': cfg['timeout_seconds']} if 'timeout_seconds' in cfg else {}
         client = odc.OpenAIDecisionsClient(
-            config=LLMConfig(api_key=KEY, model=cfg['model']),
+            config=LLMConfig(api_key=cfg.get('api_key', KEY), model=cfg['model']),
             base_url=cfg['base_url'],
             duplicate_threshold=cfg['duplicate_threshold'],
             contradiction_threshold=cfg['contradiction_threshold'],
             max_retries=cfg['max_retries'],
             http_client=http_client,
+            **extra,
         )
         client.tracer = make_tracer(spans)
         payload = {'instructions': sc['instructions'], 'state': sc['state'], 'questions': sc['questions']}
+        for omitted in sc.get('omit', []):
+            del payload[omitted]
         messages = [Message(role='system', content='system text'), Message(role='user', content=json.dumps(payload))]
         if sc.get('no_user'):
             messages = [Message(role='system', content='system text')]
@@ -626,6 +732,255 @@ async def run_scenario(sc: dict, odc, LLMConfig, Message, httpx) -> dict:
         'usage': {'total': [usage.input_tokens, usage.output_tokens], 'by_prompt': by_prompt},
         'outcome': outcome,
     }
+
+
+def special_scenario(questions, script, *, prompt='dedupe_edges.resolve_edge', state='current state', instructions='', max_retries=5,
+                     api_key=None, timeout_seconds=None, omit=(), by_clock=False) -> dict:
+    sc: dict = {
+        'prompt_name': prompt, 'instructions': instructions, 'state': state, 'questions': questions,
+        'config': {'max_retries': max_retries, 'base_url': BASE_URL, 'model': None, 'duplicate_threshold': 0.7, 'contradiction_threshold': 0.8},
+        'call': {'model': None, 'max_tokens': None, 'model_size': 'medium'},
+        'script': script,
+    }
+    if api_key is not None:
+        sc['config']['api_key'] = api_key
+    if timeout_seconds is not None:
+        sc['config']['timeout_seconds'] = timeout_seconds
+    if omit:
+        sc['omit'] = list(omit)
+    if by_clock:
+        sc['by_clock'] = True
+    return sc
+
+
+def special_scenarios() -> list:
+    """Scenarios that are written by hand. They use no random number, so the scenarios above do not change."""
+    node = 'dedupe_nodes.nodes'
+
+    def noul() -> dict:
+        return {'type': 'noul', 'instructions': 'is it?'}
+
+    def answers(names, probability=0.9, usage=None) -> dict:
+        body: dict = {'answers': [{'type': 'predicate', 'name': name, 'probability': probability} for name in names]}
+        if usage is not None:
+            body['usage'] = usage
+        return {'status': 200, 'body': json.dumps(body)}
+
+    def raw(status: int, data: bytes, content_type: str) -> dict:
+        return {'status': status, 'body_hex': data.hex(), 'content_type': content_type}
+
+    scenarios: list = []
+    add = scenarios.append
+
+    # The names of the questions are not in the order of their index, and an index has two digits.
+    add(special_scenario({'dup2': noul(), 'dup1': noul(), 'con3': noul(), 'con0': noul()}, [answers(['dup2', 'dup1', 'con3', 'con0'])]))
+    add(special_scenario({'dup10': noul(), 'dup9': noul(), 'con10': noul(), 'con9': noul()}, [answers(['dup10', 'dup9', 'con10', 'con9'])]))
+    add(special_scenario({'dup2': noul(), 'dup1': noul(), 'con3': noul(), 'con0': noul()}, [{'status': 200, 'body': json.dumps({'answers': [
+        {'type': 'predicate', 'name': 'dup2', 'probability': 0.75}, {'type': 'predicate', 'name': 'dup1', 'probability': 0.65},
+        {'type': 'predicate', 'name': 'con3', 'probability': 0.85}, {'type': 'predicate', 'name': 'con0', 'probability': 0.75}]})}]))
+
+    # A payload with no `instructions` key gets '', and one with no `state` or `questions` key is a KeyError before the span.
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], omit=['instructions']))
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], omit=['state']))
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], omit=['questions']))
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], omit=['instructions', 'state', 'questions']))
+
+    # A 400 reply whose body is valid JSON and not a dict: `.get` is an AttributeError that _is_input_too_long catches.
+    for body in ('[1]', 'null', '"text"', '5', 'true', '{"error": 5}', '{"error": null}', '{"error": {"code": 7}}',
+                 '{"error": {"code": null, "message": 5, "type": "invalid_request_error"}}', '{"error": {"code": {}}}'):
+        add(special_scenario({'dup0': noul()}, [{'status': 400, 'body': body}]))
+    # A code that is a list or a dict cannot be hashed for the set test: a TypeError that nothing catches.
+    add(special_scenario({'dup0': noul()}, [{'status': 400, 'body': json.dumps({'error': {'code': ['x']}})}]))
+    add(special_scenario({'dup0': noul(), 'dup1': noul()}, [{'status': 400, 'body': json.dumps({'error': {
+        'code': {'a': 1}, 'type': 'invalid_request_error', 'message': 'exceeds the token limit'}})}]))
+
+    # A 200 reply whose body is valid JSON and not a dict.
+    for body in ('[1]', '[]', '"x"', '5', 'null', 'true'):
+        add(special_scenario({'dup0': noul()}, [{'status': 200, 'body': body}]))
+    # A usage that is not a dict, or holds a value that int() takes or refuses.
+    for usage in ([1], 'u', 5, {'input_tokens': None}, {'input_tokens': [1]}, {'input_tokens': 'x'}, {'output_tokens': {}}, {'input_tokens': True, 'output_tokens': False},
+                  {'input_tokens': 12.9, 'output_tokens': '7'}, {'input_tokens': ' 8 '}, {'input_tokens': -4}, {'input_tokens': 1e3}, {'input_tokens': float('nan')}):
+        add(special_scenario({'dup0': noul()}, [answers(['dup0'], usage=usage)]))
+
+    # A question that is not a dict fails inside the span, after the call count of the tracker.
+    add(special_scenario({'dup0': 'x'}, [answers(['dup0'])]))
+    add(special_scenario({'dup0': noul(), 'dup1': 5}, [answers(['dup0', 'dup1'])]))
+    add(special_scenario({'dup0': None}, [answers(['dup0'])]))
+    add(special_scenario({'e0': [1]}, [answers(['e0'])], prompt=node, state='<ENTITIES>[{"id": 0, "name": "n"}]</ENTITIES>'))
+
+    # The name of a question that int() takes or refuses.
+    for name in ('dupX', 'dup', 'dup1.5', 'conX', 'dup-1', 'dup 1', 'dup1_0', 'dup\uff11', 'dup+2', 'dup\u0663', 'con\n3', 'dup0x1'):
+        add(special_scenario({name: noul()}, [answers([name])]))
+
+    # The body is bytes. response.json() reads UTF-8 and skips a byte order mark, and it ignores the charset of the header.
+    good = json.dumps({'answers': [{'type': 'predicate', 'name': 'dup0', 'probability': 0.9}]})
+    add(special_scenario({'dup0': noul()}, [raw(200, b'{"answers": [{"type": "predicate", "name": "dup0", "probability": 0.9}], "x": "\xff"}', 'application/json')]))
+    add(special_scenario({'dup0': noul()}, [raw(200, b'\xef\xbb\xbf' + good.encode(), 'application/json')]))
+    add(special_scenario({'dup0': noul()}, [raw(200, good.encode(), 'application/json; charset=iso-8859-1')]))
+    add(special_scenario({'dup0': noul()}, [raw(200, good.encode(), 'application/json; charset=nonsense')]))
+    cafe = json.dumps({'answers': [{'type': 'choice', 'name': 'e0', 'choice': 'café', 'confidence': 0.9}]}, ensure_ascii=False)
+    choice = {'e0': {'type': 'choice', 'instructions': 'x', 'criteria': {'café': 'c', 'none': 'n'}}}
+    entity_state = '<ENTITIES>[{"id": 0, "name": "n"}]</ENTITIES>'
+    add(special_scenario(choice, [raw(200, cafe.encode('utf-8'), 'application/json; charset=iso-8859-1')], prompt=node, state=entity_state))
+    add(special_scenario(choice, [raw(200, cafe.encode('utf-8'), 'application/json')], prompt=node, state=entity_state))
+    # The text of an error reply. response.text uses the charset of the header, UTF-8 otherwise, and keeps a byte order mark.
+    add(special_scenario({'dup0': noul()}, [raw(500, b'\xef\xbb\xbfoops', 'text/plain')], max_retries=1))
+    add(special_scenario({'dup0': noul()}, [raw(500, b'caf\xe9', 'text/plain; charset=iso-8859-1')], max_retries=1))
+    add(special_scenario({'dup0': noul()}, [raw(500, 'caf\u00e9 \U0001F600'.encode('utf-8') + b' \xff', 'text/plain')], max_retries=1))
+    add(special_scenario({'dup0': noul()}, [raw(500, 'caf\u00e9'.encode('utf-8'), 'text/plain; charset=nonsense')], max_retries=1))
+    add(special_scenario({'dup0': noul()}, [raw(500, 'caf\u00e9'.encode('utf-8'), 'text/plain; charset="utf-8"')], max_retries=1))
+    add(special_scenario({'dup0': noul()}, [raw(500, b'', 'text/plain; charset=iso-8859-1')], max_retries=1))
+    add(special_scenario({'dup0': noul()}, [raw(404, b'\xe9' * 400, 'text/plain; charset=iso-8859-1')]))
+    add(special_scenario({'dup0': noul()}, [raw(429, b'\xef\xbb\xbflimit', 'text/plain')], max_retries=2))
+
+    # A key that has a character above U+007F cannot be an ASCII header value: UnicodeEncodeError before the request.
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], api_key='k\u00e9y', max_retries=2))
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], api_key='k\u00e9y', max_retries=0))
+    add(special_scenario({'dup0': noul()}, [answers(['dup0'])], api_key='\U0001F600'))
+
+    # A transport error that is not a connect error: httpx.ReadError is a TransportError, and the port reads it as an IOException.
+    add(special_scenario({'dup0': noul()}, [{'raise': 'ReadError', 'message': 'read failed'}, answers(['dup0'])]))
+    add(special_scenario({'dup0': noul()}, [{'raise': 'ReadError', 'message': 'read failed'}], max_retries=2))
+
+    # The port ends a request that takes too long with its own timer. Python raises ReadTimeout for it. The test of the port
+    # holds the request until the clock moves by timeout_seconds.
+    timeout = {'raise': 'ReadTimeout', 'message': 'request timed out'}
+    add(special_scenario({'dup0': noul()}, [timeout, answers(['dup0'])], timeout_seconds=7.5, by_clock=True))
+    add(special_scenario({'dup0': noul()}, [timeout, timeout, answers(['dup0'])], timeout_seconds=0.5, by_clock=True))
+    return scenarios
+
+
+async def record_gate_cases(odc, LLMConfig, Message, httpx) -> list:
+    """The delay of _sleep. In `gate` the delay ends when the test says so, and in `cancel` the caller cancels while the
+    delay waits. The count of requests before that must stay 1, and a cancel must end the call."""
+    questions = {'dup0': {'type': 'noul', 'instructions': 'is it?'}, 'con0': {'type': 'predicate', 'instructions': 'again?'}}
+    replies = [
+        {'status': 500, 'body': 'busy'},
+        {'status': 200, 'body': json.dumps({'answers': [{'type': 'predicate', 'name': 'dup0', 'probability': 0.9},
+                                                        {'type': 'predicate', 'name': 'con0', 'probability': 0.9}],
+                                            'usage': {'input_tokens': 5, 'output_tokens': 2}})},
+    ]
+    cases = []
+    for mode in ('gate', 'cancel'):
+        exchanges: list = []
+        delays: list = []
+        spans: list = []
+        gate = asyncio.Event()
+
+        def handler(request, exchanges=exchanges):
+            reply = replies[min(len(exchanges), len(replies) - 1)]
+            exchanges.append(request.content.decode('utf-8'))
+            return httpx.Response(reply['status'], content=reply['body'].encode('utf-8'), headers={'Content-Type': 'application/json'})
+
+        async def gated(delay, delays=delays, gate=gate) -> None:
+            delays.append(delay)
+            await gate.wait()
+
+        odc._sleep = gated
+        http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            client = odc.OpenAIDecisionsClient(config=LLMConfig(api_key=KEY), base_url=BASE_URL, max_retries=3, http_client=http_client)
+            client.tracer = make_tracer(spans)
+            payload = {'instructions': '', 'state': 'current state', 'questions': questions}
+            messages = [Message(role='system', content='system text'), Message(role='user', content=json.dumps(payload))]
+            task = asyncio.ensure_future(client.generate_response(messages, prompt_name='dedupe_edges.resolve_edge'))
+            for _ in range(200):
+                await asyncio.sleep(0)
+            before = {'requests': len(exchanges), 'delays': list(delays), 'done': task.done()}
+            if mode == 'gate':
+                gate.set()
+                try:
+                    outcome: dict = {'ok': await task}
+                except Exception as exc:  # noqa: BLE001
+                    outcome = {'err': [type(exc).__name__, str(exc)]}
+            else:
+                task.cancel()
+                try:
+                    outcome = {'ok': await task}
+                except asyncio.CancelledError:
+                    outcome = {'err': ['CancelledError', '']}
+            by_prompt = [[k, v.call_count, v.total_input_tokens, v.total_output_tokens] for k, v in client.token_tracker.get_usage().items()]
+        finally:
+            await http_client.aclose()
+        cases.append({'mode': mode, 'payload': payload, 'replies': replies, 'before': before, 'requests': len(exchanges), 'delays': delays,
+                      'outcome': outcome, 'spans': spans, 'by_prompt': by_prompt})
+    return cases
+
+
+async def record_default_client(odc, LLMConfig) -> list:
+    """The constructor with no http_client takes each timeout. httpx.AsyncClient(timeout=t) does not refuse one."""
+    cases = []
+    for seconds in (120.0, 5, 0, -1, 1e7, 1e300, float('inf'), 0.001):
+        result = run(lambda: odc.OpenAIDecisionsClient(config=LLMConfig(api_key=KEY), timeout_seconds=seconds))
+        if 'ok' in result:
+            client = result['ok']
+            result = {'ok': {'timeout_seconds': client.timeout_seconds, 'has_http_client': client.http_client is not None}}
+            await client.http_client.aclose()
+        cases.append({'timeout_seconds': seconds, 'r': result})
+    return cases
+
+
+async def record_private_generate(odc, LLMConfig, Message, httpx) -> dict:
+    """_generate_response only raises NotImplementedError."""
+    http_client = httpx.AsyncClient()
+    try:
+        client = odc.OpenAIDecisionsClient(config=LLMConfig(api_key=KEY), http_client=http_client)
+        try:
+            await client._generate_response([Message(role='user', content='x')])
+            return {'ok': None}
+        except Exception as exc:  # noqa: BLE001
+            return {'err': [type(exc).__name__, str(exc)]}
+    finally:
+        await http_client.aclose()
+
+
+async def record_redirect(odc, LLMConfig, Message) -> dict:
+    """The default client of the constructor follows no redirect. A server on 127.0.0.1 answers POST /v1/decisions with 302
+    and each other request with a valid reply, so a client that follows the redirect would end with a result."""
+    requests: list = []
+
+    async def serve(reader, writer) -> None:
+        try:
+            head = await reader.readuntil(b'\r\n\r\n')
+            lines = head.decode('latin-1').split('\r\n')
+            length = 0
+            for line in lines[1:]:
+                if line.lower().startswith('content-length:'):
+                    length = int(line.split(':', 1)[1])
+            if length:
+                await reader.readexactly(length)
+            requests.append(lines[0].rsplit(' ', 1)[0])
+            if lines[0].startswith('POST /v1/decisions'):
+                reply = b'HTTP/1.1 302 Found\r\nLocation: /v1/other\r\nContent-Length: 5\r\nConnection: close\r\n\r\nmoved'
+            else:
+                body = json.dumps({'answers': [{'type': 'predicate', 'name': 'dup0', 'probability': 0.9}]}).encode()
+                reply = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ' + str(len(body)).encode() + b'\r\nConnection: close\r\n\r\n' + body
+            writer.write(reply)
+            await writer.drain()
+        finally:
+            writer.close()
+
+    async def no_wait(delay) -> None:
+        pass
+
+    odc._sleep = no_wait
+    server = await asyncio.start_server(serve, '127.0.0.1', 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        client = odc.OpenAIDecisionsClient(config=LLMConfig(api_key=KEY), base_url=f'http://127.0.0.1:{port}/v1', max_retries=3)
+        try:
+            payload = {'instructions': '', 'state': 'current state', 'questions': {'dup0': {'type': 'noul', 'instructions': 'is it?'}}}
+            messages = [Message(role='user', content=json.dumps(payload))]
+            try:
+                outcome: dict = {'ok': await client.generate_response(messages, prompt_name='dedupe_edges.resolve_edge')}
+            except Exception as exc:  # noqa: BLE001
+                outcome = {'err': [type(exc).__name__, str(exc)]}
+        finally:
+            await client.http_client.aclose()
+    finally:
+        server.close()
+        await server.wait_closed()
+    return {'requests': requests, 'outcome': outcome}
 
 
 def record_map_answers(odc) -> list:
@@ -701,10 +1056,17 @@ def main() -> int:
     from graphiti_core.prompts.models import Message
 
     scenarios = []
+    extra: dict = {}
 
     async def go() -> None:
         for i in range(126):
             scenarios.append(await run_scenario(make_scenario(i), odc, LLMConfig, Message, httpx))
+        for sc in special_scenarios():
+            scenarios.append(await run_scenario(sc, odc, LLMConfig, Message, httpx))
+        extra['async_cases'] = await record_gate_cases(odc, LLMConfig, Message, httpx)
+        extra['default_client'] = await record_default_client(odc, LLMConfig)
+        extra['private_generate'] = await record_private_generate(odc, LLMConfig, Message, httpx)
+        extra['redirect'] = await record_redirect(odc, LLMConfig, Message)
 
     # The environment may hold a real key. This process removes the two variables and reads neither of them. The
     # constructor cases set them to fixed texts.
@@ -722,10 +1084,12 @@ def main() -> int:
             'map_answers': record_map_answers(odc),
             'constructor': record_constructor(odc, LLMConfig, httpx),
             'scenarios': scenarios,
+            **extra,
         }
     # allow_nan keeps inf and nan in the file as the tokens that PyJson.Loads reads.
     text = json.dumps(data, ensure_ascii=True, allow_nan=True, separators=(',', ':')) + '\n'
-    count = len(data['pure']) + len(data['builders']) + len(data['map_answers']) + len(data['constructor']) + len(data['scenarios'])
+    count = (len(data['pure']) + len(data['builders']) + len(data['map_answers']) + len(data['constructor']) + len(data['scenarios'])
+             + len(data['async_cases']) + len(data['default_client']) + 2)
     if '--check' in sys.argv[1:]:
         if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
             print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)

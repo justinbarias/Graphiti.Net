@@ -77,19 +77,40 @@ internal static class DecisionPrompts
         @"\{.*?\}(?=" + PyRegex.Space + @"*'?," + "|" + PyRegex.Space + @"*'?\]$|" + PyRegex.Space + @"*'?\]" + PyRegex.Space + @"*$)",
         RegexOptions.Singleline | RegexOptions.CultureInvariant);
 
-    // PORT: the annotation `list[dict[str, Any]]` (R20). `json.loads` and `ast.literal_eval` can return a value of
-    // another shape, which the result type cannot hold (the judge case parse_list.json_non_list returns a dict).
-    // Py.AsList and Py.AsDict throw InvalidCastException for such a value, where Python returns it.
-    internal static List<OrderedDictionary<string, object?>> ParseList(string? text)
+    // PORT: R13. Python: rf'["\']{key}["\']\s*:\s*(-?\d+)' for the keys candidate_id, idx, and id. The keys are fixed, so
+    // each pattern is a static field. The group is read with Py.Int.
+    private static readonly Regex CandidateIdPattern = IntKeyPattern("candidate_id");
+
+    private static readonly Regex IdxPattern = IntKeyPattern("idx");
+
+    private static readonly Regex IdPattern = IntKeyPattern("id");
+
+    // PORT: R13. Python: rf'["\']{key}["\']\s*:\s*["\'](.*?)["\']\s*[,}}]' with re.S, for the keys name and fact.
+    private static readonly Regex NamePattern = TextKeyPattern("name");
+
+    private static readonly Regex FactPattern = TextKeyPattern("fact");
+
+    private static Regex IntKeyPattern(string key) => new(
+        "[\"']" + key + "[\"']" + PyRegex.Space + "*:" + PyRegex.Space + "*(-?" + PyRegex.Digit + "+)",
+        RegexOptions.CultureInvariant);
+
+    private static Regex TextKeyPattern(string key) => new(
+        "[\"']" + key + "[\"']" + PyRegex.Space + "*:" + PyRegex.Space + "*[\"'](.*?)[\"']" + PyRegex.Space + "*[,}]",
+        RegexOptions.Singleline | RegexOptions.CultureInvariant);
+
+    // PORT: the annotation `list[dict[str, Any]]` (R20). `json.loads` and `ast.literal_eval` return their value as it is,
+    // so the result is a value of the value model (R6): also a dict, a number, a text, or a list with items that are not
+    // dicts. A caller reads it as open data, as the Python caller does.
+    internal static object? ParseList(string? text)
     {
         if (text is null || PyText.Strip(text) == string.Empty)
         {
-            return [];
+            return new List<object?>();
         }
 
         try
         {
-            return Py.AsList(PyJson.Loads(text)).Select(Py.AsDict).ToList();
+            return PyJson.Loads(text);
         }
         catch (JsonException)
         {
@@ -98,14 +119,14 @@ internal static class DecisionPrompts
 
         try
         {
-            return Py.AsList(PyAst.LiteralEval(text)).Select(Py.AsDict).ToList();
+            return PyAst.LiteralEval(text);
         }
         catch (Exception e) when (e is FormatException or ArgumentException)
         {
             // PORT: Python passes
         }
 
-        List<OrderedDictionary<string, object?>> @out = [];
+        List<object?> @out = [];
         foreach (Match m in ObjectSpanPattern.Matches(text))
         {
             var span = m.Value;
@@ -125,31 +146,21 @@ internal static class DecisionPrompts
                 }
             }
 
-            // PORT: a dict with keys that are not text (a PyDict) has no place in the result type, so Py.AsDict throws
-            // InvalidCastException for it, where Python appends it.
             if (obj is not (OrderedDictionary<string, object?> or PyDict))
             {
                 var raw = new OrderedDictionary<string, object?> { ["raw"] = span };
-                foreach (var key in new[] { "candidate_id", "idx", "id" })
+                foreach (var (key, pattern) in new[] { ("candidate_id", CandidateIdPattern), ("idx", IdxPattern), ("id", IdPattern) })
                 {
-                    // Python: rf'["\']{key}["\']\s*:\s*(-?\d+)'
-                    var km = Regex.Match(
-                        span,
-                        "[\"']" + key + "[\"']" + PyRegex.Space + "*:" + PyRegex.Space + "*(-?" + PyRegex.Digit + "+)",
-                        RegexOptions.CultureInvariant);
+                    var km = pattern.Match(span);
                     if (km.Success)
                     {
                         raw[key] = Py.Int(km.Groups[1].Value);
                     }
                 }
 
-                foreach (var key in new[] { "name", "fact" })
+                foreach (var (key, pattern) in new[] { ("name", NamePattern), ("fact", FactPattern) })
                 {
-                    // Python: rf'["\']{key}["\']\s*:\s*["\'](.*?)["\']\s*[,}}]' with re.S
-                    var km = Regex.Match(
-                        span,
-                        "[\"']" + key + "[\"']" + PyRegex.Space + "*:" + PyRegex.Space + "*[\"'](.*?)[\"']" + PyRegex.Space + "*[,}]",
-                        RegexOptions.Singleline | RegexOptions.CultureInvariant);
+                    var km = pattern.Match(span);
                     if (km.Success)
                     {
                         raw[key] = km.Groups[1].Value;
@@ -160,12 +171,54 @@ internal static class DecisionPrompts
             }
             else
             {
-                @out.Add(Py.AsDict(obj));
+                @out.Add(obj);
             }
         }
 
         return @out;
     }
+
+    // PORT: the reads that Python writes on an item of parse_list. The item is open data (R6): a dict, but also a text, a
+    // list, a number, or None, and each read throws what Python raises for that type. No rule has a helper for `in`
+    // and `[]` on open data (reported), so each is a private member here. `Get` is `x.get(key, default)`.
+    private static object? Get(object? value, string key, object? @default = null) =>
+        value is PyDict pyDict
+            ? Py.Get(pyDict, key, @default)
+            : Py.Get(Py.Receiver<OrderedDictionary<string, object?>>(value, "get"), key, @default);
+
+    // `x[key]`: a KeyError for a dict without the key, and a TypeError for another type.
+    private static object? At(object? value, string key) => value switch
+    {
+        OrderedDictionary<string, object?> dict => dict[key],
+        PyDict pyDict => pyDict[key],
+        string => throw new InvalidCastException("string indices must be integers, not 'str'"),
+        List<object?> or PyTuple or byte[] => throw new InvalidCastException($"{Py.TypeName(value)} indices must be integers or slices, not str"),
+        _ => throw new InvalidCastException($"'{Py.TypeName(value)}' object is not subscriptable"),
+    };
+
+    // `key in value`: the keys of a dict, the parts of a text, the items of a list, a tuple, or a set.
+    private static bool Has(string key, object? value) => value switch
+    {
+        OrderedDictionary<string, object?> dict => dict.ContainsKey(key),
+        PyDict pyDict => pyDict.ContainsKey(key),
+        string text => text.Contains(key, StringComparison.Ordinal),
+        byte[] => throw new InvalidCastException("a bytes-like object is required, not 'str'"),
+        List<object?> or PyTuple or IPySet => Py.Iter(value).Any(item => item is string text && text == key),
+        _ => throw new InvalidCastException($"argument of type '{Py.TypeName(value)}' is not iterable"),
+    };
+
+    // `a + b` for the two lists of edge_e2. The sum of two other values is a TypeError, or a value that the loop over it
+    // cannot iterate, and the loops over `a` and `b` have already run.
+    private static IEnumerable<object?> Concat(object? a, object? b) => (a, b) switch
+    {
+        (List<object?> first, List<object?> second) => first.Concat(second),
+        (PyTuple first, PyTuple second) => Py.Iter(first).Concat(Py.Iter(second)),
+        (string first, string second) => Py.Iter(first + second),
+        _ => throw new InvalidCastException($"unsupported operand type(s) for +: '{Py.TypeName(a)}' and '{Py.TypeName(b)}'"),
+    };
+
+    // `f.get("fact", f.get("raw", ""))`
+    private static object? FactText(object? f) => Get(f, "fact", Get(f, "raw", string.Empty));
 
     /// <summary>Drop PREVIOUS MESSAGES first, then halve the CURRENT MESSAGE from the front.</summary>
     // PORT: no annotations. The state is text, and the result is text or None.
@@ -187,33 +240,33 @@ internal static class DecisionPrompts
     }
 
     /// <summary>Decompose a rendered dedupe_nodes.nodes user message into state + questions.</summary>
-    // PORT: no annotations. TYPE_HINTS.md gives a 4-tuple of the state text, the questions, and two lists from
-    // parse_list. A tuple result is a value tuple (Part 3).
-    internal static (string State, OrderedDictionary<string, OrderedDictionary<string, object?>> Questions, List<OrderedDictionary<string, object?>> Entities, List<OrderedDictionary<string, object?>> Existing) NodeN6(string user)
+    // PORT: no annotations. TYPE_HINTS.md gives a 4-tuple of the state text, the questions, and two results of
+    // parse_list. A tuple result is a value tuple (Part 3). The two results of parse_list are open data (R20).
+    internal static (string State, OrderedDictionary<string, OrderedDictionary<string, object?>> Questions, object? Entities, object? Existing) NodeN6(string user)
     {
         var entities = ParseList(Tag(user, "ENTITIES"));
         var existing = ParseList(Tag(user, "EXISTING ENTITIES"));
         var state = PyText.Split(user, "</EXISTING ENTITIES>")[0] + "</EXISTING ENTITIES>";
         var criteria = new OrderedDictionary<string, object?>();
-        foreach (var c in existing)
+        foreach (var c in Py.Iter(existing))
         {
-            if (c.TryGetValue("candidate_id", out var candidateId))
+            if (Has("candidate_id", c))
             {
-                criteria[Py.Str(candidateId)] = "candidate_id " + Py.Str(candidateId) + ": " + Py.Str(Py.Get(c, "name"));
+                criteria[Py.Str(At(c, "candidate_id"))] = "candidate_id " + Py.Str(At(c, "candidate_id")) + ": " + Py.Str(Get(c, "name"));
             }
         }
 
         criteria["none"] = NodeNone;
         var questions = new OrderedDictionary<string, OrderedDictionary<string, object?>>();
-        foreach (var e in entities)
+        foreach (var e in Py.Iter(entities))
         {
-            var entityType = Py.Get(e, "entity_type");
-            questions["e" + Py.Str(e["id"])] = new OrderedDictionary<string, object?>
+            var key = "e" + Py.Str(At(e, "id"));
+            questions[key] = new OrderedDictionary<string, object?>
             {
                 ["type"] = "choice",
                 ["instructions"] =
-                    "The entity with id " + Py.Str(e["id"]) + " in ENTITIES is \"" + Py.Str(Py.Get(e, "name")) + "\" "
-                    + "(" + string.Join(", ", (Py.Truthy(entityType) ? Py.Iter(entityType) : []).Select(Py.AsString)) + "). It was extracted from the CURRENT MESSAGE. "
+                    "The entity with id " + Py.Str(At(e, "id")) + " in ENTITIES is \"" + Py.Str(Get(e, "name")) + "\" "
+                    + "(" + string.Join(", ", Py.Iter(Py.Truthy(Get(e, "entity_type")) ? Get(e, "entity_type") : new List<object?>()).Select(Py.AsString)) + "). It was extracted from the CURRENT MESSAGE. "
                     + "Which EXISTING ENTITY (by candidate_id) refers to the same real-world object or concept "
                     + "as this entity? Obey the RULES. Choose none if there is no duplicate.",
                 ["criteria"] = criteria,
@@ -223,15 +276,15 @@ internal static class DecisionPrompts
         return (state + RulesHeader + NodeRules, questions, entities, existing);
     }
 
-    // PORT: no annotations. `f` is an item of parse_list. Internal, because judge cases call it (R2).
-    internal static OrderedDictionary<string, object?> ContraStrict(string newFact, OrderedDictionary<string, object?> f)
+    // PORT: no annotations. `f` is an item of parse_list, so it is open data (R20). Internal, because judge cases call it (R2).
+    internal static OrderedDictionary<string, object?> ContraStrict(string newFact, object? f)
     {
         return new OrderedDictionary<string, object?>
         {
             ["type"] = "noul",
             ["instructions"] =
-                "Does the NEW FACT \"" + newFact + "\" directly contradict the fact idx=" + Py.Str(f["idx"]) + " "
-                + "\"" + Py.Str(Py.Get(f, "fact", Py.Get(f, "raw", ""))) + "\", so that both cannot be true at the same time? A contradiction "
+                "Does the NEW FACT \"" + newFact + "\" directly contradict the fact idx=" + Py.Str(At(f, "idx")) + " "
+                + "\"" + Py.Str(FactText(f)) + "\", so that both cannot be true at the same time? A contradiction "
                 + "needs explicit evidence that the old fact stopped being true or was replaced "
                 + "(termination, replacement, transfer, or mutually exclusive current-state "
                 + "language). New activity, progress, or status about the same entities does not "
@@ -245,27 +298,28 @@ internal static class DecisionPrompts
     }
 
     /// <summary>Decompose a rendered dedupe_edges.resolve_edge user message (strict contradiction).</summary>
-    // PORT: no annotations. The same 4-tuple form as node_n6.
-    internal static (string State, OrderedDictionary<string, OrderedDictionary<string, object?>> Questions, List<OrderedDictionary<string, object?>> Existing, List<OrderedDictionary<string, object?>> Candidates) EdgeE2(string user)
+    // PORT: no annotations. The same 4-tuple form as node_n6, with the two results of parse_list as open data.
+    internal static (string State, OrderedDictionary<string, OrderedDictionary<string, object?>> Questions, object? Existing, object? Candidates) EdgeE2(string user)
     {
         var existing = ParseList(Tag(user, "EXISTING FACTS"));
         var candidates = ParseList(Tag(user, "FACT INVALIDATION CANDIDATES"));
         var newFact = PyText.Strip(Tag(user, "NEW FACT") ?? string.Empty);
         List<string> lines = ["NEW FACT: " + newFact, string.Empty, "EXISTING FACTS:"];
-        var existingLines = existing.Select(f => "  idx=" + Py.Str(Py.Get(f, "idx")) + ": " + Py.Str(Py.Get(f, "fact", Py.Get(f, "raw", "")))).ToList();
+        var existingLines = Py.Iter(existing).Select(f => "  idx=" + Py.Str(Get(f, "idx")) + ": " + Py.Str(FactText(f))).ToList();
         lines.AddRange(existingLines.Count > 0 ? existingLines : ["  (none)"]);
         lines.AddRange(["", "FACT INVALIDATION CANDIDATES:"]);
-        var candidateLines = candidates.Select(f => "  idx=" + Py.Str(Py.Get(f, "idx")) + ": " + Py.Str(Py.Get(f, "fact", Py.Get(f, "raw", "")))).ToList();
+        var candidateLines = Py.Iter(candidates).Select(f => "  idx=" + Py.Str(Get(f, "idx")) + ": " + Py.Str(FactText(f))).ToList();
         lines.AddRange(candidateLines.Count > 0 ? candidateLines : ["  (none)"]);
         var state = string.Join("\n", lines);
         var questions = new OrderedDictionary<string, OrderedDictionary<string, object?>>();
-        foreach (var f in existing)
+        foreach (var f in Py.Iter(existing))
         {
-            questions["dup" + Py.Str(f["idx"])] = new OrderedDictionary<string, object?>
+            var key = "dup" + Py.Str(At(f, "idx"));
+            questions[key] = new OrderedDictionary<string, object?>
             {
                 ["type"] = "noul",
                 ["instructions"] =
-                    "Does the existing fact idx=" + Py.Str(f["idx"]) + " \"" + Py.Str(Py.Get(f, "fact", Py.Get(f, "raw", ""))) + "\" "
+                    "Does the existing fact idx=" + Py.Str(At(f, "idx")) + " \"" + Py.Str(FactText(f)) + "\" "
                     + "state the same information as the NEW FACT \"" + newFact + "\", or already state "
                     + "all of the information in the NEW FACT? The wording or the language can be "
                     + "different, and the existing fact can have more detail. It is not a duplicate "
@@ -284,9 +338,9 @@ internal static class DecisionPrompts
             };
         }
 
-        foreach (var f in existing.Concat(candidates))
+        foreach (var f in Concat(existing, candidates))
         {
-            questions["con" + Py.Str(f["idx"])] = ContraStrict(newFact, f);
+            questions["con" + Py.Str(At(f, "idx"))] = ContraStrict(newFact, f);
         }
 
         return (
@@ -362,23 +416,23 @@ internal static class DecisionPrompts
     }
 
     /// <summary>Map Jev choice answers onto NodeResolutions.</summary>
+    // PORT: `entities` is `list[dict[str, Any]]`, and the client passes the result of parse_list, so it is open data (R20, R22).
     internal static OrderedDictionary<string, object?> AssembleNodeAnswers(
         OrderedDictionary<string, object?> answers,
-        List<OrderedDictionary<string, object?>> entities)
+        object? entities)
     {
         List<object?> resolutions = [];
-        foreach (var entity in entities)
+        foreach (var entity in Py.Iter(entities))
         {
-            var answerValue = Py.Get(answers, "e" + Py.Str(entity["id"]));
-            var answer = Py.AsDict(Py.Truthy(answerValue) ? answerValue : new OrderedDictionary<string, object?>());
+            var answerValue = Py.Get(answers, "e" + Py.Str(At(entity, "id")));
+            var answer = Py.Receiver<OrderedDictionary<string, object?>>(Py.Truthy(answerValue) ? answerValue : new OrderedDictionary<string, object?>(), "get");
             var probabilitiesValue = Py.Get(answer, "probabilities");
-            var probabilities = Py.AsDict(Py.Truthy(probabilitiesValue) ? probabilitiesValue : new OrderedDictionary<string, object?>());
             object? choice;
-            if (probabilities.Count > 0)
+            if (Py.Truthy(probabilitiesValue))
             {
                 // max(probabilities.items(), key=lambda item: item[1])[0]: the first of the largest values (R14).
                 KeyValuePair<string, object?>? best = null;
-                foreach (var item in probabilities)
+                foreach (var item in Py.Receiver<OrderedDictionary<string, object?>>(probabilitiesValue, "items"))
                 {
                     if (best is null || Py.LessThan(best.Value.Value, item.Value))
                     {
@@ -393,21 +447,11 @@ internal static class DecisionPrompts
                 choice = Py.Get(answer, "choice");
             }
 
-            // PORT: int(choice) of a value from open data has no PyCompat helper for an object (reported).
-            var candidateId = choice is null or "none"
-                ? -1
-                : choice switch
-                {
-                    string s => Py.Int(s),
-                    long l => l,
-                    double d => Py.Int(d),
-                    bool b => b ? 1L : 0L,
-                    _ => throw new InvalidCastException("int() argument must be a string, a bytes-like object or a real number"),
-                };
+            var candidateId = choice is null or "none" ? -1 : Py.Int(choice);
             resolutions.Add(new OrderedDictionary<string, object?>
             {
-                ["id"] = entity["id"],
-                ["name"] = Py.Get(entity, "name"),
+                ["id"] = At(entity, "id"),
+                ["name"] = Get(entity, "name"),
                 ["duplicate_candidate_id"] = candidateId,
             });
         }
@@ -427,7 +471,7 @@ internal static class DecisionPrompts
         foreach (var idx in existingIndices)
         {
             var answer = Py.Get(answers, "dup" + Py.Str(idx));
-            var noul = Py.Get(Py.AsDict(Py.Truthy(answer) ? answer : new OrderedDictionary<string, object?>()), "noul", 0.0);
+            var noul = Py.Get(Py.Receiver<OrderedDictionary<string, object?>>(Py.Truthy(answer) ? answer : new OrderedDictionary<string, object?>(), "get"), "noul", 0.0);
             if (Py.AsDouble(noul) >= duplicateThreshold)
             {
                 duplicateFacts.Add(idx);
@@ -438,7 +482,7 @@ internal static class DecisionPrompts
         foreach (var idx in contradictionIndices)
         {
             var answer = Py.Get(answers, "con" + Py.Str(idx));
-            var noul = Py.Get(Py.AsDict(Py.Truthy(answer) ? answer : new OrderedDictionary<string, object?>()), "noul", 0.0);
+            var noul = Py.Get(Py.Receiver<OrderedDictionary<string, object?>>(Py.Truthy(answer) ? answer : new OrderedDictionary<string, object?>(), "get"), "noul", 0.0);
             if (Py.AsDouble(noul) >= contradictionThreshold)
             {
                 contradictedFacts.Add(idx);

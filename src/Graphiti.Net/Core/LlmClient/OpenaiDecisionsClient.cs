@@ -20,6 +20,7 @@ namespace Graphiti.Core.LlmClient;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Numerics;
+using System.Text;
 using System.Text.Json;
 using Graphiti.Core.Prompts;
 using Graphiti.Internal;
@@ -92,7 +93,13 @@ internal sealed class OpenAIDecisionsClient : LLMClient
         ContradictionThreshold = contradictionThreshold;
         TimeoutSeconds = timeoutSeconds;
         MaxRetries = maxRetries;
-        HttpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(timeoutSeconds) };
+
+        // PORT: httpx follows no redirect by default (follow_redirects=False), and the handler of HttpClient does, so the
+        // default client turns it off. httpx applies `timeout_seconds` to each request and not to the client, so the
+        // client has no limit of its own: the limit comes from Asyncio.WaitForAsync in PostAsync (R19). Python accepts each
+        // value of `timeout_seconds` in the constructor, and the Timeout of HttpClient refuses 0, a negative value, and a
+        // very large value.
+        HttpClient = httpClient ?? new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
     }
 
     // PORT: the config that Python builds before super().__init__ (R4).
@@ -117,6 +124,14 @@ internal sealed class OpenAIDecisionsClient : LLMClient
 
     // PORT: type(self).__name__ (R15).
     internal override string PythonName => "OpenAIDecisionsClient";
+
+    // PORT: R12. `bytes.decode('ascii')` of a header value, which throws for a character above U+007F as Python does (R4).
+    private static readonly Encoding StrictAscii = Encoding.GetEncoding("us-ascii", EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+
+    // PORT: R19. The codec of `response.text` for UTF-8 text, with errors="replace".
+    private static readonly Encoding LenientUtf8 = new UTF8Encoding(false, false);
+
+    private static readonly byte[] Utf8ByteOrderMark = [0xEF, 0xBB, 0xBF];
 
     internal string ApiKey { get; set; }
 
@@ -165,7 +180,7 @@ internal sealed class OpenAIDecisionsClient : LLMClient
                 + "openai_decisions_prompt_overrides().");
         }
 
-        var payload = Py.AsDict(PyJson.Loads(DecisionPrompts.UserText(messages)));
+        var payload = Py.Receiver<OrderedDictionary<string, object?>>(PyJson.Loads(DecisionPrompts.UserText(messages)), "get");
         var instructions = Py.Get(payload, "instructions", "");
         var state = payload["state"];
         var questionsValue = payload["questions"];
@@ -179,28 +194,20 @@ internal sealed class OpenAIDecisionsClient : LLMClient
             throw new ArgumentException("Decision prompt questions must be an object");
         }
 
-        // PORT: `questions: dict[str, dict[str, Any]]`. A question that is not a dict throws here, where Python
-        // fails at its first read of the question.
-        var questions = new OrderedDictionary<string, OrderedDictionary<string, object?>>();
-        foreach (var (key, value) in questionsDict)
-        {
-            questions[key] = Py.AsDict(value);
-        }
-
         var modelId = !string.IsNullOrEmpty(model) ? model : Model;
         if (modelId is null)
         {
             throw new ArgumentException("OpenAI Decisions model must be set");
         }
 
-        var entities = promptName == nodePrompt ? DecisionPrompts.ParseList(DecisionPrompts.Tag(stateText, "ENTITIES")) : [];
+        object? entities = promptName == nodePrompt ? DecisionPrompts.ParseList(DecisionPrompts.Tag(stateText, "ENTITIES")) : new List<object?>();
 
         // PORT: int(name[3:]) of text has no `int` of the value model, and the names are text (R18).
         var existingIndices = promptName == edgePrompt
-            ? questions.Keys.Where(name => name.StartsWith("dup", StringComparison.Ordinal)).Select(name => Py.Int(Py.Slice(name, 3, null))).Order().ToList()
+            ? questionsDict.Keys.Where(name => name.StartsWith("dup", StringComparison.Ordinal)).Select(name => Py.Int(Py.Slice(name, 3, null))).Order().ToList()
             : [];
         var contradictionIndices = promptName == edgePrompt
-            ? questions.Keys.Where(name => name.StartsWith("con", StringComparison.Ordinal)).Select(name => Py.Int(Py.Slice(name, 3, null))).Order().ToList()
+            ? questionsDict.Keys.Where(name => name.StartsWith("con", StringComparison.Ordinal)).Select(name => Py.Int(Py.Slice(name, 3, null))).Order().ToList()
             : [];
         var usage = new Dictionary<string, long> { ["input_tokens"] = 0, ["output_tokens"] = 0 };
         maxTokens ??= MaxTokens;
@@ -220,6 +227,14 @@ internal sealed class OpenAIDecisionsClient : LLMClient
                 });
                 try
                 {
+                    // PORT: `questions: dict[str, dict[str, Any]]`. The first read of a question is `question.get('type')`
+                    // in _post, inside the span, so a question that is not a dict fails here, after the span starts.
+                    var questions = new OrderedDictionary<string, OrderedDictionary<string, object?>>();
+                    foreach (var (key, value) in questionsDict)
+                    {
+                        questions[key] = Py.Receiver<OrderedDictionary<string, object?>>(value, "get");
+                    }
+
                     var answers = questions.Count > 0
                         ? await CallFitAsync(instructionsText, stateText, questions, modelId, usage, cancellationToken)
                         : [];
@@ -310,6 +325,11 @@ internal sealed class OpenAIDecisionsClient : LLMClient
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, BaseUrl + "/decisions");
+
+                // PORT: httpx encodes each header value as ASCII when it builds the request of each attempt, and a key with
+                // another character raises UnicodeEncodeError (R4) before it sends anything, and with no retry. A value of
+                // HttpClient has no such test.
+                _ = StrictAscii.GetBytes("Bearer " + ApiKey);
                 request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + ApiKey);
 
                 // PORT: R19. httpx writes `json=` with ensure_ascii=False, the separators `,` and `:`, and allow_nan=False.
@@ -320,47 +340,32 @@ internal sealed class OpenAIDecisionsClient : LLMClient
                     TimeoutSeconds,
                     PortServices.Time,
                     cancellationToken);
-                if (IsInputTooLong(response))
+                var content = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                if (IsInputTooLong(response, content))
                 {
-                    throw new OpenAIInputTooLongSignalException(await response.Content.ReadAsStringAsync(cancellationToken));
+                    throw new OpenAIInputTooLongSignalException(ResponseText(response, content));
                 }
 
                 var statusCode = (long)response.StatusCode;
                 if (!(200 <= statusCode && statusCode < 300))
                 {
                     throw new HttpRequestException(
-                        "HTTP " + Py.Str(statusCode) + ": " + Py.Slice(await response.Content.ReadAsStringAsync(cancellationToken), null, 500),
+                        "HTTP " + Py.Str(statusCode) + ": " + Py.Slice(ResponseText(response, content), null, 500),
                         null,
                         response.StatusCode);
                 }
 
-                var result = Py.AsDict(PyJson.Loads(await response.Content.ReadAsStringAsync(cancellationToken)));
+                var result = Py.Receiver<OrderedDictionary<string, object?>>(ResponseJson(content), "get");
                 var answers = MapAnswers(questions, Py.Get(result, "answers"));
                 var usageValue = Py.Get(result, "usage");
-                var usage = Py.AsDict(Py.Truthy(usageValue) ? usageValue : new OrderedDictionary<string, object?>());
-
-                // PORT: int(x) of a value from open data has no PyCompat helper for an object (reported).
+                var usage = Py.Receiver<OrderedDictionary<string, object?>>(Py.Truthy(usageValue) ? usageValue : new OrderedDictionary<string, object?>(), "get");
                 return new OrderedDictionary<string, object?>
                 {
                     ["answers"] = answers,
                     ["usage"] = new OrderedDictionary<string, object?>
                     {
-                        ["input_tokens"] = Py.Get(usage, "input_tokens", 0L) switch
-                        {
-                            long l => l,
-                            string s => Py.Int(s),
-                            double d => Py.Int(d),
-                            bool b => b ? 1L : 0L,
-                            _ => throw new InvalidCastException("int() argument must be a string, a bytes-like object or a real number"),
-                        },
-                        ["output_tokens"] = Py.Get(usage, "output_tokens", 0L) switch
-                        {
-                            long l => l,
-                            string s => Py.Int(s),
-                            double d => Py.Int(d),
-                            bool b => b ? 1L : 0L,
-                            _ => throw new InvalidCastException("int() argument must be a string, a bytes-like object or a real number"),
-                        },
+                        ["input_tokens"] = Py.Int(Py.Get(usage, "input_tokens", 0L)),
+                        ["output_tokens"] = Py.Int(Py.Get(usage, "output_tokens", 0L)),
                     },
                 };
             }
@@ -404,8 +409,43 @@ internal sealed class OpenAIDecisionsClient : LLMClient
         throw new InvalidOperationException("OpenAI Decisions request did not run; max_retries must be greater than zero");
     }
 
-    // PORT: the body is buffered after PostAsync, so response.Content.ReadAsStream() reads it with no wait (R19).
-    private static bool IsInputTooLong(HttpResponseMessage response)
+    // PORT: R19. `content` is `response.content`, the bytes of the body. The send of the request has read them, so reading
+    // them again needs no wait. `response.json()` is `json.loads(self.content)`: it decodes the bytes as strict UTF-8, skips
+    // a UTF-8 byte order mark, and ignores the charset of the header. `json.loads` also reads a body in UTF-16 or UTF-32
+    // from the first bytes, and it accepts an encoded surrogate (the handler `surrogatepass`). Those are accepted
+    // differences: the port reads strict UTF-8 only.
+    private static object? ResponseJson(byte[] content)
+    {
+        var skip = content.AsSpan().StartsWith(Utf8ByteOrderMark) ? Utf8ByteOrderMark.Length : 0;
+        return PyJson.Loads(PyText.DecodeUtf8(content.AsSpan(skip)));
+    }
+
+    // PORT: R19. `response.text` decodes the bytes with the charset of the Content-Type header when the runtime knows its
+    // name, and as UTF-8 otherwise. A malformed sequence gives U+FFFD, and a byte order mark stays in the text.
+    private static string ResponseText(HttpResponseMessage response, byte[] content)
+    {
+        if (content.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var encoding = LenientUtf8;
+        if (response.Content.Headers.ContentType?.CharSet?.Trim('"', '\'') is { Length: > 0 } charset)
+        {
+            try
+            {
+                encoding = Encoding.GetEncoding(charset);
+            }
+            catch (ArgumentException)
+            {
+                // PORT: a name that the runtime does not know gives UTF-8, as an unknown codec does in httpx.
+            }
+        }
+
+        return encoding.GetString(content);
+    }
+
+    private static bool IsInputTooLong(HttpResponseMessage response, byte[] content)
     {
         if ((long)response.StatusCode != 400)
         {
@@ -415,15 +455,10 @@ internal sealed class OpenAIDecisionsClient : LLMClient
         object? error;
         try
         {
-            using var stream = response.Content.ReadAsStream();
-            using var buffer = new MemoryStream();
-            stream.CopyTo(buffer);
-
-            // PORT: `response.json().get('error', {})`. A body that is not a dict is an AttributeError in Python, and
-            // Py.AsDict throws InvalidCastException for it.
-            error = Py.Get(Py.AsDict(PyJson.Loads(PyText.DecodeUtf8(buffer.ToArray()))), "error", new OrderedDictionary<string, object?>());
+            // PORT: `response.json().get('error', {})`. A body that is not a dict is an AttributeError, and Python catches it.
+            error = Py.Get(Py.Receiver<OrderedDictionary<string, object?>>(ResponseJson(content), "get"), "error", new OrderedDictionary<string, object?>());
         }
-        catch (Exception e) when (e is ArgumentException or JsonException or InvalidCastException)
+        catch (Exception e) when (e is ArgumentException or JsonException or MissingMemberException)
         {
             return false;
         }
@@ -433,7 +468,14 @@ internal sealed class OpenAIDecisionsClient : LLMClient
             return false;
         }
 
-        if (Py.Get(errorDict, "code") is "context_length_exceeded" or "string_above_max_length")
+        // PORT: `error.get('code') in {...}` is a set test, which hashes the code. A list or a dict is a TypeError.
+        var code = Py.Get(errorDict, "code");
+        if (code is List<object?> or OrderedDictionary<string, object?>)
+        {
+            throw new InvalidCastException($"unhashable type: '{Py.TypeName(code)}'");
+        }
+
+        if (code is "context_length_exceeded" or "string_above_max_length")
         {
             return true;
         }
@@ -636,25 +678,9 @@ internal sealed class OpenAIDecisionsClient : LLMClient
         }
 
         var responseUsageValue = Py.Get(response, "usage");
-        var responseUsage = Py.AsDict(Py.Truthy(responseUsageValue) ? responseUsageValue : new OrderedDictionary<string, object?>());
-
-        // PORT: int(x) of a value from open data has no PyCompat helper for an object (reported).
-        usage["input_tokens"] += Py.Get(responseUsage, "input_tokens", 0L) switch
-        {
-            long l => l,
-            string s => Py.Int(s),
-            double d => Py.Int(d),
-            bool b => b ? 1L : 0L,
-            _ => throw new InvalidCastException("int() argument must be a string, a bytes-like object or a real number"),
-        };
-        usage["output_tokens"] += Py.Get(responseUsage, "output_tokens", 0L) switch
-        {
-            long l => l,
-            string s => Py.Int(s),
-            double d => Py.Int(d),
-            bool b => b ? 1L : 0L,
-            _ => throw new InvalidCastException("int() argument must be a string, a bytes-like object or a real number"),
-        };
+        var responseUsage = Py.Receiver<OrderedDictionary<string, object?>>(Py.Truthy(responseUsageValue) ? responseUsageValue : new OrderedDictionary<string, object?>(), "get");
+        usage["input_tokens"] += Py.Int(Py.Get(responseUsage, "input_tokens", 0L));
+        usage["output_tokens"] += Py.Int(Py.Get(responseUsage, "output_tokens", 0L));
         return Py.AsDict(response["answers"]);
     }
 }

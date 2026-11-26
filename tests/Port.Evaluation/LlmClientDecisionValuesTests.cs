@@ -1,13 +1,15 @@
 // Evaluation test for graphiti_core/llm_client/decision_prompts.py and openai_decisions_client.py (port/RULES.md,
 // R23 and R25). values/llm_client_decisions.json holds what port/tools/record_decisions_client.py recorded from
-// Python: the constants, about 650 calls of the pure functions, 20 calls of the two prompt builders, 150 calls of
-// _map_answers, the constructor for 57 argument sets, and 108 scripted exchanges with the client. The scripted
-// replies come from the recording, and the fake HttpMessageHandler gives them to the client one after the other. No
-// test here sends a request.
+// Python: the constants, about 800 calls of the pure functions, 20 calls of the two prompt builders, 150 calls of
+// _map_answers, the constructor for 57 argument sets and for 8 timeouts of the default client, about 200 scripted
+// exchanges with the client, the delay of _sleep and a cancel during it, _generate_response, and a redirect. The
+// scripted replies come from the recording, and the fake HttpMessageHandler gives them to the client one after the
+// other. The one test of the default client talks to a server on 127.0.0.1. No test here leaves the machine.
 namespace Graphiti.Port.Evaluation;
 
 using System.Net;
 using Graphiti.Core.LlmClient;
+using Graphiti.Internal;
 using Graphiti.Core.Prompts;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.DecisionSupport;
@@ -46,8 +48,9 @@ public class LlmClientDecisionValuesTests
         var name = S(recorded[0]);
         Assert.True(PythonName(actual) == name, $"{label}: expected {name}, got {actual.GetType().Name}: {actual.Message}");
 
-        // A KeyError, a TypeError, and an AttributeError have no text that the port reproduces (R25).
-        if (name is "ValueError" or "JSONDecodeError" or "HTTPStatusError" or "RateLimitError" or "RuntimeError" or "OpenAIDecisionsInputTooLongError" or "ReadTimeout" or "ConnectError")
+        // A KeyError, a TypeError, a UnicodeEncodeError, and an OverflowError have no text that the port reproduces (R25).
+        if (name is "ValueError" or "JSONDecodeError" or "HTTPStatusError" or "RateLimitError" or "RuntimeError" or "OpenAIDecisionsInputTooLongError" or "ReadTimeout" or "ConnectError"
+            or "ReadError" or "AttributeError" or "UnicodeDecodeError" or "NotImplementedError")
         {
             Assert.True(S(recorded[1]) == actual.Message, $"{label}: expected the text '{recorded[1]}', got '{actual.Message}'");
         }
@@ -108,10 +111,17 @@ public class LlmClientDecisionValuesTests
                     var thrown = Assert.ThrowsAny<Exception>(() => Invoke(f, args));
                     AssertSameError(label, thrown, L(err));
                 }
-                else if (result.ContainsKey("untyped"))
+                else if (result.TryGetValue("limit", out var limit))
                 {
-                    // PORT: the result type of parse_list is list[dict[str, Any]] (R20). Python returned another shape.
-                    Assert.Throws<InvalidCastException>(() => Invoke(f, args));
+                    // An int that a long cannot hold: Python returns the value, and the port throws (the limit of R4).
+                    var thrown = Assert.ThrowsAny<Exception>(() => Invoke(f, args));
+                    Assert.True(thrown.GetType().Name == S(limit), $"{label}: expected {limit}, got {thrown.GetType().Name}");
+                }
+                else if (result.TryGetValue("repr", out var repr))
+                {
+                    // A value that the file cannot hold, such as a dict with an int key: the repr of the Python value.
+                    var got = Py.Repr(Invoke(f, args));
+                    Assert.True(S(repr) == got, $"{label}: expected {repr} but got {got}");
                 }
                 else
                 {
@@ -287,8 +297,11 @@ public class LlmClientDecisionValuesTests
         var cursor = 0;
         List<double> delays = [];
         List<string> problems = [];
+        var byClock = scenario.ContainsKey("by_clock");
+        var timeoutSeconds = cfg.TryGetValue("timeout_seconds", out var timeoutValue) ? Py.AsDouble(timeoutValue) : 120.0;
+        using var waiting = new SemaphoreSlim(0);
 
-        HttpResponseMessage Respond(DecisionRequest request)
+        async Task<HttpResponseMessage> Respond(DecisionRequest request, CancellationToken cancellationToken)
         {
             if (cursor >= exchanges.Count)
             {
@@ -321,12 +334,24 @@ public class LlmClientDecisionValuesTests
             var reply = D(exchange["reply"]);
             if (reply.TryGetValue("raise", out var raise))
             {
-                throw S(raise) == "ReadTimeout"
-                    ? new TimeoutException(S(reply["message"]))
-                    : new HttpRequestException(S(reply["message"]));
+                if (byClock && S(raise) == "ReadTimeout")
+                {
+                    // The request takes too long: the client ends it with its own timer, when the clock moves.
+                    waiting.Release();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+
+                throw S(raise) switch
+                {
+                    "ReadTimeout" => new TimeoutException(S(reply["message"])),
+                    "ReadError" => new IOException(S(reply["message"])),
+                    _ => new HttpRequestException(S(reply["message"])),
+                };
             }
 
-            return Reply((int)Py.AsLong(reply["status"]), S(reply["body"]), S(reply["content_type"]));
+            return reply.TryGetValue("body_hex", out var hex)
+                ? RawReply((int)Py.AsLong(reply["status"]), Convert.FromHexString(S(hex)), S(reply["content_type"]))
+                : Reply((int)Py.AsLong(reply["status"]), S(reply["body"]), S(reply["content_type"]));
         }
 
         var tracer = new DecisionRecordingTracer();
@@ -335,22 +360,30 @@ public class LlmClientDecisionValuesTests
             delays.Add(delay);
             return Task.CompletedTask;
         });
+        var clock = new DecisionClock();
+        using var scope = PortServices.Use(time: clock);
         var client = new OpenAIDecisionsClient(
-            config: new LLMConfig(apiKey: Key, model: cfg["model"] as string),
+            config: new LLMConfig(apiKey: cfg.TryGetValue("api_key", out var apiKey) ? S(apiKey) : Key, model: cfg["model"] as string),
             baseUrl: cfg["base_url"] as string,
             duplicateThreshold: Py.AsDouble(cfg["duplicate_threshold"]),
             contradictionThreshold: Py.AsDouble(cfg["contradiction_threshold"]),
+            timeoutSeconds: timeoutSeconds,
             maxRetries: Py.AsLong(cfg["max_retries"]),
             httpClient: HttpClientOf(new ScriptedHandler(Respond)));
         client.Tracer = tracer;
         var payload = Dict(("instructions", scenario["instructions"]), ("state", scenario["state"]), ("questions", scenario["questions"]));
+        foreach (var omitted in scenario.TryGetValue("omit", out var omit) ? L(omit).Select(S) : [])
+        {
+            payload.Remove(omitted);
+        }
+
         List<Message> messages = [new Message { Role = "system", Content = "system text" }.Validate()];
         if (!scenario.ContainsKey("no_user"))
         {
             messages.Add(new Message { Role = "user", Content = PyJson.Dumps(payload) }.Validate());
         }
 
-        var result = await Asyncio.Run(async () =>
+        var run = Asyncio.Run(async () =>
         {
             try
             {
@@ -367,6 +400,17 @@ public class LlmClientDecisionValuesTests
                 return (Result: null, Error: error);
             }
         });
+        var clockStop = DateTime.UtcNow.AddSeconds(10);
+        while (byClock && !run.IsCompleted && DateTime.UtcNow < clockStop)
+        {
+            // Each request that waits for its timer gets it: the clock moves by the timeout of the request.
+            if (await waiting.WaitAsync(TimeSpan.FromMilliseconds(20), TestContext.Current.CancellationToken))
+            {
+                clock.Advance(TimeSpan.FromSeconds(timeoutSeconds));
+            }
+        }
+
+        var result = await run.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         client.HttpClient.Dispose();
 
         foreach (var problem in problems)
@@ -440,6 +484,14 @@ public class LlmClientDecisionValuesTests
                 failures.Add($"{label}: the span attributes are {PyJson.Dumps(span.Attributes)}, not {PyJson.Dumps(expectedSpan["attributes"])}");
             }
 
+            // The text of a UnicodeEncodeError is the message of .NET, which PyCompat does not change (R4).
+            var textDiffers = outcome.TryGetValue("err", out var recordedError) && S(L(recordedError)[0]) == "UnicodeEncodeError";
+            if (textDiffers)
+            {
+                span.Status![1] = L(expectedSpan["status"])[1] as string;
+                span.Exceptions[0] = (span.Exceptions[0].Error, S(L(L(expectedSpan["exceptions"])[0])[1]));
+            }
+
             var status = span.Status is null ? null : new List<object?> { span.Status[0], span.Status[1] };
             if (PyJson.Dumps(expectedSpan["status"]) != PyJson.Dumps(status))
             {
@@ -452,5 +504,129 @@ public class LlmClientDecisionValuesTests
                 failures.Add($"{label}: the span exceptions are {PyJson.Dumps(exceptions)}, not {PyJson.Dumps(expectedSpan["exceptions"])}");
             }
         }
+    }
+
+    [Fact]
+    public async Task The_next_request_waits_for_the_delay_and_a_cancel_ends_the_call_as_in_Python()
+    {
+        var cases = L(Document["async_cases"]);
+        Assert.Equal(["gate", "cancel"], cases.Select(c => S(D(c)["mode"])).ToList());
+        foreach (var item in cases)
+        {
+            var recorded = D(item);
+            var mode = S(recorded["mode"]);
+            var replies = L(recorded["replies"]).Select(D).ToList();
+            var count = 0;
+            var secondRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var sleeping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            List<double> delays = [];
+            var handler = new ScriptedHandler(_ =>
+            {
+                var reply = replies[Math.Min(count++, replies.Count - 1)];
+                if (count == 2)
+                {
+                    secondRequest.TrySetResult();
+                }
+
+                return Reply((int)Py.AsLong(reply["status"]), S(reply["body"]));
+            });
+            var tracer = new DecisionRecordingTracer();
+            using var patch = OpenaiDecisionsClientModule.Sleep.Use((delay, token) =>
+            {
+                delays.Add(delay);
+                sleeping.TrySetResult();
+                return mode == "gate" ? gate.Task : Task.Delay(Timeout.InfiniteTimeSpan, token);
+            });
+            var client = new OpenAIDecisionsClient(config: new LLMConfig(apiKey: Key), baseUrl: BaseUrl, maxRetries: 3, httpClient: HttpClientOf(handler));
+            client.Tracer = tracer;
+            using var cancel = new CancellationTokenSource();
+
+            var run = Asyncio.Run(() => Call(client, D(recorded["payload"]), cancel.Token));
+            await sleeping.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await Task.WhenAny(secondRequest.Task, Task.Delay(300, TestContext.Current.CancellationToken));
+
+            // While the delay waits, the client sends nothing, and the call is not done.
+            var before = D(recorded["before"]);
+            Assert.Equal(Py.AsLong(before["requests"]), handler.Requests.Count);
+            Assert.Equal(L(before["delays"]).Select(Py.AsDouble), delays);
+            Assert.Equal(Py.AsBool(before["done"]), run.IsCompleted);
+
+            var outcome = D(recorded["outcome"]);
+            if (mode == "gate")
+            {
+                gate.SetResult();
+                var result = await run.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                Assert.Equal(PyJson.Dumps(outcome["ok"]), PyJson.Dumps(result));
+            }
+            else
+            {
+                await cancel.CancelAsync();
+                var error = await Record.ExceptionAsync(() => run.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.NotNull(error);
+                Assert.True(PythonName(error) == S(L(outcome["err"])[0]), $"{mode}: expected {PyJson.Dumps(outcome["err"])}, got {error.GetType().Name}: {error.Message}");
+            }
+
+            Assert.Equal(Py.AsLong(recorded["requests"]), handler.Requests.Count);
+            Assert.Equal(L(recorded["delays"]).Select(Py.AsDouble), delays);
+            var usage = client.TokenTracker.GetUsage().Select(kv => (object?)new List<object?> { kv.Key, kv.Value.CallCount, kv.Value.TotalInputTokens, kv.Value.TotalOutputTokens }).ToList();
+            Assert.Equal(PyJson.Dumps(recorded["by_prompt"]), PyJson.Dumps(usage));
+            var span = Assert.Single(tracer.Spans);
+            var expectedSpan = Dicts(recorded["spans"]).Single();
+            Assert.Equal(PyJson.Dumps(expectedSpan["attributes"], sortKeys: true), PyJson.Dumps(span.Attributes, sortKeys: true));
+            Assert.Null(span.Status);
+            Assert.Empty(span.Exceptions);
+            client.HttpClient.Dispose();
+        }
+    }
+
+    [Fact]
+    public void The_default_client_takes_each_timeout_that_httpx_takes()
+    {
+        var cases = L(Document["default_client"]);
+        Assert.Equal(8, cases.Count);
+        foreach (var item in cases)
+        {
+            var recorded = D(item);
+            var expected = D(D(recorded["r"])["ok"]);
+
+            var client = new OpenAIDecisionsClient(config: new LLMConfig(apiKey: Key), timeoutSeconds: Py.AsDouble(recorded["timeout_seconds"]));
+
+            Assert.True(Py.AsDouble(expected["timeout_seconds"]) == client.TimeoutSeconds, PyJson.Dumps(recorded));
+            Assert.Equal(Timeout.InfiniteTimeSpan, client.HttpClient.Timeout);
+            client.HttpClient.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task The_default_client_follows_no_redirect()
+    {
+        var recorded = D(Document["redirect"]);
+        using var server = new RedirectServer();
+        using var patch = OpenaiDecisionsClientModule.Sleep.Use((_, _) => Task.CompletedTask);
+        var client = new OpenAIDecisionsClient(config: new LLMConfig(apiKey: Key), baseUrl: $"http://127.0.0.1:{server.Port}/v1", maxRetries: 3);
+        var payload = Dict(("instructions", ""), ("state", "current state"), ("questions", Dict(("dup0", Dict(("type", "noul"), ("instructions", "is it?"))))));
+
+        var error = await Record.ExceptionAsync(() => Asyncio.Run(() => Call(client, payload)));
+
+        Assert.NotNull(error);
+        AssertSameError("redirect", error, L(D(recorded["outcome"])["err"]));
+        Assert.Equal(PyJson.Dumps(recorded["requests"]), PyJson.Dumps(server.Requests.Cast<object?>().ToList()));
+        client.HttpClient.Dispose();
+    }
+
+    [Fact]
+    public async Task PrivateGenerateResponse_raises_what_Python_raises()
+    {
+        var recorded = D(Document["private_generate"]);
+        var client = new OpenAIDecisionsClient(config: new LLMConfig(apiKey: Key), httpClient: new HttpClient());
+
+        var error = await Record.ExceptionAsync(async () => await client.PrivateGenerateResponseAsync(
+            [new Message { Role = "user", Content = "x" }.Validate()],
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.NotNull(error);
+        AssertSameError("_generate_response", error, L(recorded["err"]));
+        client.HttpClient.Dispose();
     }
 }
