@@ -27,57 +27,65 @@ internal static partial class TracerModule
     internal const bool OtelAvailable = true;
 }
 
-// PORT: `with tracer.start_span(name) as span` is `using (var span = tracer.StartSpan(name))` (R16). The span is the
-// value of the context manager, so a span is IDisposable, and Dispose ends the span. An abstract method has no body,
-// as in Python.
-internal abstract class TracerSpan : IDisposable
+// PORT: an abstract method has no body, as in Python.
+internal abstract class TracerSpan
 {
     internal abstract void AddAttributes(OrderedDictionary<string, object?> attributes);
 
     internal abstract void SetStatus(string status, string? description = null);
 
     internal abstract void RecordException(Exception exception);
-
-    public abstract void Dispose();
 }
 
-// PORT: an abstract method has no body, as in Python.
+// PORT: `with tracer.start_span(name) as span:` is `await tracer.StartSpanAsync(name, async span => { ... }, token)`
+// (R16). The tracer takes the body, because the end of the Python context manager depends on the exception of the
+// body (upstream defect U19, R21), and a Dispose call cannot see that exception.
 internal abstract class Tracer
 {
-    internal abstract TracerSpan StartSpan(string name);
+    internal abstract Task<T> StartSpanAsync<T>(
+        string name,
+        Func<TracerSpan, Task<T>> body,
+        CancellationToken cancellationToken = default);
+
+    // PORT: the form for a body with no result. Python has one start_span for both.
+    internal async Task StartSpanAsync(
+        string name,
+        Func<TracerSpan, Task> body,
+        CancellationToken cancellationToken = default)
+    {
+        await StartSpanAsync<object?>(
+            name,
+            async span =>
+            {
+                await body(span).ConfigureAwait(false);
+                return null;
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
 }
 
 internal sealed class NoOpSpan : TracerSpan
 {
-    // TODO(port): NoOpSpan.add_attributes
     internal override void AddAttributes(OrderedDictionary<string, object?> attributes)
     {
-        throw new NotSupportedException("TODO(port): NoOpSpan.add_attributes");
     }
 
-    // TODO(port): NoOpSpan.set_status
     internal override void SetStatus(string status, string? description = null)
     {
-        throw new NotSupportedException("TODO(port): NoOpSpan.set_status");
     }
 
-    // TODO(port): NoOpSpan.record_exception
     internal override void RecordException(Exception exception)
     {
-        throw new NotSupportedException("TODO(port): NoOpSpan.record_exception");
-    }
-
-    // TODO(port): NoOpSpan, the end of the context manager
-    public override void Dispose()
-    {
-        throw new NotSupportedException("TODO(port): NoOpSpan.__exit__");
     }
 }
 
 internal sealed class NoOpTracer : Tracer
 {
     // TODO(port): NoOpTracer.start_span
-    internal override TracerSpan StartSpan(string name)
+    internal override Task<T> StartSpanAsync<T>(
+        string name,
+        Func<TracerSpan, Task<T>> body,
+        CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): NoOpTracer.start_span");
     }
@@ -86,7 +94,8 @@ internal sealed class NoOpTracer : Tracer
 internal sealed class OpenTelemetrySpan : TracerSpan
 {
     // TODO(port): OpenTelemetrySpan.__init__
-    internal OpenTelemetrySpan(Activity span)
+    // PORT: ActivitySource.StartActivity returns null if no listener reads the source, so the span can be null.
+    internal OpenTelemetrySpan(Activity? span)
     {
         throw new NotSupportedException("TODO(port): OpenTelemetrySpan.__init__");
     }
@@ -108,12 +117,6 @@ internal sealed class OpenTelemetrySpan : TracerSpan
     {
         throw new NotSupportedException("TODO(port): OpenTelemetrySpan.record_exception");
     }
-
-    // TODO(port): OpenTelemetrySpan, the end of the context manager
-    public override void Dispose()
-    {
-        throw new NotSupportedException("TODO(port): OpenTelemetrySpan.__exit__");
-    }
 }
 
 internal sealed class OpenTelemetryTracer : Tracer
@@ -125,7 +128,10 @@ internal sealed class OpenTelemetryTracer : Tracer
     }
 
     // TODO(port): OpenTelemetryTracer.start_span
-    internal override TracerSpan StartSpan(string name)
+    internal override Task<T> StartSpanAsync<T>(
+        string name,
+        Func<TracerSpan, Task<T>> body,
+        CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): OpenTelemetryTracer.start_span");
     }

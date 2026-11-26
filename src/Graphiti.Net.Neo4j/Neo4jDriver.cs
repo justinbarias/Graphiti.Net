@@ -235,7 +235,7 @@ internal sealed class Neo4jSession : GraphDriverSession
 
     // TODO(port): AsyncSession.execute_write
     internal override Task ExecuteWriteAsync(
-        Func<GraphDriverSession, Task> func,
+        Func<Transaction, Task> func,
         CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("TODO(port): AsyncSession.execute_write");

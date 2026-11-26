@@ -117,23 +117,14 @@ internal static class Helpers
         throw new NotSupportedException("TODO(port): semaphore_gather");
     }
 
-    // PORT: `a, b = await semaphore_gather(f(), g())` with different result types (R8).
+    // PORT: the one call with different result types, search/search.py:174, passes four coroutines and unpacks a
+    // tuple of four (R8).
     // TODO(port): semaphore_gather
-    internal static Task<(T1, T2)> SemaphoreGatherAsync<T1, T2>(
-        Func<Task<T1>> first,
-        Func<Task<T2>> second,
-        long? maxCoroutines = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException("TODO(port): semaphore_gather");
-    }
-
-    // PORT: `a, b, c = await semaphore_gather(f(), g(), h())` with different result types (R8).
-    // TODO(port): semaphore_gather
-    internal static Task<(T1, T2, T3)> SemaphoreGatherAsync<T1, T2, T3>(
+    internal static Task<(T1, T2, T3, T4)> SemaphoreGatherAsync<T1, T2, T3, T4>(
         Func<Task<T1>> first,
         Func<Task<T2>> second,
         Func<Task<T3>> third,
+        Func<Task<T4>> fourth,
         long? maxCoroutines = null,
         CancellationToken cancellationToken = default)
     {

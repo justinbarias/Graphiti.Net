@@ -48,7 +48,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task NodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> nodes,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -59,7 +59,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task NodeUpdateBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> nodes,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -188,7 +188,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task EpisodicNodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> nodes,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -199,7 +199,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task EpisodicEdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> episodicEdges,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -296,7 +296,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task CommunityNodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> nodes,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -381,7 +381,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task SagaNodeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> nodes,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -489,7 +489,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task EdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> edges,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -500,7 +500,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task EdgeUpdateBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> edges,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -721,7 +721,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task HasEpisodeEdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> edges,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
@@ -795,7 +795,7 @@ internal abstract record GraphOperationsInterface
     internal virtual Task NextEpisodeEdgeSaveBulkAsync(
         Type? cls,
         GraphDriver driver,
-        GraphDriverSession transaction,
+        Transaction transaction,
         List<OrderedDictionary<string, object?>> edges,
         long batchSize = 100,
         CancellationToken cancellationToken = default)

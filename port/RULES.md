@@ -150,6 +150,8 @@ The maintainer chose on 2026-11-26 to document this limit and not to change the 
 
 Do not add an argument guard that Python does not have. Do not replace an exception with a result type.
 An exception that Python raises with no argument has an empty text: `raise NotImplementedError` is `throw new NotImplementedException(string.Empty)`. The .NET default message is not empty.
+A test of the text of a driver error, as `'EquivalentSchemaRuleAlreadyExists' in str(e)` is, tests `e.Code` and `e.Message`. Python puts the code of a Neo4j error into `str(e)`, and `Neo4j.Driver` keeps it in `ClientException.Code`.
+`print(x)` is `Console.Out.WriteLine(x)` with the text that Python prints. Do not replace it with a log call. The one site is `Neo4jDriver.health_check`.
 The product projects compile with `CheckForOverflowUnderflow`. A `+`, `-`, or `*` on a `long` that leaves the range throws `OverflowException`, by the limit above, and never wraps to a wrong value. Code that needs a wrap, for example a hash, says `unchecked`. The switch also checks a cast: `(long)x` throws `OverflowException` for a `double` that is `nan`, infinite, or out of range. Python raises `ValueError` for `int(nan)` and `math.ceil(nan)`, so that one exception type differs. The `PyCompat` assembly does not compile with the switch, and its helpers check their own ranges.
 `Codec.PythonExceptionName` in the judge host maps each C# type back to its Python name. Part 5 lists the rows that it lacks.
 
@@ -222,6 +224,9 @@ Decision D21 keeps the library choice: records with an explicit `Validate()`. `J
 | `@field_validator` | A private static method that the reader of the field and `Validate()` both call (below). The two sites are in the table below. |
 | `@model_validator(mode='after')` | Code in `Validate()`, in the order of the Python file. The one site is in the table below. |
 | `M.model_construct(...)`, which upstream uses only in tests | `new M { ... }` with no call to `Validate()` |
+| `PrivateAttr(default=0)` | An `internal` property with the comment `// PORT: PrivateAttr`. It is not a model field: `ModelDump`, `ModelFields`, and the schema leave it out. |
+| A `@classmethod` of a base model with the body `...` that each subclass replaces (`Node.get_by_uuid`, `Node.get_by_uuids`, `Edge.get_by_uuid`) | No member on the base, and a `// PORT:` comment at its place. A C# static method does not override, and a call on a subclass with the token in the third position binds to a base method that does nothing. |
+| A `@classmethod` that a subclass inherits and that passes `cls` on (`Node.delete_by_group_id`, `Node.delete_by_uuids`, `Edge.delete_by_uuids`) | A static method on the base that passes `typeof(Node)` or `typeof(Edge)`. Each upstream caller calls it on the base class. |
 | A field of the type `type[BaseModel]` | A property of the type `IResponseModel` (below). The reader is `x => Pydantic.SubclassOf<IResponseModel>(x)`. The method group does not compile (`error CS0411`). For `type[BaseModel] \| None`, as `PromptSpec.response_model` is, the property is `IResponseModel?` and the reader is `v => Pydantic.Optional(v, x => Pydantic.SubclassOf<IResponseModel>(x))`. |
 | `ConfigDict(validate_assignment=True)` | The `set` accessor of each field that has a validator calls the same validation. Pydantic also checks the type at each assignment. A value that has the type of the property needs nothing. A value from open data, for example a field of a database record, is read under the class name and the field name: `var f = new PydanticFields("EntityNode", new() { ["name_embedding"] = value });`, then `f.Required("name_embedding", <reader>)`, `f.ThrowIfAny();`, and the assignment. `Node` and `Edge` have this configuration (`nodes.py:105`). |
 | `ConfigDict(arbitrary_types_allowed=True)` | Nothing |
@@ -336,7 +341,7 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 | `async def f(a, b=1)` | `internal static async Task<T> FAsync(A a, long b = 1, CancellationToken cancellationToken = default)` |
 | A call to an async function | Pass `cancellationToken`. Analyzer CA2016 fails the build if you do not. |
 | `semaphore_gather(*coroutines, max_coroutines=n)` | `Helpers.SemaphoreGatherAsync([() => F1Async(...), () => F2Async(...)], n, cancellationToken)`. Pass a lambda for each call. A C# async method starts when it is called, so a list of tasks ignores the limit. |
-| `a, b = await semaphore_gather(f(), g())` with different result types | The overload that takes two or three lambdas and returns a tuple |
+| `semaphore_gather` with coroutines of different result types | The one site is `search/search.py:174`, with four coroutines: the overload that takes four lambdas and returns a tuple of four. 43 of the 46 sites pass lists of one type, and 1 passes two coroutines that return `None`. |
 | `asyncio.gather(*coroutines)` | `Asyncio.GatherAsync` with lambdas |
 | `asyncio.gather(..., return_exceptions=True)` | `Asyncio.GatherAsync(..., returnExceptions: true, cancellationToken)`. Each result is a value or an exception. It does not throw for a canceled token, where Python raises `CancelledError`. |
 | `asyncio.gather(task, return_exceptions=True)` on a task that exists (`ingestion/scheduler.py:173`, `ingestion/phases.py:321`) | `Asyncio.GatherAsync([task], returnExceptions: true)`. This form takes tasks, not lambdas. A lambda that returns the task adds one more trip through the queue than Python makes. |
@@ -387,7 +392,8 @@ var query = "\n" + """
 - `Neo4jDriver.ExecuteQueryAsync` and the Neo4j transaction convert each parameter value before the driver call, at each depth. An `OrderedDictionary<string, object?>` becomes a `Dictionary<string, object?>`. A `PyDateTime` becomes a `DateTimeOffset` if it has an offset, and a `LocalDateTime` if it has none. A `PyTuple` or a `PySet<T>` becomes a list. A `BigInteger` or a `ulong` that fits becomes a `long`. Each other value outside the driver's types throws. Records come back the other way: a driver map becomes an `OrderedDictionary`, and a temporal value becomes a `PyDateTime`.
 - The reason is a measurement with `Neo4j.Driver` 6.5.1. For a nested `OrderedDictionary`, a struct, a tuple, a `BigInteger`, a `ulong`, and an enum, the driver throws `ProtocolException`. It reads the `OrderedDictionary` as a list of pairs. A typed list, a `float[]`, a `HashSet<T>`, a `Dictionary<string, object?>`, and a `DateTimeOffset` work.
 - `execute_query` returns the tuple `(Records, Summary, Keys)`, and a caller writes `var (records, _, _) = await ...`. `tx.run(...)` is `Transaction.RunAsync`, which returns `Task`: none of the 150 upstream sites reads its result.
-- `session.execute_write(func, *args, **kwargs)` passes the extra arguments to `func`. Write a lambda that closes over them: `session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => FuncAsync(tx, a, b)))`. `ExecuteWriteAsync` takes a `Func<GraphDriverSession, Task>` and returns `Task`, because each upstream work function returns `None`.
+- The conversion members are on `Neo4jDriver`: `ToDriverParameters`, `ToDriverValue`, `FromDriverRecord`, and `FromDriverValue`, each `internal static`. A record value that is a map or a list of maps is converted at each depth, because `search/search_utils.py` passes items of such a list to the record parsers. `session()` returns the adapter class `Neo4jSession`, which wraps the `IAsyncSession` of the package and has no Python class. A `run` call does not consume its result cursor, as in Python.
+- `session.execute_write(func, *args, **kwargs)` passes the extra arguments to `func`. Write a lambda that closes over them: `session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => FuncAsync(tx, a, b)))`. `ExecuteWriteAsync` takes a `Func<Transaction, Task>` and returns `Task`. The work function receives the managed transaction, and each upstream work function calls only `tx.run` on it and returns `None`. So a `tx: GraphDriverSession` annotation of a work function is `Transaction`, and so is the `transaction` parameter of the bulk methods of `GraphOperationsInterface`.
 - Keep the call shape: one `execute_query` call is one call, and the operations of one session or transaction stay in order. The judge captures both shapes.
 - A constant in `graph_queries.py` or a `*_db_queries.py` file is a `const string` or a `static readonly string` with the same text (GAPS F12).
 - Never add an `ORDER BY`, a `group_id` filter, or a missing space. See R21.
@@ -560,9 +566,9 @@ No `dynamic` and no reflection, except the one site that the table names. Each `
 | `search/search.py:73` | `value.value if hasattr(value, 'value') else value` | Two overloads of `EnumValue`: one for `string`, one for an enum that returns its wire value |
 | `graphiti.py:527`, `:535`, `:541`, `:727`, `:2029` | `getattr(self, 'concurrent_ingestion', None)` and the like | Nullable fields of the facade class, read directly |
 | `decorators.py:53`, `:54`, `:63`, `:95` | `hasattr(self, 'clients')`, `getattr(driver, '_database', None)` | Typed access inside the explicit wrapper of R16: `self.Clients.Driver`, `driver.Database`, `self.MaxCoroutines` |
-| `utils/bulk_utils.py:195` | `hasattr(session, 'query_timeout_ms')` | An interface `IQueryTimeoutSession` with the one property. Test with `is`. |
+| `utils/bulk_utils.py:195` | `hasattr(session, 'query_timeout_ms')` | The interface `IQueryTimeoutSession` with the one property, in `Core/Driver/Driver.cs` after `GraphDriverSession`. Test with `is`. |
 | `utils/bulk_utils.py:283` | Tests whether the interface class overrides an operation | Reflection is allowed at this one site: compare `GetMethod(name).DeclaringType` with `typeof(GraphOperationsInterface)`. Keep the Python operation names in the result. |
-| `utils/maintenance/attribute_utils.py:87`, `:88`, `:98` | `getattr(field_info, 'metadata', [])`, `max_length`, `is_required` | `GraphFieldDescriptor.MaxLength` (a `long?`) and `GraphFieldDescriptor.Required` of the custom type descriptor (below) |
+| `utils/maintenance/attribute_utils.py:87`, `:88`, `:98` | `getattr(field_info, 'metadata', [])`, `max_length`, `is_required` | `GraphFieldDescriptor.MaxLength` (a `long?`) and `GraphFieldDescriptor.IsRequired` of the custom type descriptor (below) |
 | `namespaces/nodes.py:352`, `namespaces/edges.py:352` | `__getattr__` raises `NotImplementedError` for the names of the operations that a driver lacks | One property for each name that Python tests. Its getter throws `NotImplementedException` with the same message if the driver has no such operations. Other names do not exist in C#. |
 | `prompts/lib.py:477` to `:618` (11 sites) | `getattr(library, group_name)`, `getattr(group, method_name)`, `hasattr(library, 'specs')` | `IPromptLibrary` and `IPromptGroup` (below) |
 | `llm_client/prompt_config.py:96`, `:108`, `:118`, `:292`, `:312` | `getattr(parent, nested_name)`, `getattr(overrides, group_name)`, `fields(overrides)` | A static table from the Python group name to the nested type and to a getter, in field order |
@@ -607,7 +613,7 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | `@contextmanager` | A method that returns an `IDisposable`. Code before `yield` runs in the method. Code in `finally` runs in `Dispose`. |
 | `@asynccontextmanager` | A method that returns an `IAsyncDisposable`, used with `await using`. `GraphDriver.transaction()` is the exception, because it commits or rolls back by the outcome of the body, which a dispose call cannot see: `Task TransactionAsync(Func<Transaction, Task> body, CancellationToken cancellationToken)`. |
 | A context manager that reads the exception, for example to roll back a transaction or to set a span status | `try`, `catch`, and `finally` written out at the call site, or a method that takes the body as a lambda. `Dispose` cannot see the exception. |
-| `with self.tracer.start_span(name) as span:` | `using (var span = Tracer.StartSpan(name)) { ... }` with a block, so that the span ends where the Python `with` ends. A `set_status('error')` in an `except` stays in a `catch`. |
+| `with self.tracer.start_span(name) as span:` | `await Tracer.StartSpanAsync(name, async span => { ... }, cancellationToken)`. The body of the `with` is the lambda, and a `return` in it is the result of the call. A `set_status('error')` in an `except` stays in a `catch` inside the lambda. The tracer takes the body, because the end of the Python context manager depends on the exception of the body (defect U19), and a `Dispose` call cannot see it. |
 | `@lru_cache(maxsize=n)` | `PyLruCache<TKey, TValue>` with the same size, in a static field. The cached function is `cache.GetOrAdd(key, compute)`. |
 | `@property`, `@staticmethod`, `@classmethod` | A property, a static method, a static method. A classmethod that builds an instance is a static factory. |
 | `@abstractmethod` | `abstract` |
@@ -716,6 +722,7 @@ Write `// PORT: upstream defect U<n>` at the place of each defect, so that a rev
 | U14 | Keep the two-name unpacking in `add_episode` with `update_communities=True`: destructure the result list into exactly two names with `Py.Unpack2`, which throws `ArgumentException` for any other count |
 | U17 | Keep the concurrent `update_community` calls with no lock |
 | U18 | Keep the merge onto the smallest UUID in `compress_uuid_map`, compared with `Py.CompareStrings` |
+| U19 | `OpenTelemetryTracer.start_span` yields a second time in its `except Exception`. With an OpenTelemetry tracer, an exception in the body of a span leaves the `with` as `RuntimeError: generator didn't stop after throw()`, and the span has the error status and one exception event. `OpenTelemetryTracer.StartSpanAsync` reproduces it: it throws `InvalidOperationException` with that message and the exception of the body as the inner exception. The no-op tracer passes the exception of the body on. |
 | F22 | Keep the `expired_at` behavior for a fact that arrives with an end date |
 | F23 | Keep the base path of decision D17. The schema text stays at the end of the prompt. |
 
@@ -1058,6 +1065,7 @@ Each entry of [GAPS.md](GAPS.md) and the rule that answers it.
 | U16 | `build_communities` pairs summaries in row order | R21 |
 | U17 | Concurrent `update_community` | R8, R21 |
 | U18 | Merge onto the smallest UUID | R14, R21 |
+| U19 | An exception in a traced span becomes `RuntimeError` | R16, R21 |
 
 ### Findings from the case writers
 
@@ -1127,6 +1135,15 @@ The review of the judge host codec (plan 0003, task P7) found 23 more cases of t
 
 Also, 19 `pure.queries.fulltext_query.*` cases pass a `types:SimpleNamespace` object as the driver. Their answer depends on how the unit binds that `$model`, so the unit of `fulltext_query` reports them.
 
+The review of the first skeleton packet found 14 more cases of open item O4. Each one stays in `expected-failures.txt` with the answer `JudgeTypeRejected` (decision D40).
+
+| Cases | Argument | Proposed answer |
+| --- | --- | --- |
+| `pure.text.validate_excluded_entity_types.known_custom`, `.unknown_with_types`. `pure.text.validate_entity_types.clean_model`, `.conflicting_model`, `.first_ok_second_conflict`. `pure.text.validate_identity_properties.none_props`, `.empty_props`, `.valid`, `.type_not_defined`, `.empty_property_list`, `.unknown_property`. | A built-in pydantic class (`ExtractedEntities`, `EntityNode`) as the value of a dict of custom types. The C# parameter is a `GraphTypeDescriptor`. The same holds for the `attribute_utils` cases that pass `EntityNode` as the model. | A helper of the judge host builds a descriptor from the field names of a built-in model. It needs a field kind for a type outside the closed set, which changes the internal descriptor. |
+| `pure.queries.get_vector_cosine_func_query.non_str` | `1` and `[2, 3]` for two parameters of the type `string`. Each caller passes Cypher text. | Accept by name. |
+| `pure.parsers.entity_node.created_at_int` | `created_at: 12345`. `parse_db_date` returns the int unchanged, and pydantic reads it as a Unix time. | The same answer as `pure.datetime.parse_db_date.wrong_type_int`. |
+| `pure.parsers.episodic_node.source_none` | `source: None` reaches `EpisodeType.from_str(None)`. | The same answer as `pure.models.EpisodeType.from_str.invalid_none`. |
+
 ## Rule changes
 
 | Date | Change | Units to port again |
@@ -1145,3 +1162,4 @@ Also, 19 `pure.queries.fulltext_query.*` cases pass a `types:SimpleNamespace` ob
 | 2026-11-26 | After the adversarial review of the pilot support pull request, and the two reviews of `entity_node_ops`. R2: the driver option keys in `parameters`. R6 and R9: the driver does not accept each value type, so the Neo4j project converts at the boundary, typed lists pass as they are, and `Transaction.RunAsync` returns `Task`. R24: `utc_now`, and the equality and the label validation of `Node`. R1: `global::Neo4j.Driver` in test projects, and when a local reader function is allowed. R4: the switch checks casts. R7: the optional form of `type[BaseModel]`, and the type check of `validate_assignment`. R10: the `PromptVersion` reason. R14: `PySet<T>` has value equality only through `PyEqualityComparer`. R17: `PyPatch<T>` has no implicit conversion, and code reads `.Value`. Part 3: two surrogates side by side. | `content_chunking`: yes, each read of a `PyPatch<T>` gets `.Value` before its merge. `entity_node_ops`: its fix round applies R7. |
 | 2026-11-26 | After the fix round of `entity_node_ops`. R3: the Neo4j project grants `InternalsVisibleTo` to `Port.Evaluation`. R7: `PythonName` for a validator on an abstract base model. R25: a recording for each Neo4j operations unit, and how a test compares a pydantic message. | None. `entity_node_ops` follows them. |
 | 2026-11-26 | After the first skeleton packet of plan 0004, layer 0. R1: the namespace of a package with one module of its name. R9: `ExecuteWriteAsync` returns `Task`. R16: `GraphDriver.transaction()` takes the body. R17: `os.environ.get` with a default. R20: `_cls`, `EmbedderClient.create`, and `NDArray`. R24: what the skeleton ports in full. | None. |
+| 2026-11-26 | After the adversarial review of the first skeleton packet, and after the packets for the node and edge types and for the Neo4j driver. R4: the text of a driver error, and `print`. R7: `PrivateAttr`, and the two forms of a base `@classmethod`. R8: the four-lambda form of `semaphore_gather`. R9: the work function of `ExecuteWriteAsync` receives a `Transaction`, and the conversion members of `Neo4jDriver`. R15: the place of `IQueryTimeoutSession`, and `IsRequired`. R16 and R21: the tracer takes the body of a span, and the new defect U19. 14 more cases in open item O4. | None. No unit uses these shapes yet. |

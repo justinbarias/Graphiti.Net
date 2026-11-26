@@ -67,11 +67,18 @@ internal abstract class GraphDriverSession : IAsyncDisposable
     internal abstract Task CloseAsync(CancellationToken cancellationToken = default);
 
     // PORT: the extra arguments of Python are closed over by the lambda (R9). The work function receives the
-    // write transaction, which the upstream callers annotate as GraphDriverSession. Each upstream work function
-    // returns None, so the result is a Task.
+    // managed write transaction. The upstream callers annotate it as GraphDriverSession, and each one calls only
+    // tx.run on it, so the type is Transaction. Each upstream work function returns None, so the result is a Task.
     internal abstract Task ExecuteWriteAsync(
-        Func<GraphDriverSession, Task> func,
+        Func<Transaction, Task> func,
         CancellationToken cancellationToken = default);
+}
+
+// PORT: R15. `hasattr(session, 'query_timeout_ms')` in utils/bulk_utils.py:195 is a test for this interface. It has no
+// Python class. A session of a provider that takes a query timeout implements it.
+internal interface IQueryTimeoutSession
+{
+    long? QueryTimeoutMs { get; set; }
 }
 
 internal abstract class GraphDriver : QueryExecutor

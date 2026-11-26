@@ -23,7 +23,7 @@ internal static class NodeDbQueries
 {
     // PORT: the parameter is `str | list[str]`, a union of two shapes, so it is object (RULES.md Part 3).
     // TODO(port): _validate_entity_labels
-    private static List<string> ValidateEntityLabels(object labels)
+    private static List<string> ValidateEntityLabels(object? labels)
     {
         throw new NotSupportedException("TODO(port): _validate_entity_labels");
     }
