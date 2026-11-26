@@ -23,419 +23,436 @@ using Graphiti.Core.Embedder;
 
 internal sealed class EntityEdgeNamespace
 {
-    // TODO(port): EntityEdgeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly EntityEdgeOperations _ops;
+    private readonly EmbedderClient _embedder;
+
     internal EntityEdgeNamespace(GraphDriver driver, EntityEdgeOperations ops, EmbedderClient embedder)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
+        _embedder = embedder;
     }
 
-    // TODO(port): EntityEdgeNamespace.save
-    internal Task<EntityEdge> SaveAsync(
+    internal async Task<EntityEdge> SaveAsync(
         EntityEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.save");
+        await edge.GenerateEmbeddingAsync(_embedder, cancellationToken);
+        await _ops.SaveAsync(_driver, edge, tx, cancellationToken);
+        return edge;
     }
 
-    // TODO(port): EntityEdgeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<EntityEdge> edges,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, edges, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         EntityEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.delete");
+        await _ops.DeleteAsync(_driver, edge, tx, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.get_by_uuid
-    internal Task<EntityEdge> GetByUuidAsync(
+    internal async Task<EntityEdge> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.get_by_uuids
-    internal Task<List<EntityEdge>> GetByUuidsAsync(
+    internal async Task<List<EntityEdge>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.get_by_group_ids
-    internal Task<List<EntityEdge>> GetByGroupIdsAsync(
+    internal async Task<List<EntityEdge>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.get_between_nodes
-    internal Task<List<EntityEdge>> GetBetweenNodesAsync(
+    internal async Task<List<EntityEdge>> GetBetweenNodesAsync(
         string sourceNodeUuid,
         string targetNodeUuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.get_between_nodes");
+        return await _ops.GetBetweenNodesAsync(_driver, sourceNodeUuid, targetNodeUuid, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.get_by_node_uuid
-    internal Task<List<EntityEdge>> GetByNodeUuidAsync(
+    internal async Task<List<EntityEdge>> GetByNodeUuidAsync(
         string nodeUuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.get_by_node_uuid");
+        return await _ops.GetByNodeUuidAsync(_driver, nodeUuid, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.load_embeddings
-    internal Task LoadEmbeddingsAsync(
+    internal async Task LoadEmbeddingsAsync(
         EntityEdge edge,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.load_embeddings");
+        await _ops.LoadEmbeddingsAsync(_driver, edge, cancellationToken);
     }
 
-    // TODO(port): EntityEdgeNamespace.load_embeddings_bulk
-    internal Task LoadEmbeddingsBulkAsync(
+    internal async Task LoadEmbeddingsBulkAsync(
         List<EntityEdge> edges,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityEdgeNamespace.load_embeddings_bulk");
+        await _ops.LoadEmbeddingsBulkAsync(_driver, edges, batchSize, cancellationToken);
     }
 }
 
 internal sealed class EpisodicEdgeNamespace
 {
-    // TODO(port): EpisodicEdgeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly EpisodicEdgeOperations _ops;
+
     internal EpisodicEdgeNamespace(GraphDriver driver, EpisodicEdgeOperations ops)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
     }
 
-    // TODO(port): EpisodicEdgeNamespace.save
-    internal Task<EpisodicEdge> SaveAsync(
+    internal async Task<EpisodicEdge> SaveAsync(
         EpisodicEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.save");
+        await _ops.SaveAsync(_driver, edge, tx, cancellationToken);
+        return edge;
     }
 
-    // TODO(port): EpisodicEdgeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<EpisodicEdge> edges,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, edges, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EpisodicEdgeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         EpisodicEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.delete");
+        await _ops.DeleteAsync(_driver, edge, tx, cancellationToken);
     }
 
-    // TODO(port): EpisodicEdgeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, cancellationToken);
     }
 
-    // TODO(port): EpisodicEdgeNamespace.get_by_uuid
-    internal Task<EpisodicEdge> GetByUuidAsync(
+    internal async Task<EpisodicEdge> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): EpisodicEdgeNamespace.get_by_uuids
-    internal Task<List<EpisodicEdge>> GetByUuidsAsync(
+    internal async Task<List<EpisodicEdge>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): EpisodicEdgeNamespace.get_by_group_ids
-    internal Task<List<EpisodicEdge>> GetByGroupIdsAsync(
+    internal async Task<List<EpisodicEdge>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodicEdgeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 }
 
 internal sealed class CommunityEdgeNamespace
 {
-    // TODO(port): CommunityEdgeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly CommunityEdgeOperations _ops;
+
     internal CommunityEdgeNamespace(GraphDriver driver, CommunityEdgeOperations ops)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
     }
 
-    // TODO(port): CommunityEdgeNamespace.save
-    internal Task<CommunityEdge> SaveAsync(
+    internal async Task<CommunityEdge> SaveAsync(
         CommunityEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.save");
+        await _ops.SaveAsync(_driver, edge, tx, cancellationToken);
+        return edge;
     }
 
-    // TODO(port): CommunityEdgeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         CommunityEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.delete");
+        await _ops.DeleteAsync(_driver, edge, tx, cancellationToken);
     }
 
-    // TODO(port): CommunityEdgeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, cancellationToken);
     }
 
-    // TODO(port): CommunityEdgeNamespace.get_by_uuid
-    internal Task<CommunityEdge> GetByUuidAsync(
+    internal async Task<CommunityEdge> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): CommunityEdgeNamespace.get_by_uuids
-    internal Task<List<CommunityEdge>> GetByUuidsAsync(
+    internal async Task<List<CommunityEdge>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): CommunityEdgeNamespace.get_by_group_ids
-    internal Task<List<CommunityEdge>> GetByGroupIdsAsync(
+    internal async Task<List<CommunityEdge>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityEdgeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 }
 
 internal sealed class HasEpisodeEdgeNamespace
 {
-    // TODO(port): HasEpisodeEdgeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly HasEpisodeEdgeOperations _ops;
+
     internal HasEpisodeEdgeNamespace(GraphDriver driver, HasEpisodeEdgeOperations ops)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.save
-    internal Task<HasEpisodeEdge> SaveAsync(
+    internal async Task<HasEpisodeEdge> SaveAsync(
         HasEpisodeEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.save");
+        await _ops.SaveAsync(_driver, edge, tx, cancellationToken);
+        return edge;
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<HasEpisodeEdge> edges,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, edges, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         HasEpisodeEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.delete");
+        await _ops.DeleteAsync(_driver, edge, tx, cancellationToken);
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, cancellationToken);
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.get_by_uuid
-    internal Task<HasEpisodeEdge> GetByUuidAsync(
+    internal async Task<HasEpisodeEdge> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.get_by_uuids
-    internal Task<List<HasEpisodeEdge>> GetByUuidsAsync(
+    internal async Task<List<HasEpisodeEdge>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): HasEpisodeEdgeNamespace.get_by_group_ids
-    internal Task<List<HasEpisodeEdge>> GetByGroupIdsAsync(
+    internal async Task<List<HasEpisodeEdge>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): HasEpisodeEdgeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 }
 
 internal sealed class NextEpisodeEdgeNamespace
 {
-    // TODO(port): NextEpisodeEdgeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly NextEpisodeEdgeOperations _ops;
+
     internal NextEpisodeEdgeNamespace(GraphDriver driver, NextEpisodeEdgeOperations ops)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.save
-    internal Task<NextEpisodeEdge> SaveAsync(
+    internal async Task<NextEpisodeEdge> SaveAsync(
         NextEpisodeEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.save");
+        await _ops.SaveAsync(_driver, edge, tx, cancellationToken);
+        return edge;
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<NextEpisodeEdge> edges,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, edges, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         NextEpisodeEdge edge,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.delete");
+        await _ops.DeleteAsync(_driver, edge, tx, cancellationToken);
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, cancellationToken);
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.get_by_uuid
-    internal Task<NextEpisodeEdge> GetByUuidAsync(
+    internal async Task<NextEpisodeEdge> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.get_by_uuids
-    internal Task<List<NextEpisodeEdge>> GetByUuidsAsync(
+    internal async Task<List<NextEpisodeEdge>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): NextEpisodeEdgeNamespace.get_by_group_ids
-    internal Task<List<NextEpisodeEdge>> GetByGroupIdsAsync(
+    internal async Task<List<NextEpisodeEdge>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): NextEpisodeEdgeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 }
 
 internal sealed class EdgeNamespace
 {
-    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
-    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): EdgeNamespace.entity
-    internal EntityEdgeNamespace Entity => throw new NotSupportedException("TODO(port): EdgeNamespace.entity");
+    private readonly string _driverName;
+
+    private readonly EntityEdgeNamespace? _entity;
+    private readonly EpisodicEdgeNamespace? _episodic;
+    private readonly CommunityEdgeNamespace? _community;
+    private readonly HasEpisodeEdgeNamespace? _hasEpisode;
+    private readonly NextEpisodeEdgeNamespace? _nextEpisode;
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): EdgeNamespace.episodic
-    internal EpisodicEdgeNamespace Episodic => throw new NotSupportedException("TODO(port): EdgeNamespace.episodic");
+    internal EntityEdgeNamespace Entity => _entity ?? throw new NotImplementedException(_driverName + " does not implement entity_edge_ops");
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): EdgeNamespace.community
-    internal CommunityEdgeNamespace Community => throw new NotSupportedException("TODO(port): EdgeNamespace.community");
+    internal EpisodicEdgeNamespace Episodic => _episodic ?? throw new NotImplementedException(_driverName + " does not implement episodic_edge_ops");
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): EdgeNamespace.has_episode
-    internal HasEpisodeEdgeNamespace HasEpisode => throw new NotSupportedException("TODO(port): EdgeNamespace.has_episode");
+    internal CommunityEdgeNamespace Community => _community ?? throw new NotImplementedException(_driverName + " does not implement community_edge_ops");
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): EdgeNamespace.next_episode
-    internal NextEpisodeEdgeNamespace NextEpisode => throw new NotSupportedException("TODO(port): EdgeNamespace.next_episode");
+    internal HasEpisodeEdgeNamespace HasEpisode => _hasEpisode ?? throw new NotImplementedException(_driverName + " does not implement has_episode_edge_ops");
 
-    // PORT: the unit adds _driver_name with the constructor body.
-    // TODO(port): EdgeNamespace.__init__
+    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
+    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
+    internal NextEpisodeEdgeNamespace NextEpisode => _nextEpisode ?? throw new NotImplementedException(_driverName + " does not implement next_episode_edge_ops");
+
+    // PORT: _driver_name is type(driver).__name__, which is PythonName (R15).
     internal EdgeNamespace(GraphDriver driver, EmbedderClient embedder)
     {
-        throw new NotSupportedException("TODO(port): EdgeNamespace.__init__");
+        _driverName = driver.PythonName;
+
+        var entityEdgeOps = driver.EntityEdgeOps;
+        if (entityEdgeOps is not null)
+        {
+            _entity = new EntityEdgeNamespace(driver, entityEdgeOps, embedder);
+        }
+
+        var episodicEdgeOps = driver.EpisodicEdgeOps;
+        if (episodicEdgeOps is not null)
+        {
+            _episodic = new EpisodicEdgeNamespace(driver, episodicEdgeOps);
+        }
+
+        var communityEdgeOps = driver.CommunityEdgeOps;
+        if (communityEdgeOps is not null)
+        {
+            _community = new CommunityEdgeNamespace(driver, communityEdgeOps);
+        }
+
+        var hasEpisodeEdgeOps = driver.HasEpisodeEdgeOps;
+        if (hasEpisodeEdgeOps is not null)
+        {
+            _hasEpisode = new HasEpisodeEdgeNamespace(driver, hasEpisodeEdgeOps);
+        }
+
+        var nextEpisodeEdgeOps = driver.NextEpisodeEdgeOps;
+        if (nextEpisodeEdgeOps is not null)
+        {
+            _nextEpisode = new NextEpisodeEdgeNamespace(driver, nextEpisodeEdgeOps);
+        }
     }
 }

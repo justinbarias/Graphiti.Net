@@ -24,196 +24,187 @@ using Graphiti.PyCompat;
 
 internal sealed class EntityNodeNamespace
 {
-    // TODO(port): EntityNodeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly EntityNodeOperations _ops;
+    private readonly EmbedderClient _embedder;
+
     internal EntityNodeNamespace(GraphDriver driver, EntityNodeOperations ops, EmbedderClient embedder)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
+        _embedder = embedder;
     }
 
-    // TODO(port): EntityNodeNamespace.save
-    internal Task<EntityNode> SaveAsync(
+    internal async Task<EntityNode> SaveAsync(
         EntityNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.save");
+        await node.GenerateNameEmbeddingAsync(_embedder, cancellationToken);
+        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        return node;
     }
 
-    // TODO(port): EntityNodeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<EntityNode> nodes,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         EntityNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.delete");
+        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.delete_by_group_id
-    internal Task DeleteByGroupIdAsync(
+    internal async Task DeleteByGroupIdAsync(
         string groupId,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.delete_by_group_id");
+        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.get_by_uuid
-    internal Task<EntityNode> GetByUuidAsync(
+    internal async Task<EntityNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.get_by_uuids
-    internal Task<List<EntityNode>> GetByUuidsAsync(
+    internal async Task<List<EntityNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.get_by_group_ids
-    internal Task<List<EntityNode>> GetByGroupIdsAsync(
+    internal async Task<List<EntityNode>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.load_embeddings
-    internal Task LoadEmbeddingsAsync(
+    internal async Task LoadEmbeddingsAsync(
         EntityNode node,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.load_embeddings");
+        await _ops.LoadEmbeddingsAsync(_driver, node, cancellationToken);
     }
 
-    // TODO(port): EntityNodeNamespace.load_embeddings_bulk
-    internal Task LoadEmbeddingsBulkAsync(
+    internal async Task LoadEmbeddingsBulkAsync(
         List<EntityNode> nodes,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EntityNodeNamespace.load_embeddings_bulk");
+        await _ops.LoadEmbeddingsBulkAsync(_driver, nodes, batchSize, cancellationToken);
     }
 }
 
 internal sealed class EpisodeNodeNamespace
 {
-    // TODO(port): EpisodeNodeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly EpisodeNodeOperations _ops;
+
     internal EpisodeNodeNamespace(GraphDriver driver, EpisodeNodeOperations ops)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
     }
 
-    // TODO(port): EpisodeNodeNamespace.save
-    internal Task<EpisodicNode> SaveAsync(
+    internal async Task<EpisodicNode> SaveAsync(
         EpisodicNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.save");
+        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        return node;
     }
 
-    // TODO(port): EpisodeNodeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<EpisodicNode> nodes,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         EpisodicNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.delete");
+        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.delete_by_group_id
-    internal Task DeleteByGroupIdAsync(
+    internal async Task DeleteByGroupIdAsync(
         string groupId,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.delete_by_group_id");
+        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.get_by_uuid
-    internal Task<EpisodicNode> GetByUuidAsync(
+    internal async Task<EpisodicNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.get_by_uuids
-    internal Task<List<EpisodicNode>> GetByUuidsAsync(
+    internal async Task<List<EpisodicNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.get_by_group_ids
-    internal Task<List<EpisodicNode>> GetByGroupIdsAsync(
+    internal async Task<List<EpisodicNode>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.get_by_entity_node_uuid
-    internal Task<List<EpisodicNode>> GetByEntityNodeUuidAsync(
+    internal async Task<List<EpisodicNode>> GetByEntityNodeUuidAsync(
         string entityNodeUuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.get_by_entity_node_uuid");
+        return await _ops.GetByEntityNodeUuidAsync(_driver, entityNodeUuid, cancellationToken);
     }
 
-    // TODO(port): EpisodeNodeNamespace.retrieve_episodes
-    internal Task<List<EpisodicNode>> RetrieveEpisodesAsync(
+    internal async Task<List<EpisodicNode>> RetrieveEpisodesAsync(
         PyDateTime referenceTime,
         long lastN = 3,
         List<string>? groupIds = null,
@@ -221,210 +212,230 @@ internal sealed class EpisodeNodeNamespace
         string? saga = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): EpisodeNodeNamespace.retrieve_episodes");
+        return await _ops.RetrieveEpisodesAsync(_driver, referenceTime, lastN, groupIds, source, saga, cancellationToken);
     }
 }
 
 internal sealed class CommunityNodeNamespace
 {
-    // TODO(port): CommunityNodeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly CommunityNodeOperations _ops;
+    private readonly EmbedderClient _embedder;
+
     internal CommunityNodeNamespace(GraphDriver driver, CommunityNodeOperations ops, EmbedderClient embedder)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
+        _embedder = embedder;
     }
 
-    // TODO(port): CommunityNodeNamespace.save
-    internal Task<CommunityNode> SaveAsync(
+    internal async Task<CommunityNode> SaveAsync(
         CommunityNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.save");
+        await node.GenerateNameEmbeddingAsync(_embedder, cancellationToken);
+        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        return node;
     }
 
-    // TODO(port): CommunityNodeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<CommunityNode> nodes,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         CommunityNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.delete");
+        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.delete_by_group_id
-    internal Task DeleteByGroupIdAsync(
+    internal async Task DeleteByGroupIdAsync(
         string groupId,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.delete_by_group_id");
+        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.get_by_uuid
-    internal Task<CommunityNode> GetByUuidAsync(
+    internal async Task<CommunityNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.get_by_uuids
-    internal Task<List<CommunityNode>> GetByUuidsAsync(
+    internal async Task<List<CommunityNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.get_by_group_ids
-    internal Task<List<CommunityNode>> GetByGroupIdsAsync(
+    internal async Task<List<CommunityNode>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 
-    // TODO(port): CommunityNodeNamespace.load_name_embedding
-    internal Task LoadNameEmbeddingAsync(
+    internal async Task LoadNameEmbeddingAsync(
         CommunityNode node,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): CommunityNodeNamespace.load_name_embedding");
+        await _ops.LoadNameEmbeddingAsync(_driver, node, cancellationToken);
     }
 }
 
 internal sealed class SagaNodeNamespace
 {
-    // TODO(port): SagaNodeNamespace.__init__
+    private readonly GraphDriver _driver;
+    private readonly SagaNodeOperations _ops;
+
     internal SagaNodeNamespace(GraphDriver driver, SagaNodeOperations ops)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.__init__");
+        _driver = driver;
+        _ops = ops;
     }
 
-    // TODO(port): SagaNodeNamespace.save
-    internal Task<SagaNode> SaveAsync(
+    internal async Task<SagaNode> SaveAsync(
         SagaNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.save");
+        await _ops.SaveAsync(_driver, node, tx, cancellationToken);
+        return node;
     }
 
-    // TODO(port): SagaNodeNamespace.save_bulk
-    internal Task SaveBulkAsync(
+    internal async Task SaveBulkAsync(
         List<SagaNode> nodes,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.save_bulk");
+        await _ops.SaveBulkAsync(_driver, nodes, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): SagaNodeNamespace.delete
-    internal Task DeleteAsync(
+    internal async Task DeleteAsync(
         SagaNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.delete");
+        await _ops.DeleteAsync(_driver, node, tx, cancellationToken);
     }
 
-    // TODO(port): SagaNodeNamespace.delete_by_group_id
-    internal Task DeleteByGroupIdAsync(
+    internal async Task DeleteByGroupIdAsync(
         string groupId,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.delete_by_group_id");
+        await _ops.DeleteByGroupIdAsync(_driver, groupId, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): SagaNodeNamespace.delete_by_uuids
-    internal Task DeleteByUuidsAsync(
+    internal async Task DeleteByUuidsAsync(
         List<string> uuids,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.delete_by_uuids");
+        await _ops.DeleteByUuidsAsync(_driver, uuids, tx, batchSize, cancellationToken);
     }
 
-    // TODO(port): SagaNodeNamespace.get_by_uuid
-    internal Task<SagaNode> GetByUuidAsync(
+    internal async Task<SagaNode> GetByUuidAsync(
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.get_by_uuid");
+        return await _ops.GetByUuidAsync(_driver, uuid, cancellationToken);
     }
 
-    // TODO(port): SagaNodeNamespace.get_by_uuids
-    internal Task<List<SagaNode>> GetByUuidsAsync(
+    internal async Task<List<SagaNode>> GetByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.get_by_uuids");
+        return await _ops.GetByUuidsAsync(_driver, uuids, cancellationToken);
     }
 
-    // TODO(port): SagaNodeNamespace.get_by_group_ids
-    internal Task<List<SagaNode>> GetByGroupIdsAsync(
+    internal async Task<List<SagaNode>> GetByGroupIdsAsync(
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): SagaNodeNamespace.get_by_group_ids");
+        return await _ops.GetByGroupIdsAsync(_driver, groupIds, limit, uuidCursor, cancellationToken);
     }
 }
 
 internal sealed class NodeNamespace
 {
-    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
-    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): NodeNamespace.entity
-    internal EntityNodeNamespace Entity => throw new NotSupportedException("TODO(port): NodeNamespace.entity");
+    private readonly string _driverName;
+
+    private readonly EntityNodeNamespace? _entity;
+    private readonly EpisodeNodeNamespace? _episode;
+    private readonly CommunityNodeNamespace? _community;
+    private readonly SagaNodeNamespace? _saga;
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): NodeNamespace.episode
-    internal EpisodeNodeNamespace Episode => throw new NotSupportedException("TODO(port): NodeNamespace.episode");
+    internal EntityNodeNamespace Entity => _entity ?? throw new NotImplementedException(_driverName + " does not implement entity_node_ops");
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): NodeNamespace.community
-    internal CommunityNodeNamespace Community => throw new NotSupportedException("TODO(port): NodeNamespace.community");
+    internal EpisodeNodeNamespace Episode => _episode ?? throw new NotImplementedException(_driverName + " does not implement episode_node_ops");
 
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
-    // TODO(port): NodeNamespace.saga
-    internal SagaNodeNamespace Saga => throw new NotSupportedException("TODO(port): NodeNamespace.saga");
+    internal CommunityNodeNamespace Community => _community ?? throw new NotImplementedException(_driverName + " does not implement community_node_ops");
 
-    // PORT: the unit adds _driver_name with the constructor body.
-    // TODO(port): NodeNamespace.__init__
+    // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
+    // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
+    internal SagaNodeNamespace Saga => _saga ?? throw new NotImplementedException(_driverName + " does not implement saga_node_ops");
+
+    // PORT: _driver_name is type(driver).__name__, which is PythonName (R15).
     internal NodeNamespace(GraphDriver driver, EmbedderClient embedder)
     {
-        throw new NotSupportedException("TODO(port): NodeNamespace.__init__");
+        _driverName = driver.PythonName;
+
+        var entityNodeOps = driver.EntityNodeOps;
+        if (entityNodeOps is not null)
+        {
+            _entity = new EntityNodeNamespace(driver, entityNodeOps, embedder);
+        }
+
+        var episodeNodeOps = driver.EpisodeNodeOps;
+        if (episodeNodeOps is not null)
+        {
+            _episode = new EpisodeNodeNamespace(driver, episodeNodeOps);
+        }
+
+        var communityNodeOps = driver.CommunityNodeOps;
+        if (communityNodeOps is not null)
+        {
+            _community = new CommunityNodeNamespace(driver, communityNodeOps, embedder);
+        }
+
+        var sagaNodeOps = driver.SagaNodeOps;
+        if (sagaNodeOps is not null)
+        {
+            _saga = new SagaNodeNamespace(driver, sagaNodeOps);
+        }
     }
 }
