@@ -667,9 +667,9 @@
         "json",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/PromptHelpers.cs",
+      "status": "reviewed",
+      "notes": "Ported with the pilot unit dedupe_nodes. Its 16 pure cases pass."
     },
     {
       "order": 33,
@@ -686,9 +686,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/Models.cs",
+      "status": "reviewed",
+      "notes": "Ported with the pilot unit dedupe_nodes. 16 judge cases pass. The case pure.prompts.models.PromptSpec.with_model is not bound: its argument names the model ExtractedEntities of prompts.extract_nodes, which is not ported."
     },
     {
       "order": 34,
@@ -773,9 +773,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/DedupeNodes.cs",
+      "status": "reviewed",
+      "notes": "Pilot unit (plan 0003, task 6). Its 12 pure cases and 2 schema cases pass. tests/Port.Evaluation/PromptsRecordedTests.cs compares recorded Python results (port/tools/record_prompt_values.py)."
     },
     {
       "order": 38,
@@ -962,9 +962,9 @@
         "types",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Prompts/Lib.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot declared the interfaces IPromptGroup and IPromptLibrary for real (rule R24). The other members are not ported. The upstream tests test_chat_prompt_defaults_match_legacy_prompt_text and test_as_messages_appends_unicode_note_for_overrides wait for this unit."
     },
     {
       "order": 47,
