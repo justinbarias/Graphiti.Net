@@ -174,9 +174,9 @@
       "lines": 144,
       "imports": [],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Errors.cs",
+      "status": "reviewed",
+      "notes": "Pilot unit (plan 0003, task 6). 19 pure judge cases pass. tests/Port.Evaluation/ErrorsTests.cs compares 219 recorded messages (gap J1)."
     },
     {
       "order": 8,

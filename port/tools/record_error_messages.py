@@ -11,8 +11,8 @@ It writes tests/Port.Evaluation/values/errors.json. --check writes nothing and e
 file differs from what the run would write. The tool needs Python 3.12 and the pinned upstream
 in .upstream/graphiti. It changes nothing there. Nothing here uses the network.
 
-Each case holds the class name, the arguments, str(exception), the message attribute, and the
-names of the base classes in method resolution order up to Exception.
+Each case holds the class name, the arguments, str(exception), the message attribute, each other
+instance attribute, and the names of the base classes in method resolution order up to Exception.
 """
 from __future__ import annotations
 
@@ -36,6 +36,9 @@ TEXTS = [
     'emoji 😀',
     'é',
     '{braces} %s {0}',
+    'nul\x00 del\x7f',
+    'nbsp\xa0 zwsp\u200b ls\u2028',
+    'nel\x85 shy\xad unassigned\u0378',
 ]
 LISTS = [
     [],
@@ -46,6 +49,9 @@ LISTS = [
     ['both \' and "'],
     ['back\\slash', 'line\nbreak'],
     ['😀', 'é', ''],
+    # Items that repr must escape, and items that it must not.
+    ['\x00', '\x7f', '\xa0'],
+    ['\u200b', '\u2028', '\x85', '\xad', '\u0378'],
 ]
 INTS = [0, 7, -1, 2**63 - 1]
 
@@ -106,6 +112,7 @@ def main() -> int:
                     'args': arguments,
                     'str': str(error),
                     'message': getattr(error, 'message', None),
+                    'attrs': {name: value for name, value in vars(error).items() if name != 'message'},
                     'bases': bases,
                 }
             )
