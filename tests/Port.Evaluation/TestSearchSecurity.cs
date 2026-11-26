@@ -1,5 +1,6 @@
 // Ported from tests/utils/search/test_search_security.py (port/RULES.md, R25). Only the tests whose code under test
-// is in graphiti_core/search/search_filters.py, helpers.validate_node_labels, or driver/neo4j/operations/search_ops.py.
+// is in graphiti_core/search/search_filters.py, helpers.validate_node_labels,
+// driver/neo4j/operations/search_ops.py, or graphiti_core/search/search_utils.py.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core.Driver;
@@ -55,5 +56,34 @@ public class TestSearchSecurity
     {
         var error = Assert.Throws<GroupIdValidationException>(() => SearchOps.BuildNeo4jFulltextQuery("test", ["bad\"group"]));
         Assert.Contains("must contain only alphanumeric", error.Message, StringComparison.Ordinal);
+    }
+
+    // Ported with graphiti_core/search/search_utils.py. SimpleNamespace(provider=..., fulltext_syntax='') is a driver
+    // that answers no query.
+    [Fact]
+    public void test_fulltext_query_rejects_invalid_group_ids()
+    {
+        var driver = new NamespaceDriver { Provider = GraphProvider.Neo4j, FulltextSyntax = string.Empty };
+
+        var error = Assert.Throws<GroupIdValidationException>(() => SearchUtils.FulltextQuery("test", ["bad\"group"], driver));
+        Assert.Contains("must contain only alphanumeric", error.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class NamespaceDriver : GraphDriver
+    {
+        internal override string PythonName => "SimpleNamespace";
+
+        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+            string cypherQuery,
+            OrderedDictionary<string, object?> parameters,
+            CancellationToken cancellationToken = default) => throw new InvalidOperationException("not used");
+
+        internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");
+
+        internal override Task CloseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        internal override Task DeleteAllIndexesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        internal override Task BuildIndicesAndConstraintsAsync(bool deleteExisting = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
