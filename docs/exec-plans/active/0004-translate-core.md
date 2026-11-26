@@ -110,4 +110,43 @@ Commands at the tip, after the rebase on `main`:
 
 Not in this pull request: the two skeleton packets for layers 7 to 9. They are outside the goal of decision D39, which ends at layer 6.
 
+### Layer 1, the foundations, 2026-11-27
+
+Five packets ported 11 modules. Two Opus 5.5 high reviewers read each packet, one against Python with its own inputs and one against the evidence with seeded defects. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Implementer | Review findings |
+| --- | --- | --- | --- |
+| P1a | `helpers`, `utils.datetime_utils`, `utils.text_utils` | Sonnet 5.5, medium | 5 important, 16 minor. 22,550 calls of one reviewer matched Python. |
+| P1b | `graph_queries`, `models.edges.edge_db_queries`, `models.nodes.node_db_queries` | Sonnet 5.5, medium | 5 important, 10 minor. The query text matched Python for each provider. |
+| P1c | `tracer` | Sonnet 5.5, high | In the P1e row |
+| P1d | `graphiti_types` | Sonnet 5.5, medium | In the P1e row |
+| P1e | `namespaces.nodes`, `namespaces.edges` | Sonnet 5.5, medium | 7 important, 17 minor, for P1c, P1d, and P1e together |
+
+What the reviews found, and the result:
+
+| Finding | Result |
+| --- | --- |
+| 13 query constants had no test that can fail: 7 of 24 seeded defects passed each check. | The recording holds each module constant by name (rule R25). |
+| A private helper of the query unit refused `bytes` labels and broke on a dict with other keys. | `Py.Iter` in `PyCompat` (rule R6). |
+| The sum of `normalize_l2` was a private copy of numpy's pairwise sum. | `PyNumpy.AddReduce` in `PyCompat`, with 140 recorded numpy results (rule R18). |
+| The binding of `parse_db_date` had a guard that hid a wrong result. | The function returns its input unchanged for another type, as Python does (rule R20). One case left open item O4. |
+| A wrong `SEMAPHORE_LIMIT` failed no test, because the test compared the port with itself. | The recording holds the constant, and the test compares the largest count of calls that ran at the same time. |
+| The telemetry of an exception has .NET names where Python has its own. | Accepted as decision D46. The maintainer decides at gate 4. |
+| Four reachable namespace methods had no test. | The recording has 177 cases, from 55. |
+
+Two units left the layer: `decorators` goes to layer 6, and `utils.ontology_utils.entity_types_utils` goes to layer 2 (see "Lead decisions").
+
+Evidence that waits for a later layer:
+
+- `graphiti_types`: no test reaches `complete_prompt`, `generate_prompt_response`, and two routes of `resolve_prompt_messages`. They stop at skeleton members of layers 3 and 4.
+- `namespaces`: the recording reaches the entity node namespace. The others wait for the Neo4j operations of layer 5.
+- `utils.text_utils`: 16 judge cases need the `EpisodicNode` model, which layer 2 registers.
+
+Commands at the tip:
+
+- `scripts/check.sh`: `check: passed`.
+- `dotnet test --project tests/Port.Evaluation`: 2,450 tests, 0 failed, 0 skipped.
+- The recorders with `--check`: `helpers` 1,926 cases, the query builders 2,804, `namespaces` 177, `tracer` 900, and the numpy values. Each one is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 680 passed, 0 unexpected, 0 bound and wrong. 277 ids left `expected-failures.txt`, and 1,319 stay. The pull request lists the ids.
+
 Found beside the plan: `scripts/mutate.sh` gave no result on 2026-11-26. Two tests, `PyAstTests.LiteralEval_matches_Python` and `PyAstTests.LiteralEval_of_long_and_deeply_nested_texts_matches_Python`, stop the test host in a mutated build. Stryker then runs them against each mutant, and each mutant gets the status `RuntimeError`. A probe on `PyHash.cs` with 56 mutants took 159 seconds and gave 56 errors. With the two tests skipped it took 8 seconds and killed 56. The probable cause is a stack overflow in the mutated parser. The lead fixes the two tests before the mutation run of layer 5.

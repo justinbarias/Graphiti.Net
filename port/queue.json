@@ -190,8 +190,8 @@
         "datetime"
       ],
       "target": "src/Graphiti.Net/Core/Utils/DatetimeUtils.cs",
-      "status": "todo",
-      "notes": "The pilot ported utc_now for real (rule R24). The other members are skeleton members."
+      "status": "tests_pass",
+      "notes": "Layer 1. Two reviews and one fix round. 2 covering cases stay listed: they need a model that a later unit registers."
     },
     {
       "order": 9,
@@ -504,8 +504,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Helpers.cs",
-      "status": "todo",
-      "notes": "The pilot ported validate_node_labels with SAFE_CYPHER_IDENTIFIER_PATTERN and the CHUNK_* constants for real (rule R24). 13 of the 14 pure cases of validate_node_labels pass, and 1 answers JudgeTypeRejected (O4). The other members are not ported."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. 16 covering cases stay listed with the answer JudgeTypeRejected (open item O4). The numpy sum is PyNumpy.AddReduce."
     },
     {
       "order": 24,
@@ -518,9 +518,9 @@
         "graphiti_core.driver.driver"
       ],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Models/Edges/EdgeDbQueries.cs",
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. 3 covering cases stay listed with the answer JudgeTypeRejected (open item O4)."
     },
     {
       "order": 25,
@@ -537,8 +537,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Models/Nodes/NodeDbQueries.cs",
-      "status": "todo",
-      "notes": "The pilot added three skeleton members for entity nodes (rule R24). No member is ported. 2 tests of test_node_label_security.py wait for this unit."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. 5 covering cases stay listed with the answer JudgeTypeRejected (open item O4)."
     },
     {
       "order": 26,
@@ -705,9 +705,9 @@
         "opentelemetry",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Tracer.cs",
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. No judge case. A recording of the OpenTelemetry SDK with 900 cases. Decision D46: the telemetry of an exception keeps its .NET type name."
     },
     {
       "order": 35,
@@ -832,9 +832,9 @@
         "re",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Utils/TextUtils.cs",
+      "status": "tests_pass",
+      "notes": "Layer 1. Two reviews and one fix round. 17 covering cases stay listed: 16 need the EpisodicNode model, which layer 2 registers."
     },
     {
       "order": 41,
@@ -1242,9 +1242,9 @@
         "typing",
         "typing_extensions"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/GraphQueries.cs",
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. 4 covering cases stay listed with the answer JudgeTypeRejected (open item O4). STOPWORDS of driver/falkordb/__init__.py is in Core/Driver/Falkordb/Package.cs."
     },
     {
       "order": 60,
@@ -1313,9 +1313,9 @@
         "inspect",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Decorators.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "Moved from layer 1 to layer 6: it imports search.search_config, and four of its tests need SearchResults.merge."
     },
     {
       "order": 63,
@@ -1708,9 +1708,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/GraphitiTypes.cs",
+      "status": "tests_pass",
+      "notes": "Layer 1. Two reviews and one fix round. No test reaches complete_prompt, generate_prompt_response, and the runtime and library routes of resolve_prompt_messages: they stop at skeleton members. Layers 3 and 4 add those tests."
     },
     {
       "order": 79,
@@ -2144,9 +2144,9 @@
         "graphiti_core.embedder"
       ],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Namespaces/Edges.cs",
+      "status": "tests_pass",
+      "notes": "Layer 1. Two reviews and one fix round. Each path waits for the Neo4j operations of layer 5, and the recording grows then."
     },
     {
       "order": 96,
@@ -2168,9 +2168,9 @@
       "external": [
         "datetime"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Namespaces/Nodes.cs",
+      "status": "tests_pass",
+      "notes": "Layer 1. Two reviews and one fix round. The recording reaches the entity node namespace. The other namespaces wait for the Neo4j operations of layer 5, and the recording grows then."
     },
     {
       "order": 97,
@@ -2185,8 +2185,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "No file: the package module only imports names again (rule R1)."
     },
     {
       "order": 98,
@@ -2271,9 +2271,9 @@
       "external": [
         "pydantic"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/OntologyUtils/EntityTypesUtils.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "Moved from layer 1 to layer 2: it reads the fields of EntityNode."
     },
     {
       "order": 102,
@@ -4066,8 +4066,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "No file: the package module only imports names again (rule R1)."
     },
     {
       "order": 176,
@@ -4079,8 +4079,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "No file: the package module only imports names again (rule R1)."
     },
     {
       "order": 177,
@@ -4092,8 +4092,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "No file: the package module only imports names again (rule R1)."
     },
     {
       "order": 178,
@@ -4135,8 +4135,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "No file: the package module only imports names again (rule R1)."
     },
     {
       "order": 181,
