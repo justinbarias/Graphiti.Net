@@ -21,6 +21,20 @@ public sealed class BindingsTests
         Assert.Equal("{\"error\": \"JudgeNotBound\"}", line);
     }
 
+    [Theory]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:str\", \"args\": [1.0]}", "{\"ok\": \"1.0\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:str\", \"args\": [\"a'b\"]}", "{\"ok\": \"a'b\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:repr\", \"args\": [\"a'b\"]}", "{\"ok\": \"\\\"a'b\\\"\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:repr\", \"args\": [1000]}", "{\"ok\": \"1000\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [{\"$tuple\": [\"a\", \"b\"]}]}", "{\"ok\": [\"a\", \"b\"]}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [5]}", "{\"error\": \"TypeError\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:list\", \"args\": [\"ab\"]}", "{\"host_error\": \"JudgeHostErrorException\"}")]
+    [InlineData("{\"id\": \"x\", \"fn\": \"builtins:str\", \"args\": [{\"$ref\": \"no.such.module:NAME\"}]}", "{\"error\": \"JudgeNotBound\"}")]
+    public async Task The_builtins_answer_as_Python_does(string line, string expected)
+    {
+        Assert.Equal(expected, await HostLoop.AnswerAsync(line));
+    }
+
     [Fact]
     public void Load_calls_Register_of_each_unit_class()
     {

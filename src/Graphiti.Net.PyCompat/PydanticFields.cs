@@ -108,10 +108,12 @@ internal sealed class PydanticFields
 
     /// <summary>Throws one <see cref="ValidationException"/> with each error so far, in field order, if there is one.</summary>
     /// <remarks>
-    /// A known difference, accepted by the lead: pydantic checks a constraint and runs a field validator together with
-    /// the type checks of the other fields. RULES.md R7 puts them in <c>Validate()</c>, which runs only after the
-    /// field reads pass. So when one field has a type error and another field fails a constraint or a validator, the
-    /// port reports the type errors only. The exception type is the same, and no upstream code reads the error list.
+    /// A field validator runs inside the reader of its field (RULES.md R7), so its error stands with the errors of
+    /// the other fields in field order, as in pydantic. A known difference stays for a constraint (<c>Field(ge=1)</c>)
+    /// and for a model validator: RULES.md R7 puts them in <c>Validate()</c>, which runs only after the field reads
+    /// pass. Pydantic checks a constraint together with the type checks of the other fields. So when one field has a
+    /// type error and another field fails a constraint, the port reports the type errors only. The exception type is
+    /// the same, and no upstream code reads the error list.
     /// A field that held an int that a long cannot hold adds no error, as pydantic accepts the int. If no other field
     /// gave an error, its <see cref="OverflowException"/> goes on (the limit of RULES.md R4, debt T25).
     /// </remarks>

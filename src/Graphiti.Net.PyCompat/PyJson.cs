@@ -46,7 +46,7 @@ internal static class PyJson
     internal static string Dumps(
         object? value,
         bool ensureAscii = true,
-        int? indent = null,
+        long? indent = null,
         bool sortKeys = false,
         Func<object?, object?>? @default = null,
         bool compact = false,
@@ -139,7 +139,7 @@ internal static class PyJson
 
     private sealed class Encoder(
         bool ensureAscii,
-        int? indent,
+        long? indent,
         bool sortKeys,
         Func<object?, object?>? @default,
         string itemSeparator,
@@ -205,7 +205,8 @@ internal static class PyJson
         {
             if (indent is { } spaces)
             {
-                sb.Append('\n').Append(' ', Math.Max(spaces, 0) * depth);
+                // An indent of 0 or less writes the line breaks and no spaces, as Python does.
+                sb.Append('\n').Append(' ', checked((int)(Math.Max(spaces, 0L) * depth)));
             }
         }
 

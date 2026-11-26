@@ -2,6 +2,8 @@
   <PropertyGroup>
     <RootNamespace>Graphiti.Neo4j</RootNamespace>
     <PackageId>Graphiti.Net.Neo4j</PackageId>
+    <!-- A Python int has no limit. An overflow of a long throws OverflowException and never wraps (port/RULES.md, R18). -->
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Neo4j.Driver" />

@@ -28,7 +28,29 @@ public class NumberTests
     public void Float_of_text_matches_Python() => CheckFloat("float_str", c => Py.Float(Text(c, "s")));
 
     [Fact]
-    public void Comb_matches_Python() => CheckLong("comb", c => Py.Comb(c.GetProperty("n").GetInt64(), c.GetProperty("k").GetInt64()));
+    public void Comb_matches_Python()
+    {
+        // A case with "big" holds a result that a long cannot hold. Comb returns it, and does not throw.
+        var cases = Cases("comb");
+        Assert.Contains(cases, c => c.TryGetProperty("big", out _));
+        foreach (var c in cases)
+        {
+            var (n, k) = (c.GetProperty("n").GetInt64(), c.GetProperty("k").GetInt64());
+            if (c.TryGetProperty("e", out _))
+            {
+                Assert.Throws<ArgumentException>(() => Py.Comb(n, k));
+            }
+            else
+            {
+                var expected = c.TryGetProperty("big", out var big)
+                    ? System.Numerics.BigInteger.Parse(big.GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                    : c.GetProperty("r").GetInt64();
+                Assert.Equal(expected, Py.Comb(n, k));
+            }
+        }
+
+        Assert.Equal(System.Numerics.BigInteger.Parse("535983370403809682970", System.Globalization.CultureInfo.InvariantCulture), Py.Comb(100, 20));
+    }
 
     // Laws that hold for any input. They do not use the Python values.
 
