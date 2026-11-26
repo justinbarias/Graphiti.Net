@@ -35,13 +35,14 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 - Ported code never declares a type in the namespace `Graphiti` itself, except the two error files. The public records there have the names of ported classes, for example `EntityNode` and `SearchConfig` (decision D35).
 - Use a file-scoped namespace, and write each `using` directive after the namespace line, not at the top of the file. This holds for each C# project below the namespace `Graphiti`: the files of `Core/` and `Internal/`, the Neo4j project, the `PyCompat` project, the judge host with `Bindings.cs`, and the test projects. Most of these files name a ported type. Each of these namespaces is a child of `Graphiti`. C# searches the parent namespace `Graphiti` before it searches a `using` directive at the top of a file.
 - A wrong placement binds a name such as `SearchConfig` or `EntityNode` to the public record. The analyzer rule IDE0065 is an error in `.editorconfig`, so the build fails for a directive above the namespace. Without that rule, the build does not always fail. A constructor call gave `error CS1503`, but `typeof(SearchConfig)` and `value is SearchFilters` compiled and used the public record (measured on 2026-11-25 with the .NET 10 SDK). A directive inside the namespace binds to the ported type.
-- In the Neo4j project, write `using global::Neo4j.Driver;`. Inside `namespace Graphiti.Neo4j.<Sub>;` the name `Neo4j` is `Graphiti.Neo4j`, and `using Neo4j.Driver;` fails with `error CS0234`.
+- In the Neo4j project and in each test project, write `using global::Neo4j.Driver;`. Inside `namespace Graphiti.Neo4j.<Sub>;` the name `Neo4j` is `Graphiti.Neo4j`, and `using Neo4j.Driver;` fails with `error CS0234`.
 - A ported file needs no `using Graphiti;`. The exception classes and `ModelCallFailure` are visible from each `Graphiti.Core` namespace.
 - A branch that builds a default object from a module that is not ported, or the Neo4j driver from core code, is not ported. Keep the parameter, and throw in that branch: `throw new ArgumentException("<python parameter name> must be provided"); // PORT: D3, D28`. The four sites are in `Graphiti.__init__`: `Neo4jDriver(uri, user, password)` at `graphiti.py:372`, `OpenAIClient()` at `:385`, `OpenAIEmbedder()` at `:389`, and `OpenAIRerankerClient()` at `:393`. The `uri is None` test before the first one keeps its upstream message. The facade always passes the four objects.
 - A public member needs an XML comment, because the build treats a missing one as an error (CS1591). Where Python has no docstring, write `/// <summary>Initializes a new instance of the <see cref="X"/> class.</summary>` for a constructor, `/// <summary>Initializes a new instance of the <see cref="X"/> class with the exception that caused this one.</summary>` for the constructor with `innerException` (R4), and `/// <summary>Gets the Python attribute <c>name</c>.</summary>` for a property, with the Python attribute name. This applies to the two error files only.
 - Put `// Ported from graphiti_core/<path>.py` on the first line of each file.
 - Copy the licence text at the top of the Python file into a block comment (`/* ... */`) after that first line, with the same words.
 - Keep the definitions in the order of the Python file. One Python module is one C# file.
+- Write no private helper that Python does not have. If Python writes the same expression at two sites, write it at both sites. The one exception is a local function inside `ModelValidate` for a reader that two or more fields use, or that does not fit on one line (R7).
 - Copy each docstring into an XML doc comment with the same text.
 - Copy each code comment to the same place. A comment that explains a C# difference starts with `// PORT:`.
 - Port each branch of a function, also the branches for FalkorDB, Neptune, Kuzu, and Relate. The judge calls query builders with each provider value.
@@ -60,10 +61,12 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 | `_private` function or field | The same name without the underscore. `private` if only its own class uses it, `internal` if not. |
 | A class | The same name. An exception class follows R4. |
 | The class `Graphiti` of `graphiti.py` | `GraphitiCore`. A type named `Graphiti` inside a namespace that starts with `Graphiti` breaks each qualified name (decision D24). The module-level functions of the file go to `GraphitiModule`, by the row above. |
-| `Prompt` and `Versions` in each of the 8 prompt modules | `<Module>Prompt` and `<Module>Versions`, for example `DedupeNodesPrompt`. These are the names that `prompts/lib.py` imports them under. |
+| `Prompt` in each of the 8 prompt modules | The interface `<Module>Prompt`, for example `DedupeNodesPrompt`, with one get-only property of the type `PromptFunction` for each attribute. This is the name that `prompts/lib.py` imports it under. |
+| `Versions` in each of the 8 prompt modules | No C# type. It is a `TypedDict` that `prompts/lib.py` reads by key and with `.items()`, so a value of it is an `OrderedDictionary<string, PromptFunction>` (R7, R10). |
+| An enum member, `UPPER_SNAKE` or `lower_snake` | PascalCase by the words of the Python name: `NEO4J` gives `Neo4j`, `FALKORDB` gives `Falkordb`, `fact_triple` gives `FactTriple`. The Python name stays in `[PyEnumMember]` (R7). |
 | A name that is a C# keyword (`eval`, `params`, `event`) | Add the prefix `@` for a parameter or a local. For a member, use the PascalCase name. |
 | Keyword arguments with defaults | Optional parameters in the same order with the same defaults |
-| `**kwargs` that holds query parameters | `OrderedDictionary<string, object?> parameters` |
+| `**kwargs` that holds query parameters | `OrderedDictionary<string, object?> parameters`. The keys `routing_`, `database_`, and `params` are driver options inside that dictionary, and `Neo4jDriver.ExecuteQueryAsync` removes them as `neo4j_driver.py:161-170` does. A caller with no keyword argument passes `new()`. |
 | A wire name: a JSON key, a node property, a Cypher parameter, a prompt name, a span attribute | Keep the Python text exactly. Never derive it from a C# name. |
 
 A member keeps the meaning of its Python name. Do not rename a member to make it clearer.
@@ -145,6 +148,8 @@ Example: `utils/maintenance/attribute_utils.py:67` calls `int(raw)` inside `exce
 The maintainer chose on 2026-11-26 to document this limit and not to change the helpers. Add no `catch` for it in ported code.
 
 Do not add an argument guard that Python does not have. Do not replace an exception with a result type.
+An exception that Python raises with no argument has an empty text: `raise NotImplementedError` is `throw new NotImplementedException(string.Empty)`. The .NET default message is not empty.
+The product projects compile with `CheckForOverflowUnderflow`. A `+`, `-`, or `*` on a `long` that leaves the range throws `OverflowException`, by the limit above, and never wraps to a wrong value. Code that needs a wrap, for example a hash, says `unchecked`. The switch also checks a cast: `(long)x` throws `OverflowException` for a `double` that is `nan`, infinite, or out of range. Python raises `ValueError` for `int(nan)` and `math.ceil(nan)`, so that one exception type differs. The `PyCompat` assembly does not compile with the switch, and its helpers check their own ranges.
 `Codec.PythonExceptionName` in the judge host maps each C# type back to its Python name. Part 5 lists the rows that it lacks.
 
 ### R5. Logging
@@ -152,7 +157,8 @@ Do not add an argument guard that Python does not have. Do not replace an except
 Upstream has `logger = logging.getLogger(__name__)` in 34 modules and 130 log calls.
 
 - Each module that logs has `private static ILogger Logger => PortServices.Logger(typeof(<ModuleClass>));`. `PortServices` is the ambient holder of decision D23.
-- Each log call becomes a source-generated method: a `private static partial` method with `[LoggerMessage]` in a nested `static partial class Log` at the end of the module class.
+- Each log call becomes a source-generated method: an `internal static partial` method with `[LoggerMessage]` in a nested `private static partial class Log` at the end of the module class. The method cannot be `private`, because the module class calls it.
+- If a class of the file that is not the module class logs, for example `EpisodeTypeExtensions` in `nodes.py`, the `Logger` property and the class `Log` of the module class are `internal`, and that class calls them.
 - Keep the level: `debug` is `Debug`, `info` is `Information`, `warning` is `Warning`, `error` is `Error`. `logger.exception` and `exc_info=True` pass the exception as the first argument after the logger.
 - Keep the message text. Each `{expression}` of an f-string and each `%s` becomes a named placeholder: `f'Saved Node to Graph: {node.uuid}'` gives `"Saved Node to Graph: {Uuid}"`.
 - Format a list or a dict argument with `Py.Repr` so that the text is the same as Python's.
@@ -166,7 +172,7 @@ Upstream has `logger = logging.getLogger(__name__)` in 34 modules and 130 log ca
 ### R6. The Python value model
 
 Decision D21. Upstream passes open data between model replies, node attributes, prompt contexts, and query parameters.
-The port keeps such data as `object?` values from one closed set. `Neo4j.Driver` accepts the same set as query parameters.
+The port keeps such data as `object?` values from one closed set. `Neo4j.Driver` does not accept each type of the set as a query parameter. The Neo4j project converts the values at the driver boundary (R9).
 
 Use the value model only where the Python annotation is `Any`, `dict[str, Any]`, `list[Any]`, a bare `dict` or `list`, or where [TYPE_HINTS.md](TYPE_HINTS.md) infers such a type.
 Typed data stays typed: `dict[str, list[str]]` is `OrderedDictionary<string, List<string>>`.
@@ -196,6 +202,7 @@ Typed data stays typed: `dict[str, list[str]]` is `OrderedDictionary<string, Lis
 - `d.get(k)`, `d.get(k, default)`, `d.setdefault`, `d.pop`, and `d.update` become the matching `OrderedDictionary` calls. `d[k]` on a missing key throws `KeyNotFoundException`.
 - `copy.deepcopy(x)` is `Py.DeepCopy(x)`. `copy.copy(x)` and `dict(x)` are a new collection with the same items.
 - A list or a dict is shared by reference, as in Python. Do not copy one unless Python copies it.
+- A typed list or set goes into a parameter dictionary as it is: `["uuids"] = uuids`. Never write `.Cast<object?>().ToList()`, which is a copy.
 
 ### R7. Pydantic models and validators
 
@@ -211,8 +218,11 @@ Decision D21 keeps the library choice: records with an explicit `Validate()`. `J
 | `Field(default_factory=list)`, `dict`, `lambda: utc_now()`, `lambda: str(uuid4())` | Property initializer: `= []`, `= new()`, `= DatetimeUtils.UtcNow()`, `= Py.Uuid4()` |
 | `Field(description=...)` | A row in the model's schema (below). Keep the text exactly. |
 | `Field(ge=1)`, `gt`, `le`, `lt`, `max_length`, `min_length` | A test in `Validate()` that throws `ValidationException` |
-| `@field_validator`, `@model_validator(mode='after')` | Code in `Validate()`, in the order of the Python file. The three sites are in the table below. |
-| `ConfigDict(validate_assignment=True)` | The `set` accessor of each field that has a validator calls the same validation |
+| `@field_validator` | A private static method that the reader of the field and `Validate()` both call (below). The two sites are in the table below. |
+| `@model_validator(mode='after')` | Code in `Validate()`, in the order of the Python file. The one site is in the table below. |
+| `M.model_construct(...)`, which upstream uses only in tests | `new M { ... }` with no call to `Validate()` |
+| A field of the type `type[BaseModel]` | A property of the type `IResponseModel` (below). The reader is `x => Pydantic.SubclassOf<IResponseModel>(x)`. The method group does not compile (`error CS0411`). For `type[BaseModel] \| None`, as `PromptSpec.response_model` is, the property is `IResponseModel?` and the reader is `v => Pydantic.Optional(v, x => Pydantic.SubclassOf<IResponseModel>(x))`. |
+| `ConfigDict(validate_assignment=True)` | The `set` accessor of each field that has a validator calls the same validation. Pydantic also checks the type at each assignment. A value that has the type of the property needs nothing. A value from open data, for example a field of a database record, is read under the class name and the field name: `var f = new PydanticFields("EntityNode", new() { ["name_embedding"] = value });`, then `f.Required("name_embedding", <reader>)`, `f.ThrowIfAny();`, and the assignment. `Node` and `Edge` have this configuration (`nodes.py:105`). |
 | `ConfigDict(arbitrary_types_allowed=True)` | Nothing |
 | `M(**data)` or `M.model_validate(data)` with open data | `M.ModelValidate(data)` |
 | `M(a=1, b=2)` with typed arguments | `new M { A = 1, B = 2 }.Validate()` |
@@ -226,6 +236,7 @@ Decision D21 keeps the library choice: records with an explicit `Validate()`. `J
 | `__eq__` and `__hash__` on `Node` and `Edge` | `Equals` and `GetHashCode`. See R18 and R21. |
 
 Each model has these members after its properties, in this order. Add a member only if upstream or a judge case needs it.
+After them come the methods of the Python class in the order of the Python file: each validator method, each `@classmethod`, and each instance method. Do not put `ModelJsonSchema` or `ResponseModel` above the properties.
 
 1. `internal M Validate()`. It runs the constraints and the validators, and returns `this`. Every construction path calls it.
 2. `internal static M ModelValidate(OrderedDictionary<string, object?> data)`. It is the Python constructor for open data. It reads each field with a `Pydantic.*` helper, applies defaults, ignores unknown keys, and ends with `.Validate()`. A missing required field, a `None` for a field that is not optional, or a value that lax mode cannot coerce throws `ValidationException`.
@@ -238,6 +249,8 @@ How to write the members with the helpers of `PyCompat`:
 
 - A model implements `IPydanticModel`, so that `Pydantic.Dump` can dump it inside another model. Add the explicit member `OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);` after `ModelDump`.
 - `ModelValidate` creates `var f = new PydanticFields("<Python class name>", data);`. It reads each field in field order: `f.Required("<python name>", <reader>)` for a required field, and `f.Default("<python name>", <reader>, () => <default>)` for a field with a default or a default factory. It then calls `f.ThrowIfAny();`, which throws one `ValidationException` with each error, as pydantic does. Only after that call does it read `.Value` of each field, build the record, and call `.Validate()`.
+- A `@field_validator` is a private static method of the model with the name of the Python validator: `private static T ValidateX(T value, string? field = null)`. It runs the validator code inside `Pydantic.Wrap(..., "<Python class name>", field)` and returns the value. The reader of that field in `ModelValidate` calls it after the type read, with no field: `f.Default("node_labels", v => ValidateNodeLabelFilters(Strs(v)), () => null)`. `PydanticFields` then keeps its error with the errors of the other fields in field order, as pydantic does. `Validate()` calls the same method with the Python field name, so that a typed construction validates too. `SearchFilters` in `Core/Search/SearchFilters.cs` shows the form.
+- A `@model_validator(mode='after')` runs in `Validate()` only, after the field reads pass.
 - A reader is a `Pydantic.*` member or a lambda of them: `Pydantic.Str`, `Int`, `Float`, `Bool`, `DateTime`, `Any`, `Enum<T>`, `v => Pydantic.Literal(v, "a", "b")`, `Pydantic.StrIntFloat`, `v => Pydantic.Optional(v, Pydantic.Str)` for a reference type or `Pydantic.OptionalValue` for a value type, `v => Pydantic.List(v, Pydantic.Str)`, `v => Pydantic.Dict(v, Pydantic.Any)`, `v => Pydantic.Model(v, "<Python class name>", M.ModelValidate)`, and `Pydantic.Tagged` for a discriminated union.
 - `Validate()` of a model with a constraint creates `var f = new PydanticFields("<Python class name>");` with no data, calls `f.Ge`, `f.Gt`, or `f.MaxLength` for each constraint in field order, and then `f.ThrowIfAny();`. A model with no constraint and no validator has `internal M Validate() => this;`.
 - `ModelDump` is `Pydantic.DumpFields(json, ("<python name>", Property), ...)` in field order.
@@ -265,8 +278,8 @@ Validators at the pinned commit:
 
 | Site | Python | C# |
 | --- | --- | --- |
-| `nodes.py:107` | `@field_validator('labels')` on `Node`, with `validate_assignment=True` | `Validate()` and the `set` accessor of `Labels` call `Helpers.ValidateNodeLabels` inside `Pydantic.Wrap<NodeLabelValidationException>` |
-| `search/search_filters.py:75` | `@field_validator('node_labels')` on `SearchFilters` | `Validate()` calls `Helpers.ValidateNodeLabels(NodeLabels)` inside `Pydantic.Wrap<NodeLabelValidationException>` |
+| `nodes.py:107` | `@field_validator('labels')` on `Node`, with `validate_assignment=True` | A validator method that calls `Helpers.ValidateNodeLabels` inside `Pydantic.Wrap<NodeLabelValidationException>`. The reader of `labels`, `Validate()`, and the `set` accessor of `Labels` call it. |
+| `search/search_filters.py:75` | `@field_validator('node_labels')` on `SearchFilters` | A validator method that calls `Helpers.ValidateNodeLabels(NodeLabels)` inside `Pydantic.Wrap<NodeLabelValidationException>`. The reader of `node_labels` and `Validate()` call it. |
 | `ingestion/config.py:77` | `@model_validator(mode='after')` on `ConcurrentIngestionConfig` | `Validate()`, after the field constraints, inside `Pydantic.Wrap` |
 
 Pydantic catches a `ValueError` that a validator raises and raises `ValidationError` in its place. `NodeLabelValidationError` is a `ValueError` in Python, so a bad label gives `ValidationError`, and 16 judge cases expect that.
@@ -368,7 +381,10 @@ var query = "\n" + """
 - A value that enters query text is a label, a property name, or an index name. Each one passes the same validation call as in Python before it enters the text. Add no validation and remove none.
 - A hole formats its value as Python `str()` does. Use `Py.Str` for a value that is not a string.
 - Keep each parameter name, each `RETURN` alias, and each property name exactly.
-- Build the parameter dictionary in the order of the Python dict, with values from the value model (R6). `created_at` stays a `PyDateTime`. The Neo4j project converts it to the driver's type at the last step.
+- Build the parameter dictionary in the order of the Python dict, with values from the value model (R6). `created_at` stays a `PyDateTime`.
+- `Neo4jDriver.ExecuteQueryAsync` and the Neo4j transaction convert each parameter value before the driver call, at each depth. An `OrderedDictionary<string, object?>` becomes a `Dictionary<string, object?>`. A `PyDateTime` becomes a `DateTimeOffset` if it has an offset, and a `LocalDateTime` if it has none. A `PyTuple` or a `PySet<T>` becomes a list. A `BigInteger` or a `ulong` that fits becomes a `long`. Each other value outside the driver's types throws. Records come back the other way: a driver map becomes an `OrderedDictionary`, and a temporal value becomes a `PyDateTime`.
+- The reason is a measurement with `Neo4j.Driver` 6.5.1. For a nested `OrderedDictionary`, a struct, a tuple, a `BigInteger`, a `ulong`, and an enum, the driver throws `ProtocolException`. It reads the `OrderedDictionary` as a list of pairs. A typed list, a `float[]`, a `HashSet<T>`, a `Dictionary<string, object?>`, and a `DateTimeOffset` work.
+- `execute_query` returns the tuple `(Records, Summary, Keys)`, and a caller writes `var (records, _, _) = await ...`. `tx.run(...)` is `Transaction.RunAsync`, which returns `Task`: none of the 150 upstream sites reads its result.
 - `session.execute_write(func, *args, **kwargs)` passes the extra arguments to `func`. Write a lambda that closes over them: `session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => FuncAsync(tx, a, b)))`.
 - Keep the call shape: one `execute_query` call is one call, and the operations of one session or transaction stay in order. The judge captures both shapes.
 - A constant in `graph_queries.py` or a `*_db_queries.py` file is a `const string` or a `static readonly string` with the same text (GAPS F12).
@@ -382,7 +398,8 @@ The judge compares each prompt character for character.
 | Python | C# |
 | --- | --- |
 | `def node(context: dict[str, Any]) -> list[Message]` | `internal static List<Message> Node(OrderedDictionary<string, object?> context)` |
-| `PromptFunction`, `ChatPromptFunction`, `PromptVersion` | Delegates with the same names |
+| `PromptFunction`, `ChatPromptFunction` | Delegates with the same names |
+| `PromptVersion`, a `Protocol` with `__call__` only | No second type. It has the shape of `PromptFunction`: upstream gives each of the 25 prompt functions the annotation `PromptVersion`, and names the same function as a `PromptFunction` in the `Versions` dict. Write `PromptFunction` in its place. |
 | `context['key']` | `context["key"]`. A missing key throws `KeyNotFoundException`, which the judge expects. |
 | `context.get('key')`, `context.get('key', d)` | `Py.Get(context, "key")`, `Py.Get(context, "key", d)` |
 | `{context['x']}` in an f-string | `Py.Str(context["x"])`. For a string it is the string. For a list or a dict it is `repr` text (GAPS G1). |
@@ -405,9 +422,10 @@ The judge compares each prompt character for character.
 | --- | --- | --- |
 | `repr(x)`, `f'{x!r}'`, a list or dict inside an f-string | `Py.Repr(x)` | G1, F1 |
 | `str(x)`, `f'{x}'` | `Py.Str(x)`. `True` gives `True`, `None` gives `None`, `1.0` gives `1.0`. | G1 |
-| `json.dumps(x, ...)` | `PyJson.Dumps(x, ensureAscii, indent, sortKeys, @default)` with the options of the call site. Python's defaults are `ensure_ascii=True` and separators `, ` and `: `. | G2, F3 |
+| `json.dumps(x, ...)` | `PyJson.Dumps(x, ensureAscii, indent, sortKeys, @default)` with the options of the call site. `indent` is a `long?`: pass a Python `int` as it is, with no cast and no range test. Python's defaults are `ensure_ascii=True` and separators `, ` and `: `. | G2, F3 |
 | `json.loads(s)` | `PyJson.Loads(s)`. It returns the value model. | G5 |
 | `ast.literal_eval(s)` | `PyAst.LiteralEval(s)` | F5 |
+| A C# `int`, for example a loop index or `List.Count`, as an argument of a value-model helper (`Py.Str`, `Py.Repr`, `Py.Format`) or as a value in open data | Cast it to `long` first. The value model has no `int` (R6), and `Py.Str` of an `int` does not give Python's text. | |
 | A `datetime` annotation, typed or open | `PyDateTime`, a struct that holds a date and time to the microsecond and an offset that is null for a naive value. Never `DateTime` or `DateTimeOffset` in ported code. A naive value stays naive, and judge cases pin that, for example `pure.models.EntityNode.created_at_naive_kept_naive`. | G4 |
 | `dt.isoformat()` | `dt.IsoFormat()`. No fraction if the microseconds are zero. `+00:00`, never `Z`. | G4 |
 | `str(dt)`, `f'{dt}'` | `dt.Str()`, and `Py.Str` calls it. A space in place of `T`. | G4, F2 |
@@ -451,7 +469,7 @@ Python counts code points. C# counts UTF-16 units. Upstream text is episode cont
 ### R13. Regular expressions
 
 Translate each pattern by hand with the rules in Part 3. Keep the Python pattern in a comment above the C# pattern.
-A module-level `re.compile` is a `private static readonly Regex`. A pattern inside a function also becomes a static field.
+A module-level `re.compile` is a `private static readonly Regex`, or `internal` if another module imports the name (`SAFE_CYPHER_IDENTIFIER_PATTERN` is imported at `nodes.py:35`). A pattern inside a function also becomes a static field.
 
 | Python | C# |
 | --- | --- |
@@ -461,6 +479,8 @@ A module-level `re.compile` is a `private static readonly Regex`. A pattern insi
 | `\d` | `PyRegex.Digit`. .NET's `\d` misses the decimal digits above U+FFFF. Never set `RegexOptions.ECMAScript`. |
 | `re.IGNORECASE` | `RegexOptions.IgnoreCase \| RegexOptions.CultureInvariant`, and write three letters out. Python also matches U+017F for `s`, and U+0130 and U+0131 for `i`. .NET does not. Each `s` that the flag covers becomes `[sſ]`, each `i` becomes `[iİı]`, and a class such as `[a-z]` becomes `[a-zſİı]`. The evaluation tests of the unit hold one case for each of the three characters, recorded from Python. |
 | `$` with no `re.MULTILINE` | `$`. Both also match before a final line break. Do not change it to `\z` (GAPS F7). |
+| `pattern.fullmatch(s)`, `re.fullmatch(p, s)` (`nodes.py:681`) | A second static `Regex` with the pattern text `\A(?:` + pattern + `)\z`. Never `IsMatch` on the pattern of a `match` call: `fullmatch('a\n')` fails where `match('a\n')` with `$` matches. |
+| `re.split` with a pattern that has no group | `PyRegex.Split(...)` gives `List<string?>`, because a group that did not match is `None`. With no group no item is null: add `.OfType<string>()`. |
 | A pattern built with an f-string from a name | Pass the name through `Regex.Escape` only if Python calls `re.escape` |
 | Every pattern | `RegexOptions.CultureInvariant`, and the flags of the Python call |
 
@@ -510,6 +530,7 @@ GAPS.md G16 counts 19 `re` calls with a wider `grep` pattern. The table above na
 | A `set` or `frozenset` that code tests only with `in`, or compares, or takes the size of | `HashSet<T>`. For strings pass `StringComparer.Ordinal`. |
 | A `set` that code passes to `sorted()` | `HashSet<T>`, then the sort rule above |
 | A `set` that code iterates with no sort | `PySet<T>`, which iterates in insertion order. See the table below. |
+| A `tuple[int, ...]` or a `frozenset` as an item of a set | `PyTuple` for the tuple, and a frozen `PySet<long>` for the frozenset. `PyTuple` overrides `Equals` and `GetHashCode`, so a `HashSet<PyTuple>` works. `PySet<T>` overrides neither. It has the equality of the value only as an item of a `PySet<T>` or with `PyEqualityComparer`, so write `PySet<PySet<long>>` and never `HashSet<PySet<long>>`. |
 
 A Python set has no stable order, so each run of upstream can differ at these sites. The port picks insertion order, which is one of the orders that Python can give.
 
@@ -521,7 +542,7 @@ A Python set has no stable order, so each run of upstream can differ at these si
 | `utils/maintenance/dedup_helpers.py:359`, `ingestion/delta.py:91` | `for candidate_id in candidate_ids:` with `score > best_score` | `PySet<string>`. Candidates in the order of the bands and of each bucket. The first best score wins. |
 | `utils/maintenance/edge_operations.py:469` | `list(referenced_node_uuids)` as a query parameter | `PySet<string>`, in the order of the edges |
 | `utils/bulk_utils.py:792` | `UnionFind(all_uuids)` and a dict over the set | `PySet<string>`, in the order of the pairs |
-| `utils/content_chunking.py:745`, `:820` | `for pair in uncovered_pairs:` | `PySet` of pairs, built in `(i, j)` order. Only the sampling path reaches the loop (GAPS F9). |
+| `utils/content_chunking.py:745`, `:820` | `for pair in uncovered_pairs:` | `PySet` of pairs, built in `(i, j)` order. The sampling path reaches the loop (GAPS F9), and so does a call with `k` of 0 or 1. CPython gives one fixed order there, because the hash of a frozenset of ints has no seed. The port gives insertion order: the same chunks in another order (decision D43, for the maintainer at gate 4). |
 | `utils/maintenance/attribute_utils.py:179`, `:256` | `for field in dropped:` writes keys into `merged` | `PySet<string>`, in the order of `response`. The key order of the merged attributes reaches prompt text. |
 
 If you find another set that code iterates with no sort, and its order can reach a prompt, a query, a result, or a stored value, stop and tell the lead.
@@ -551,6 +572,8 @@ The prompt library is read by name, so it gets two interfaces:
 - `getattr` on a missing name throws `MissingMemberException(name)`. `hasattr` is the `TryGet` call.
 - A class with `__getattr__` (`_OverrideGroup`, `_ComposedPromptLibrary`, `_LibraryWithBuiltinSpecs`) implements the interface and forwards in `TryGet`.
 - The typed members of the Python classes (`library.dedupe_nodes.node`) stay as properties and methods next to the lookup.
+- The two interfaces are in `src/Graphiti.Net/Core/Prompts/Lib.cs`, the file of `prompts/lib.py`. Each `<Module>Prompts` class of a prompt module (an `ABC`, for example `DedupeNodesPrompts`) implements `IPromptGroup`: `TryGetFunction` gives the method for each Python method name of the class.
+- How `PromptTypeWrapper` and `PromptLibraryWrapper` give the 8 `<Module>Prompt` interfaces is open (Part 5, O12). The unit of `prompts/lib.py` asks the lead.
 
 A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeDescriptor` (decision D26). The lead writes it. The public `GraphTypeDefinition` builds it. It implements `IResponseModel` (R7), because upstream passes a custom type as the response model of the attribute prompt.
 
@@ -594,12 +617,13 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | Python | C# |
 | --- | --- |
 | A module-level constant | `const` for a number, a `bool`, or a string. `static readonly` for other types. |
-| A module-level value read from the environment at import (11 sites in `helpers.py`, `driver/driver.py`, `embedder/client.py`) | `internal static readonly` field with the same name, read one time with `PyEnv` |
+| A module-level value read from the environment at import (11 sites in `helpers.py`, `driver/driver.py`, `embedder/client.py`) | `internal static readonly` field with the same name, read one time with `PyEnv`. The read runs at the first use of the class, not at import. A value that does not parse then gives `TypeInitializationException` with the `ArgumentException` inside, where Python raises `ValueError` at import. |
 | A read inside a function or a constructor (`attribute_utils.py:63` at each call, `openai_decisions_client.py:68` and `:84` in `__init__`) | A `PyEnv` call at the same place. Do not move it to a static field. GAPS.md G10 counts 7 reads with another `grep` pattern. These 14 are each site. |
 | `int(os.getenv('X', 20))`, `float(os.getenv('X', 0.15))` | `PyEnv.Int("X", 20)`, `PyEnv.Float("X", 0.15)`. A value that does not parse throws, as Python does at import. |
 | `bool(os.getenv('X', False))` | `PyEnv.Truthy("X")`. Python gives `True` for each value that is not empty, also for `"false"`. |
 | `os.environ.get('X', 'default')` | `PyEnv.Str("X", "default")` |
 | A test that needs an environment value | `using (PyEnv.Use(name => ...))`. It holds for a read inside a function. Never start the static initializer of a ported class inside such a scope, because a `static readonly` field keeps the value for the whole process. |
+| A module-level value that an upstream test replaces with `monkeypatch.setattr(module, 'NAME', value)` (`CHUNK_DENSITY_THRESHOLD` and `CHUNK_MIN_TOKENS` in `tests/utils/test_content_chunking.py`) | `internal static readonly PyPatch<T> Name = new(<the value>);`. Code reads it with `.Value` at each site. The type has no implicit conversion, because with one the compiler accepts `Name == null`, `Name.Equals(x)`, and `var x = Name`, and each reads the holder. The test writes `using (Helpers.Name.Use(value))` in the test method or in the constructor of the test class, which holds for the flow of execution of that test. A call after an `await` in a fixture method does not reach the test. Nested scopes end in reverse order. Use `PyPatch<T>` only for a name that a ported test replaces. The lead adds each name to this row. |
 | `load_dotenv()` | Not ported. The library reads no `.env` file. |
 | A module-level mutable object, for example a search recipe | A `static readonly` field that holds the same single object. Upstream changes one of them in a call (R21, U8). |
 | A module-level cache or a "warned once" set | A `static readonly` field. The exclusive scheduler of R8 protects it. |
@@ -619,7 +643,7 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
 | `a // b`, `a % b` | `Py.FloorDiv(a, b)`, `Py.Mod(a, b)` |
 | `round(x)`, `round(x, n)` | `Py.Round(x)`, `Py.Round(x, n)` |
 | `int(x)` on a float | `Py.Int(x)`. It cuts toward zero and throws for `nan` and `inf`. |
-| `math.comb`, `math.log2`, `math.ceil`, `math.floor` | `Py.Comb`, `Math.Log2`, `(long)Math.Ceiling(x)`, `(long)Math.Floor(x)` |
+| `math.comb`, `math.log2`, `math.ceil`, `math.floor` | `Py.Comb`, `Math.Log2`, `(long)Math.Ceiling(x)`, `(long)Math.Floor(x)`. `Py.Comb` returns a `BigInteger`, because `comb(100, 20)` does not fit in a `long` and upstream compares it with a limit. |
 | `math.isnan(x)` | `double.IsNaN(x)` |
 | `sum(xs)`, `sum(1 for ...)` | A loop or `Sum()` over the same order. Float sums keep the Python order. |
 | A function that returns the integer `0` in one branch and a float in others | `double` (GAPS F18) |
@@ -700,11 +724,14 @@ The four lookup methods that apply no group filter (`node_distance_reranker`, `e
 - A constructor, a property, or a method on an instance uses the explicit reads: `call => Codec.Result(new XException(call.Signature("uuid").String("uuid")))`. For a parameter with a default, read `Has("name")` only to choose between two constructor calls that Python also tells apart. Never write a default value in a binding.
 - A unit that ports a member of another module for real (R24) puts the bindings of that member in the file of that module, for example `Units/Helpers.cs` for `helpers.validate_node_labels`. If the file exists, the unit adds its lines at the end of `Register`. `Add` throws for a name that is bound two times, so the host stops at its start.
 - A unit adds each model of its module to the schemas, with the Python path of the class as the key: `table.Schemas.Add("graphiti_core.prompts.dedupe_nodes:NodeDuplicate", NodeDuplicate.ModelJsonSchema);`. The judge function `judge:schema_text` reads that dictionary (R7).
-- A unit registers each `$model`, `$enum`, and `$ref` path that its cases use, and the encoder of each model type that a result holds, in `table.Registry`.
+- A unit registers each `$model`, `$enum`, and `$ref` path that its cases use, and the encoder of each model type that a result holds, in `table.Registry`. Each path is registered one time, in the bindings file of the module that defines the name: the enum `GraphProvider` is in `Units/Driver.cs`, also when the cases of another module pass it. A path that two files register stops the host at its start.
+- `Units/Builtins.cs` is lead code. It binds `builtins:str`, `builtins:repr`, and `builtins:list`, which cases of several units call on a `$ref`. A unit registers only the `$ref`.
+- A model constructor `M(**kwargs)` is bound with a private helper of the unit file that passes `call.Keywords` to `M.ModelValidate` and rejects a positional argument with `JudgeTypeRejectedException`. `Units/SearchFilters.cs` shows it. An enum call `E(value)` is `call.Signature("value").InvokeAsync((Func<object?, E>)PyEnum.FromValue<E>)`.
+- `Signature` has no mark for a keyword-only parameter (a name after `*`). A case that passes such an argument by position gets a result where Python raises `TypeError`. No case does it today (Part 5, O11).
 - An exception type with no row in `Codec.PythonExceptionName` gives a `host_error`. If ported code throws such a type by a rule of R4, tell the lead. Only the lead changes `tests/Graphiti.Net.JudgeHost/Core/`.
 - A `{"$ref": "fixtures:Name"}` argument is a custom type. `tests/Graphiti.Net.JudgeHost/Fixtures.cs` holds one `GraphTypeDescriptor` for each of the five classes of `port/judge/host-python/fixtures.py`, built through the public `GraphTypeDefinition`. The lead writes that file.
 - A `$model` argument is decoded with `ModelValidate` (R7). A `$enum` argument is decoded with `PyEnum.FromValue<T>`. A `$ref` to a constant or a function is decoded to the ported member.
-- A model in a result is encoded as `$type` with the Python class name and the Python field names. Use `ModelDump` if the model has it.
+- A model in a result is encoded as `$type` with the Python class name and the Python field names. Register it with `table.Registry.AddType<M>("<Python class name>", m => [new("<python name>", m.Property), ...])`, with the property values as they are. Do not use `ModelDump`: it turns a nested model into a dict, and the Python codec keeps a `$type` for each nested model.
 - A function that only changes its arguments returns nothing, so no pure case observes it (GAPS F20). Bind it only if a case names it. The flow layer covers it.
 - `driver/neo4j/operations/search_ops.py` is reached only by the direct flow scenarios (GAPS F21). Its unit is not `parity_pass` before those scenarios pass.
 - The order of keys in a dict is a contract only where it reaches prompt text or Cypher text (GAPS J15). R14 still applies to each dict that code iterates.
@@ -755,7 +782,9 @@ The unit that ports the surface delivers both. The lead writes or approves the r
   - `helpers.validate_node_labels` with `SAFE_CYPHER_IDENTIFIER_PATTERN`, and the constants `CHUNK_TOKEN_SIZE`, `CHUNK_OVERLAP_TOKENS`, `CHUNK_MIN_TOKENS`, and `CHUNK_DENSITY_THRESHOLD` of `helpers`.
   - The enums `nodes.EpisodeType` and `driver.driver.GraphProvider`.
   - The modules `prompts.models` and `prompts.prompt_helpers` in full.
-- Each other name from a module that is not ported is a skeleton member, and so is each name that `entity_node_ops` uses. That unit has no pure case. The lead adds the files to the unit's file list. Layer 0 and the later layers complete them.
+  - `utils.datetime_utils.utc_now`. On `nodes.Node` and `nodes.EntityNode`: the fields, the validation of `labels`, `__hash__`, and `__eq__` (R18). A skeleton `Node` with reference equality lets a later unit pass its tests with the wrong meaning.
+- A module whose Python bodies are only `...` or a docstring, for example an abstract base class, is ported in full. It has no `TODO(port)` marker, and its unit is not a skeleton.
+- Each other name from a module that is not ported is a skeleton member, and so is each other name that `entity_node_ops` uses. That unit has no pure case. The lead adds the files to the unit's file list. Layer 0 and the later layers complete them.
 - A skeleton member never throws `NotImplementedException`. Ported code catches that type to fall back from a driver operation (71 sites), and such a `catch` must not hide a member that is not ported yet.
 - Not allowed in product code: `dynamic`, the null-forgiving `!` operator, `#pragma warning disable`, `[SuppressMessage]`, an empty `catch` block that Python does not have, `async void`, `.Result`, and `.Wait()`.
 - A Python `except X: pass` is a `catch` block with the comment `// PORT: Python passes`.
@@ -764,6 +793,9 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 ### R25. Tests
 
 - Port the upstream pytest file that covers a module into `tests/Port.Evaluation`, with the same test names. These tests are temporary (decision D6).
+- A test method keeps its Python name in snake_case, so that a search finds it. A test class keeps its Python name.
+- If a pytest file covers several modules, port the tests whose code under test is ported with your unit. Name each other test in the `notes` of the module that it needs, so that the unit of that module ports it.
+- The ported pytest tests are mostly property tests. In the review of `content_chunking` they found none of 13 seeded defects, and a recording of real Python results found most of them. So a unit with logic also delivers a recording: a script in `port/tools/` calls each function of the module with generated inputs from a fixed seed and writes the results to `tests/Port.Evaluation/values/`, and one test compares the port with each result (R23).
 - A pytest file that mocks an internal class is ported as it is. This is the one place where a fake between internal classes is allowed ([TESTING.md](../docs/TESTING.md)).
 - Do not drop a test because it is hard to port. Mark it `// TODO(port)` and set the unit to `blocked`.
 - Write no new unit test that restates the implementation. A gap in coverage gets a judge case, a property test, or an end-to-end test.
@@ -793,8 +825,9 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `PyLruCache<TKey, TValue>` | Type. `GetOrAdd`, `Hits`, `Misses`, `Count` | `functools.lru_cache` |
 | `PyRandom` | Type. `Random`, `Uniform`, `SampleRange` | The `random` functions that upstream calls, with a seed for tests. The sequence is not Python's (GAPS F9). |
 | `PyEnv` | `Str`, `Int`, `Float`, `Truthy`, `Use` | `os.getenv` with the conversions of R17. `Use` is the seam for tests. |
+| `PyPatch<T>` | Type. `Value`, `Use(value)` | A module-level value that an upstream test replaces with `monkeypatch.setattr` (R17, R25) |
 | `PyHash` | `Blake2b` | `hashlib.blake2b` with a digest size |
-| `Pydantic` | `Str`, `Int`, `Float`, `Bool`, `DateTime`, `Any`, `Enum<T>`, `Literal`, `StrIntFloat`, `Callable<T>`, `Optional`, `OptionalValue`, `List`, `Dict`, `Model`, `Tagged`, `Wrap`, `Wrap<TException>`, `Dump`, `DumpFields`, `JsonValue`, `DumpJson`, `LoadJson`. Also `PydanticFields` (`Required`, `Default`, `Ge`, `Gt`, `MaxLength`, `ThrowIfAny`), `PydanticField`, `IPydanticModel`, `ValidationException`, `PydanticSchema` (`Required`, `Default`, `Factory`, `ToDict`), and `PydanticType`. | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError` with pydantic's text, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode. R7 says how a model uses them. |
+| `Pydantic` | `Str`, `Int`, `Float`, `Bool`, `DateTime`, `Any`, `Enum<T>`, `Literal`, `StrIntFloat`, `Callable<T>`, `Optional`, `OptionalValue`, `List`, `Dict`, `Model`, `Tagged`, `Wrap`, `Wrap<TException>`, `SubclassOf<T>`, `Dump`, `DumpFields`, `JsonValue`, `DumpJson`, `LoadJson`. Also `PydanticFields` (`Required`, `Default`, `Ge`, `Gt`, `MaxLength`, `ThrowIfAny`), `PydanticField`, `IPydanticModel`, `ValidationException`, `PydanticSchema` (`Required`, `Default`, `Factory`, `ToDict`), and `PydanticType`. | Lax-mode coercion, the wrapping of a validator's `ValueError`, `ValidationError` with pydantic's text, the text of `json.dumps(model_json_schema())`, and pydantic's JSON mode. R7 says how a model uses them. |
 | `Asyncio` | `Run`, `OnLoopAsync`, `GatherAsync`, `SemaphoreGatherAsync`, `CreateTask`, `WaitForAsync`, `ShieldAsync`, `ToThreadAsync`, `CallHostAsync`, `IsCancellation`, `IsOnLoop`, `Scheduler`, `AsyncEvent` | The asyncio calls of R8 on the exclusive scheduler. `CallHostAsync` has no Python form: it is the hop to a host service (decision D33). |
 
 There is no general regex helper. Translate each pattern by hand (R13).
@@ -881,7 +914,7 @@ R12 replaces this table. Three rows stay:
 | --- | --- | --- |
 | `unicodedata.normalize(form, s)` | `s.Normalize(NormalizationForm...)` | Results depend on the Unicode version of each runtime. Stop and tell the lead, who records both versions in DECISIONS.md. |
 | `s.encode("ascii", "ignore")` | No one-call form | Filter to code points below 128, then encode |
-| A string can hold a lone surrogate | So can a `string`, but a high and a low surrogate side by side read as one character | The judge protocol carries lone surrogates. Use `PyText.DropLoneSurrogates` where Python cleans the text. |
+| A string can hold a lone surrogate, and a lone high surrogate next to a lone low one stays two code points | So can a `string`, but a high and a low surrogate side by side read as one character. A recorder in `port/tools/` never puts the two side by side. | The judge protocol carries lone surrogates. Use `PyText.DropLoneSurrogates` where Python cleans the text. |
 
 ### Types
 
@@ -889,6 +922,7 @@ R12 replaces this table. Three rows stay:
 | --- | --- |
 | `Optional[T]`, `T \| None` | `T?` with nullable reference types on |
 | `X \| Y` of different shapes | A sealed abstract record with one derived record for each case |
+| A union of scalars, for example `str \| int \| float \| None` | `object?` that holds a value of the model of R6. Read it with `Pydantic.StrIntFloat`, in `Pydantic.Optional` if `None` is a member. |
 | `Any`, `dict[str, Any]` | Find the real type. If the data is open, use the value model (R6). Never `dynamic`. |
 | `list[T]` | `List<T>`. Python lists are mutable and shared, so keep `List<T>` in signatures too. |
 | `tuple[T, ...]` | `IReadOnlyList<T>` |
@@ -937,7 +971,9 @@ R4 holds the exception rules. R16 holds decorators and generators.
 | `@pytest.mark.parametrize` | `[Theory]` with `[InlineData]` or `[MemberData]`. Inside `TheoryData` rows, write values as tuples. |
 | A fixture | Constructor setup, `IAsyncLifetime`, or a class or collection fixture |
 | `tmp_path` | A temp folder created in the constructor and removed in `Dispose` |
-| `monkeypatch`, `mock.patch` | An injected interface with a fake. Use `PortServices.Use(time: ...)` for clocks and a stub `HttpMessageHandler` for HTTP. Never assign `PortServices.Time` in a test: tests run at the same time. |
+| `monkeypatch.setattr(module, 'NAME', value)` on a module-level value | `using (Module.Name.Use(value))` on the `PyPatch<T>` field of R17 |
+| `monkeypatch.setattr` or `mock.patch` on a module-level function or on a method of a class | No form yet (Part 5, O10). Mark the test `// TODO(port): O10`, and name it in the `notes` of the unit. This does not block the unit. |
+| `monkeypatch`, `mock.patch` on an object that the code receives | An injected interface with a fake. Use `PortServices.Use(time: ...)` for clocks and a stub `HttpMessageHandler` for HTTP. Never assign `PortServices.Time` in a test: tests run at the same time. |
 | `pytest.raises(X, match=...)` | `Assert.Throws<X>`, then an assertion on the message |
 | `caplog` | A fake `ILoggerFactory` in `PortServices.Use(loggerFactory: ...)` that collects entries |
 
@@ -1058,6 +1094,9 @@ These items need the lead or the maintainer. An implementer that meets one stops
 | O8 | Closed on 2026-11-26. `.editorconfig` makes IDE0065 an error for each C# file, so a `using` directive above the namespace fails the build (plan 0003, task P1). | | |
 | O7 | Decision D22 holds only if each lambda that a library calls enters the scheduler again (R8). The rule depends on the implementer and on the test in `GatherAsync`. The pilot must show that this is enough. | Lead, after the pilot | Gate 3 |
 | O9 | `Asyncio.WaitForAsync` returns only after its call ends. A session call of Neo4j.Driver 6.5.1 takes no `CancellationToken`, so the write budgets of `ingestion/phases.py:1292` to `:1319` and of `utils/bulk_utils.py:197` do not hold if the ported save goes through a session. The adversarial review of the `Asyncio` helpers found it. | Maintainer | Layer 7 of plan 0004 |
+| O10 | About 250 sites of the upstream tests replace a module-level function or a method with `monkeypatch.setattr` or `mock.patch`, for example `edge_ops.semaphore_gather` and `EntityNode.get_by_uuid`. C# cannot replace a static method. A seam for each such name changes the product code at each call. Most of these tests cover `utils/maintenance` and `ingestion`. | Maintainer: a seam, another test for the same behavior, or no port of these tests | Layer 7 of plan 0004 |
+| O11 | The judge host lacks three members, and `tests/Graphiti.Net.JudgeHost/Core/` changes in its own pull request: a helper for a model constructor (each model unit writes the same private helper today), a mark for a keyword-only parameter in `Signature`, and `Fixtures.cs` (debt T18). | Lead | Layer 2 of plan 0004 |
+| O12 | `prompts/lib.py` gives the attributes of `PromptLibrary` and of each `<Module>Prompt` with `setattr` in `PromptTypeWrapper` and `PromptLibraryWrapper`. No rule says which C# class implements the 8 `<Module>Prompt` interfaces. Two names, `extract_attributes` and `extract_message`, are in two groups each. | Lead, with the unit of `prompts/lib.py` | Layer 4 of plan 0004 |
 
 Wrong-type cases of O4:
 
@@ -1094,3 +1133,5 @@ Also, 19 `pure.queries.fulltext_query.*` cases pass a `types:SimpleNamespace` ob
 | 2026-11-26 | After the reviews of the `PyCompat` helpers (plan 0003, tasks P2, P4, P5). R7: an enum member carries `[PyEnumMember]`, and there is no `<Enum>Values` class. R8: cleanup after a cancellation passes `CancellationToken.None`, `WaitForAsync` takes the clock, a gather of existing tasks has its own form, and three differences from asyncio are stated. R11: no `strftime`, `strptime`, or subtraction, and `ToUtc()` throws for a naive value. R12: `PyText.Count`. R13: the `PyRegex` constants and the limits of `Split`. R14: `Py.SortInPlace` for float, datetime, and open keys. R18: `math.isnan`. Part 2 lists the members that exist. New open item O9. | None. No unit is ported. |
 | 2026-11-26 | After `PyJson`, `PyAst`, `Pydantic`, the judge host codec, and the first pilot unit (`errors`). R1: the licence text is a block comment, and the constructor with `innerException` has its own XML comment. R4: a class with no `__init__` takes `string message = ""`, each class has two constructors, and the row of `NodeLabelValidationError` names the pydantic sites. R7: how a model uses `PydanticFields`, `PydanticSchema`, and `IPydanticModel`, the schema facts that the Python class does not show, and five differences from pydantic. R22: the binding form `InvokeAsync`, the registry, and the `parity_pass` rule for a listed case. Part 2: the members of `Pydantic` and the limits of `PyAst`. Open items O1, O2, and O5 are closed, and O4 has 23 more cases. | `errors`: no. Its code already follows each new rule. |
 | 2026-11-26 | With the pilot base. R7: a static method of an enum class goes to `<Enum>Extensions`. R22: each unit has its own bindings file in `Units/`, and it adds its models to the schemas for `judge:schema_text`. `Bindings.cs` has no union merge, because that merge gave code that did not compile. R3 names the three assemblies that the core project grants access to, and R17 and Part 3 give `PortServices.Use` as the seam of a test. | None. No ported unit has an enum or a model. |
+| 2026-11-26 | After two reviews of each of three pilot units (`search_filters`, `dedupe_nodes`, `content_chunking`). R1: no private helper that Python lacks. R2: `Versions` has no type, and enum member names. R4: an empty message for a bare `raise`, and checked arithmetic. R5: the `Log` methods are `internal`. R7: a field validator runs inside the read of its field, `model_construct`, `type[BaseModel]`, and the place of the Python methods. R10: one delegate, `PromptFunction`. R11: `indent` is a `long?`, and a C# `int` is cast to `long`. R13: `internal` patterns, `fullmatch`, and `OfType` after a split. R14: a tuple or a frozenset as a set item, and the pair loop of `content_chunking` (D43). R15: `IPromptGroup` on each `<Module>Prompts` class. R17: `PyPatch<T>`. R18: `Py.Comb` returns a `BigInteger`. R22: `AddType` for a result model, one place for each path, the lead file for builtins, and the constructor form. R25: test names, shared pytest files, patched values, and a recording for each unit with logic. New open items O10, O11, and O12. | `search_filters`: yes, for the member order of R7. The same pull request moves `ModelJsonSchema` and the validator below the four members. `dedupe_nodes` and `content_chunking`: their fix rounds apply these rules before their merge. |
+| 2026-11-26 | After the adversarial review of the pilot support pull request, and the two reviews of `entity_node_ops`. R2: the driver option keys in `parameters`. R6 and R9: the driver does not accept each value type, so the Neo4j project converts at the boundary, typed lists pass as they are, and `Transaction.RunAsync` returns `Task`. R24: `utc_now`, and the equality and the label validation of `Node`. R1: `global::Neo4j.Driver` in test projects, and when a local reader function is allowed. R4: the switch checks casts. R7: the optional form of `type[BaseModel]`, and the type check of `validate_assignment`. R10: the `PromptVersion` reason. R14: `PySet<T>` has value equality only through `PyEqualityComparer`. R17: `PyPatch<T>` has no implicit conversion, and code reads `.Value`. Part 3: two surrogates side by side. | `content_chunking`: yes, each read of a `PyPatch<T>` gets `.Value` before its merge. `entity_node_ops`: its fix round applies R7. |

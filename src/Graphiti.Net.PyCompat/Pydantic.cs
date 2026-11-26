@@ -185,6 +185,16 @@ internal static partial class Pydantic
         throw new ValidationException(null, errors);
     }
 
+    /// <summary>
+    /// A <c>type[Base]</c> field, for example <c>response_model: type[BaseModel]</c>: the value must be the C# object
+    /// that stands for a class, such as an <c>IResponseModel</c> (RULES.md R7). Another value is the pydantic error
+    /// <c>is_subclass_of</c>.
+    /// </summary>
+    /// <param name="value">The value of the field.</param>
+    /// <param name="baseName">The Python name of the base class, which the message shows.</param>
+    internal static T SubclassOf<T>(object? value, string baseName = "BaseModel")
+        where T : class => value as T ?? throw Error("is_subclass_of", $"Input should be a subclass of {baseName}");
+
     /// <summary>A <c>Callable</c> field with <c>arbitrary_types_allowed</c>: a delegate of type <typeparamref name="T"/>.</summary>
     internal static T Callable<T>(object? value)
         where T : Delegate => value as T ?? throw Error("callable_type", "Input should be callable");

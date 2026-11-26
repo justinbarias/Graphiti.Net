@@ -28,7 +28,9 @@ internal static class PyJson
     /// <c>json.dumps(value, ensure_ascii=..., indent=..., sort_keys=..., default=..., separators=..., allow_nan=...)</c>.
     /// <paramref name="compact"/> is <c>separators=(',', ':')</c>. Without it the separators are <c>, </c> and
     /// <c>: </c>, and <c>,</c> and <c>: </c> when <paramref name="indent"/> is not null. An <paramref name="indent"/>
-    /// of zero or less writes a new line with no spaces. A value outside the JSON types goes to
+    /// of zero or less writes a new line with no spaces. An <paramref name="indent"/> above <see cref="int.MaxValue"/>
+    /// throws <see cref="OverflowException"/> for each value, where Python builds the text of one level first and
+    /// raises <c>MemoryError</c>. A value outside the JSON types goes to
     /// <paramref name="default"/>, which is called as Python calls it. Without it, such a value throws
     /// <see cref="InvalidCastException"/> (<c>TypeError: Object of type X is not JSON serializable</c>). A dict key
     /// that is not text, an int, a float, a bool, or <c>None</c> throws <see cref="InvalidCastException"/> too.
@@ -46,12 +48,17 @@ internal static class PyJson
     internal static string Dumps(
         object? value,
         bool ensureAscii = true,
-        int? indent = null,
+        long? indent = null,
         bool sortKeys = false,
         Func<object?, object?>? @default = null,
         bool compact = false,
         bool allowNan = true)
     {
+        if (indent > int.MaxValue)
+        {
+            throw new OverflowException("An indent of more than 2147483647 spaces is over the limit of the port.");
+        }
+
         var itemSeparator = compact || indent is not null ? "," : ", ";
         var keySeparator = compact ? ":" : ": ";
         return new Encoder(ensureAscii, indent, sortKeys, @default, itemSeparator, keySeparator, allowNan).Encode(value);
@@ -139,7 +146,7 @@ internal static class PyJson
 
     private sealed class Encoder(
         bool ensureAscii,
-        int? indent,
+        long? indent,
         bool sortKeys,
         Func<object?, object?>? @default,
         string itemSeparator,
@@ -205,7 +212,8 @@ internal static class PyJson
         {
             if (indent is { } spaces)
             {
-                sb.Append('\n').Append(' ', Math.Max(spaces, 0) * depth);
+                // An indent of 0 or less writes the line breaks and no spaces, as Python does.
+                sb.Append('\n').Append(' ', checked((int)(Math.Max(spaces, 0L) * depth)));
             }
         }
 

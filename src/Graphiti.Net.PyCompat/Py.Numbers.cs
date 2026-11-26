@@ -127,10 +127,11 @@ internal static partial class Py
     /// <summary>
     /// <c>math.comb(n, k)</c>: the number of ways to choose <paramref name="k"/> items from
     /// <paramref name="n"/>. It is 0 when <paramref name="k"/> is above <paramref name="n"/>. A negative
-    /// argument throws <see cref="ArgumentException"/> (<c>ValueError</c>). A result outside the range
-    /// of a long throws <see cref="OverflowException"/> (debt T25).
+    /// argument throws <see cref="ArgumentException"/> (<c>ValueError</c>). The result is a
+    /// <see cref="BigInteger"/>, because a count such as <c>comb(100, 20)</c> does not fit in a long, and
+    /// upstream compares it with a limit (<c>utils/content_chunking.py:752</c>).
     /// </summary>
-    internal static long Comb(long n, long k)
+    internal static BigInteger Comb(long n, long k)
     {
         if (n < 0)
         {
@@ -144,21 +145,17 @@ internal static partial class Py
 
         if (k > n)
         {
-            return 0;
+            return BigInteger.Zero;
         }
 
         k = Math.Min(k, n - k);
-        BigInteger result = 1;
+        var result = BigInteger.One;
         for (long i = 1; i <= k; i++)
         {
             result = result * (n - k + i) / i;
-            if (result > long.MaxValue)
-            {
-                throw new OverflowException("the value does not fit in a long");
-            }
         }
 
-        return (long)result;
+        return result;
     }
 
     /// <summary>
