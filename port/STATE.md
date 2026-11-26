@@ -14,7 +14,7 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 
 ## Queue counts
 
-182 units. 6 have the status `reviewed` (`errors`, `search.search_filters`, `prompts.dedupe_nodes`, `prompts.models`, `prompts.prompt_helpers`, `utils.content_chunking`), and 176 have the status `todo`. Of these 176, `helpers`, `driver.driver`, `prompts.lib`, and `nodes` hold the members that rule R24 names. 114 are in MVP scope. See the scope table in [DECISIONS.md](DECISIONS.md).
+182 units. 8 have the status `reviewed` (`errors`, `search.search_filters`, `prompts.dedupe_nodes`, `prompts.models`, `prompts.prompt_helpers`, `utils.content_chunking`, `driver.query_executor`, `driver.operations.entity_node_ops`). 1 has the status `tests_pass` (`driver.neo4j.operations.entity_node_ops`, which layer 5 completes). 173 have the status `todo`. Of these 173, `helpers`, `driver.driver`, `prompts.lib`, `nodes`, and `utils.datetime_utils` hold the members that rule R24 names. 114 are in MVP scope. See the scope table in [DECISIONS.md](DECISIONS.md).
 
 ## Judge
 

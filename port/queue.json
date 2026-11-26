@@ -109,9 +109,9 @@
         "abc",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/QueryExecutor.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the pilot unit entity_node_ops. The module has abstract members only. Transaction.RunAsync returns Task (rule R9)."
     },
     {
       "order": 4,
@@ -189,9 +189,9 @@
       "external": [
         "datetime"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/DatetimeUtils.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot ported utc_now for real (rule R24). The other members are skeleton members."
     },
     {
       "order": 9,
@@ -316,9 +316,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Driver/Operations/EntityNodeOps.cs",
+      "status": "reviewed",
+      "notes": "Ported in full with the pilot unit entity_node_ops. The module has abstract members only."
     },
     {
       "order": 15,
@@ -536,9 +536,9 @@
       "external": [
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Models/Nodes/NodeDbQueries.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot added three skeleton members for entity nodes (rule R24). No member is ported. 2 tests of test_node_label_security.py wait for this unit."
     },
     {
       "order": 26,
@@ -568,7 +568,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Nodes.cs",
       "status": "todo",
-      "notes": "The pilot ported the enum EpisodeType with from_str for real (rule R24). The other members are not ported."
+      "notes": "The pilot ported for real (rule R24): the enum EpisodeType with from_str, and on Node and EntityNode the fields, the validation of labels, __eq__, and __hash__. The R7 members and each other member are not ported. tests/Port.Evaluation/TestNodeLabelSecurity.cs holds 2 of the 4 tests of test_node_label_security.py. The other 2 wait for node_db_queries."
     },
     {
       "order": 27,
@@ -1356,9 +1356,9 @@
       "external": [
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Driver/RecordParsers.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot added the skeleton member entity_node_from_record (rule R24). No member is ported."
     },
     {
       "order": 65,
@@ -1428,9 +1428,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/EntityNodeOps.cs",
+      "status": "tests_pass",
+      "notes": "Pilot unit (plan 0003, task 6), reviewed twice. It has no pure judge case, and its 3 flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEntityNodeOperationsTests.cs compares 94 recorded calls (port/tools/record_entity_node_ops.py) for delete, delete_by_group_id, delete_by_uuids, load_embeddings, and load_embeddings_bulk. save, save_bulk, get_by_uuid, get_by_uuids, and get_by_group_ids stop at skeleton members of node_db_queries and record_parsers. Layer 5 records them and sets the status reviewed."
     },
     {
       "order": 68,
