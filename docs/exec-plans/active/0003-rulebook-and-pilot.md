@@ -11,7 +11,16 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | 3 | Done 2026-11-25. Create `src/Graphiti.Net.PyCompat` and `tests/Graphiti.Net.Property.Tests`. Build only the helpers that the queue needs. Generate expected values from Python into a file. | Workhorse, Sonnet 5.5, medium | CsCheck property tests pass against the Python values, including negative numbers, zero divisors, empty strings, an emoji, and a combining mark. |
 | 4 | Done 2026-11-26. Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
 | 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
-| 6 | Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering judge cases pass for each unit. |
+| P1 | Add the `.editorconfig` entry that makes IDE0065 an error for each C# file. Move the `using` directives of the judge host and the end-to-end tests inside the namespace. Closes open item O8 and debt T22. | Lead, Fable 5.2, medium | A file with a directive at the top fails the build. The gate passes. Own pull request. |
+| P2 | Build the value model of `PyCompat`: `PyDict`, `PySet<T>`, `PyTuple`, `Py.Repr`, `Py.Str`, `Py.Truthy`, `Py.Len`, `Py.Get`, `Py.As*`, `Py.EnumValue`. | Workhorse, Opus 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
+| P3 | Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
+| P4 | Build `PyDateTime`. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
+| P5 | Build `PyRegex`, `PyRandom`, and `PyEnv`. | Workhorse, Sonnet 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
+| P6 | Build `Pydantic`. Needs P2 and P4. | Workhorse, Opus 5.5, medium | Property tests pass against values that pydantic recorded at the pinned version. |
+| P7 | Judge host: add the decoders for a `$model`, `$enum`, `$ref`, and `$dt` argument. Add the encoder for a `$type` result and the exception rows of open item O2. Write `Fixtures.cs` (R22). Needs P2 and P6. Closes O2 and debt T18. | Lead, Fable 5.2, medium | The gate passes, and the judge case count stays 1999. Own pull request. |
+| P8 | Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
+| P9 | Create the project `tests/Port.Evaluation`. Write the script in `port/tools/` that records `str(exception)` for the `errors` unit (R23, J1). | Lead, Fable 5.2, medium | The gate builds the project. The script records from `.upstream` with Python 3.12. |
+| 6 | Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). A unit also ports the members of other modules that R24 names. Needs P1 to P9. | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering pure judge cases pass for each unit. `entity_node_ops` has no pure case: build and format only, and its 3 flow cases wait for plan 0004, layer 9. |
 | 7 | Review the pilot. Two fresh reviewers for each unit. If they disagree, a third reviewer decides. | Reviewers, Opus 5.5, high | Findings with inputs. Each finding that shows a missing rule changes `RULES.md`. |
 | 8 | Decide what to do with the pilot output. If a rule changed in a way that the output does not follow, delete the output. | Lead, Fable 5.2, medium | The decision, in `port/STATE.md`. |
 
@@ -365,3 +374,35 @@ The hand-built report printed the same output. The variants in the table above r
 No second review ran after the fixes.
 
 The gate after the fixes: `COMPOSE_PROJECT_NAME=graphitinet scripts/check.sh --test` printed `check: passed`, with 56 tests passed and the judge at `expected failures=1998 unexpected=0 fixed=0 bound_wrong=0`. `scripts/command_center.sh --check` exited 0. The `verify` skill ran: steps 1, 2, and 5. Steps 3 and 4 do not apply, because this change touches no ported code and no public flow.
+
+### Pre-pilot scan, 2026-11-26
+
+The lead scanned the five pilot units before task 6. The scan read the syntax tree of each module with `ast`, and it counted the pure judge cases and their golden results by module.
+It did not read each line of each unit.
+
+| Unit | Pure cases | Golden results | Needs that did not exist |
+| --- | --- | --- | --- |
+| `errors` | 19 | 19 values | `Py.Str` for a list. The project `tests/Port.Evaluation` and a recording script (R23, J1). |
+| `search.search_filters` | 133 | 108 values, 23 `ValidationError`, 2 `ValueError` | `Pydantic`, `PyDateTime`, `PyDict`, `Py.EnumValue`. It calls `helpers.validate_node_labels`. |
+| `prompts.dedupe_nodes` | 12 | 9 values, 3 `KeyError` | `Pydantic`, `PyDict`, `PyJson`. Each case calls `to_prompt_json` and `Message`. |
+| `driver.neo4j.operations.entity_node_ops` | 0 | 3 flow cases in `flow/direct.jsonl` | The flow layer of the judge host, which plan 0004, layer 9 binds. |
+| `utils.content_chunking` | 179 | 163 values, 13 `TypeError`, 2 `AttributeError`, 1 `ValueError` | `PyJson`, `PyRegex`, `PyRandom`, `PyEnv`, `PySet<T>`, `PyTuple`, `Py.As*`, `Py.Truthy`. It reads 4 constants of `helpers` and `EpisodeType`. |
+
+Findings:
+
+- The pilot needs most of the value-model helpers of debt T23. Tasks P2 to P6 build them. It does not need `Py.Format`, `PyAst`, `PyLruCache`, `PyHash`, `PyText.Replace`, `str.count`, or `math.isnan`.
+- 19 `content_chunking` cases have `wrong_type` in the id. 14 of them have a golden `TypeError` or `AttributeError` and pass only as `JudgeTypeRejected` (task P8). 5 have a golden value and stay expected failures until gate 4 (open item O4).
+- The judge host had no decoder for a `$model`, `$enum`, `$ref`, or `$dt` argument and no encoder for a `$type` result. `Codec.cs` had 48 lines. Task P7 adds them.
+- R24 made each name from a module outside the pilot a skeleton member that throws. A case that reaches such a member cannot pass. All 12 `dedupe_nodes` cases reach one.
+- The earlier sentence in debt T23 that the pilot needs `str.count` was wrong. R19 ports `search.search_filters` alone, and `entity_node_ops` only builds.
+
+The maintainer decided four points on 2026-11-26. They are decisions D37 and D38. D39 is the instruction to continue through plan 0004, layer 6, with standing approvals:
+
+| Point | Decision |
+| --- | --- |
+| Members of modules outside the pilot | The pilot ports them for real. R19 and R24 name them. |
+| `entity_node_ops` | It stays in the pilot. Its acceptance is build and format only. |
+| Open item O5 | First answer: the lead writes a patch file, and the maintainer applies it. Changed on the same day (D38), because the runner fails the gate while a listed case passes. The lead removes the passing ids in the pull request of the unit, after the maintainer narrows the deny rule for that one file. |
+| Open item O1 | The lead writes the runner change as a patch file outside `port/judge/`. The maintainer applies it. |
+
+Not checked: the exact `Pydantic` members that the units use, whether `entity_node_ops` needs `Asyncio`, and whether a `generate_covering_chunks` case reaches `random.sample`.

@@ -10,7 +10,7 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 | Phase | 4. Plan 0003 is active. Tasks 1 to 4 are done: [RULES.md](RULES.md) is written, the maintainer approved [the public surface design](../docs/design-docs/public-surface-design.md), `PyCompat` has its scalar and text helpers, and `scripts/mutation_survivors.py` lists the tests that the pruning rule deletes. Tasks 5 to 8 are not started. |
 | Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to it. Gate 3 is next: the maintainer approves `port/RULES.md` after the pilot. |
 | Last action | 2026-11-26 (task 4): wrote `scripts/mutation_survivors.py` and ran Stryker two times on `PyCompat` (93.22% each). 2026-11-26: fixed the 14 important findings of one Opus 5.5 adversarial review of the public surface design. The maintainer decided D36. 2026-11-25: wrote the design. The maintainer decided D24 to D35 and approved the page. The rulebook changed in R1, R2, R3, R4, R7, R8, R15, R17, R19, and R22. Before that: wrote the rulebook, [RULES.md](RULES.md), with 25 repository rules, the `PyCompat` helper list, the general rules of the skill, and a map from each of the 78 entries of GAPS.md to a rule. The maintainer decided D20 to D23. One Opus 5.5 adversarial review found 16 important findings, and each one changed the rulebook. 2026-11-25 (task 3): built `src/Graphiti.Net.PyCompat` (scalar and text helpers) and `tests/Graphiti.Net.Property.Tests` (55 tests against Python values). |
-| Next action | Plan 0003, task 5 (apply the pruning rule to `PyCompat`). The maintainer decides who builds the other `PyCompat` helpers (debt T23), because the pilot needs them. Before the pilot, close open items O1, O2, O5, and O8 of the rulebook (debt T17, T18, T19, T22). |
+| Next action | Plan 0003, task 5 (apply the pruning rule to `PyCompat`) and tasks P1 to P9, which the pilot needs. P2 to P6 build the value-model helpers of `PyCompat` (debt T23). P1, P7, and P8 close open items O8, O2, and O1 of the rulebook (debt T22, T18, T17). The pre-pilot scan in the plan gives the reasons. |
 
 ## Queue counts
 
@@ -112,6 +112,7 @@ None.
 | 2026-11-25 | After the public surface design (D24 to D35). Ported code uses the namespace `Graphiti.Core` and the folder `src/Graphiti.Net/Core/`. The facade class is `GraphitiCore`, and the exception classes are public. New rules cover provider errors, `Asyncio.CallHostAsync`, the custom type descriptor, and `HttpClient` for the decisions client. | None. No unit is ported. |
 | 2026-11-25 | After the adversarial review of the design. The rulebook lists the changes in its own change table. | None. No unit is ported. |
 | 2026-11-26 | After the integrated review of the pull request stack. R12 uses the `PyText` members for `split(sep)` and `strip(chars)`. R1 names the `PyCompat` project in the `using` rule. R4 has a row for `UnicodeDecodeError` and the limit of `OverflowException`. | None. No unit is ported. |
+| 2026-11-26 | After the pre-pilot scan. R24 names the members of modules outside the pilot that a pilot unit ports for real. R22 says who removes a passing case from `expected-failures.txt`. Open item O5 is decided (D38). | None. No unit is ported. |
 
 [GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 18 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
@@ -141,11 +142,12 @@ For the maintainer, from the public surface design (the page lists all 12 open q
 For the maintainer, before the pilot (plan 0003, task 6):
 
 1. A new member on the driver session contract for a write with a timeout (`utils/bulk_utils.py:192` uses `neo4j.unit_of_work` in core code). RULES.md, open item O6. Needed before layer 7.
-2. Who removes a passing case from `port/judge/expected-failures.txt`? `.claude/settings.json` denies each edit under `port/judge/`. RULES.md, open item O5.
-3. Approve the runner change of decision D20 in its own pull request. RULES.md, open item O1.
+2. Apply the patch file that the lead writes for the runner change of decision D20, in its own pull request. RULES.md, open item O1. Plan 0003, task P8.
+3. Narrow the deny rule in `.claude/settings.json` so that a session can edit `port/judge/expected-failures.txt` and no other file under `port/judge/` (decision D38). Until then, no unit can reach `parity_pass`.
 
 Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.
 Decided on 2026-11-25 for the rulebook: D20 (wrong-type cases), D21 (the Python value model), D22 (the exclusive scheduler), D23 (the ambient service holder).
+Decided on 2026-11-26 for the pilot: the pilot ports the members that R24 names for real, and `entity_node_ops` only builds (D37). The lead removes passing ids from `expected-failures.txt`, and each other judge change is a patch file (D38). The lead continues through plan 0004, layer 6, with standing approvals (D39).
 Decided on 2026-11-25 for the public surface: D24 to D35. Decided on 2026-11-26 after the review: D36 (naive dates) and an amendment to D24. [DECISIONS.md](DECISIONS.md) holds one row for each.
 
 ## Checks not run

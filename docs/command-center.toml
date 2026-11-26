@@ -26,6 +26,11 @@ order = [
 "0003-3" = "PyCompat"
 "0003-4" = "Test quality"
 "0003-5" = "Test quality"
+"0003-P1" = "Repository and tooling"
+"0003-P7" = "Judge"
+"0003-P8" = "Judge"
+"0003-P9" = "Pilot"
+"0003-P*" = "PyCompat"
 "0003-6" = "Pilot"
 "0003-7" = "Pilot"
 "0003-8" = "Pilot"
@@ -63,13 +68,19 @@ after_plan = "0005"
 after = ["0004"]
 
 # A task starts after the tasks that it uses. The plan files state this order in text only.
-# Plan 0003: the mutation tasks and the pilot need PyCompat. The pilot review and the pilot decision follow the pilot.
+# Plan 0003: the mutation tasks and the pilot need PyCompat. The pilot also needs the pre-pilot tasks P1 to P9. The pilot review and the pilot decision follow the pilot.
 [tasks."0003-4"]
 waits_for = ["0003-3"]
 [tasks."0003-5"]
 waits_for = ["0003-3", "0003-4"]
+[tasks."0003-P3"]
+waits_for = ["0003-P2"]
+[tasks."0003-P6"]
+waits_for = ["0003-P2", "0003-P4"]
+[tasks."0003-P7"]
+waits_for = ["0003-P2", "0003-P6"]
 [tasks."0003-6"]
-waits_for = ["0003-3"]
+waits_for = ["0003-3", "0003-P1", "0003-P2", "0003-P3", "0003-P4", "0003-P5", "0003-P6", "0003-P7", "0003-P8", "0003-P9"]
 [tasks."0003-7"]
 waits_for = ["0003-6"]
 [tasks."0003-8"]

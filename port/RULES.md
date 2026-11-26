@@ -611,7 +611,7 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
   - The call returns `List<TopLogprob>?`, which stands for `response.choices[0].logprobs.content[0].top_logprobs`. Null stands for the two `is not None` tests of upstream, and the port writes `?? []`. A `TopLogprob` has `Token` and `Logprob`.
   - `np.exp(x)` is `Math.Exp(x)`. `except openai.RateLimitError` follows R4.
 - `from neo4j import unit_of_work` in `utils/bulk_utils.py:192`: the core needs a way to ask the driver session for a write with a timeout. That is a new member of the driver contract, which is an ask-first item. The unit is `blocked` until the maintainer decides (open item O6).
-- The pilot (plan 0003, task 6) ports `search.search_filters` alone, although it is in group 10. It adds skeleton members by R24 for each name that it uses from the other 17 modules. This is the one exception to the rule above.
+- The pilot (plan 0003, task 6) ports `search.search_filters` alone, although it is in group 10. For each name that it uses from the other 17 modules, it follows the pilot rule of R24. This is the one exception to the rule above.
 
 ### R20. Type hints
 
@@ -667,6 +667,12 @@ Wrong-type cases, decision D20 (GAPS F11):
 - The reviewer found 23 more cases with a golden `TypeError` or `AttributeError` whose id does not hold `wrong_type`. The rule is the same for them.
 - Part 5 lists the wrong-type cases that this rule does not settle.
 
+Cases that now pass:
+
+- An implementer never edits `port/judge/expected-failures.txt`. It reports the ids of the cases that now pass.
+- The lead removes only those ids from the file, in the pull request of the unit. The pull request lists each id (decision D38).
+- Each other change under `port/judge/` is a patch file that the lead writes and the maintainer applies.
+
 ### R23. Surfaces that the judge cannot reach
 
 Each surface gets expected values that a script in `port/tools/` records from Python at the pinned commit, and a test in `tests/Port.Evaluation` that compares the port with them.
@@ -692,7 +698,11 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 
 - Write no stub and no simplified version. If you cannot port something, write `// TODO(port): <reason>`, set the unit to `blocked`, and name it in [STATE.md](STATE.md).
 - A skeleton member (plan 0004, layer 0) has the final signature and the body `throw new NotSupportedException("TODO(port): <Python name>");` with a `// TODO(port)` comment above it.
-- The pilot runs before layer 0. A pilot unit that uses a name from a module that is not ported adds that one member as a skeleton member, in the target file of its module by R1. The lead adds those files to the unit's file list. Layer 0 later completes the files.
+- The pilot runs before layer 0. A judge case that reaches a skeleton member cannot pass, so a pilot unit ports for real each member below that its code calls. The member goes in the target file of its module by R1.
+  - `helpers.validate_node_labels` with `SAFE_CYPHER_IDENTIFIER_PATTERN`, and the constants `CHUNK_TOKEN_SIZE`, `CHUNK_OVERLAP_TOKENS`, `CHUNK_MIN_TOKENS`, and `CHUNK_DENSITY_THRESHOLD` of `helpers`.
+  - The enums `nodes.EpisodeType` and `driver.driver.GraphProvider`.
+  - The modules `prompts.models` and `prompts.prompt_helpers` in full.
+- Each other name from a module that is not ported is a skeleton member, and so is each name that `entity_node_ops` uses. That unit has no pure case. The lead adds the files to the unit's file list. Layer 0 and the later layers complete them.
 - A skeleton member never throws `NotImplementedException`. Ported code catches that type to fall back from a driver operation (71 sites), and such a `catch` must not hide a member that is not ported yet.
 - Not allowed in product code: `dynamic`, the null-forgiving `!` operator, `#pragma warning disable`, `[SuppressMessage]`, an empty `catch` block that Python does not have, `async void`, `.Result`, and `.Wait()`.
 - A Python `except X: pass` is a `catch` block with the comment `// PORT: Python passes`.
@@ -985,11 +995,11 @@ These items need the lead or the maintainer. An implementer that meets one stops
 
 | # | Item | Owner | Needed before |
 | --- | --- | --- | --- |
-| O1 | The runner does not yet accept `JudgeTypeRejected` (decision D20). The change touches `port/judge/run.py` after gate 2, so it goes in its own pull request. | Maintainer approves the pull request | The pilot (plan 0003, task 6) |
-| O2 | `Codec.PythonExceptionName` lacks rows for `ValidationException`, `MissingMemberException`, `DivideByZeroException`, `OverflowException`, `JsonException`, `FormatException`, `InvalidOperationException`, `TimeoutException`, the `Neo4j.Driver` exception types, and each ported exception class of R4. Its default branch returns the C# type name. The row for `ValidationException` and the rows for other types that derive from `ArgumentException` must stand above the `ArgumentException` arm, which matches first today. `tests/Graphiti.Net.JudgeHost/Core/` changes in its own pull request. | Lead | The pilot |
+| O1 | The runner does not yet accept `JudgeTypeRejected` (decision D20). The change touches `port/judge/run.py` after gate 2, so it goes in its own pull request. | The lead writes a patch file outside `port/judge/`. The maintainer applies it (decided on 2026-11-26). Plan 0003, task P8. | The pilot (plan 0003, task 6) |
+| O2 | `Codec.PythonExceptionName` lacks rows for `ValidationException`, `MissingMemberException`, `DivideByZeroException`, `OverflowException`, `JsonException`, `FormatException`, `InvalidOperationException`, `TimeoutException`, the `Neo4j.Driver` exception types, and each ported exception class of R4. Its default branch returns the C# type name. The row for `ValidationException` and the rows for other types that derive from `ArgumentException` must stand above the `ArgumentException` arm, which matches first today. `tests/Graphiti.Net.JudgeHost/Core/` changes in its own pull request. The host also has no decoder for a `$model`, `$enum`, `$ref`, or `$dt` argument and no encoder for a `$type` result. Plan 0003, task P7 adds them in the same pull request. | Lead | The pilot |
 | O3 | Closed on 2026-11-25. [The public surface design](../docs/design-docs/public-surface-design.md) and decisions D24 to D35 answer it: R1, R2, R3, R4, R8, R15, and R19 hold the rules. | | |
 | O4 | 23 cases with `wrong_type` in the id have a golden result that is not `TypeError` or `AttributeError`. The table below gives the proposed answer for each group. | Maintainer, by name at gate 4 | Gate 4 |
-| O5 | `.claude/settings.json` denies each edit under `port/judge/`, but the runner tells a session to remove a passing case from `port/judge/expected-failures.txt`. | Maintainer | The pilot |
+| O5 | Decided on 2026-11-26 (D38): the lead removes a passing case from `port/judge/expected-failures.txt`. R22 holds the rule. The deny rule in `.claude/settings.json` still blocks the edit. | Maintainer narrows the deny rule | The pilot |
 | O6 | `utils/bulk_utils.py:192` calls `neo4j.unit_of_work` from core code to set a transaction timeout. The port needs a new member on the driver session contract for a write with a timeout. That is an interface change, so it is an ask-first item (R19). | Maintainer | Layer 7 of plan 0004 |
 | O8 | The rule on `using` directives in R1 depends on the implementer, and a wrong placement does not always fail the build. One `.editorconfig` entry for all C# files that makes `csharp_using_directive_placement = inside_namespace` an error (IDE0065) turns the rule into a build failure. Nobody tested that IDE0065 fails the build for a file-scoped namespace. The existing files of the judge host and the end-to-end tests have their directives at the top and change in the same pull request. | Lead | The pilot |
 | O7 | Decision D22 holds only if each lambda that a library calls enters the scheduler again (R8). The rule depends on the implementer and on the test in `GatherAsync`. The pilot must show that this is enough. | Lead, after the pilot | Gate 3 |
@@ -1013,3 +1023,4 @@ Wrong-type cases of O4:
 | 2026-11-25 | After the public surface design (plan 0003, task 2, decisions D24 to D35): ported code moves to `src/Graphiti.Net/Core/` and the namespace `Graphiti.Core`, the class `Graphiti` is `GraphitiCore`, the exception classes of the two error files are public in `Graphiti`, four provider error rows, `Asyncio.CallHostAsync` for host services, the custom type descriptor and `IResponseModel`, `PortServices.ClassifyModelFailure`, and `HttpClient` for the decisions client. Open item O3 is closed. | None. No unit is ported. |
 | 2026-11-25 | After the adversarial review of the public surface design (plan 0003, results of task 2): the `using` placement covers each project and `global::Neo4j.Driver`, the default-object branches of `Graphiti.__init__`, XML comments on public exception members, the inner-exception constructor, the timeout and transport rows of R4, the server error wrap of the chat adapter, `Pydantic.Wrap<TException>`, `ModelFields` as an ordered dictionary, the exact `IResponseModel`, `Asyncio.Run` returns a task, the HTTP rules of the decisions client, the reranker unit on the seam `LogProbabilityChat`, and judge fixtures as descriptors. | None. No unit is ported. |
 | 2026-11-26 | After the integrated review of the pull request stack. R12 sends `split(sep)` and `strip(chars)` to the `PyText` members. R12 has two rows for `replace`, and Part 2 lists `PyText.Replace`. R1 names the `PyCompat` project in the `using` rule. R4 and Part 2 have rows for `UnicodeDecodeError` and `DecodeUtf8`. R4 states the limit of `OverflowException` for an integer above 64 bits. | None. No unit is ported. |
+| 2026-11-26 | After the pre-pilot scan (plan 0003, results). R24 names the members of modules outside the pilot that a pilot unit ports for real, and R19 points to it. R22 says who removes a passing case from `expected-failures.txt`. Open item O5 is decided (D38), and O1 and O2 name tasks P8 and P7. | None. No unit is ported. |
