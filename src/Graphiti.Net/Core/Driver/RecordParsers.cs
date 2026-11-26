@@ -24,8 +24,8 @@ internal static class RecordParsers
     /// <summary>Parse an entity node from a database record.</summary>
     internal static EntityNode EntityNodeFromRecord(OrderedDictionary<string, object?> record)
     {
-        // PORT: attributes.pop(...) on a value from open data that can be None raises AttributeError (R6, Py.NotNone).
-        var attributes = Py.AsDict(Py.NotNone(record["attributes"], "pop"));
+        // PORT: attributes.pop(...) on a value from open data raises AttributeError for a value without pop (R4, Py.Receiver).
+        var attributes = Py.Receiver<OrderedDictionary<string, object?>>(record["attributes"], "pop");
         attributes.Remove("uuid");
         attributes.Remove("name");
         attributes.Remove("group_id");
@@ -34,13 +34,13 @@ internal static class RecordParsers
         attributes.Remove("created_at");
         attributes.Remove("labels");
 
-        // PORT: labels is read as open data here, and `in` and remove are the first calls on it. The typed read is at that site (R6).
+        // PORT: labels is read as open data here. The `in` test keeps the typed read (GAPS F24), and remove is a method call on it (R4, Py.Receiver).
         var labels = Py.Get(record, "labels", (object?)new List<object?>());
         var groupId = Py.Get(record, "group_id");
-        var dynamicLabel = "Entity_" + Py.AsString(Py.NotNone(groupId, "replace")).Replace("-", string.Empty, StringComparison.Ordinal);
+        var dynamicLabel = "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal);
         if (Py.Contains(Py.AsList(labels), dynamicLabel))
         {
-            Py.Remove(Py.AsList(labels), dynamicLabel);
+            Py.Remove(Py.Receiver<List<object?>>(labels, "remove"), dynamicLabel);
         }
 
         // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
@@ -60,8 +60,8 @@ internal static class RecordParsers
     /// <summary>Parse an entity edge from a database record.</summary>
     internal static EntityEdge EntityEdgeFromRecord(OrderedDictionary<string, object?> record)
     {
-        // PORT: attributes.pop(...) on a value from open data that can be None raises AttributeError (R6, Py.NotNone).
-        var attributes = Py.AsDict(Py.NotNone(record["attributes"], "pop"));
+        // PORT: attributes.pop(...) on a value from open data raises AttributeError for a value without pop (R4, Py.Receiver).
+        var attributes = Py.Receiver<OrderedDictionary<string, object?>>(record["attributes"], "pop");
         attributes.Remove("uuid");
         attributes.Remove("source_node_uuid");
         attributes.Remove("target_node_uuid");

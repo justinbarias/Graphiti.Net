@@ -25,9 +25,10 @@ file differs from what the run would write. The tool needs Python 3.12 and the p
 .upstream/graphiti. It changes nothing there. Nothing here uses the network.
 
 Inputs that the port cannot reproduce by a rule are left out, and the reports of plan 0004 packet P2a
-and its fix round name them: CommunityNode.save on Neptune (driver.save_to_aoss), a record value that
-is not None and not of the type that the code calls a method on, and a graph operations interface that
-returns None for get_by_uuids with a group id or with require_all (Python raises TypeError there).
+and its fix round name them: CommunityNode.save on Neptune (driver.save_to_aoss), and a graph
+operations interface that returns None for get_by_uuids with a group id or with require_all (Python
+raises TypeError there). A record value of a wrong type at a method call (attributes, labels, group_id)
+is recorded: Py.Receiver gives the AttributeError of Python (R4).
 """
 from __future__ import annotations
 
@@ -242,12 +243,12 @@ def record_cases():
         'attributes': {'uuid': 'x', 'name': 'x', 'group_id': 'x', 'name_embedding': 'x', 'summary': 'x', 'created_at': 'x', 'labels': 'x', 'age': 3, 'city': '東京'},
     }
     entity_values = {
-        'group_id': [None, '', 'abc'],
-        'labels': [[], ['Entity_a-b-c'], ['Bad Label', 'Entity_abc'], None],
+        'group_id': [None, '', 'abc', 5, ['a']],
+        'labels': [[], ['Entity_a-b-c'], ['Bad Label', 'Entity_abc'], None, 5, 'Entity', 'xEntity_abcx'],
         'name_embedding': [None, ['x'], 'abc'],
         'created_at': [None, 'nope', T1],
         'summary': [None, 5],
-        'attributes': [{}, {'k': [1, {'n': None}]}, None],
+        'attributes': [{}, {'k': [1, {'n': None}]}, None, 5, 'x', [1]],
         'uuid': [5],
     }
     out.extend(variants('get_entity_node_from_record', entity, entity_values))

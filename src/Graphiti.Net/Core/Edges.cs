@@ -1458,7 +1458,8 @@ internal static partial class Edges
     internal static EntityEdge GetEntityEdgeFromRecord(OrderedDictionary<string, object?> record, GraphProvider provider)
     {
         var episodes = record["episodes"];
-        var attributes = Py.AsDict(record["attributes"]);
+        // PORT: attributes.pop(...) on a value from open data raises AttributeError for a value without pop (R4, Py.Receiver).
+        var attributes = Py.Receiver<OrderedDictionary<string, object?>>(record["attributes"], "pop");
         attributes.Remove("uuid");
         attributes.Remove("source_node_uuid");
         attributes.Remove("target_node_uuid");

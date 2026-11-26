@@ -25,9 +25,13 @@ The tool writes tests/Port.Evaluation/values/driver_contract.json. --check write
 if the file differs from what the run would write. The tool needs Python 3.12 and the pinned upstream
 (GRAPHITI_UPSTREAM, or .upstream/graphiti). It changes nothing there. Nothing here uses the network.
 
-Inputs that the port cannot reproduce by a rule are left out: a record value that is not None and
-not of the type that the code calls a method on (attributes, labels, and group_id of an entity
-record, and attributes of an edge record), and an edge_count that a 64-bit integer cannot hold (R7).
+Inputs that the port cannot reproduce by a rule are left out: an edge_count that a 64-bit integer
+cannot hold (R7), and a graph that does not end (U11).
+
+A record value of a wrong type at a method call (attributes, labels, and group_id of an entity record,
+attributes of an edge record) is recorded. Py.Receiver gives the AttributeError of Python (R4). The
+index names are recorded with no environment value: a static field reads the variable one time (R17), and
+PyEnv.Use cannot reach it, so the environment branch has no test.
 """
 from __future__ import annotations
 
@@ -57,9 +61,9 @@ DATE_VALUES = [
 OTHER_VALUES = [None, 5, 1.5, True, 'x', '', 'Zoë 東京 😀', [], ['a'], {}]
 EMB_VALUES = [None, [], [0.1, 2], ['1.5'], ['x'], 'abc', 5]
 SOURCE_VALUES = ['text', 'message', 'json', 'fact_triple', 'html', 'JSON', '', None, 5]
-LABEL_VALUES = [None, [], ['Entity'], ['Entity', 'Person', 'Entity_abc', 'Entity_abc'], ['Bad Label'], ['Entity_a-b-c']]
-GROUP_VALUES = [None, '', 'abc', 'a-b-c', 'g-1', 'Zoë-東京']
-ATTR_VALUES = [None, {}, {'k': 1}, {'k': [1, {'n': None}]}, {'uuid': 'x', 'extra': 'é'}]
+LABEL_VALUES = [None, [], ['Entity'], ['Entity', 'Person', 'Entity_abc', 'Entity_abc'], ['Bad Label'], ['Entity_a-b-c'], 5, 'Entity', 'xEntity_abcx', {}]
+GROUP_VALUES = [None, '', 'abc', 'a-b-c', 'g-1', 'Zoë-東京', 5, ['a'], {}]
+ATTR_VALUES = [None, {}, {'k': 1}, {'k': [1, {'n': None}]}, {'uuid': 'x', 'extra': 'é'}, 5, 'x', [1]]
 EDGE_LIST_VALUES = [None, [], ['e1'], ['e1', 'e2'], 'e1', [1]]
 
 PROVIDERS = ['neo4j', 'falkordb', 'neptune', 'relate']
@@ -157,6 +161,17 @@ def parser_cases(rng):
         for field, values in pools.items():
             for value in values:
                 cases.append({'function': function, 'record': {**copy_record(base), field: value}})
+        if function == 'episodic_node_from_record':
+            # Both dates None, and a None date with no uuid: the message names the episode or 'unknown'.
+            cases.append({'function': function, 'record': {**copy_record(base), 'created_at': None, 'valid_at': None}})
+            for field in ['created_at', 'valid_at']:
+                no_uuid = copy_record(base)
+                del no_uuid['uuid']
+                no_uuid[field] = None
+                cases.append({'function': function, 'record': no_uuid})
+            both = copy_record(base)
+            del both['uuid']
+            cases.append({'function': function, 'record': {**both, 'created_at': None, 'valid_at': None}})
         if function == 'entity_node_from_record':
             # A bad label together with another field error: pydantic reports both, in field order.
             for other in [{'summary': None}, {'name': None}, {'created_at': 'nope'}, {'summary': None, 'name_embedding': ['x']}, {'uuid': 5}]:
@@ -188,6 +203,8 @@ def run_parser(case):
         entry['result'] = {'class': type(node).__name__, 'dump': encode(node.model_dump())}
     except Exception as error:  # noqa: BLE001
         entry['error'] = error_of(error)
+    # The parser changes the record in place (attributes.pop, labels.remove), and a port that copies it differs.
+    entry['record_after'] = encode(record)
     return entry
 
 
@@ -207,6 +224,9 @@ def neighbor_cases():
     for value in [None, 'many', '3', '', 1.5, 2.0, True, False, [], {}, -4, 2**62]:
         datas.append({**base, 'edge_count': value})
     datas.append({**base, 'extra': 1})
+    # Two invalid fields: pydantic reports node_uuid, then edge_count.
+    datas.append({})
+    datas.append({'node_uuid': None, 'edge_count': 'x'})
     out = []
     for data in datas:
         entry = {'data': encode_kwargs(data)}
@@ -217,6 +237,12 @@ def neighbor_cases():
             entry['error'] = error_of(error)
         out.append(entry)
     return out
+
+
+def neighbor_schema():
+    from graphiti_core.driver.operations.graph_utils import Neighbor
+
+    return json.dumps(Neighbor.model_json_schema())
 
 
 # ---------- label_propagation ----------
@@ -468,6 +494,7 @@ def main():
         'constants': consts,
         'parsers': parsers,
         'neighbor': neighbor_cases(),
+        'neighbor_schema': neighbor_schema(),
         'label_propagation': label_cases,
         'nonterminating': nonterminating,
         'driver': driver_cases(),

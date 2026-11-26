@@ -120,27 +120,39 @@ public class EdgesRecordedTests
         {
             Assert.NotNull(error);
             var type = expectedError.GetProperty("type").GetString();
-            Assert.Equal(
-                type switch
-                {
-                    "EdgeNotFoundError" => typeof(EdgeNotFoundException),
-                    "GroupsEdgesNotFoundError" => typeof(GroupsEdgesNotFoundException),
-                    "IndexError" => typeof(ArgumentOutOfRangeException),
-                    "KeyError" => typeof(KeyNotFoundException),
-                    // PORT: Python fails on the None with an AttributeError (group check) or a TypeError (iteration). Py.NotNone
-                    // gives the MissingMemberException, and LINQ gives an ArgumentNullException for the iteration. The type of
-                    // the result is not nullable, so only a fake shows it (GAPS F25).
-                    "AttributeError" => typeof(MissingMemberException),
-                    "TypeError" => typeof(ArgumentNullException),
-                    "ValueError" => typeof(ArgumentException),
-                    _ => throw new InvalidOperationException(type),
-                },
-                error.GetType());
 
-            // The text of a KeyError and of an IndexError is Python's own, and a .NET message has other words.
-            if (type is not "KeyError" and not "IndexError" and not "AttributeError" and not "TypeError")
+            // R4: Py.Receiver<OrderedDictionary> refuses a list as attributes with the AttributeError of Python for a missing method, and a
+            // Python list has pop. Python then raises TypeError: pop expected at most 1 argument, got 2. This differs from Python by design.
+            if (method == "get_entity_edge_from_record" && record is not null && record.TryGetValue("attributes", out var attributes) && attributes is List<object?>)
             {
-                Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
+                Assert.Equal(typeof(MissingMemberException), error.GetType());
+                Assert.Equal("'list' object has no attribute 'pop'", error.Message);
+            }
+            else
+            {
+                Assert.Equal(
+                    type switch
+                    {
+                        "EdgeNotFoundError" => typeof(EdgeNotFoundException),
+                        "GroupsEdgesNotFoundError" => typeof(GroupsEdgesNotFoundException),
+                        "IndexError" => typeof(ArgumentOutOfRangeException),
+                        "KeyError" => typeof(KeyNotFoundException),
+                        // PORT: Python fails on the None with an AttributeError (group check) or a TypeError (iteration). Py.NotNone
+                        // gives the MissingMemberException, and LINQ gives an ArgumentNullException for the iteration. The type of
+                        // the result is not nullable, so only a fake shows it (GAPS F25).
+                        "AttributeError" => typeof(MissingMemberException),
+                        "TypeError" => typeof(ArgumentNullException),
+                        "ValueError" => typeof(ArgumentException),
+                        _ => throw new InvalidOperationException(type),
+                    },
+                    error.GetType());
+
+                // The text of a KeyError and of an IndexError is Python's own, and a .NET message has other words. A TypeError of
+                // GAPS F25 has the text of LINQ.
+                if (type is not "KeyError" and not "IndexError" and not "TypeError")
+                {
+                    Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
+                }
             }
         }
 

@@ -176,7 +176,8 @@ internal abstract class GraphDriver : QueryExecutor
         }
         finally
         {
-            await session.CloseAsync(cancellationToken);
+            // PORT: the finally runs `await session.close()` to the end, also after a cancellation. A cleanup after a cancellation passes no token (R8).
+            await session.CloseAsync(CancellationToken.None);
         }
     }
 

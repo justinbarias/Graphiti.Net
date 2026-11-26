@@ -259,7 +259,7 @@ def module_cases() -> list[dict]:
         'custom': 1,
         'other': [1, 'a'],
     }
-    for attributes in ({}, reserved, {'custom': {'nested': True}}):
+    for attributes in ({}, reserved, {'custom': {'nested': True}}, None, 5, 'x', [1]):
         out.append({'cls': 'Edge', 'method': 'get_entity_edge_from_record', 'mode': 'none', 'provider': 'neo4j', 'record': {**entity_record('r-1', 'g'), 'attributes': attributes}})
     return out
 

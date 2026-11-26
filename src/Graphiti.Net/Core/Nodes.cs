@@ -1800,8 +1800,8 @@ internal static partial class Nodes
 
     internal static EntityNode GetEntityNodeFromRecord(OrderedDictionary<string, object?> record, GraphProvider provider)
     {
-        // PORT: attributes.pop(...) on a value from open data that can be None raises AttributeError (R4, Py.NotNone).
-        var attributes = Py.AsDict(Py.NotNone(record["attributes"], "pop"));
+        // PORT: attributes.pop(...) on a value from open data raises AttributeError for a value without pop (R4, Py.Receiver).
+        var attributes = Py.Receiver<OrderedDictionary<string, object?>>(record["attributes"], "pop");
         attributes.Remove("uuid");
         attributes.Remove("name");
         attributes.Remove("group_id");
@@ -1810,11 +1810,12 @@ internal static partial class Nodes
         attributes.Remove("created_at");
         attributes.Remove("labels");
 
-        var labels = Py.AsList(Py.Get(record, "labels", (object?)new List<object?>()));
+        // PORT: labels is open data. The `in` test keeps the typed read (GAPS F24), and remove is a method call on it (R4, Py.Receiver).
+        var labels = Py.Get(record, "labels", (object?)new List<object?>());
         var groupId = Py.Get(record, "group_id");
-        if (Py.Contains(labels, "Entity_" + Py.AsString(Py.NotNone(groupId, "replace")).Replace("-", string.Empty, StringComparison.Ordinal)))
+        if (Py.Contains(Py.AsList(labels), "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal)))
         {
-            Py.Remove(labels, "Entity_" + Py.AsString(Py.NotNone(groupId, "replace")).Replace("-", string.Empty, StringComparison.Ordinal));
+            Py.Remove(Py.Receiver<List<object?>>(labels, "remove"), "Entity_" + Py.Receiver<string>(groupId, "replace").Replace("-", string.Empty, StringComparison.Ordinal));
         }
 
         // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).

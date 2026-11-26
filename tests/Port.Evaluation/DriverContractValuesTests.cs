@@ -52,19 +52,62 @@ public partial class DriverContractValuesTests
     {
         var entry = Root.GetProperty("parsers")[index];
         var record = DecodeKwargs(entry.GetProperty("record"));
+        var function = entry.GetProperty("function").GetString()!;
+        var difference = DifferenceByDesign(function, record);
         object? result = null;
-        var error = Catch(() => result = DumpNode(entry.GetProperty("function").GetString() switch
+        var error = Catch(() => result = DumpNode(function switch
         {
             "entity_node_from_record" => RecordParsers.EntityNodeFromRecord(record),
             "entity_edge_from_record" => RecordParsers.EntityEdgeFromRecord(record),
             "episodic_node_from_record" => RecordParsers.EpisodicNodeFromRecord(record),
             _ => RecordParsers.CommunityNodeFromRecord(record),
         }));
-        AssertOutcome(entry.GetProperty("error"), error);
-        if (error is null)
+        if (difference is { } by)
         {
-            AssertSame(entry.GetProperty("result"), (JsonNode?)result);
+            Assert.NotNull(error);
+            Assert.Equal(by.Type, error.GetType());
+            if (by.Text is not null)
+            {
+                Assert.Equal(by.Text, error.Message);
+            }
         }
+        else
+        {
+            AssertOutcome(entry.GetProperty("error"), error);
+            if (error is null)
+            {
+                AssertSame(entry.GetProperty("result"), (JsonNode?)result);
+            }
+        }
+
+        // The parser changes the record in place (attributes.pop, labels.remove). A port that copies it differs (R6).
+        AssertSame(entry.GetProperty("record_after"), Encode(record));
+    }
+
+    // Two outcomes differ from Python by design, and each one has a reason:
+    // - GAPS F24: the `in` test of labels keeps the typed read, so a labels value that is not a list throws InvalidCastException.
+    //   Python takes str (a substring test), dict (a key test), and None or int (TypeError) there. A tuple or a set that Python accepts is not recorded.
+    // - R4: Py.Receiver<OrderedDictionary> refuses a list as attributes with the AttributeError of Python for a missing method, and a Python list has pop.
+    //   Python then raises TypeError: pop expected at most 1 argument, got 2.
+    private static (Type Type, string? Text)? DifferenceByDesign(string function, OrderedDictionary<string, object?> record)
+    {
+        if (function is not ("entity_node_from_record" or "entity_edge_from_record") || !record.TryGetValue("attributes", out var attributes))
+        {
+            return null;
+        }
+
+        if (attributes is List<object?>)
+        {
+            return (typeof(MissingMemberException), "'list' object has no attribute 'pop'");
+        }
+
+        if (function == "entity_node_from_record" && attributes is OrderedDictionary<string, object?> && record.TryGetValue("group_id", out var groupId) && groupId is string
+            && record.TryGetValue("labels", out var labels) && labels is not List<object?>)
+        {
+            return (typeof(InvalidCastException), null);
+        }
+
+        return null;
     }
 
     [Theory]
@@ -82,6 +125,12 @@ public partial class DriverContractValuesTests
         }
     }
 
+    [Fact]
+    public void The_schema_of_Neighbor_matches_Python()
+    {
+        Assert.Equal(Root.GetProperty("neighbor_schema").GetString(), PyJson.Dumps(Neighbor.ModelJsonSchema.ToDict()));
+    }
+
     [Theory]
     [MemberData(nameof(LabelPropagationIndexes))]
     public void Each_label_propagation_matches_Python(int index)
@@ -93,8 +142,12 @@ public partial class DriverContractValuesTests
             projection[pair[0].GetString()!] = [.. pair[1].EnumerateArray().Select(n => new Neighbor { NodeUuid = n[0].GetString()!, EdgeCount = n[1].GetInt64() }.Validate())];
         }
 
+        // PORT: upstream defect U11: label_propagation does not end for some inputs. A wrong tie order makes a recorded graph loop, so a case that does not end fails.
         List<List<string>>? result = null;
-        var error = Catch(() => result = GraphUtils.LabelPropagation(projection));
+        Exception? error = null;
+        var worker = new Thread(() => error = Catch(() => result = GraphUtils.LabelPropagation(projection))) { IsBackground = true };
+        worker.Start();
+        Assert.True(worker.Join(TimeSpan.FromSeconds(5)), "label_propagation did not end within 5 seconds");
         AssertOutcome(entry.GetProperty("error"), error);
         if (error is null)
         {
@@ -112,7 +165,7 @@ public partial class DriverContractValuesTests
             var driver = new FakeDriver(PyEnum.FromValue<GraphProvider>(e.GetProperty("provider").GetString()!), "first", []);
             var cloned = (FakeDriver)driver.WithDatabase(e.GetProperty("database").GetString()!);
             Assert.Equal(e.GetProperty("same_object").GetBoolean(), ReferenceEquals(cloned, driver));
-            Assert.Equal(e.GetProperty("type").GetString(), cloned.PythonName);
+            Assert.Equal(e.GetProperty("type").GetString(), cloned.GetType().Name);
             Assert.Equal(e.GetProperty("database_of_clone").GetString(), cloned.Database);
             Assert.Equal(e.GetProperty("database_of_original").GetString(), driver.Database);
             Assert.Equal(e.GetProperty("provider_of_clone").GetString(), (string)PyEnum.Value(cloned.Provider));
@@ -156,18 +209,15 @@ public partial class DriverContractValuesTests
         {
             var calls = new List<JsonObject>();
             var driver = new FakeDriver(PyEnum.FromValue<GraphProvider>(e.GetProperty("provider").GetString()!), "first", calls);
-            JsonNode? runResult = null;
             var body = e.GetProperty("body").GetString();
             var error = await CatchAsync(() => driver.TransactionAsync(async tx =>
             {
                 // PORT: type(tx).__name__ is _SessionTransaction, and the port drops the underscore (R2).
-                Assert.Equal("_SessionTransaction", e.GetProperty("tx_type").GetString());
-                Assert.IsType<SessionTransaction>(tx);
+                Assert.Equal(e.GetProperty("tx_type").GetString(), "_" + tx.GetType().Name);
                 switch (body)
                 {
                     case "run":
                         await tx.RunAsync("MATCH (n) WHERE n.uuid = $uuid RETURN n", new() { ["uuid"] = "u-1", ["names"] = new List<object?> { "a", "é" }, ["flag"] = null });
-                        runResult = new JsonObject { ["type"] = "str", ["value"] = "run-result" };
                         break;
                     case "two_runs":
                         await tx.RunAsync("A", new() { ["x"] = 1L });
@@ -178,16 +228,51 @@ public partial class DriverContractValuesTests
                 }
             }));
             AssertOutcome(e.GetProperty("error"), error);
-            if (error is not null)
-            {
-                Assert.Equal("boom", error.Message);
-            }
 
             // PORT: tx.run returns the result of session.run in Python. The port returns Task, so the result is not observed.
             var expected = e.GetProperty("calls").EnumerateArray().Select(c => JsonNode.Parse(c.GetRawText())!.AsObject()).ToList();
             Assert.Equal(expected.Select(c => c.ToJsonString()), calls.Select(c => c.ToJsonString()));
-            _ = runResult;
         }
+    }
+
+    // No Python original: the finally of GraphDriver.transaction runs `await session.close()` to the end, also after a cancellation of the
+    // body. The fake session honors its token, so a close with the canceled token never records (R8).
+    [Fact]
+    public async Task a_canceled_body_still_closes_the_session()
+    {
+        using var source = new CancellationTokenSource();
+        var calls = new List<JsonObject>();
+        var driver = new FakeDriver(GraphProvider.Neo4j, "first", calls);
+        var error = await CatchAsync(() => driver.TransactionAsync(
+            async tx =>
+            {
+                await source.CancelAsync();
+                await tx.RunAsync("Q", new(), source.Token);
+            },
+            source.Token));
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+        Assert.Equal(["session", "close"], calls.Select(c => (string)c["via"]!));
+    }
+
+    // R25: each async method with a body that the fakes reach throws for a canceled token.
+    [Theory]
+    [InlineData("transaction")]
+    [InlineData("remove_communities_all")]
+    [InlineData("remove_communities_groups")]
+    public async Task A_canceled_token_stops_each_async_method(string method)
+    {
+        var token = new CancellationToken(true);
+        var calls = new List<JsonObject>();
+        var driver = new FakeDriver(GraphProvider.Neo4j, "first", calls);
+        var executor = new FakeExecutor(calls);
+        Func<Task> call = method switch
+        {
+            "transaction" => () => driver.TransactionAsync(tx => tx.RunAsync("Q", new(), token), token),
+            "remove_communities_all" => () => new Ops().RemoveCommunitiesAsync(executor, null, token),
+            _ => () => new Ops().RemoveCommunitiesAsync(executor, ["g1"], token),
+        };
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(call);
+        Assert.DoesNotContain(calls, c => c["query"] is not null);
     }
 
     [Fact]
@@ -301,6 +386,9 @@ public partial class DriverContractValuesTests
 
         Assert.NotNull(error);
         var type = expected.GetProperty("type").GetString();
+
+        // Each class is exact. A subclass is another Python class, and R4 maps a Python class to a subclass only where it names one.
+        // ValidationException derives from ArgumentException, so a ValueError of Python is the base class here.
         var expectedType = type switch
         {
             "ValidationError" => typeof(ValidationException),
@@ -311,16 +399,28 @@ public partial class DriverContractValuesTests
             "TypeError" => typeof(InvalidCastException),
             _ => throw new InvalidOperationException(type),
         };
-        Assert.True(error.GetType() == expectedType || (type == "ValueError" && error is ArgumentException), $"expected {type} but got {error}");
+        Assert.True(error.GetType() == expectedType, $"expected {type} but got {error}");
 
         var text = expected.GetProperty("text").GetString()!;
-        if (type is "ValidationError")
+        switch (type)
         {
-            Assert.Equal(PydanticInput().Replace(text, "]"), error.Message);
-        }
-        else if (type is "NotImplementedError" or "ValueError" && (text.StartsWith("created_at cannot", StringComparison.Ordinal) || text.StartsWith("valid_at cannot", StringComparison.Ordinal) || text.StartsWith("build_fulltext_query", StringComparison.Ordinal)))
-        {
-            Assert.Equal(text, error.Message);
+            case "ValidationError":
+                Assert.Equal(PydanticInput().Replace(text, "]"), error.Message);
+                break;
+            case "KeyError":
+                // A KeyError is compared by type only (R25): its text is the Python repr of the key.
+                break;
+            case "TypeError":
+                // The typed read names the C# type, so a TypeError text differs from Python by design. The text is compared where the port gives it.
+                if (!text.Contains("is not iterable", StringComparison.Ordinal))
+                {
+                    Assert.Equal(text, error.Message);
+                }
+
+                break;
+            default:
+                Assert.Equal(text, error.Message);
+                break;
         }
     }
 
@@ -449,16 +549,18 @@ public partial class DriverContractValuesTests
             return ValueTask.CompletedTask;
         }
 
-        internal override Task RunAsync(string query, OrderedDictionary<string, object?> parameters, CancellationToken cancellationToken = default)
+        internal override async Task RunAsync(string query, OrderedDictionary<string, object?> parameters, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(Call("run", query, parameters));
-            return Task.CompletedTask;
         }
 
-        internal override Task CloseAsync(CancellationToken cancellationToken = default)
+        internal override async Task CloseAsync(CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(new JsonObject { ["via"] = "close" });
-            return Task.CompletedTask;
         }
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
@@ -467,13 +569,15 @@ public partial class DriverContractValuesTests
 
     private sealed class FakeExecutor(List<JsonObject> calls) : QueryExecutor
     {
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             calls.Add(Call(null, cypherQuery, parameters));
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>(([], null, null));
+            return ([], null, null);
         }
     }
 
