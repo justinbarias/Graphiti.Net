@@ -43,14 +43,14 @@ scripts/command_center.sh         # build the status board (docs/FRONTEND.md)
 ## Invariants
 
 1. Read `port/STATE.md` and `port/queue.json` before port work. Update both before you stop.
-2. Never edit `port/judge/`, its golden files, or `.upstream/` to make a check pass. If a check looks wrong, stop and tell the maintainer.
+2. Never edit `port/judge/`, its golden files, or `.upstream/` to make a check pass. If a check looks wrong, stop and tell the maintainer. One exception: the lead removes the id of a case that now passes from `port/judge/expected-failures.txt` (decision D38).
 3. The commands decide that a unit is done. Your reading of the code is not proof.
 4. Keep the structure of the source. One Python module becomes one C# file with the same names in the same order. Idiomatic changes wait until M1 is done. The public surface in [port/DECISIONS.md](port/DECISIONS.md) is the one exception.
 5. Write no stubs and no simplified versions. If you cannot port something, mark it `// TODO(port): <reason>`, set the unit to `blocked`, and list it in `port/STATE.md`.
 6. If the same mistake shows up twice, change `port/RULES.md` and redo the affected units. Do not patch output by hand.
 7. Write no unit tests that restate the implementation, and no mocks between internal classes. Fakes exist only at the network boundary. See [docs/TESTING.md](docs/TESTING.md).
 8. Graphiti.Net sends no usage telemetry.
-9. A change cannot modify the check that judges it. `REVIEW.md`, `scripts/check.sh`, and `port/judge/` change in their own pull requests.
+9. A change cannot modify the check that judges it. `REVIEW.md`, `scripts/check.sh`, and `port/judge/` change in their own pull requests. The removal of a passing id under decision D38 goes in the pull request of its unit.
 
 ## Work loop
 
