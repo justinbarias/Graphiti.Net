@@ -20,7 +20,7 @@ This is the canonical home of the test strategy. It follows
 | Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,999 cases: 1,965 pure and 34 flow. 11 flow scenarios use replies from a real model. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
 | Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | 55 tests for `PyCompat`: each helper against the values that Python recorded, and laws that hold for any input. |
-| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. `PyCompat` is the first code to mutate. No mutation run has scored it yet (plan 0003, tasks 4 and 5). |
+| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. Two runs on `PyCompat` on 2026-11-26 each scored 93.22%. The pruning rule is not applied yet (plan 0003, task 5). |
 
 ### Differential judge
 
@@ -63,10 +63,24 @@ Stryker.NET changes the product code in small ways and runs the tests. A mutant 
 
 The pruning rule:
 
-1. Run `scripts/mutate.sh`. Open `StrykerOutput/<run>/reports/mutation-report.json`.
+1. Run `scripts/mutate.sh`. Then run `python3 scripts/mutation_survivors.py`, which reads the newest `StrykerOutput/<run>/reports/mutation-report.json`.
 2. If a test kills no mutant, delete the test.
 3. If every mutant that a test kills is also killed by a broader test, delete the narrower test.
 4. If a mutant survives in code that matters, add an end-to-end or property test. Do not add a unit test.
+
+The script lists the tests of steps 2 and 3 and the mutants of step 4. It deletes nothing.
+It reads "broader" as one other test that kills every mutant of the narrower test, and more.
+Tests that kill the same mutants, with no broader test, are not in the list. The script shows each such group, and a person decides.
+It exempts `EnvironmentTests`. `--json` prints the same result for a program.
+
+Limits of the list:
+
+- Property tests use random inputs, so the list can differ between two runs of the same code. Compare two runs before you delete a test.
+- The rule compares killed mutants only. A test that compares values with Python can be listed because another test runs through the same code.
+- With no per-test data, for example a killed mutant with no `killedBy`, the script prints no list. Keep `disable-bail` on, because the script cannot see that a report is incomplete.
+- A timeout mutant names no killer in the reports of 2026-11-26. If one test covers it, that test gets the credit. If more tests cover it, none gets credit, and a listed one has a note.
+- A static mutant has an empty `coveredBy` in the reports of 2026-11-26, so its `killedBy` can be incomplete. The script counts these mutants.
+- The result holds only for the code that the run mutated.
 
 The gate is in observe mode: `thresholds.break` is 0 and the CI job cannot block a merge.
 After M1 gives a baseline score, the maintainer sets an enforced threshold (M3 in the [spec](product-specs/spec.md)).
@@ -87,7 +101,11 @@ scripts/check.sh --test
 scripts/mutate.sh
 ```
 
+```bash
+python3 scripts/mutation_survivors.py
+```
+
 ## Known gaps
 
-- No tool finds the tests that the pruning rule deletes. A person reads the JSON report. Plan 0003 adds a script.
-- Stryker ran one time on 2026-11-24 and found 0 mutants, because the product projects are empty. No mutation score exists yet.
+- Nobody applied the pruning rule yet. Plan 0003, task 5 does it.
+- Only `PyCompat` has product code, so no mutation score exists for ported code.
