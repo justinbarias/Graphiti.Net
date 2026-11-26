@@ -552,7 +552,7 @@ GAPS.md G16 counts 19 `re` calls with a wider `grep` pattern. The table above na
 | `defaultdict(list)` | `OrderedDictionary` with `Py.SetDefault` |
 | `defaultdict(int)` with `d[k] += n` | `d[k] = Py.Get(d, k, 0) + n` on an `OrderedDictionary` |
 | `OrderedDict` with `move_to_end(k)` and `popitem(last=False)` (`ingestion/delta.py:152`) | `OrderedDictionary`: remove the key and add it again, and `RemoveAt(0)` |
-| `MappingProxyType(d)` | `d.AsReadOnly()`, a live view that cannot be changed |
+| `MappingProxyType(d)` | `d.AsReadOnly()`, a live view that cannot be changed. For an `OrderedDictionary<K, V>` write the type arguments, `d.AsReadOnly<K, V>()`, because the call is ambiguous with no arguments (error CS0121). |
 | `itertools.combinations(xs, k)`, `itertools.zip_longest(a, b)` | `Py.Combinations(xs, k)` in Python's order, `Py.ZipLongest(a, b)` with null for a missing item |
 | A `set` or `frozenset` that code tests only with `in`, or compares, or takes the size of | `HashSet<T>`. For strings pass `StringComparer.Ordinal`. |
 | A `set` that code passes to `sorted()` | `HashSet<T>`, then the sort rule above |
@@ -618,13 +618,14 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 | `typing.Protocol` | `interface` with the member names in PascalCase (GAPS G8) |
 | `ABC` with `@abstractmethod` | `abstract class`. Keep it a class if any member has a body. |
 | A base method that raises `NotImplementedError` | A `virtual` method that throws `NotImplementedException` |
-| `isinstance(x, T)` | `x is T`. For the value model, test the runtime type from the table in R6. Test `bool` before `long`, because a Python `bool` is an `int`. |
+| `isinstance(x, T)` | `x is T`. For the value model, test the runtime type from the table in R6. Test `bool` before `long`, because a Python `bool` is an `int`. `isinstance(x, list)` on an open value is `Py.TypeName(x) == "list"`, because `x is IList` also matches `byte[]` and an `OrderedDictionary`. |
 | `isinstance(x, (A, B))` | `x is A or B` |
 | `callable(x)` | `x is not null` for a delegate type |
 | `type(x).__name__`, `cls.__name__`, `__qualname__` in a message or a result | A `PythonName` constant on the type with the Python name. Never `GetType().Name`. |
 | The class name of an exception in the telemetry of a span: the status description `f'{type(e).__name__}: {e}'` and the exception event | The .NET type name, and the event that `Activity.AddException` writes (decision D46). A .NET exception has a .NET message, so a Python class name in front of it names an error that never existed. This is the one exception to the row above. Python's event has one more key, `exception.escaped`. |
 | The class name of a driver, of a model client, or of a nested override group | `GraphDriver` and `LLMClient` have `internal abstract string PythonName { get; }`, and each subclass returns its Python class name. Each nested `*Group` record of `prompt_config.py` has `internal const string PythonName`. A qualified name is the outer name, a dot, and that value. |
 | An attribute of a prompt group that exists and is not callable | `TryGetFunction` returns true with a null function. `callable(x)` is then the test `x is not null`. |
+| An attribute of a prompt library that exists and is not a group | `TryGetGroup` returns true with a null group. `hasattr(group, name)` is then false for each name, and a `getattr` on it throws `MissingMemberException`. |
 
 ### R16. Decorators, context managers, generators, and caches
 
