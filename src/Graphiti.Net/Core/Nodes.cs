@@ -86,7 +86,7 @@ internal static class EpisodeTypeExtensions
         }
 
         Nodes.Log.EpisodeTypeNotImplemented(Nodes.Logger, episodeType);
-        throw new NotImplementedException();
+        throw new NotImplementedException(string.Empty);
     }
 }
 

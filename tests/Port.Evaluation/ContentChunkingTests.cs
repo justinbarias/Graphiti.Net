@@ -1,13 +1,4 @@
 // Ported from tests/utils/test_content_chunking.py (port/RULES.md, R25). The test names are the Python names.
-//
-// TODO(port): ten tests are not ported, because each one sets a module constant with monkeypatch.setattr
-// (content_chunking.CHUNK_DENSITY_THRESHOLD or CHUNK_MIN_TOKENS). RULES.md R17 makes these constants
-// static readonly fields of Helpers with no seam for a test, so a test cannot change them:
-//   TestShouldChunk: test_short_content_never_chunks, test_high_density_large_json_chunks,
-//     test_low_density_text_no_chunk, test_low_density_json_no_chunk
-//   TestJsonDensityEstimation: test_dense_array_detected, test_sparse_array_not_dense, test_dense_object_detected
-//   TestTextDensityEstimation: test_entity_rich_text_detected, test_prose_not_dense, test_sentence_starters_ignored
-// The judge cases of should_chunk, _json_likely_dense, and _text_likely_dense cover these paths with the default constants.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
@@ -68,15 +59,9 @@ internal static class ChunkingTestSupport
     // random.seed(seed): the port seeds the ambient random source (R18).
     internal static T Seeded<T>(long seed, Func<T> body)
     {
-        var saved = PortServices.Random;
-        PortServices.Random = new PyRandom(seed);
-        try
+        using (PortServices.Use(random: new PyRandom(seed)))
         {
             return body();
-        }
-        finally
-        {
-            PortServices.Random = saved;
         }
     }
 }
@@ -486,10 +471,125 @@ public class TestShouldChunk
         Assert.False(ContentChunking.ShouldChunk(string.Empty, EpisodeType.Text));
         Assert.False(ContentChunking.ShouldChunk(string.Empty, EpisodeType.Json));
     }
+
+    [Fact]
+    public void test_short_content_never_chunks()
+    {
+        // Short content should never chunk regardless of density.
+        // Set very low thresholds that would normally trigger chunking
+        using (Helpers.ChunkDensityThreshold.Use(0.001))
+        using (Helpers.ChunkMinTokens.Use(1000))
+        {
+            // Dense but short JSON (~200 tokens, below 1000 minimum)
+            var denseData = Enumerable.Range(0, 50).Select(i => (object?)ChunkingTestSupport.Dict(("name", $"Entity{i}"))).ToList();
+            var denseJson = ChunkingTestSupport.Dumps(denseData);
+            Assert.False(ContentChunking.ShouldChunk(denseJson, EpisodeType.Json));
+        }
+    }
+
+    [Fact]
+    public void test_high_density_large_json_chunks()
+    {
+        // Large high-density JSON should trigger chunking.
+        using (Helpers.ChunkDensityThreshold.Use(0.01))
+        using (Helpers.ChunkMinTokens.Use(500))
+        {
+            // Dense JSON: many elements, large enough to exceed minimum
+            var denseData = Enumerable.Range(0, 200).Select(i => (object?)ChunkingTestSupport.Dict(("name", $"Entity{i}"), ("desc", new string('x', 20)))).ToList();
+            var denseJson = ChunkingTestSupport.Dumps(denseData);
+            Assert.True(ContentChunking.ShouldChunk(denseJson, EpisodeType.Json));
+        }
+    }
+
+    [Fact]
+    public void test_low_density_text_no_chunk()
+    {
+        // Low-density prose should not trigger chunking.
+        using (Helpers.ChunkDensityThreshold.Use(0.05))
+        using (Helpers.ChunkMinTokens.Use(100))
+        {
+            // Low-density prose: mostly lowercase narrative
+            var prose = string.Concat(Enumerable.Repeat("the quick brown fox jumps over the lazy dog. ", 50));
+            Assert.False(ContentChunking.ShouldChunk(prose, EpisodeType.Text));
+        }
+    }
+
+    [Fact]
+    public void test_low_density_json_no_chunk()
+    {
+        // Low-density JSON (few elements, lots of content) should not chunk.
+        using (Helpers.ChunkDensityThreshold.Use(0.05))
+        using (Helpers.ChunkMinTokens.Use(100))
+        {
+            // Sparse JSON: few elements with lots of content each
+            var sparseData = new List<object?>
+            {
+                ChunkingTestSupport.Dict(("content", new string('x', 1000))),
+                ChunkingTestSupport.Dict(("content", new string('y', 1000))),
+            };
+            var sparseJson = ChunkingTestSupport.Dumps(sparseData);
+            Assert.False(ContentChunking.ShouldChunk(sparseJson, EpisodeType.Json));
+        }
+    }
 }
 
 public class TestJsonDensityEstimation
 {
+    [Fact]
+    public void test_dense_array_detected()
+    {
+        // Arrays with many elements should be detected as dense.
+        using (Helpers.ChunkDensityThreshold.Use(0.01))
+        {
+            // Array with 100 elements, ~800 chars = 200 tokens
+            // Density = 100/200 * 1000 = 500, threshold = 10
+            var data = Enumerable.Range(0, 100).Select(i => (object?)ChunkingTestSupport.Dict(("id", (long)i))).ToList();
+            var content = ChunkingTestSupport.Dumps(data);
+            var tokens = ContentChunking.EstimateTokens(content);
+
+            Assert.True(ContentChunking.JsonLikelyDense(content, tokens));
+        }
+    }
+
+    [Fact]
+    public void test_sparse_array_not_dense()
+    {
+        // Arrays with few elements should not be detected as dense.
+        using (Helpers.ChunkDensityThreshold.Use(0.05))
+        {
+            // Array with 2 elements but lots of content each
+            var data = new List<object?>
+            {
+                ChunkingTestSupport.Dict(("content", new string('x', 1000))),
+                ChunkingTestSupport.Dict(("content", new string('y', 1000))),
+            };
+            var content = ChunkingTestSupport.Dumps(data);
+            var tokens = ContentChunking.EstimateTokens(content);
+
+            Assert.False(ContentChunking.JsonLikelyDense(content, tokens));
+        }
+    }
+
+    [Fact]
+    public void test_dense_object_detected()
+    {
+        // Objects with many keys should be detected as dense.
+        using (Helpers.ChunkDensityThreshold.Use(0.01))
+        {
+            // Object with 50 keys
+            var data = new OrderedDictionary<string, object?>();
+            for (var i = 0; i < 50; i++)
+            {
+                data[$"key_{i}"] = $"value_{i}";
+            }
+
+            var content = ChunkingTestSupport.Dumps(data);
+            var tokens = ContentChunking.EstimateTokens(content);
+
+            Assert.True(ContentChunking.JsonLikelyDense(content, tokens));
+        }
+    }
+
     [Fact]
     public void test_count_json_keys_shallow()
     {
@@ -515,6 +615,63 @@ public class TestJsonDensityEstimation
 
         // At depth 2: 'a' and 'b'
         Assert.Equal(2, ContentChunking.CountJsonKeys(data, maxDepth: 2));
+    }
+}
+
+public class TestTextDensityEstimation
+{
+    [Fact]
+    public void test_entity_rich_text_detected()
+    {
+        // Text with many proper nouns should be detected as dense.
+        using (Helpers.ChunkDensityThreshold.Use(0.01))
+        {
+            // Entity-rich text: many capitalized names
+            var text = "Alice met Bob at Acme Corp. Then Carol and David joined them. ";
+            text += "Eve from Globex introduced Frank and Grace. ";
+            text += "Later Henry and Iris arrived from Initech. ";
+            text = string.Concat(Enumerable.Repeat(text, 10));
+            var tokens = ContentChunking.EstimateTokens(text);
+
+            Assert.True(ContentChunking.TextLikelyDense(text, tokens));
+        }
+    }
+
+    [Fact]
+    public void test_prose_not_dense()
+    {
+        // Narrative prose should not be detected as dense.
+        using (Helpers.ChunkDensityThreshold.Use(0.05))
+        {
+            // Low-entity prose
+            var prose = "\n"
+                + "        the sun was setting over the horizon as the old man walked slowly\n"
+                + "        down the dusty road. he had been traveling for many days and his\n"
+                + "        feet were tired. the journey had been long but he knew that soon\n"
+                + "        he would reach his destination. the wind whispered through the trees\n"
+                + "        and the birds sang their evening songs.\n"
+                + "        ";
+            prose = string.Concat(Enumerable.Repeat(prose, 10));
+            var tokens = ContentChunking.EstimateTokens(prose);
+
+            Assert.False(ContentChunking.TextLikelyDense(prose, tokens));
+        }
+    }
+
+    [Fact]
+    public void test_sentence_starters_ignored()
+    {
+        // Capitalized words after periods should be ignored.
+        using (Helpers.ChunkDensityThreshold.Use(0.05))
+        {
+            // Many sentences but no mid-sentence proper nouns
+            var text = "This is a sentence. Another one follows. Yet another here. ";
+            text = string.Concat(Enumerable.Repeat(text, 50));
+            var tokens = ContentChunking.EstimateTokens(text);
+
+            // Should not be dense since capitals are sentence starters
+            Assert.False(ContentChunking.TextLikelyDense(text, tokens));
+        }
     }
 }
 

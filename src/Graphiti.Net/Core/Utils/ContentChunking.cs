@@ -859,7 +859,7 @@ internal static partial class ContentChunking
     /// <summary>Generate a random combination of k items from range(n).</summary>
     internal static IReadOnlyList<long> RandomCombination(long n, long k)
     {
-        return [.. PortServices.Random.SampleRange(n, checked((int)k)).Order()];
+        return [.. PortServices.Random.SampleRange(n, (int)k).Order()];
     }
 
     /// <summary>
@@ -896,7 +896,7 @@ internal static partial class ContentChunking
         {
             for (var j = i + 1; j < n; j++)
             {
-                uncoveredPairs.Add(FrozenPair(i, j));
+                uncoveredPairs.Add(new PySet<long>([i, j]) { Frozen = true });
             }
         }
 
@@ -915,7 +915,7 @@ internal static partial class ContentChunking
             if (useSampling)
             {
                 // Sample random combinations when there are too many to enumerate
-                PySet<PyTuple> seenCombinations = [];
+                HashSet<PyTuple> seenCombinations = [];
 
                 // Limit total attempts (including duplicates) to prevent infinite loops
                 var maxTotalAttempts = MaxCombinationsToEvaluate * 3;
@@ -932,7 +932,7 @@ internal static partial class ContentChunking
 
                     var chunkIndices = RandomCombination(n, k);
 
-                    // PORT: a tuple of ints is a PyTuple as the item of a set.
+                    // PORT: a tuple of ints is a PyTuple as the item of a set (R13).
                     var sample = PyTuple.From(chunkIndices.Select(index => (object?)index));
                     if (seenCombinations.Contains(sample))
                     {
@@ -943,7 +943,9 @@ internal static partial class ContentChunking
                     samplesEvaluated += 1;
 
                     // Count how many uncovered pairs this chunk covers
-                    var coveredCount = CountCoveredPairs(chunkIndices, uncoveredPairs);
+                    var coveredCount = chunkIndices.Index()
+                        .SelectMany(entry => Py.Slice(chunkIndices, entry.Index + 1, null).Select(idxJ => (idxI: entry.Item, idxJ)))
+                        .LongCount(pair => uncoveredPairs.Contains(new PySet<long>([pair.idxI, pair.idxJ]) { Frozen = true }));
 
                     if (coveredCount > bestCoveredCount)
                     {
@@ -958,7 +960,9 @@ internal static partial class ContentChunking
                 foreach (var chunkIndices in Py.Combinations(Enumerable.Range(0, (int)n).Select(i => (long)i).ToList(), (int)k))
                 {
                     // Count how many uncovered pairs this chunk covers
-                    var coveredCount = CountCoveredPairs(chunkIndices, uncoveredPairs);
+                    var coveredCount = chunkIndices.Index()
+                        .SelectMany(entry => Py.Slice(chunkIndices, entry.Index + 1, null).Select(idxJ => (idxI: entry.Item, idxJ)))
+                        .LongCount(pair => uncoveredPairs.Contains(new PySet<long>([pair.idxI, pair.idxJ]) { Frozen = true }));
 
                     if (coveredCount > bestCoveredCount)
                     {
@@ -981,7 +985,7 @@ internal static partial class ContentChunking
             {
                 foreach (var idxJ in Py.Slice(bestChunkIndices, i + 1, null))
                 {
-                    uncoveredPairs.Discard(FrozenPair(idxI, idxJ));
+                    uncoveredPairs.Discard(new PySet<long>([idxI, idxJ]) { Frozen = true });
                 }
             }
 
@@ -992,6 +996,7 @@ internal static partial class ContentChunking
         // Handle any remaining uncovered pairs that the greedy algorithm missed.
         // This can happen when random sampling fails to find covering chunks.
         // Create minimal chunks (size 2) to guarantee all pairs are covered.
+        // PORT: D43. A set of ints has one fixed order in CPython; the port iterates in insertion order, so a call with k of 0 or 1 gives the same chunks in another order.
         foreach (var pair in uncoveredPairs)
         {
             var pairIndices = pair.Order().ToList();
@@ -1001,27 +1006,6 @@ internal static partial class ContentChunking
 
         return chunks;
     }
-
-    // PORT: the two generator expressions with "sum(1 for ...)" and "frozenset([i, j])" repeat at four sites,
-    // so they are written once here. Behavior and order are the same.
-    private static long CountCoveredPairs(IReadOnlyList<long> chunkIndices, PySet<PySet<long>> uncoveredPairs)
-    {
-        long coveredCount = 0;
-        foreach (var (i, idxI) in chunkIndices.Index())
-        {
-            foreach (var idxJ in Py.Slice(chunkIndices, i + 1, null))
-            {
-                if (uncoveredPairs.Contains(FrozenPair(idxI, idxJ)))
-                {
-                    coveredCount += 1;
-                }
-            }
-        }
-
-        return coveredCount;
-    }
-
-    private static PySet<long> FrozenPair(long first, long second) => new([first, second]) { Frozen = true };
 
     private static partial class Log
     {
