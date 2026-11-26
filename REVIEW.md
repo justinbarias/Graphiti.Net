@@ -24,7 +24,7 @@ Compare the C# file with its Python original in `.upstream/`. Report every diffe
 - Check retry counts, wait times, and concurrency limits (`SEMAPHORE_LIMIT` upstream).
 - Probe the paths that `port/GAPS.md` lists as outside the judge. Challenge the gap list itself.
 - Flag any stub, any simplified logic, and any `TODO(port)` marker that `port/STATE.md` does not list.
-- Read each new binding in `tests/Graphiti.Net.JudgeHost/Bindings.cs`. A binding can do three things only: decode the arguments, call the product code, and encode the result. Flag a binding that branches on the case, fills in a default, or repairs output.
+- Read each new binding in `tests/Graphiti.Net.JudgeHost/Units/`. Each ported module has one file there, and `Bindings.cs` loads them. A binding can do three things only: decode the arguments, call the product code, and encode the result. Flag a binding that branches on the case, fills in a default, or repairs output.
 
 ## For a test change
 
