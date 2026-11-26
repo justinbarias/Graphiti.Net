@@ -42,9 +42,13 @@ internal class ValueDecoder(JudgeRegistry registry)
             return double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
         }
 
-        return long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var small)
-            ? small
-            : BigInteger.Parse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+        // Each branch is boxed on its own. A conditional expression would give both the type BigInteger.
+        if (long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var small))
+        {
+            return small;
+        }
+
+        return BigInteger.Parse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
     }
 
     /// <summary>

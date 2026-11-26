@@ -2,6 +2,7 @@ namespace Graphiti.JudgeHost.Core;
 
 using System.Collections;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Graphiti.PyCompat;
@@ -51,13 +52,16 @@ internal static partial class Codec
             case byte[] bytes:
                 return new JsonObject { ["$bytes"] = System.Convert.ToHexStringLower(bytes) };
             case Type type:
-                return Class(typeof(Exception).IsAssignableFrom(type) ? PythonExceptionName(type) : type.Name);
+                return Class(ClassName(type));
             case JudgeClass judgeClass:
                 return Class(judgeClass.PythonName);
             case Exception error:
-                return new JsonObject { ["$exc"] = PythonExceptionName(error) };
+                return new JsonObject { ["$exc"] = PythonExceptionName(error) ?? throw NoPythonName(error.GetType()) };
             case IJudgeModel model:
                 return Model(model.PythonName, model.JudgeFields, registry);
+            case ITuple tuple:
+                // A ValueTuple or a System.Tuple stands for a Python tuple, which results carry as a list.
+                return new JsonArray([.. Enumerable.Range(0, tuple.Length).Select(index => Encode(tuple[index], registry))]);
         }
 
         if (registry.FindEncoder(value.GetType()) is { } encode)
@@ -95,7 +99,7 @@ internal static partial class Codec
     internal static JsonObject Class(string pythonName) => new() { ["$class"] = pythonName };
 
     /// <summary>A vector as a JSON array of numbers.</summary>
-    internal static JsonArray Vector(IEnumerable<double> values) => new([.. values.Select(v => (JsonNode)JsonValue.Create(v))]);
+    internal static JsonArray Vector(IEnumerable<double> values) => new([.. values.Select(Float)]);
 
     /// <summary>
     /// A point in time as Python's <c>datetime.isoformat()</c> writes it: microseconds appear only
@@ -111,6 +115,18 @@ internal static partial class Codec
         value >= long.MinValue && value <= long.MaxValue
             ? JsonValue.Create((long)value)
             : JsonValue.Create(JsonDocument.Parse(value.ToString(System.Globalization.CultureInfo.InvariantCulture)).RootElement.Clone())!;
+
+    // The Python class names of the C# types that stand for built-in Python types (RULES.md R6).
+    private static string ClassName(Type type) =>
+        type == typeof(string) ? "str"
+        : type == typeof(long) ? "int"
+        : type == typeof(double) ? "float"
+        : type == typeof(bool) ? "bool"
+        : typeof(Exception).IsAssignableFrom(type) ? PythonExceptionName(type) ?? throw NoPythonName(type)
+        : type.Name;
+
+    private static JudgeHostErrorException NoPythonName(Type type) =>
+        new($"The exception type {type.FullName} has no Python name in Codec.PythonExceptionName.");
 
     private static JsonNode Float(double value) =>
         double.IsNaN(value) ? new JsonObject { ["$float"] = "nan" }

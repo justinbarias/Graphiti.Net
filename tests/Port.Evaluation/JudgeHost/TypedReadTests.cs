@@ -135,6 +135,6 @@ public sealed class TypedReadTests
         Assert.Throws<JudgeTypeRejectedException>(() => new JudgeArguments(["a", "b"], []).Signature("query"));
         Assert.Throws<JudgeTypeRejectedException>(() => new JudgeArguments([], new() { ["other"] = 1L }).Signature("query"));
         Assert.Throws<JudgeTypeRejectedException>(() => new JudgeArguments(["a"], new() { ["query"] = "b" }).Signature("query"));
-        Assert.Throws<InvalidOperationException>(() => p.Value("unnamed"));
+        Assert.Throws<JudgeHostErrorException>(() => p.Value("unnamed"));
     }
 }

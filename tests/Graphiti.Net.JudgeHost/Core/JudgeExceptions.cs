@@ -25,6 +25,31 @@ internal sealed class JudgeTypeRejectedException : Exception
 }
 
 /// <summary>
+/// A defect of the host or of a binding, not a result of the case: a binding that reads a parameter that its
+/// signature does not name, a signature that does not fit its method, or an exception with no Python name.
+/// The host reports it as <c>{"host_error": ...}</c>, which never matches a golden result.
+/// </summary>
+internal sealed class JudgeHostErrorException : Exception
+{
+    /// <summary>Initializes a new instance of the <see cref="JudgeHostErrorException"/> class.</summary>
+    public JudgeHostErrorException()
+    {
+    }
+
+    /// <summary>Initializes a new instance of the <see cref="JudgeHostErrorException"/> class.</summary>
+    public JudgeHostErrorException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Initializes a new instance of the <see cref="JudgeHostErrorException"/> class.</summary>
+    public JudgeHostErrorException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// A case needs a value that no binding file registered: a <c>$ref</c>, <c>$enum</c>, or <c>$model</c> path of a unit
 /// that is not ported yet, or a tag of the flow layer. The host reports it as <c>{"error": "JudgeNotBound"}</c>.
 /// </summary>

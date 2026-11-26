@@ -2,7 +2,10 @@ namespace Graphiti.JudgeHost.Core;
 
 using System.Collections;
 using System.Numerics;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Graphiti.PyCompat;
 
 /// <summary>
@@ -168,10 +171,110 @@ internal sealed class JudgeParameters
     internal T Ref<T>(string name)
         where T : class => Get<T>(name);
 
+    /// <summary>
+    /// Calls <paramref name="method"/> with the arguments of the case and encodes its result. The i-th name of the
+    /// signature is the i-th parameter of the method. A last parameter of type <see cref="CancellationToken"/> has no
+    /// name and gets <see cref="CancellationToken.None"/>. Each value that the case passes is read with
+    /// <see cref="JudgeTypes.Convert"/>, so a wrong type is <see cref="JudgeTypeRejectedException"/>. A
+    /// parameter of a reference type that is annotated nullable takes <c>None</c>. A name that the case leaves out
+    /// takes the C# default of the parameter, which is the Python default by rule R7, or is a missing argument if the
+    /// parameter has none. The result of a <c>Task</c>, <c>Task&lt;T&gt;</c>, <c>ValueTask</c>, or
+    /// <c>ValueTask&lt;T&gt;</c> is awaited. An exception of the method reaches the caller with its own type and stack.
+    /// </summary>
+    /// <remarks>
+    /// A method group converts to <see cref="Delegate"/> with no cast when the method has one overload and is not
+    /// generic: <c>call.Signature("query").InvokeAsync(Helpers.LuceneSanitize)</c>. An overloaded method or a generic
+    /// method has no natural delegate type, so it needs a cast to a <c>Func</c> or an <c>Action</c> type, for example
+    /// <c>InvokeAsync((Func&lt;string, long, string&gt;)Text.Truncate)</c>. A constructor, a property, or a method that
+    /// needs an instance built from an argument uses the explicit reads.
+    /// </remarks>
+    internal async ValueTask<JsonNode?> InvokeAsync(Delegate method)
+    {
+        var info = method.Method;
+        var parameters = info.GetParameters();
+        var count = parameters.Length;
+        var token = count > 0 && parameters[^1].ParameterType == typeof(CancellationToken);
+        if (token)
+        {
+            count--;
+        }
+
+        if (count != names.Length)
+        {
+            throw new JudgeHostErrorException($"The signature names {names.Length} parameters, and {info.Name} has {count}.");
+        }
+
+        var nullability = new NullabilityInfoContext();
+        var arguments = new object?[parameters.Length];
+        for (var index = 0; index < count; index++)
+        {
+            var parameter = parameters[index];
+            var name = names[index];
+            if (!values.TryGetValue(name, out var value))
+            {
+                arguments[index] = parameter.HasDefaultValue
+                    ? parameter.DefaultValue
+                    : throw new JudgeTypeRejectedException($"missing a required argument: '{name}'");
+                continue;
+            }
+
+            arguments[index] = value is null && !parameter.ParameterType.IsValueType && nullability.Create(parameter).WriteState == NullabilityState.Nullable
+                ? null
+                : JudgeTypes.Convert(parameter.ParameterType, value, $"argument '{name}'");
+        }
+
+        if (token)
+        {
+            arguments[^1] = CancellationToken.None;
+        }
+
+        object? result;
+        try
+        {
+            result = info.Invoke(method.Target, arguments);
+        }
+        catch (TargetInvocationException error) when (error.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+            throw;
+        }
+
+        return Codec.Encode(await Await(info.ReturnType, result));
+    }
+
+    private static async Task<object?> Await(Type returnType, object? result)
+    {
+        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+        {
+            result = returnType.GetMethod(nameof(ValueTask<int>.AsTask))!.Invoke(result, null);
+            returnType = typeof(Task<>).MakeGenericType(returnType.GetGenericArguments());
+        }
+        else if (returnType == typeof(ValueTask))
+        {
+            result = ((ValueTask)result!).AsTask();
+            returnType = typeof(Task);
+        }
+
+        if (returnType == typeof(Task))
+        {
+            await ((Task)result!).ConfigureAwait(true);
+            return null;
+        }
+
+        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            var task = (Task)result!;
+            await task.ConfigureAwait(true);
+            return returnType.GetProperty(nameof(Task<int>.Result))!.GetValue(task);
+        }
+
+        return result;
+    }
+
     private string Known(string name) =>
         names.Contains(name, StringComparer.Ordinal)
             ? name
-            : throw new InvalidOperationException($"The binding reads the parameter '{name}', which its signature does not name.");
+            : throw new JudgeHostErrorException($"The binding reads the parameter '{name}', which its signature does not name.");
 }
 
 /// <summary>
@@ -182,7 +285,10 @@ internal sealed class JudgeParameters
 /// <item>A <c>double</c> takes a <c>double</c>, a <c>long</c>, or a <c>BigInteger</c>, converted as <c>float(x)</c> does.</item>
 /// <item>A <c>long</c> or an <c>int</c> takes an int that fits. A <c>bool</c>, a <c>double</c>, or a larger int is rejected.</item>
 /// <item>A <c>bool</c> takes only a <c>bool</c>. An enum takes only its own member.</item>
-/// <item>A <c>List&lt;T&gt;</c> takes a list, and an <c>OrderedDictionary&lt;string, T&gt;</c> a dict with string keys, with each item read by these rules.</item>
+/// <item>A <c>List&lt;T&gt;</c>, an <c>IEnumerable&lt;T&gt;</c>, or an <c>IReadOnlyList&lt;T&gt;</c> takes a list, and an
+/// <c>OrderedDictionary&lt;string, T&gt;</c> a dict with string keys, with each item read by these rules. A tuple is
+/// not a list.</item>
+/// <item>A <c>PySet&lt;T&gt;</c> or a <c>HashSet&lt;T&gt;</c> takes a set, with each item read by these rules.</item>
 /// <item>Each other type takes a value of that runtime type.</item>
 /// </list>
 /// </summary>
@@ -224,7 +330,8 @@ internal static class JudgeTypes
             return value is long l && l is >= int.MinValue and <= int.MaxValue ? (int)l : throw Rejected(target, value, what);
         }
 
-        if (target.IsGenericType && target.GetGenericTypeDefinition() == typeof(List<>))
+        var definition = target.IsGenericType ? target.GetGenericTypeDefinition() : null;
+        if (definition == typeof(List<>) || definition == typeof(IEnumerable<>) || definition == typeof(IReadOnlyList<>))
         {
             if (value is not List<object?> list)
             {
@@ -237,7 +344,7 @@ internal static class JudgeTypes
                 return list;
             }
 
-            var result = (IList)Activator.CreateInstance(target, list.Count)!;
+            var result = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(item), list.Count)!;
             for (var index = 0; index < list.Count; index++)
             {
                 result.Add(Convert(item, list[index], $"{what}[{index}]"));
@@ -268,8 +375,39 @@ internal static class JudgeTypes
             return result;
         }
 
+        if (definition == typeof(PySet<>) || definition == typeof(HashSet<>))
+        {
+            if (value is not PySet<object?> set)
+            {
+                throw Rejected(target, value, what);
+            }
+
+            var item = target.GetGenericArguments()[0];
+            if (target == typeof(PySet<object?>))
+            {
+                return set;
+            }
+
+            var read = typeof(JudgeTypes).GetMethod(definition == typeof(PySet<>) ? nameof(ToPySet) : nameof(ToHashSet), BindingFlags.NonPublic | BindingFlags.Static)!;
+            try
+            {
+                return read.MakeGenericMethod(item).Invoke(null, [set, what]);
+            }
+            catch (TargetInvocationException error) when (error.InnerException is not null)
+            {
+                ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+                throw;
+            }
+        }
+
         return target.IsInstanceOfType(value) ? value : throw Rejected(target, value, what);
     }
+
+    private static PySet<T> ToPySet<T>(PySet<object?> set, string what) =>
+        new(set.Select((item, index) => (T)Convert(typeof(T), item, $"{what} item {index}")!));
+
+    private static HashSet<T> ToHashSet<T>(PySet<object?> set, string what) =>
+        [.. set.Select((item, index) => (T)Convert(typeof(T), item, $"{what} item {index}")!)];
 
     private static JudgeTypeRejectedException Rejected(Type target, object? value, string what) =>
         new($"{what}: the C# type {target.Name} cannot hold a Python {Py.TypeName(value)}");

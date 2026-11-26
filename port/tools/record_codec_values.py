@@ -1,11 +1,14 @@
 """Records what the Python judge codec writes for generated values (plan 0003, task P7).
 
-One file comes out of a run:
+Two files come out of a run:
 
 - tests/Port.Evaluation/JudgeHost/python-codec-values.jsonl: one line for each value, with the value as
   argument tags in "input" and the text of json.dumps(encode(value), ensure_ascii=True) in "output".
   That is how port/judge/host-python/host.py writes a result. A test decodes each input with the C# decoder,
   encodes it with the C# codec, and compares the text.
+- tests/Port.Evaluation/JudgeHost/python-neo4j-errors.json: the class name that the neo4j driver of the oracle
+  gives to a server error with each status code (Neo4jError._hydrate_neo4j). The codes are the keys of the
+  driver's own tables and a few codes outside them.
 
 Run it with the oracle interpreter, and with -B so that no __pycache__ folder appears under port/judge/:
 
@@ -45,6 +48,7 @@ sys.path.insert(0, str(ROOT / 'port' / 'judge' / 'host-python'))
 from codec import encode  # noqa: E402
 
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'JudgeHost' / 'python-codec-values.jsonl'
+NEO4J_OUT = ROOT / 'tests' / 'Port.Evaluation' / 'JudgeHost' / 'python-neo4j-errors.json'
 
 
 class Color(enum.Enum):
@@ -283,17 +287,42 @@ def records() -> list[dict]:
     return out
 
 
+def neo4j_errors() -> dict:
+    import neo4j
+    from neo4j import exceptions
+
+    codes = [*exceptions._client_errors, *exceptions._transient_errors, *exceptions._ERROR_REWRITE_MAP]
+    codes += [
+        'Neo.ClientError.Statement.ParameterMissing',
+        'Neo.ClientError.Security.AuthorizationExpired',
+        'Neo.TransientError.General.OutOfMemoryError',
+        'Neo.TransientError.Statement.SyntaxError',
+        'Neo.DatabaseError.General.UnknownError',
+        'Neo.DatabaseError.Statement.SyntaxError',
+        'Neo.OtherError.General.Something',
+        'Neo.ClientError.Statement',
+        'Neo.ClientError.Statement.SyntaxError.Extra',
+        'NotACode',
+    ]
+    rows = [{'code': c, 'python': type(exceptions.Neo4jError._hydrate_neo4j(code=c, message='m')).__name__}
+            for c in dict.fromkeys(codes)]
+    return {'neo4j': neo4j.__version__, 'codes': rows}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--check', action='store_true')
     options = parser.parse_args()
     text = ''.join(json.dumps(r, ensure_ascii=True) + '\n' for r in records())
+    neo4j_text = json.dumps(neo4j_errors(), ensure_ascii=True, indent=1) + '\n'
     if options.check:
-        same = OUT.exists() and OUT.read_text(encoding='utf-8') == text
+        same = all(path.exists() and path.read_text(encoding='utf-8') == content
+                   for path, content in ((OUT, text), (NEO4J_OUT, neo4j_text)))
         print('record_codec_values: up to date' if same else 'record_codec_values: differs', file=sys.stderr)
         return 0 if same else 1
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(text, encoding='utf-8')
+    NEO4J_OUT.write_text(neo4j_text, encoding='utf-8')
     print(f'record_codec_values: wrote {len(text.splitlines())} values to {OUT.relative_to(ROOT)}', file=sys.stderr)
     return 0
 

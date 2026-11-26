@@ -40,8 +40,18 @@ public sealed class ExceptionNameTests
         { nameof(OperationCanceledException), "CancelledError" },
         { nameof(TaskCanceledException), "CancelledError" },
         { nameof(TimeoutException), "TimeoutError" },
-        { nameof(NullReferenceException), "NullReferenceException" },
+        { "RegexParseException", "error" },
     };
+
+    [Theory]
+    [InlineData(nameof(NullReferenceException))]
+    [InlineData(nameof(AggregateException))]
+    [InlineData(nameof(Exception))]
+    [InlineData(nameof(ApplicationException))]
+    public void ATypeWithNoRowHasNoPythonName(string type)
+    {
+        Assert.Null(Codec.PythonExceptionName((Exception)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(Find(type))));
+    }
 
     [Theory]
     [MemberData(nameof(BuiltinRows))]
@@ -82,8 +92,8 @@ public sealed class ExceptionNameTests
         Assert.Equal("NodeNotFoundError", Name(Build("Graphiti.Nodes.SpecialNodeNotFoundException", Built["Graphiti.NodeNotFoundException"])));
         Assert.Equal("GraphitiError", Name(Build("Graphiti.Search.UnlistedException", root)));
 
-        // A type outside the namespace Graphiti keeps its own name.
-        Assert.Equal("NodeNotFoundException", Name(Build("Elsewhere.NodeNotFoundException", typeof(Exception))));
+        // A type outside the namespace Graphiti has no Python name.
+        Assert.Null(Name(Build("Elsewhere.NodeNotFoundException", typeof(Exception))));
     }
 
     [Fact]
@@ -98,7 +108,7 @@ public sealed class ExceptionNameTests
 
         var builtin = Codec.BuiltinExceptionNames.Select(r => r.Type).ToList();
         var argument = builtin.IndexOf(typeof(ArgumentException).FullName!);
-        foreach (var derived in new[] { "Graphiti.PyCompat.ValidationException", typeof(DecoderFallbackException).FullName!, typeof(EncoderFallbackException).FullName!, typeof(ArgumentNullException).FullName!, typeof(ArgumentOutOfRangeException).FullName! })
+        foreach (var derived in new[] { "Graphiti.PyCompat.ValidationException", typeof(System.Text.RegularExpressions.RegexParseException).FullName!, typeof(DecoderFallbackException).FullName!, typeof(EncoderFallbackException).FullName!, typeof(ArgumentNullException).FullName!, typeof(ArgumentOutOfRangeException).FullName! })
         {
             Assert.True(builtin.IndexOf(derived) < argument, derived);
         }
@@ -106,18 +116,20 @@ public sealed class ExceptionNameTests
         Assert.True(builtin.IndexOf(typeof(TaskCanceledException).FullName!) < builtin.IndexOf(typeof(OperationCanceledException).FullName!));
     }
 
-    [Theory]
-    [InlineData("Neo.ClientError.Statement.SyntaxError", "CypherSyntaxError")]
-    [InlineData("Neo.ClientError.Statement.TypeError", "CypherTypeError")]
-    [InlineData("Neo.ClientError.Schema.ConstraintValidationFailed", "ConstraintError")]
-    [InlineData("Neo.ClientError.Statement.ParameterMissing", "ClientError")]
-    [InlineData("Neo.DatabaseError.General.UnknownError", "DatabaseError")]
-    [InlineData("Neo.TransientError.General.DatabaseUnavailable", "TransientError")]
-    [InlineData("Neo.TransientError.Transaction.Terminated", "ClientError")]
-    public void ANeo4jErrorIsNamedByItsCode(string code, string python)
+    // port/tools/record_codec_values.py recorded the class that the driver of the oracle gives to each code.
+    [Fact]
+    public void ANeo4jErrorIsNamedByItsCodeAsTheOracleDriverNamesIt()
     {
-        Assert.Equal(python, Codec.PythonExceptionName(new ClientException(code, "message")));
-        Assert.Equal(python, Codec.PythonExceptionName(new DatabaseException(code, "message")));
+        using var document = JsonDocument.Parse(File.ReadAllText(Repository.Path("tests", "Port.Evaluation", "JudgeHost", "python-neo4j-errors.json")));
+        var rows = document.RootElement.GetProperty("codes").EnumerateArray().ToList();
+        Assert.True(rows.Count > 25);
+        foreach (var row in rows)
+        {
+            var code = row.GetProperty("code").GetString()!;
+            var python = row.GetProperty("python").GetString()!;
+            Assert.True(python == Codec.PythonExceptionName(new ClientException(code, "message")), code);
+            Assert.True(python == Codec.PythonExceptionName(new DatabaseException(code, "message")), code);
+        }
     }
 
     [Fact]
@@ -135,10 +147,10 @@ public sealed class ExceptionNameTests
         Assert.Equal("TransportError", Codec.PythonExceptionName(new HttpRequestException("x")));
     }
 
-    private static string Name(Type type) => Codec.PythonExceptionName((Exception)Activator.CreateInstance(type)!);
+    private static string? Name(Type type) => Codec.PythonExceptionName((Exception)Activator.CreateInstance(type)!);
 
     private static Type Find(string name) =>
-        new[] { typeof(object).Assembly, typeof(JsonException).Assembly, typeof(DecoderFallbackException).Assembly }
+        new[] { typeof(object).Assembly, typeof(JsonException).Assembly, typeof(DecoderFallbackException).Assembly, typeof(System.Text.RegularExpressions.Regex).Assembly }
             .Select(a => a.GetTypes().FirstOrDefault(t => t.Name == name && t.IsPublic && typeof(Exception).IsAssignableFrom(t)))
             .First(t => t is not null)!;
 
