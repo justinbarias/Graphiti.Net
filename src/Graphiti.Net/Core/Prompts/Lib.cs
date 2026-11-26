@@ -18,6 +18,7 @@ limitations under the License.
 namespace Graphiti.Core.Prompts;
 
 using Graphiti.Internal;
+using Graphiti.PyCompat;
 
 // PORT: the two interfaces of R15. The pilot declared them for real (R24). Each library class below implements
 // IPromptLibrary, and each group class implements IPromptGroup, so that `getattr` by name has a typed form.
@@ -97,10 +98,9 @@ internal interface PromptLibrary
 
 internal sealed class VersionWrapper
 {
-    // TODO(port): VersionWrapper.__init__
     internal VersionWrapper(PromptFunction func)
     {
-        throw new NotSupportedException("TODO(port): VersionWrapper.__init__");
+        Func = func;
     }
 
     internal PromptFunction Func { get; set; }
@@ -108,7 +108,13 @@ internal sealed class VersionWrapper
     // PORT: Call for __call__ (R2). Its method group is a PromptFunction.
     internal List<Message> Call(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): VersionWrapper.__call__");
+        var messages = Func(context);
+        foreach (var message in messages)
+        {
+            message.Content += message.Role == "system" ? PromptHelpers.DoNotEscapeUnicode : string.Empty;
+        }
+
+        return messages;
     }
 }
 
@@ -126,156 +132,133 @@ internal sealed class PromptTypeWrapper :
     SummarizeSagasPrompt,
     EvalPrompt
 {
+    // PORT: R15. The attributes that `setattr` sets, by version name.
+    private readonly Dictionary<string, VersionWrapper> attributes = [];
+
     // PORT: R15, the form of the prompt wrappers
-    // TODO(port): PromptTypeWrapper.__init__
     internal PromptTypeWrapper(OrderedDictionary<string, PromptFunction> versions)
     {
-        throw new NotSupportedException("TODO(port): PromptTypeWrapper.__init__");
+        foreach (var (version, func) in versions)
+        {
+            attributes[version] = new VersionWrapper(func);
+        }
     }
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_message
-    PromptFunction ExtractNodesPrompt.ExtractMessage => throw new NotSupportedException("TODO(port): extract_nodes.extract_message");
+    PromptFunction ExtractNodesPrompt.ExtractMessage =>
+        attributes.TryGetValue("extract_message", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_message");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_json
-    PromptFunction ExtractNodesPrompt.ExtractJson => throw new NotSupportedException("TODO(port): extract_nodes.extract_json");
+    PromptFunction ExtractNodesPrompt.ExtractJson =>
+        attributes.TryGetValue("extract_json", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_json");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_text
-    PromptFunction ExtractNodesPrompt.ExtractText => throw new NotSupportedException("TODO(port): extract_nodes.extract_text");
+    PromptFunction ExtractNodesPrompt.ExtractText =>
+        attributes.TryGetValue("extract_text", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_text");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.classify_nodes
-    PromptFunction ExtractNodesPrompt.ClassifyNodes => throw new NotSupportedException("TODO(port): extract_nodes.classify_nodes");
+    PromptFunction ExtractNodesPrompt.ClassifyNodes =>
+        attributes.TryGetValue("classify_nodes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("classify_nodes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_attributes
-    PromptFunction ExtractNodesPrompt.ExtractAttributes => throw new NotSupportedException("TODO(port): extract_nodes.extract_attributes");
+    PromptFunction ExtractNodesPrompt.ExtractAttributes =>
+        attributes.TryGetValue("extract_attributes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_attributes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_summary
-    PromptFunction ExtractNodesPrompt.ExtractSummary => throw new NotSupportedException("TODO(port): extract_nodes.extract_summary");
+    PromptFunction ExtractNodesPrompt.ExtractSummary =>
+        attributes.TryGetValue("extract_summary", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_summary");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_summaries_batch
-    PromptFunction ExtractNodesPrompt.ExtractSummariesBatch => throw new NotSupportedException("TODO(port): extract_nodes.extract_summaries_batch");
+    PromptFunction ExtractNodesPrompt.ExtractSummariesBatch =>
+        attributes.TryGetValue("extract_summaries_batch", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_summaries_batch");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes.extract_entity_summaries_from_episodes
-    PromptFunction ExtractNodesPrompt.ExtractEntitySummariesFromEpisodes => throw new NotSupportedException("TODO(port): extract_nodes.extract_entity_summaries_from_episodes");
+    PromptFunction ExtractNodesPrompt.ExtractEntitySummariesFromEpisodes =>
+        attributes.TryGetValue("extract_entity_summaries_from_episodes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_entity_summaries_from_episodes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): dedupe_nodes.node
-    PromptFunction DedupeNodesPrompt.Node => throw new NotSupportedException("TODO(port): dedupe_nodes.node");
+    PromptFunction DedupeNodesPrompt.Node =>
+        attributes.TryGetValue("node", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("node");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): dedupe_nodes.node_list
-    PromptFunction DedupeNodesPrompt.NodeList => throw new NotSupportedException("TODO(port): dedupe_nodes.node_list");
+    PromptFunction DedupeNodesPrompt.NodeList =>
+        attributes.TryGetValue("node_list", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("node_list");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): dedupe_nodes.nodes
-    PromptFunction DedupeNodesPrompt.Nodes => throw new NotSupportedException("TODO(port): dedupe_nodes.nodes");
+    PromptFunction DedupeNodesPrompt.Nodes =>
+        attributes.TryGetValue("nodes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("nodes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_edges.edge
-    PromptFunction ExtractEdgesPrompt.Edge => throw new NotSupportedException("TODO(port): extract_edges.edge");
+    PromptFunction ExtractEdgesPrompt.Edge =>
+        attributes.TryGetValue("edge", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("edge");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_edges.extract_attributes
-    PromptFunction ExtractEdgesPrompt.ExtractAttributes => throw new NotSupportedException("TODO(port): extract_edges.extract_attributes");
+    PromptFunction ExtractEdgesPrompt.ExtractAttributes =>
+        attributes.TryGetValue("extract_attributes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_attributes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_edges.extract_timestamps
-    PromptFunction ExtractEdgesPrompt.ExtractTimestamps => throw new NotSupportedException("TODO(port): extract_edges.extract_timestamps");
+    PromptFunction ExtractEdgesPrompt.ExtractTimestamps =>
+        attributes.TryGetValue("extract_timestamps", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_timestamps");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_edges.extract_timestamps_batch
-    PromptFunction ExtractEdgesPrompt.ExtractTimestampsBatch => throw new NotSupportedException("TODO(port): extract_edges.extract_timestamps_batch");
+    PromptFunction ExtractEdgesPrompt.ExtractTimestampsBatch =>
+        attributes.TryGetValue("extract_timestamps_batch", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_timestamps_batch");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes_and_edges.extract_message
-    PromptFunction ExtractNodesAndEdgesPrompt.ExtractMessage => throw new NotSupportedException("TODO(port): extract_nodes_and_edges.extract_message");
+    PromptFunction ExtractNodesAndEdgesPrompt.ExtractMessage =>
+        attributes.TryGetValue("extract_message", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_message");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): dedupe_edges.resolve_edge
-    PromptFunction DedupeEdgesPrompt.ResolveEdge => throw new NotSupportedException("TODO(port): dedupe_edges.resolve_edge");
+    PromptFunction DedupeEdgesPrompt.ResolveEdge =>
+        attributes.TryGetValue("resolve_edge", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("resolve_edge");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): summarize_nodes.summarize_pair
-    PromptFunction SummarizeNodesPrompt.SummarizePair => throw new NotSupportedException("TODO(port): summarize_nodes.summarize_pair");
+    PromptFunction SummarizeNodesPrompt.SummarizePair =>
+        attributes.TryGetValue("summarize_pair", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summarize_pair");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): summarize_nodes.summarize_context
-    PromptFunction SummarizeNodesPrompt.SummarizeContext => throw new NotSupportedException("TODO(port): summarize_nodes.summarize_context");
+    PromptFunction SummarizeNodesPrompt.SummarizeContext =>
+        attributes.TryGetValue("summarize_context", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summarize_context");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): summarize_nodes.summary_description
-    PromptFunction SummarizeNodesPrompt.SummaryDescription => throw new NotSupportedException("TODO(port): summarize_nodes.summary_description");
+    PromptFunction SummarizeNodesPrompt.SummaryDescription =>
+        attributes.TryGetValue("summary_description", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summary_description");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): summarize_sagas.summarize_saga
-    PromptFunction SummarizeSagasPrompt.SummarizeSaga => throw new NotSupportedException("TODO(port): summarize_sagas.summarize_saga");
+    PromptFunction SummarizeSagasPrompt.SummarizeSaga =>
+        attributes.TryGetValue("summarize_saga", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summarize_saga");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): eval.qa_prompt
-    PromptFunction EvalPrompt.QaPrompt => throw new NotSupportedException("TODO(port): eval.qa_prompt");
+    PromptFunction EvalPrompt.QaPrompt =>
+        attributes.TryGetValue("qa_prompt", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("qa_prompt");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): eval.eval_prompt
-    PromptFunction EvalPrompt.EvalPromptFunction => throw new NotSupportedException("TODO(port): eval.eval_prompt");
+    PromptFunction EvalPrompt.EvalPromptFunction =>
+        attributes.TryGetValue("eval_prompt", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("eval_prompt");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): eval.query_expansion
-    PromptFunction EvalPrompt.QueryExpansion => throw new NotSupportedException("TODO(port): eval.query_expansion");
+    PromptFunction EvalPrompt.QueryExpansion =>
+        attributes.TryGetValue("query_expansion", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("query_expansion");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): eval.eval_add_episode_results
-    PromptFunction EvalPrompt.EvalAddEpisodeResults => throw new NotSupportedException("TODO(port): eval.eval_add_episode_results");
+    PromptFunction EvalPrompt.EvalAddEpisodeResults =>
+        attributes.TryGetValue("eval_add_episode_results", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("eval_add_episode_results");
 }
 
 // PORT: R15, the form of the prompt wrappers. PromptLibraryWrapper sets one attribute for each group with
 // `setattr`. This class implements the interface PromptLibrary.
 internal sealed class PromptLibraryWrapper : PromptLibrary
 {
+    // PORT: R15. The attributes that `setattr` sets, by group name.
+    private readonly Dictionary<string, PromptTypeWrapper> attributes = [];
+
     // PORT: R15, the form of the prompt wrappers
-    // TODO(port): PromptLibraryWrapper.__init__
     internal PromptLibraryWrapper(OrderedDictionary<string, OrderedDictionary<string, PromptFunction>> library)
     {
-        throw new NotSupportedException("TODO(port): PromptLibraryWrapper.__init__");
+        foreach (var (promptType, versions) in library)
+        {
+            attributes[promptType] = new PromptTypeWrapper(versions);
+        }
     }
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes
-    ExtractNodesPrompt PromptLibrary.ExtractNodes => throw new NotSupportedException("TODO(port): extract_nodes");
+    ExtractNodesPrompt PromptLibrary.ExtractNodes =>
+        attributes.TryGetValue("extract_nodes", out var group) ? group : throw new MissingMemberException("extract_nodes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): dedupe_nodes
-    DedupeNodesPrompt PromptLibrary.DedupeNodes => throw new NotSupportedException("TODO(port): dedupe_nodes");
+    DedupeNodesPrompt PromptLibrary.DedupeNodes =>
+        attributes.TryGetValue("dedupe_nodes", out var group) ? group : throw new MissingMemberException("dedupe_nodes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_edges
-    ExtractEdgesPrompt PromptLibrary.ExtractEdges => throw new NotSupportedException("TODO(port): extract_edges");
+    ExtractEdgesPrompt PromptLibrary.ExtractEdges =>
+        attributes.TryGetValue("extract_edges", out var group) ? group : throw new MissingMemberException("extract_edges");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): extract_nodes_and_edges
-    ExtractNodesAndEdgesPrompt PromptLibrary.ExtractNodesAndEdges => throw new NotSupportedException("TODO(port): extract_nodes_and_edges");
+    ExtractNodesAndEdgesPrompt PromptLibrary.ExtractNodesAndEdges =>
+        attributes.TryGetValue("extract_nodes_and_edges", out var group) ? group : throw new MissingMemberException("extract_nodes_and_edges");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): dedupe_edges
-    DedupeEdgesPrompt PromptLibrary.DedupeEdges => throw new NotSupportedException("TODO(port): dedupe_edges");
+    DedupeEdgesPrompt PromptLibrary.DedupeEdges =>
+        attributes.TryGetValue("dedupe_edges", out var group) ? group : throw new MissingMemberException("dedupe_edges");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): summarize_nodes
-    SummarizeNodesPrompt PromptLibrary.SummarizeNodes => throw new NotSupportedException("TODO(port): summarize_nodes");
+    SummarizeNodesPrompt PromptLibrary.SummarizeNodes =>
+        attributes.TryGetValue("summarize_nodes", out var group) ? group : throw new MissingMemberException("summarize_nodes");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): summarize_sagas
-    SummarizeSagasPrompt PromptLibrary.SummarizeSagas => throw new NotSupportedException("TODO(port): summarize_sagas");
+    SummarizeSagasPrompt PromptLibrary.SummarizeSagas =>
+        attributes.TryGetValue("summarize_sagas", out var group) ? group : throw new MissingMemberException("summarize_sagas");
 
-    // PORT: R15, the form of the prompt wrappers
-    // TODO(port): eval
-    EvalPrompt PromptLibrary.Eval => throw new NotSupportedException("TODO(port): eval");
+    EvalPrompt PromptLibrary.Eval =>
+        attributes.TryGetValue("eval", out var group) ? group : throw new MissingMemberException("eval");
 }
 
 internal static partial class Lib
@@ -296,22 +279,173 @@ internal static partial class Lib
         "Prompt overrides must return ChatPrompt(system=..., user=...). "
         + "Returning list[Message] is no longer supported.";
 
-    // TODO(port): _builtin_specs
+    // Fixed prompt_name -> response_model registry. Schemas are not overridable.
     private static OrderedDictionary<string, PromptSpec> BuiltinSpecs()
     {
-        throw new NotSupportedException("TODO(port): _builtin_specs");
+        return new OrderedDictionary<string, PromptSpec>
+        {
+            ["extract_nodes.extract_message"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_message",
+                ResponseModel = ExtractedEntities.ResponseModel,
+            }.Validate(),
+            ["extract_nodes.extract_text"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_text",
+                ResponseModel = ExtractedEntities.ResponseModel,
+            }.Validate(),
+            ["extract_nodes.extract_json"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_json",
+                ResponseModel = ExtractedEntities.ResponseModel,
+            }.Validate(),
+            ["extract_nodes.classify_nodes"] = new PromptSpec
+            {
+                Name = "extract_nodes.classify_nodes",
+            }.Validate(),
+            ["extract_nodes.extract_attributes"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_attributes",
+                DynamicSchema = true,
+            }.Validate(),
+            ["extract_nodes.extract_summary"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_summary",
+            }.Validate(),
+            ["extract_nodes.extract_summaries_batch"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_summaries_batch",
+                ResponseModel = SummarizedEntities.ResponseModel,
+            }.Validate(),
+            ["extract_nodes.extract_entity_summaries_from_episodes"] = new PromptSpec
+            {
+                Name = "extract_nodes.extract_entity_summaries_from_episodes",
+                ResponseModel = SummarizedEntities.ResponseModel,
+            }.Validate(),
+            ["dedupe_nodes.node"] = new PromptSpec
+            {
+                Name = "dedupe_nodes.node",
+                ResponseModel = NodeDuplicate.ResponseModel,
+            }.Validate(),
+            ["dedupe_nodes.node_list"] = new PromptSpec
+            {
+                Name = "dedupe_nodes.node_list",
+            }.Validate(),
+            ["dedupe_nodes.nodes"] = new PromptSpec
+            {
+                Name = "dedupe_nodes.nodes",
+                ResponseModel = NodeResolutions.ResponseModel,
+            }.Validate(),
+            ["extract_edges.edge"] = new PromptSpec
+            {
+                Name = "extract_edges.edge",
+                ResponseModel = ExtractedEdges.ResponseModel,
+            }.Validate(),
+            ["extract_edges.extract_attributes"] = new PromptSpec
+            {
+                Name = "extract_edges.extract_attributes",
+                DynamicSchema = true,
+            }.Validate(),
+            ["extract_edges.extract_timestamps"] = new PromptSpec
+            {
+                Name = "extract_edges.extract_timestamps",
+                ResponseModel = EdgeTimestamps.ResponseModel,
+            }.Validate(),
+            ["extract_edges.extract_timestamps_batch"] = new PromptSpec
+            {
+                Name = "extract_edges.extract_timestamps_batch",
+                ResponseModel = BatchEdgeTimestamps.ResponseModel,
+            }.Validate(),
+            ["extract_nodes_and_edges.extract_message"] = new PromptSpec
+            {
+                Name = "extract_nodes_and_edges.extract_message",
+                ResponseModel = CombinedExtraction.ResponseModel,
+            }.Validate(),
+            ["dedupe_edges.resolve_edge"] = new PromptSpec
+            {
+                Name = "dedupe_edges.resolve_edge",
+                ResponseModel = EdgeDuplicate.ResponseModel,
+            }.Validate(),
+            ["summarize_nodes.summarize_pair"] = new PromptSpec
+            {
+                Name = "summarize_nodes.summarize_pair",
+                ResponseModel = Summary.ResponseModel,
+            }.Validate(),
+            ["summarize_nodes.summarize_context"] = new PromptSpec
+            {
+                Name = "summarize_nodes.summarize_context",
+                ResponseModel = Summary.ResponseModel,
+            }.Validate(),
+            ["summarize_nodes.summary_description"] = new PromptSpec
+            {
+                Name = "summarize_nodes.summary_description",
+                ResponseModel = SummaryDescription.ResponseModel,
+            }.Validate(),
+            ["summarize_sagas.summarize_saga"] = new PromptSpec
+            {
+                Name = "summarize_sagas.summarize_saga",
+                ResponseModel = SagaSummary.ResponseModel,
+            }.Validate(),
+            ["eval.query_expansion"] = new PromptSpec
+            {
+                Name = "eval.query_expansion",
+                ResponseModel = QueryExpansion.ResponseModel,
+            }.Validate(),
+            ["eval.qa_prompt"] = new PromptSpec
+            {
+                Name = "eval.qa_prompt",
+                ResponseModel = QAResponse.ResponseModel,
+            }.Validate(),
+            ["eval.eval_prompt"] = new PromptSpec
+            {
+                Name = "eval.eval_prompt",
+                ResponseModel = EvalResponse.ResponseModel,
+            }.Validate(),
+            ["eval.eval_add_episode_results"] = new PromptSpec
+            {
+                Name = "eval.eval_add_episode_results",
+                ResponseModel = EvalAddEpisodeResults.ResponseModel,
+            }.Validate(),
+        };
     }
 
-    // PORT: `MappingProxyType(_builtin_specs())` is a read-only view (R14). The value needs a call to a skeleton
-    // member, so it is a property that throws until the unit ports it.
-    // TODO(port): BUILTIN_PROMPT_SPECS
-    internal static IReadOnlyDictionary<string, PromptSpec> BuiltinPromptSpecs =>
-        throw new NotSupportedException("TODO(port): BUILTIN_PROMPT_SPECS");
+    // PORT: `MappingProxyType(...)` is a live read-only view (R14).
+    internal static readonly IReadOnlyDictionary<string, PromptSpec> BuiltinPromptSpecs = BuiltinSpecs().AsReadOnly<string, PromptSpec>();
 
-    // TODO(port): resolve_response_model
+    /// <summary>
+    /// Return the fixed schema for <c>promptName</c>, or the caller schema if dynamic.
+    ///
+    /// Raises <c>ValueError</c> for unknown names, missing dynamic schemas, and attempts
+    /// to replace a fixed schema.
+    /// </summary>
     internal static IResponseModel? ResolveResponseModel(string promptName, IResponseModel? responseModel = null)
     {
-        throw new NotSupportedException("TODO(port): resolve_response_model");
+        var spec = BuiltinPromptSpecs.GetValueOrDefault(promptName);
+        if (spec is null)
+        {
+            throw new ArgumentException($"Unknown prompt_name: {promptName}");
+        }
+
+        if (spec.DynamicSchema)
+        {
+            if (responseModel is null)
+            {
+                throw new ArgumentException(
+                    $"prompt {promptName} has dynamic_schema=True; response_model is required");
+            }
+
+            return responseModel;
+        }
+
+        if (responseModel is not null && !ReferenceEquals(responseModel, spec.ResponseModel))
+        {
+            throw new ArgumentException(
+                $"Prompt schema overrides are not allowed for {promptName}: "
+                + $"got {responseModel.PythonName}, expected "
+                + $"{(spec.ResponseModel is not null ? spec.ResponseModel.PythonName : "None")}");
+        }
+
+        return spec.ResponseModel;
     }
 }
 
@@ -357,52 +491,54 @@ internal abstract class ChatPromptLibrary : IPromptLibrary
     }
 }
 
-// PORT: the private attributes `_extract_nodes` to `_specs` are not declared. The unit adds them with the
-// constructor body.
 internal sealed class DefaultChatPromptLibrary : ChatPromptLibrary
 {
-    // TODO(port): DefaultChatPromptLibrary.__init__
+    private readonly DefaultExtractNodesPrompts extractNodes;
+    private readonly DefaultDedupeNodesPrompts dedupeNodes;
+    private readonly DefaultExtractEdgesPrompts extractEdges;
+    private readonly DefaultExtractNodesAndEdgesPrompts extractNodesAndEdges;
+    private readonly DefaultDedupeEdgesPrompts dedupeEdges;
+    private readonly DefaultSummarizeNodesPrompts summarizeNodes;
+    private readonly DefaultSummarizeSagasPrompts summarizeSagas;
+    private readonly DefaultEvalPrompts eval;
+    private readonly IReadOnlyDictionary<string, PromptSpec> specs;
+
     internal DefaultChatPromptLibrary()
     {
-        throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.__init__");
+        extractNodes = new DefaultExtractNodesPrompts();
+        dedupeNodes = new DefaultDedupeNodesPrompts();
+        extractEdges = new DefaultExtractEdgesPrompts();
+        extractNodesAndEdges = new DefaultExtractNodesAndEdgesPrompts();
+        dedupeEdges = new DefaultDedupeEdgesPrompts();
+        summarizeNodes = new DefaultSummarizeNodesPrompts();
+        summarizeSagas = new DefaultSummarizeSagasPrompts();
+        eval = new DefaultEvalPrompts();
+        specs = Lib.BuiltinPromptSpecs;
     }
 
-    // TODO(port): DefaultChatPromptLibrary.extract_nodes
-    internal override ExtractNodesPrompts ExtractNodes => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.extract_nodes");
+    internal override ExtractNodesPrompts ExtractNodes => extractNodes;
 
-    // TODO(port): DefaultChatPromptLibrary.dedupe_nodes
-    internal override DedupeNodesPrompts DedupeNodes => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.dedupe_nodes");
+    internal override DedupeNodesPrompts DedupeNodes => dedupeNodes;
 
-    // TODO(port): DefaultChatPromptLibrary.extract_edges
-    internal override ExtractEdgesPrompts ExtractEdges => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.extract_edges");
+    internal override ExtractEdgesPrompts ExtractEdges => extractEdges;
 
-    // TODO(port): DefaultChatPromptLibrary.extract_nodes_and_edges
-    internal override ExtractNodesAndEdgesPrompts ExtractNodesAndEdges => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.extract_nodes_and_edges");
+    internal override ExtractNodesAndEdgesPrompts ExtractNodesAndEdges => extractNodesAndEdges;
 
-    // TODO(port): DefaultChatPromptLibrary.dedupe_edges
-    internal override DedupeEdgesPrompts DedupeEdges => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.dedupe_edges");
+    internal override DedupeEdgesPrompts DedupeEdges => dedupeEdges;
 
-    // TODO(port): DefaultChatPromptLibrary.summarize_nodes
-    internal override SummarizeNodesPrompts SummarizeNodes => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.summarize_nodes");
+    internal override SummarizeNodesPrompts SummarizeNodes => summarizeNodes;
 
-    // TODO(port): DefaultChatPromptLibrary.summarize_sagas
-    internal override SummarizeSagasPrompts SummarizeSagas => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.summarize_sagas");
+    internal override SummarizeSagasPrompts SummarizeSagas => summarizeSagas;
 
-    // TODO(port): DefaultChatPromptLibrary.eval
-    internal override EvalPrompts Eval => throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.eval");
+    internal override EvalPrompts Eval => eval;
 
-    // TODO(port): DefaultChatPromptLibrary.specs
-    internal override IReadOnlyDictionary<string, PromptSpec> Specs =>
-        throw new NotSupportedException("TODO(port): DefaultChatPromptLibrary.specs");
+    internal override IReadOnlyDictionary<string, PromptSpec> Specs => specs;
 }
 
 internal static partial class Lib
 {
-    // PORT: a module-level object that needs a call to a skeleton member, so it is a property that throws until the
-    // unit ports it. The unit makes it a static readonly field: one object, as in Python (R17).
-    // TODO(port): default_chat_prompt_library
-    internal static DefaultChatPromptLibrary DefaultChatPromptLibrary =>
-        throw new NotSupportedException("TODO(port): default_chat_prompt_library");
+    // PORT: one object, as in Python (R17).
+    internal static readonly DefaultChatPromptLibrary DefaultChatPromptLibrary = new();
 
     // PORT: no type for a type alias (R2). `PromptOverrides = dict[str, dict[str, ChatPromptFunction]]`
     // has no C# type. Each annotation `PromptOverrides` is
@@ -410,122 +546,286 @@ internal static partial class Lib
 }
 
 // PORT: a class with `__getattr__` implements IPromptGroup and forwards in TryGetFunction (R15). `base: Any` is the
-// group of the base library, an IPromptGroup. The private attributes `_base` and `_overrides` are not declared.
+// group of the base library, an IPromptGroup.
 internal sealed class OverrideGroup : IPromptGroup
 {
-    // TODO(port): _OverrideGroup.__init__
+    private readonly IPromptGroup @base;
+    private readonly OrderedDictionary<string, ChatPromptFunction> overrides;
+
     internal OverrideGroup(IPromptGroup @base, OrderedDictionary<string, ChatPromptFunction> overrides)
     {
-        throw new NotSupportedException("TODO(port): _OverrideGroup.__init__");
+        this.@base = @base;
+        this.overrides = overrides;
     }
 
-    // TODO(port): _OverrideGroup.__getattr__
     public bool TryGetFunction(string name, out ChatPromptFunction? function)
     {
-        throw new NotSupportedException("TODO(port): _OverrideGroup.__getattr__");
+        if (overrides.TryGetValue(name, out var @override))
+        {
+            function = context =>
+            {
+                var result = @override(context);
+                return Lib.PrivateEnsureChatPrompt(result, $"override.{name}");
+            };
+            return true;
+        }
+
+        return @base.TryGetFunction(name, out function);
     }
 }
 
-// PORT: a class with `__getattr__` implements IPromptLibrary and forwards in TryGetGroup and Specs (R15). The private
-// attributes `_base` and `_groups` are not declared.
+// PORT: a class with `__getattr__` implements IPromptLibrary and forwards in TryGetGroup and Specs (R15).
 internal sealed class ComposedPromptLibrary : IPromptLibrary
 {
-    // TODO(port): _ComposedPromptLibrary.__init__
+    private readonly ChatPromptLibrary @base;
+    private readonly Dictionary<string, IPromptGroup> groups = [];
+
     internal ComposedPromptLibrary(
         ChatPromptLibrary @base,
         OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>> overrides)
     {
-        throw new NotSupportedException("TODO(port): _ComposedPromptLibrary.__init__");
+        this.@base = @base;
+        foreach (var groupName in Lib.PromptGroups.Keys)
+        {
+            var groupOverrides = overrides.GetValueOrDefault(groupName, []);
+            if (!@base.TryGetGroup(groupName, out var baseGroup) || baseGroup is null)
+            {
+                throw new MissingMemberException(groupName);
+            }
+
+            if (groupOverrides.Count > 0)
+            {
+                groups[groupName] = new OverrideGroup(baseGroup, groupOverrides);
+            }
+            else
+            {
+                groups[groupName] = baseGroup;
+            }
+        }
     }
 
-    // TODO(port): _ComposedPromptLibrary.__getattr__, the name `specs`
-    public IReadOnlyDictionary<string, PromptSpec>? Specs =>
-        throw new NotSupportedException("TODO(port): _ComposedPromptLibrary.__getattr__");
+    // PORT: `__getattr__` with the name `specs`.
+    public IReadOnlyDictionary<string, PromptSpec>? Specs => @base.Specs;
 
-    // TODO(port): _ComposedPromptLibrary.__getattr__, the group names
+    // PORT: `__getattr__` with a group name.
     public bool TryGetGroup(string name, out IPromptGroup? group)
     {
-        throw new NotSupportedException("TODO(port): _ComposedPromptLibrary.__getattr__");
+        if (groups.TryGetValue(name, out var found))
+        {
+            group = found;
+            return true;
+        }
+
+        group = null;
+        return false;
     }
 }
 
 internal static partial class Lib
 {
     // PORT: `result: Any`. Judge cases pass a ChatPrompt, a list, and a string.
-    // TODO(port): ensure_chat_prompt
     internal static ChatPrompt EnsureChatPrompt(object? result, string label)
     {
-        throw new NotSupportedException("TODO(port): ensure_chat_prompt");
+        if (result is ChatPrompt chatPrompt)
+        {
+            return chatPrompt;
+        }
+
+        if (Py.TypeName(result) == "list")
+        {
+            throw new InvalidCastException($"{label} returned list[Message]; {ChatPromptMigrationNote}");
+        }
+
+        throw new InvalidCastException(
+            $"{label} must return ChatPrompt, got {Py.TypeName(result)}. {ChatPromptMigrationNote}");
     }
 
     // PORT: the prefix Private (R2). `_ensure_chat_prompt` without the underscore is the name of
     // `ensure_chat_prompt` in the same class.
     internal static ChatPrompt PrivateEnsureChatPrompt(object? result, string label)
     {
-        throw new NotSupportedException("TODO(port): _ensure_chat_prompt");
+        return EnsureChatPrompt(result, label);
     }
 
+    /// <summary>Resolve <c>group.method</c> from a prompt library to a callable builder.</summary>
     // PORT: `library: Any` is read with getattr by name, so it is an IPromptLibrary (R15).
-    // TODO(port): get_prompt_builder
     internal static ChatPromptFunction GetPromptBuilder(IPromptLibrary library, string promptName)
     {
-        throw new NotSupportedException("TODO(port): get_prompt_builder");
+        if (!promptName.Contains('.', StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"Invalid prompt_name (expected group.method): {promptName}");
+        }
+
+        var parts = PyText.Split(promptName, ".", 1);
+        var groupName = parts[0];
+        var methodName = parts[1];
+        if (!PromptGroups.TryGetValue(groupName, out var methodNames))
+        {
+            throw new ArgumentException($"Unknown prompt group: {groupName}");
+        }
+
+        if (!methodNames.Contains(methodName))
+        {
+            throw new ArgumentException($"Unknown prompt function for group {groupName}: {methodName}");
+        }
+
+        if (!library.TryGetGroup(groupName, out var group))
+        {
+            throw new MissingMemberException(groupName);
+        }
+
+        // PORT: an attribute that is not a group has no such method: getattr raises AttributeError.
+        if (group is null || !group.TryGetFunction(methodName, out var builder))
+        {
+            throw new MissingMemberException(methodName);
+        }
+
+        if (builder is null)
+        {
+            throw new ArgumentException($"Prompt library function must be callable: {promptName}");
+        }
+
+        return context => EnsureChatPrompt(builder(context), promptName);
     }
 
-    // PORT: a module-level object that needs a call to a skeleton member, so it is a property that throws until the
-    // unit ports it.
     // PORT: R15, the form of the prompt wrappers
-    // TODO(port): prompt_library
-    internal static PromptLibrary PromptLibrary =>
-        throw new NotSupportedException("TODO(port): prompt_library");
+    internal static readonly PromptLibrary PromptLibrary = new PromptLibraryWrapper(PromptLibraryImpl);
 
+    /// <summary>
+    /// Create a prompt library, optionally applying partial overrides to the defaults.
+    ///
+    /// Override callables must return <c>ChatPrompt</c>. Returning <c>list[Message]</c> raises
+    /// <c>TypeError</c> with a migration note.
+    /// </summary>
     // PORT: the annotation of the result is ChatPromptLibrary, but the override path returns a _ComposedPromptLibrary
     // with `# type: ignore[return-value]`. The C# result is the type that both share, IPromptLibrary.
-    // TODO(port): create_prompt_library
     internal static IPromptLibrary CreatePromptLibrary(
         OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>>? overrides = null)
     {
-        throw new NotSupportedException("TODO(port): create_prompt_library");
+        if (overrides is null || overrides.Count == 0)
+        {
+            return new DefaultChatPromptLibrary();
+        }
+
+        foreach (var (groupName, groupOverrides) in overrides)
+        {
+            if (!PromptGroups.TryGetValue(groupName, out var functionNames))
+            {
+                throw new ArgumentException($"Unknown prompt group: {groupName}");
+            }
+
+            foreach (var (functionName, function) in groupOverrides)
+            {
+                if (!functionNames.Contains(functionName))
+                {
+                    throw new ArgumentException($"Unknown prompt function for group {groupName}: {functionName}");
+                }
+
+                if (function is null)
+                {
+                    throw new ArgumentException($"Prompt override must be callable: {groupName}.{functionName}");
+                }
+            }
+        }
+
+        return new ComposedPromptLibrary(new DefaultChatPromptLibrary(), overrides);
     }
 }
 
 // PORT: a class with `__getattr__` implements IPromptLibrary and forwards in TryGetGroup (R15). `library: Any` is an
-// IPromptLibrary. The private attributes `_library` and `_specs` are not declared.
+// IPromptLibrary.
 internal sealed class LibraryWithBuiltinSpecs : IPromptLibrary
 {
-    // TODO(port): _LibraryWithBuiltinSpecs.__init__
+    private readonly IPromptLibrary library;
+    private readonly IReadOnlyDictionary<string, PromptSpec> specs;
+
     internal LibraryWithBuiltinSpecs(IPromptLibrary library)
     {
-        throw new NotSupportedException("TODO(port): _LibraryWithBuiltinSpecs.__init__");
+        this.library = library;
+        specs = Lib.BuiltinPromptSpecs;
     }
 
     IReadOnlyDictionary<string, PromptSpec>? IPromptLibrary.Specs => Specs;
 
-    // TODO(port): _LibraryWithBuiltinSpecs.specs
-    internal IReadOnlyDictionary<string, PromptSpec> Specs =>
-        throw new NotSupportedException("TODO(port): _LibraryWithBuiltinSpecs.specs");
+    internal IReadOnlyDictionary<string, PromptSpec> Specs => specs;
 
-    // TODO(port): _LibraryWithBuiltinSpecs.__getattr__
     public bool TryGetGroup(string name, out IPromptGroup? group)
     {
-        throw new NotSupportedException("TODO(port): _LibraryWithBuiltinSpecs.__getattr__");
+        return library.TryGetGroup(name, out group);
     }
 }
 
 internal static partial class Lib
 {
+    /// <summary>Structurally validate a complete prompt library (duck-typed; ABC not required).</summary>
     // PORT: `library: Any` is read with hasattr and getattr by name, so it is an IPromptLibrary (R15).
-    // TODO(port): validate_prompt_library
     internal static void ValidatePromptLibrary(IPromptLibrary library)
     {
-        throw new NotSupportedException("TODO(port): validate_prompt_library");
+        foreach (var (groupName, functionNames) in PromptGroups)
+        {
+            if (!library.TryGetGroup(groupName, out var group))
+            {
+                throw new ArgumentException($"Prompt library missing group: {groupName}");
+            }
+
+            foreach (var functionName in functionNames)
+            {
+                // PORT: an attribute that is not a group has no such function: hasattr is false.
+                if (group is null || !group.TryGetFunction(functionName, out var function))
+                {
+                    throw new ArgumentException($"Prompt library missing function: {groupName}.{functionName}");
+                }
+
+                if (function is null)
+                {
+                    throw new ArgumentException(
+                        $"Prompt library function must be callable: {groupName}.{functionName}");
+                }
+            }
+        }
+
+        // PORT: `Specs` is typed as a mapping of PromptSpec, so the two branches `must be a mapping` and
+        // `must be PromptSpec` cannot be reached. A null `Specs` stands for `not hasattr(library, 'specs')`.
+        var specs = library.Specs;
+        if (specs is not null)
+        {
+            foreach (var (name, spec) in BuiltinPromptSpecs)
+            {
+                if (!specs.TryGetValue(name, out var libSpec))
+                {
+                    throw new ArgumentException($"Prompt library specs missing entry: {name}");
+                }
+
+                if (libSpec.DynamicSchema != spec.DynamicSchema)
+                {
+                    throw new ArgumentException(
+                        $"Prompt schema overrides are not allowed: {name} dynamic_schema mismatch");
+                }
+
+                if (!ReferenceEquals(libSpec.ResponseModel, spec.ResponseModel))
+                {
+                    throw new ArgumentException(
+                        $"Prompt schema overrides are not allowed: {name} response_model mismatch");
+                }
+            }
+        }
     }
 
+    /// <summary>
+    /// Validate and return the library, attaching builtin specs when missing.
+    ///
+    /// Unicode post-processing is handled by <c>ChatPrompt.as_messages</c>; no VersionWrapper.
+    /// </summary>
     // PORT: the parameter annotation is ChatPromptLibrary and the result is Any. llm_runtime.py passes the result of
     // create_prompt_library, which can be a _ComposedPromptLibrary, so both are IPromptLibrary.
-    // TODO(port): ensure_prompt_library_wrapped
     internal static IPromptLibrary EnsurePromptLibraryWrapped(IPromptLibrary library)
     {
-        throw new NotSupportedException("TODO(port): ensure_prompt_library_wrapped");
+        ValidatePromptLibrary(library);
+        if (library.Specs is null)
+        {
+            return new LibraryWithBuiltinSpecs(library);
+        }
+
+        return library;
     }
 }
