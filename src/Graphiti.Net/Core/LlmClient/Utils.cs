@@ -18,16 +18,40 @@ limitations under the License.
 namespace Graphiti.Core.LlmClient;
 
 using Graphiti.Core.Embedder;
+using Graphiti.Internal;
+using Graphiti.PyCompat;
+using Microsoft.Extensions.Logging;
 
-internal static class Utils
+internal static partial class Utils
 {
+    private static ILogger Logger => PortServices.Logger(typeof(Utils));
+
     // PORT: the result has no annotation. TYPE_HINTS.md gives list[float].
-    // TODO(port): generate_embedding
-    internal static Task<List<double>> GenerateEmbeddingAsync(
+    internal static async Task<List<double>> GenerateEmbeddingAsync(
         EmbedderClient embedder,
         string text,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): generate_embedding");
+        var start = Py.TimeSeconds();
+
+        text = text.Replace("\n", " ", StringComparison.Ordinal);
+        var embedding = await embedder.CreateAsync([text], cancellationToken);
+
+        var end = Py.TimeSeconds();
+        var logger = Logger;
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            var length = Py.Str(Py.Len(text));
+            var elapsed = Py.Str(end - start);
+            Log.EmbeddedText(logger, length, elapsed);
+        }
+
+        return embedding;
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Debug, Message = "embedded text of length {Length} in {Elapsed} ms")]
+        internal static partial void EmbeddedText(ILogger logger, string length, string elapsed);
     }
 }
