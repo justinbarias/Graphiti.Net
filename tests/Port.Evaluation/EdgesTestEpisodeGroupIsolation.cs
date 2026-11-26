@@ -1,6 +1,6 @@
 // Ported from tests/test_episode_group_isolation.py (port/RULES.md, R25): the six tests whose code under test is in
 // graphiti_core/edges.py. The other tests of the file wait for the units of graphiti.py, nodes.py, ingestion, and
-// utils/maintenance. Python has no test class here, so the class has the name of the file with the prefix of the unit.
+// utils/maintenance. The class is the partial class TestEpisodeGroupIsolation, as in the other files of this name.
 namespace Graphiti.Port.Evaluation;
 
 using System.Text.RegularExpressions;
@@ -8,14 +8,14 @@ using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.PyCompat;
 
-public class EdgesTestEpisodeGroupIsolation
+public partial class TestEpisodeGroupIsolation
 {
-    private static readonly PyDateTime Now = PyDateTime.FromIsoFormat("2026-01-01T00:00:00+00:00");
+    private static readonly PyDateTime EdgeNow = PyDateTime.FromIsoFormat("2026-01-01T00:00:00+00:00");
 
     [Fact]
     public async Task test_entity_edge_uuid_lookup_filters_requested_group()
     {
-        var driver = new StubDriver([EntityEdgeRecord()]);
+        var driver = new EdgeStubDriver([EntityEdgeRecord()]);
 
         var edge = await EntityEdge.GetByUuidAsync(driver, "edge-a", groupId: "group-a", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -28,7 +28,7 @@ public class EdgesTestEpisodeGroupIsolation
     [Fact]
     public async Task test_entity_edge_uuid_lookup_rejects_foreign_query_result()
     {
-        var driver = new StubDriver([EntityEdgeRecord(groupId: "group-b")]);
+        var driver = new EdgeStubDriver([EntityEdgeRecord(groupId: "group-b")]);
 
         var error = await Assert.ThrowsAsync<EdgeNotFoundException>(
             () => EntityEdge.GetByUuidAsync(driver, "edge-a", groupId: "group-a", cancellationToken: TestContext.Current.CancellationToken));
@@ -38,7 +38,7 @@ public class EdgesTestEpisodeGroupIsolation
     [Fact]
     public async Task test_entity_edge_uuid_lookup_keeps_unscoped_behavior()
     {
-        var driver = new StubDriver([EntityEdgeRecord(groupId: "group-b")]);
+        var driver = new EdgeStubDriver([EntityEdgeRecord(groupId: "group-b")]);
 
         var edge = await EntityEdge.GetByUuidAsync(driver, "edge-a", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -51,7 +51,7 @@ public class EdgesTestEpisodeGroupIsolation
     [Fact]
     public async Task test_entity_edge_bulk_lookup_filters_foreign_edges()
     {
-        var driver = new StubDriver([EntityEdgeRecord(), EntityEdgeRecord(uuid: "edge-b", groupId: "group-b")]);
+        var driver = new EdgeStubDriver([EntityEdgeRecord(), EntityEdgeRecord(uuid: "edge-b", groupId: "group-b")]);
 
         var edges = await EntityEdge.GetByUuidsAsync(driver, ["edge-a", "edge-b"], groupId: "group-a", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -70,11 +70,11 @@ public class EdgesTestEpisodeGroupIsolation
             GroupId = "group-b",
             SourceNodeUuid = "source-b",
             TargetNodeUuid = "target-b",
-            CreatedAt = Now,
+            CreatedAt = EdgeNow,
             Name = "RELATED_TO",
             Fact = "source relates to target",
         }.Validate();
-        var driver = new StubDriver([]) { GraphOperationsInterface = new EntityEdgeOperations(edge) };
+        var driver = new EdgeStubDriver([]) { GraphOperationsInterface = new EntityEdgeOperations(edge) };
 
         var error = await Assert.ThrowsAsync<EdgeNotFoundException>(
             () => EntityEdge.GetByUuidAsync(driver, "edge-b", groupId: "group-a", cancellationToken: TestContext.Current.CancellationToken));
@@ -94,7 +94,7 @@ public class EdgesTestEpisodeGroupIsolation
                 GroupId = "group-a",
                 SourceNodeUuid = "source-a",
                 TargetNodeUuid = "target-a",
-                CreatedAt = Now,
+                CreatedAt = EdgeNow,
                 Name = "RELATED_TO",
                 Fact = "source relates to target",
             }.Validate(),
@@ -104,12 +104,12 @@ public class EdgesTestEpisodeGroupIsolation
                 GroupId = "group-b",
                 SourceNodeUuid = "source-b",
                 TargetNodeUuid = "target-b",
-                CreatedAt = Now,
+                CreatedAt = EdgeNow,
                 Name = "RELATED_TO",
                 Fact = "source relates to target",
             }.Validate(),
         ];
-        var driver = new StubDriver([]) { GraphOperationsInterface = new EntityEdgeOperations(edges[0], edges) };
+        var driver = new EdgeStubDriver([]) { GraphOperationsInterface = new EntityEdgeOperations(edges[0], edges) };
 
         var result = await EntityEdge.GetByUuidsAsync(driver, ["edge-a", "edge-b"], groupId: "group-a", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -127,7 +127,7 @@ public class EdgesTestEpisodeGroupIsolation
         ["name"] = "RELATED_TO",
         ["group_id"] = groupId,
         ["episodes"] = new List<object?>(),
-        ["created_at"] = Now,
+        ["created_at"] = EdgeNow,
         ["expired_at"] = null,
         ["valid_at"] = null,
         ["invalid_at"] = null,
@@ -135,7 +135,7 @@ public class EdgesTestEpisodeGroupIsolation
         ["attributes"] = new OrderedDictionary<string, object?>(),
     };
 
-    private sealed class StubDriver(List<OrderedDictionary<string, object?>> records) : GraphDriver
+    private sealed class EdgeStubDriver(List<OrderedDictionary<string, object?>> records) : GraphDriver
     {
         internal List<(string Query, OrderedDictionary<string, object?> Parameters)> Calls { get; } = [];
 

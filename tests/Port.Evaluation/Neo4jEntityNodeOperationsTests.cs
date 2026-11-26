@@ -185,7 +185,8 @@ public class Neo4jEntityNodeOperationsTests
         JsonValueKind.True => true,
         JsonValueKind.False => false,
         JsonValueKind.String => e.GetString(),
-        JsonValueKind.Number => e.GetRawText().Any(c => c is '.' or 'e' or 'E') ? e.GetDouble() : e.GetInt64(),
+        // A cast to object keeps an int a long: the ternary of a double and a long is a double.
+        JsonValueKind.Number => e.GetRawText().Any(c => c is '.' or 'e' or 'E') ? e.GetDouble() : (object)e.GetInt64(),
         JsonValueKind.Array => e.EnumerateArray().Select(Read).ToList(),
         JsonValueKind.Object => ReadObject(e),
         _ => throw new InvalidOperationException(e.ValueKind.ToString()),

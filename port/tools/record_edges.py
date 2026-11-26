@@ -11,6 +11,7 @@ graph operations interface of the driver is one of three:
 - none: the attribute is None, so the method runs its own query.
 - raise: the base GraphOperationsInterface, whose methods raise NotImplementedError, so the method
   falls back to its own query.
+- null: a subclass whose edge_get_by_uuid and edge_get_by_uuids return None.
 - return: a subclass that records each call (the operation name and its arguments after the driver)
   and returns fixed edges.
 
@@ -43,7 +44,8 @@ MODES = ['none', 'raise', 'return']
 UUIDS = ['e-1', 'Zoë 東京 😀']
 UUID_LISTS = [[], ['e-1'], ['e-1', 'Zoë 東京 😀']]
 GROUP_ID_LISTS = [['g'], ['g', 'grüp 東京']]
-PAGES = [(None, None), (5, None), (None, ''), (3, 'c-1')]
+PAGES = [(None, None), (5, None), (None, ''), (3, 'c-1'), (0, ''), (0, 'c-1')]
+ENTITY_PAGES = [(None, None), (0, ''), (0, 'c-1')]
 CLASSES = ['EpisodicEdge', 'EntityEdge', 'CommunityEdge', 'HasEpisodeEdge', 'NextEpisodeEdge']
 
 BASE_EDGE = {
@@ -165,7 +167,7 @@ def entity_cases() -> list[dict]:
     for mode in MODES:
         for provider in PROVIDERS:
             for count in (0, 2) if mode != 'return' else (0,):
-                for group_id in (None, 'g', 'other'):
+                for group_id in (None, 'g', 'other', ''):
                     out.append({'cls': 'EntityEdge', 'method': 'get_by_uuid', 'mode': mode, 'provider': provider, 'uuid': 'e-1', 'group_id': group_id, 'records': count})
                     for uuids in UUID_LISTS:
                         out.append({'cls': 'EntityEdge', 'method': 'get_by_uuids', 'mode': mode, 'provider': provider, 'uuids': uuids, 'group_id': group_id, 'records': count})
@@ -185,9 +187,43 @@ def entity_cases() -> list[dict]:
                             'records': count,
                         }
                     )
+                for group_ids in (['g'], ['']):
+                    for limit, cursor in ENTITY_PAGES if count == 0 and mode == 'none' else []:
+                        for with_embeddings in (False, True):
+                            out.append(
+                                {
+                                    'cls': 'EntityEdge',
+                                    'method': 'get_by_group_ids',
+                                    'mode': mode,
+                                    'provider': provider,
+                                    'group_ids': group_ids,
+                                    'limit': limit,
+                                    'uuid_cursor': cursor,
+                                    'with_embeddings': with_embeddings,
+                                    'records': count,
+                                }
+                            )
+                if mode == 'none' and count == 2:
+                    # One call with no with_embeddings: the default of the method.
+                    out.append(
+                        {
+                            'cls': 'EntityEdge',
+                            'method': 'get_by_group_ids',
+                            'mode': mode,
+                            'provider': provider,
+                            'group_ids': ['g'],
+                            'limit': 2,
+                            'uuid_cursor': 'c',
+                            'with_embeddings': 'default',
+                            'records': count,
+                        }
+                    )
             out.append({'cls': 'EntityEdge', 'method': 'save', 'mode': mode, 'provider': provider, 'edge': ENTITY_EDGE})
             for load in ([], [{}], [{'fact_embedding': None}], [{'fact_embedding': [0.5, -2.25]}, {'fact_embedding': [9.0]}]):
                 out.append({'cls': 'EntityEdge', 'method': 'load_fact_embedding', 'mode': mode, 'provider': provider, 'edge': ENTITY_EDGE, 'load': load})
+    # An operation that returns None is not NotImplementedError, so the method returns, or fails on the None.
+    out.append({'cls': 'EntityEdge', 'method': 'get_by_uuid', 'mode': 'null', 'provider': 'neo4j', 'uuid': 'e-1', 'group_id': 'g', 'records': 2})
+    out.append({'cls': 'EntityEdge', 'method': 'get_by_uuids', 'mode': 'null', 'provider': 'neo4j', 'uuids': ['e-1'], 'group_id': 'g', 'records': 2})
     for fact in ('Ana works\nat Acme 😀', '', '\n\n', 'plain'):
         out.append({'cls': 'EntityEdge', 'method': 'generate_embedding', 'mode': 'none', 'provider': 'neo4j', 'edge': {**ENTITY_EDGE, 'fact': fact}})
     return out
@@ -202,7 +238,7 @@ def module_cases() -> list[dict]:
     for uuids in UUID_LISTS:
         for mode in MODES:
             out.append({'cls': 'Edge', 'method': 'delete_by_uuids', 'mode': mode, 'provider': 'neo4j', 'uuids': uuids})
-    fact_lists = [[], [''], ['a'], ['a', '', 'b 😀'], ['', '']]
+    fact_lists = [[], [''], ['a'], ['a', '', 'b 😀'], ['', ''], [' '], ['\t'], ['a', ' ', '\t', '']]
     for facts in fact_lists:
         for delta in (0, -1, 1):
             out.append({'cls': 'Edge', 'method': 'create_entity_edge_embeddings', 'mode': 'none', 'provider': 'neo4j', 'facts': facts, 'delta': delta})
@@ -228,8 +264,37 @@ def module_cases() -> list[dict]:
     return out
 
 
+def value_cases(cls_name: str) -> list[dict]:
+    """Equality, hashing, the JSON dump, the copies, and the defaults of one class."""
+    edge = ENTITY_EDGE if cls_name == 'EntityEdge' else BASE_EDGE
+    other_fields = {**edge, 'group_id': 'h', 'source_node_uuid': 's2', 'target_node_uuid': 't2'}
+    if cls_name == 'EntityEdge':
+        other_fields = {**other_fields, 'fact': 'another fact', 'name': 'KNOWS'}
+    base = {'cls': cls_name, 'mode': 'none', 'provider': 'neo4j'}
+    out = [
+        {
+            **base,
+            'method': 'equality',
+            'edge': edge,
+            'same_uuid_edge': other_fields,
+            'other_uuid_edge': {**edge, 'uuid': 'E-1'},
+        },
+        {**base, 'method': 'model_copy', 'edge': edge},
+    ]
+    offset = {**edge, 'created_at': '2026-01-02T03:04:05.123456+05:30', 'uuid': 'Zoë 東京 😀'}
+    for variant in (edge, offset):
+        out.append({**base, 'method': 'model_dump_json', 'edge': variant})
+    if cls_name == 'EntityEdge':
+        out.append({**base, 'method': 'model_validate', 'edge': edge})
+        bare = {k: v for k, v in edge.items() if k not in ('episodes', 'attributes', 'fact_embedding')}
+        out.append({**base, 'method': 'defaults', 'bare': bare})
+    return out
+
+
 def cases() -> list[dict]:
     out = []
+    for cls_name in CLASSES:
+        out.extend(value_cases(cls_name))
     for cls_name in CLASSES:
         out.extend(instance_cases(cls_name))
         if cls_name != 'EntityEdge':
@@ -312,6 +377,12 @@ def main() -> int:
         namespace = {name: make(name) for name in OPERATIONS}
         return type('ReturningOperations', (GraphOperationsInterface,), namespace)()
 
+    def null_operations():
+        async def operation(self, *args):
+            return None
+
+        return type('NullOperations', (GraphOperationsInterface,), {'edge_get_by_uuid': operation, 'edge_get_by_uuids': operation})()
+
     class FakeEmbedder(EmbedderClient):
         def __init__(self, delta=0):
             self.calls = []
@@ -353,6 +424,8 @@ def main() -> int:
             operations = GraphOperationsInterface()
         elif mode == 'return':
             operations = returning_operations(op_calls, case['cls'])
+        elif mode == 'null':
+            operations = null_operations()
         if 'load' in case:
             records = json.loads(json.dumps(case['load']))
         else:
@@ -381,9 +454,12 @@ def main() -> int:
             elif method == 'get_by_uuids':
                 value = asyncio.run(cls.get_by_uuids(driver, case['uuids']))
             elif method == 'get_by_group_ids' and case['cls'] == 'EntityEdge':
-                value = asyncio.run(
-                    cls.get_by_group_ids(driver, case['group_ids'], case['limit'], case['uuid_cursor'], case['with_embeddings'])
-                )
+                if case['with_embeddings'] == 'default':
+                    value = asyncio.run(cls.get_by_group_ids(driver, case['group_ids'], case['limit'], case['uuid_cursor']))
+                else:
+                    value = asyncio.run(
+                        cls.get_by_group_ids(driver, case['group_ids'], case['limit'], case['uuid_cursor'], case['with_embeddings'])
+                    )
             elif method == 'get_by_group_ids':
                 value = asyncio.run(cls.get_by_group_ids(driver, case['group_ids'], case['limit'], case['uuid_cursor']))
             elif method == 'get_between_nodes':
@@ -394,6 +470,52 @@ def main() -> int:
                 value = asyncio.run(edge.load_fact_embedding(driver))
             elif method == 'generate_embedding':
                 value = asyncio.run(edge.generate_embedding(embedder))
+            elif method == 'equality':
+                same = cls(**json.loads(json.dumps(case['same_uuid_edge'])))
+                other = cls(**json.loads(json.dumps(case['other_uuid_edge'])))
+                value = {
+                    'same_object_eq': edge == edge,
+                    'same_object_hash': hash(edge) == hash(edge),
+                    'same_uuid_eq': edge == same,
+                    'same_uuid_hash': hash(edge) == hash(same),
+                    'other_uuid_eq': edge == other,
+                    'other_uuid_hash': hash(edge) == hash(other),
+                    'str_eq': edge == edge.uuid,
+                    'int_eq': edge == 5,
+                    'none_eq': edge == None,  # noqa: E711
+                    'hash_is_uuid_hash': hash(edge) == hash(edge.uuid),
+                }
+            elif method == 'model_dump_json':
+                value = edge.model_dump(mode='json')
+            elif method == 'model_copy':
+                value = {}
+                for label, copy in (('shallow', edge.model_copy()), ('deep', edge.model_copy(deep=True))):
+                    value[label + '_new_object'] = copy is not edge
+                    value[label + '_dump'] = copy.model_dump()
+                    if case['cls'] == 'EntityEdge':
+                        value[label + '_episodes_shared'] = copy.episodes is edge.episodes
+                        value[label + '_embedding_shared'] = copy.fact_embedding is edge.fact_embedding
+                        value[label + '_attributes_shared'] = copy.attributes is edge.attributes
+                        value[label + '_nested_shared'] = copy.attributes['n'] is edge.attributes['n']
+            elif method == 'model_validate':
+                data = json.loads(json.dumps(case['edge']))
+                made = cls(**data)
+                value = {
+                    'attributes_same_object': made.attributes is data['attributes'],
+                    'attributes_equal': made.attributes == data['attributes'],
+                    'nested_same_object': made.attributes['n'] is data['attributes']['n'],
+                    'episodes_same_object': made.episodes is data['episodes'],
+                }
+            elif method == 'defaults':
+                first = cls(**case['bare'])
+                second = cls(**case['bare'])
+                value = {
+                    'episodes_empty': first.episodes == [],
+                    'episodes_shared': first.episodes is second.episodes,
+                    'attributes_empty': first.attributes == {},
+                    'attributes_shared': first.attributes is second.attributes,
+                    'embedding_none': first.fact_embedding is None,
+                }
             elif method == 'create_entity_edge_embeddings':
                 value = asyncio.run(edges_module.create_entity_edge_embeddings(embedder, entity_edges))
             else:

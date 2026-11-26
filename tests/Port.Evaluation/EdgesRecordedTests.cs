@@ -1,7 +1,8 @@
 // Evaluation test for graphiti_core/edges.py (port/RULES.md, R23, R25).
-// The recording is values/edges.json, which port/tools/record_edges.py wrote from Python. A fake driver and a fake
-// embedder stand at the network boundary. The graph operations interface is null, the base class (each operation
-// throws NotImplementedException), or a subclass that records each call and returns fixed edges.
+// The recording is values/edges.json, which port/tools/record_edges.py wrote from Python. Fakes replace the graph
+// driver, the graph operations interface, and the embedder, and the test asserts on their call lists. The graph
+// operations interface is null, the base class (each operation throws NotImplementedException), or a subclass that
+// records each call and returns fixed edges.
 namespace Graphiti.Port.Evaluation;
 
 using System.Text.Json;
@@ -50,10 +51,10 @@ public class EdgesRecordedTests
         Assert.Contains("Edge.delete_by_uuids", methods);
         Assert.Contains("Edge.create_entity_edge_embeddings", methods);
         Assert.Equal(
-            ["EdgeNotFoundError", "GroupsEdgesNotFoundError", "IndexError", "KeyError", "ValueError"],
+            ["AttributeError", "EdgeNotFoundError", "GroupsEdgesNotFoundError", "IndexError", "KeyError", "TypeError", "ValueError"],
             Cases.Select(c => c.GetProperty("output").GetProperty("error")).Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => e.GetProperty("type").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
-        Assert.Equal(["none", "raise", "return"], Cases.Select(c => c.GetProperty("input").GetProperty("mode").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
+        Assert.Equal(["none", "null", "raise", "return"], Cases.Select(c => c.GetProperty("input").GetProperty("mode").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
     }
 
     [Theory]
@@ -71,6 +72,7 @@ public class EdgesRecordedTests
         {
             "raise" => new RaisingOperations(),
             "return" => new ReturningOperations(operationCalls, clsName),
+            "null" => new NullOperations(),
             _ => null,
         };
         var records = input.TryGetProperty("load", out var load)
@@ -98,7 +100,7 @@ public class EdgesRecordedTests
         {
             value = await RunAsync(clsName, method, input, driver, edge, embedder, entityEdges, record, token);
         }
-        catch (Exception e) when (e is GraphitiException or ArgumentException or KeyNotFoundException)
+        catch (Exception e) when (e is GraphitiException or ArgumentException or KeyNotFoundException or MissingMemberException)
         {
             error = e;
         }
@@ -125,13 +127,16 @@ public class EdgesRecordedTests
                     "GroupsEdgesNotFoundError" => typeof(GroupsEdgesNotFoundException),
                     "IndexError" => typeof(ArgumentOutOfRangeException),
                     "KeyError" => typeof(KeyNotFoundException),
+                    // PORT: Python fails on the None with an AttributeError (group check) or a TypeError (iteration). Py.NotNone
+                    // gives a MissingMemberException for both (the type of the result is not nullable, so only a fake shows it).
+                    "AttributeError" or "TypeError" => typeof(MissingMemberException),
                     "ValueError" => typeof(ArgumentException),
                     _ => throw new InvalidOperationException(type),
                 },
                 error.GetType());
 
             // The text of a KeyError and of an IndexError is Python's own, and a .NET message has other words.
-            if (type is not "KeyError" and not "IndexError")
+            if (type is not "KeyError" and not "IndexError" and not "AttributeError" and not "TypeError")
             {
                 Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
             }
@@ -164,9 +169,9 @@ public class EdgesRecordedTests
             AssertSame(edgeAfter, Encode(Dump(edge!)));
         }
 
-        // PORT: zip(strict=True) in Python assigns the pairs before the short side ends, and then raises. Part 3 of the
-        // rulebook compares the counts first, so the port assigns none. The embeddings are compared only with no error.
-        if (output.TryGetProperty("edges", out var edgesAfter) && expectedError.ValueKind == JsonValueKind.Null)
+        // zip(strict=True) in Python assigns the pairs before the short side ends, and then raises, so the embeddings are
+        // compared after an error too.
+        if (output.TryGetProperty("edges", out var edgesAfter))
         {
             AssertSame(edgesAfter, new JsonArray([.. entityEdges.Select(e => Encode(e.FactEmbedding))]));
         }
@@ -175,6 +180,58 @@ public class EdgesRecordedTests
         {
             AssertSame(attributesAfter, Encode(record!["attributes"]));
         }
+    }
+
+    private static readonly string[] CancelModes = ["none", "return"];
+
+    private static readonly (string Cls, string Method)[] CancelMethods =
+    [
+        .. new[] { "EpisodicEdge", "EntityEdge", "CommunityEdge", "HasEpisodeEdge", "NextEpisodeEdge" }
+            .SelectMany(cls => new[] { "save", "delete", "get_by_uuid", "get_by_uuids", "get_by_group_ids" }.Select(method => (cls, method))),
+        ("Edge", "delete_by_uuids"),
+        ("EntityEdge", "get_between_nodes"),
+        ("EntityEdge", "get_by_node_uuid"),
+        ("EntityEdge", "load_fact_embedding"),
+        ("EntityEdge", "generate_embedding"),
+        ("Edge", "create_entity_edge_embeddings"),
+    ];
+
+    public static TheoryData<string, string, string> CanceledCalls()
+    {
+        var data = new TheoryData<string, string, string>();
+        foreach (var (cls, method) in CancelMethods)
+        {
+            foreach (var mode in CancelModes)
+            {
+                data.Add(cls, method, mode);
+            }
+        }
+
+        return data;
+    }
+
+    // PORT: no Python original. Python has no cancellation token, so this test checks rule R8 by itself. Each async
+    // method passes its token to the driver, the operations interface, and the embedder, and awaits the call. A fake
+    // that is canceled throws OperationCanceledException after a yield, so a dropped token or a missing await does
+    // not give the exception.
+    [Theory]
+    [MemberData(nameof(CanceledCalls))]
+    public async Task Each_async_method_passes_its_token_and_awaits_the_call(string cls, string method, string mode)
+    {
+        using var canceled = new CancellationTokenSource();
+        await canceled.CancelAsync();
+        using var json = JsonDocument.Parse(
+            "{\"uuid\":\"u\",\"uuids\":[\"u\"],\"group_ids\":[\"g\"],\"limit\":1,\"uuid_cursor\":null,\"with_embeddings\":true,\"group_id\":null,\"source\":\"a\",\"target\":\"b\",\"node_uuid\":\"n\"}");
+        var operationCalls = new List<JsonNode>();
+        var driver = new FakeDriver([])
+        {
+            GraphOperationsInterface = mode == "return" ? new ReturningOperations(operationCalls, cls) : null,
+        };
+        var edge = cls == "Edge" ? null : Construct(cls, cls == "EntityEdge" ? EntityData() : BaseData());
+        List<EntityEdge> entityEdges = [EntityEdge.ModelValidate(EntityData())];
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => RunAsync(cls, method, json.RootElement, driver, edge, new FakeEmbedder(0), entityEdges, null, canceled.Token));
     }
 
     private static async Task<object?> RunAsync(
@@ -214,6 +271,16 @@ public class EdgesRecordedTests
                 return null;
             case "get_entity_edge_from_record":
                 return Edges.GetEntityEdgeFromRecord(record!, driver.Provider);
+            case "equality":
+                return Equality(cls, input, edge!);
+            case "model_dump_json":
+                return Dump(edge!, json: true);
+            case "model_copy":
+                return ModelCopies(cls, edge!);
+            case "model_validate":
+                return ModelValidateCopies(input);
+            case "defaults":
+                return Defaults(input);
             case "get_between_nodes":
                 return await EntityEdge.GetBetweenNodesAsync(driver, S("source"), S("target"), token);
             case "get_by_node_uuid":
@@ -227,6 +294,8 @@ public class EdgesRecordedTests
             ("EpisodicEdge", "get_by_group_ids") => await EpisodicEdge.GetByGroupIdsAsync(driver, L("group_ids"), Limit(), NS("uuid_cursor"), token),
             ("EntityEdge", "get_by_uuid") => await EntityEdge.GetByUuidAsync(driver, S("uuid"), NS("group_id"), token),
             ("EntityEdge", "get_by_uuids") => await EntityEdge.GetByUuidsAsync(driver, L("uuids"), NS("group_id"), token),
+            ("EntityEdge", "get_by_group_ids") when input.GetProperty("with_embeddings").ValueKind == JsonValueKind.String =>
+                await EntityEdge.GetByGroupIdsAsync(driver, L("group_ids"), Limit(), NS("uuid_cursor"), cancellationToken: token),
             ("EntityEdge", "get_by_group_ids") => await EntityEdge.GetByGroupIdsAsync(
                 driver,
                 L("group_ids"),
@@ -247,6 +316,91 @@ public class EdgesRecordedTests
         };
     }
 
+    // a == b and hash(a) == hash(b). The port uses Equals, and GetHashCode with the hash of the uuid (rule R18).
+    private static OrderedDictionary<string, object?> Equality(string cls, JsonElement input, Edge edge)
+    {
+        var same = Construct(cls, Py.AsDict(Read(input.GetProperty("same_uuid_edge"))));
+        var other = Construct(cls, Py.AsDict(Read(input.GetProperty("other_uuid_edge"))));
+        var hashIsUuidHash = edge.GetHashCode() == string.GetHashCode(edge.Uuid, StringComparison.Ordinal);
+        return new()
+        {
+            ["same_object_eq"] = edge.Equals(edge),
+            ["same_object_hash"] = edge.GetHashCode() == edge.GetHashCode(),
+            ["same_uuid_eq"] = edge.Equals(same),
+            ["same_uuid_hash"] = edge.GetHashCode() == same.GetHashCode(),
+            ["other_uuid_eq"] = edge.Equals(other),
+            ["other_uuid_hash"] = edge.GetHashCode() == other.GetHashCode(),
+            ["str_eq"] = edge.Equals(edge.Uuid),
+            ["int_eq"] = edge.Equals(5L),
+            ["none_eq"] = edge.Equals(null),
+            ["hash_is_uuid_hash"] = hashIsUuidHash,
+        };
+    }
+
+    private static OrderedDictionary<string, object?> ModelCopies(string cls, Edge edge)
+    {
+        var result = new OrderedDictionary<string, object?>();
+        foreach (var (label, deep) in new[] { ("shallow", false), ("deep", true) })
+        {
+            var copy = Copy(edge, deep);
+            result[label + "_new_object"] = !ReferenceEquals(copy, edge);
+            result[label + "_dump"] = Dump(copy);
+            if (cls == "EntityEdge")
+            {
+                var a = (EntityEdge)edge;
+                var c = (EntityEdge)copy;
+                result[label + "_episodes_shared"] = ReferenceEquals(c.Episodes, a.Episodes);
+                result[label + "_embedding_shared"] = ReferenceEquals(c.FactEmbedding, a.FactEmbedding);
+                result[label + "_attributes_shared"] = ReferenceEquals(c.Attributes, a.Attributes);
+                result[label + "_nested_shared"] = ReferenceEquals(c.Attributes["n"], a.Attributes["n"]);
+            }
+        }
+
+        return result;
+    }
+
+    // The constructor of a pydantic model copies the dict of attributes and the list of episodes, and keeps the items.
+    private static OrderedDictionary<string, object?> ModelValidateCopies(JsonElement input)
+    {
+        var data = Py.AsDict(Read(input.GetProperty("edge")));
+        var made = EntityEdge.ModelValidate(data);
+        var given = Py.AsDict(data["attributes"]);
+        return new()
+        {
+            ["attributes_same_object"] = ReferenceEquals(made.Attributes, given),
+            ["attributes_equal"] = JsonNode.DeepEquals(Encode(made.Attributes), Encode(given)),
+            ["nested_same_object"] = ReferenceEquals(made.Attributes["n"], given["n"]),
+            ["episodes_same_object"] = ReferenceEquals(made.Episodes, data["episodes"]),
+        };
+    }
+
+    // new EntityEdge { ... } with no Episodes and no Attributes: each instance has its own empty list and dict.
+    private static OrderedDictionary<string, object?> Defaults(JsonElement input)
+    {
+        var bare = Py.AsDict(Read(input.GetProperty("bare")));
+        EntityEdge Make() => new()
+        {
+            Uuid = (string)bare["uuid"]!,
+            GroupId = (string)bare["group_id"]!,
+            SourceNodeUuid = (string)bare["source_node_uuid"]!,
+            TargetNodeUuid = (string)bare["target_node_uuid"]!,
+            CreatedAt = PyDateTime.FromIsoFormat((string)bare["created_at"]!),
+            Name = (string)bare["name"]!,
+            Fact = (string)bare["fact"]!,
+        };
+
+        var first = Make();
+        var second = Make();
+        return new()
+        {
+            ["episodes_empty"] = first.Episodes.Count == 0,
+            ["episodes_shared"] = ReferenceEquals(first.Episodes, second.Episodes),
+            ["attributes_empty"] = first.Attributes.Count == 0,
+            ["attributes_shared"] = ReferenceEquals(first.Attributes, second.Attributes),
+            ["embedding_none"] = first.FactEmbedding is null,
+        };
+    }
+
     private static Edge Construct(string cls, OrderedDictionary<string, object?> data) => cls switch
     {
         "EpisodicEdge" => EpisodicEdge.ModelValidate(data),
@@ -256,13 +410,23 @@ public class EdgesRecordedTests
         _ => EntityEdge.ModelValidate(data),
     };
 
-    private static OrderedDictionary<string, object?> Dump(Edge edge) => edge switch
+    private static OrderedDictionary<string, object?> Dump(Edge edge, bool json = false) => edge switch
     {
-        EpisodicEdge e => e.ModelDump(),
-        EntityEdge e => e.ModelDump(),
-        CommunityEdge e => e.ModelDump(),
-        HasEpisodeEdge e => e.ModelDump(),
-        NextEpisodeEdge e => e.ModelDump(),
+        EpisodicEdge e => e.ModelDump(json),
+        EntityEdge e => e.ModelDump(json),
+        CommunityEdge e => e.ModelDump(json),
+        HasEpisodeEdge e => e.ModelDump(json),
+        NextEpisodeEdge e => e.ModelDump(json),
+        _ => throw new InvalidOperationException(edge.GetType().Name),
+    };
+
+    private static Edge Copy(Edge edge, bool deep) => edge switch
+    {
+        EpisodicEdge e => e.ModelCopy(deep),
+        EntityEdge e => e.ModelCopy(deep),
+        CommunityEdge e => e.ModelCopy(),
+        HasEpisodeEdge e => e.ModelCopy(),
+        NextEpisodeEdge e => e.ModelCopy(),
         _ => throw new InvalidOperationException(edge.GetType().Name),
     };
 
@@ -381,13 +545,15 @@ public class EdgesRecordedTests
 
         internal override string PythonName => "FakeDriver";
 
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             Calls.Add(new(cypherQuery, [.. parameters.Keys], [.. parameters.Values.Select(Encode)]));
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>((records, null, null));
+            return (records, null, null);
         }
 
         internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");
@@ -397,6 +563,16 @@ public class EdgesRecordedTests
         internal override Task DeleteAllIndexesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         internal override Task BuildIndicesAndConstraintsAsync(bool deleteExisting = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    // An operation that returns null where the C# type is not nullable: Python returns None.
+    private sealed record NullOperations : GraphOperationsInterface
+    {
+        internal override Task<EntityEdge> EdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
+            Task.FromResult<EntityEdge>(null!);
+
+        internal override Task<List<EntityEdge>> EdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
+            Task.FromResult<List<EntityEdge>>(null!);
     }
 
     // The base class: each operation throws NotImplementedException, as each Python method raises NotImplementedError.
@@ -418,99 +594,104 @@ public class EdgesRecordedTests
             two = Construct(name, With(new(data), ("uuid", "ops-2"), ("group_id", "other")));
         }
 
-        internal override Task EdgeSaveAsync(EntityEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("edge_save", edge);
+        internal override Task EdgeSaveAsync(EntityEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("edge_save", cancellationToken, edge);
 
-        internal override Task EdgeDeleteAsync(Edge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("edge_delete", edge);
+        internal override Task EdgeDeleteAsync(Edge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("edge_delete", cancellationToken, edge);
 
         internal override Task EdgeDeleteByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, string? groupId = null, CancellationToken cancellationToken = default) =>
-            groupId is null ? None("edge_delete_by_uuids", cls, uuids) : None("edge_delete_by_uuids", cls, uuids, groupId);
+            groupId is null ? None("edge_delete_by_uuids", cancellationToken, cls, uuids) : None("edge_delete_by_uuids", cancellationToken, cls, uuids, groupId);
 
         internal override Task<EntityEdge> EdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            One<EntityEdge>("edge_get_by_uuid", cls, uuid);
+            One<EntityEdge>("edge_get_by_uuid", cancellationToken, cls, uuid);
 
         internal override Task<List<EntityEdge>> EdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
-            Two<EntityEdge>("edge_get_by_uuids", cls, uuids);
+            Two<EntityEdge>("edge_get_by_uuids", cancellationToken, cls, uuids);
 
         internal override Task<List<EntityEdge>> EdgeGetByGroupIdsAsync(Type? cls, GraphDriver driver, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default) =>
-            Two<EntityEdge>("edge_get_by_group_ids", cls, groupIds, limit, uuidCursor);
+            Two<EntityEdge>("edge_get_by_group_ids", cancellationToken, cls, groupIds, limit, uuidCursor);
 
-        internal override Task EdgeLoadEmbeddingsAsync(EntityEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("edge_load_embeddings", edge);
+        internal override Task EdgeLoadEmbeddingsAsync(EntityEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("edge_load_embeddings", cancellationToken, edge);
 
         internal override Task<List<EntityEdge>> EdgeGetBetweenNodesAsync(Type? cls, GraphDriver driver, string sourceNodeUuid, string targetNodeUuid, CancellationToken cancellationToken = default) =>
-            Two<EntityEdge>("edge_get_between_nodes", cls, sourceNodeUuid, targetNodeUuid);
+            Two<EntityEdge>("edge_get_between_nodes", cancellationToken, cls, sourceNodeUuid, targetNodeUuid);
 
         internal override Task<List<EntityEdge>> EdgeGetByNodeUuidAsync(Type? cls, GraphDriver driver, string nodeUuid, CancellationToken cancellationToken = default) =>
-            Two<EntityEdge>("edge_get_by_node_uuid", cls, nodeUuid);
+            Two<EntityEdge>("edge_get_by_node_uuid", cancellationToken, cls, nodeUuid);
 
-        internal override Task EpisodicEdgeSaveAsync(EpisodicEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("episodic_edge_save", edge);
+        internal override Task EpisodicEdgeSaveAsync(EpisodicEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("episodic_edge_save", cancellationToken, edge);
 
         internal override Task<EpisodicEdge> EpisodicEdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            One<EpisodicEdge>("episodic_edge_get_by_uuid", cls, uuid);
+            One<EpisodicEdge>("episodic_edge_get_by_uuid", cancellationToken, cls, uuid);
 
         internal override Task<List<EpisodicEdge>> EpisodicEdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
-            Two<EpisodicEdge>("episodic_edge_get_by_uuids", cls, uuids);
+            Two<EpisodicEdge>("episodic_edge_get_by_uuids", cancellationToken, cls, uuids);
 
         internal override Task<List<EpisodicEdge>> EpisodicEdgeGetByGroupIdsAsync(Type? cls, GraphDriver driver, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default) =>
-            Two<EpisodicEdge>("episodic_edge_get_by_group_ids", cls, groupIds, limit, uuidCursor);
+            Two<EpisodicEdge>("episodic_edge_get_by_group_ids", cancellationToken, cls, groupIds, limit, uuidCursor);
 
-        internal override Task CommunityEdgeSaveAsync(CommunityEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("community_edge_save", edge);
+        internal override Task CommunityEdgeSaveAsync(CommunityEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("community_edge_save", cancellationToken, edge);
 
         internal override Task<CommunityEdge> CommunityEdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            One<CommunityEdge>("community_edge_get_by_uuid", cls, uuid);
+            One<CommunityEdge>("community_edge_get_by_uuid", cancellationToken, cls, uuid);
 
         internal override Task<List<CommunityEdge>> CommunityEdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
-            Two<CommunityEdge>("community_edge_get_by_uuids", cls, uuids);
+            Two<CommunityEdge>("community_edge_get_by_uuids", cancellationToken, cls, uuids);
 
         internal override Task<List<CommunityEdge>> CommunityEdgeGetByGroupIdsAsync(Type? cls, GraphDriver driver, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default) =>
-            Two<CommunityEdge>("community_edge_get_by_group_ids", cls, groupIds, limit, uuidCursor);
+            Two<CommunityEdge>("community_edge_get_by_group_ids", cancellationToken, cls, groupIds, limit, uuidCursor);
 
-        internal override Task HasEpisodeEdgeSaveAsync(HasEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("has_episode_edge_save", edge);
+        internal override Task HasEpisodeEdgeSaveAsync(HasEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("has_episode_edge_save", cancellationToken, edge);
 
-        internal override Task HasEpisodeEdgeDeleteAsync(HasEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("has_episode_edge_delete", edge);
+        internal override Task HasEpisodeEdgeDeleteAsync(HasEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("has_episode_edge_delete", cancellationToken, edge);
 
         internal override Task<HasEpisodeEdge> HasEpisodeEdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            One<HasEpisodeEdge>("has_episode_edge_get_by_uuid", cls, uuid);
+            One<HasEpisodeEdge>("has_episode_edge_get_by_uuid", cancellationToken, cls, uuid);
 
         internal override Task<List<HasEpisodeEdge>> HasEpisodeEdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
-            Two<HasEpisodeEdge>("has_episode_edge_get_by_uuids", cls, uuids);
+            Two<HasEpisodeEdge>("has_episode_edge_get_by_uuids", cancellationToken, cls, uuids);
 
         internal override Task<List<HasEpisodeEdge>> HasEpisodeEdgeGetByGroupIdsAsync(Type? cls, GraphDriver driver, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default) =>
-            Two<HasEpisodeEdge>("has_episode_edge_get_by_group_ids", cls, groupIds, limit, uuidCursor);
+            Two<HasEpisodeEdge>("has_episode_edge_get_by_group_ids", cancellationToken, cls, groupIds, limit, uuidCursor);
 
-        internal override Task NextEpisodeEdgeSaveAsync(NextEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("next_episode_edge_save", edge);
+        internal override Task NextEpisodeEdgeSaveAsync(NextEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("next_episode_edge_save", cancellationToken, edge);
 
-        internal override Task NextEpisodeEdgeDeleteAsync(NextEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("next_episode_edge_delete", edge);
+        internal override Task NextEpisodeEdgeDeleteAsync(NextEpisodeEdge edge, GraphDriver driver, CancellationToken cancellationToken = default) => None("next_episode_edge_delete", cancellationToken, edge);
 
         internal override Task<NextEpisodeEdge> NextEpisodeEdgeGetByUuidAsync(Type? cls, GraphDriver driver, string uuid, CancellationToken cancellationToken = default) =>
-            One<NextEpisodeEdge>("next_episode_edge_get_by_uuid", cls, uuid);
+            One<NextEpisodeEdge>("next_episode_edge_get_by_uuid", cancellationToken, cls, uuid);
 
         internal override Task<List<NextEpisodeEdge>> NextEpisodeEdgeGetByUuidsAsync(Type? cls, GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default) =>
-            Two<NextEpisodeEdge>("next_episode_edge_get_by_uuids", cls, uuids);
+            Two<NextEpisodeEdge>("next_episode_edge_get_by_uuids", cancellationToken, cls, uuids);
 
         internal override Task<List<NextEpisodeEdge>> NextEpisodeEdgeGetByGroupIdsAsync(Type? cls, GraphDriver driver, List<string> groupIds, long? limit = null, string? uuidCursor = null, CancellationToken cancellationToken = default) =>
-            Two<NextEpisodeEdge>("next_episode_edge_get_by_group_ids", cls, groupIds, limit, uuidCursor);
+            Two<NextEpisodeEdge>("next_episode_edge_get_by_group_ids", cancellationToken, cls, groupIds, limit, uuidCursor);
 
         private void Note(string op, object?[] args) =>
             calls.Add(new JsonObject { ["op"] = op, ["args"] = new JsonArray([.. args.Select(Encode)]) });
 
-        private Task None(string op, params object?[] args)
+        private async Task None(string op, CancellationToken cancellationToken, params object?[] args)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             Note(op, args);
-            return Task.CompletedTask;
         }
 
-        private Task<T> One<T>(string op, params object?[] args)
+        private async Task<T> One<T>(string op, CancellationToken cancellationToken, params object?[] args)
             where T : Edge
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             Note(op, args);
-            return Task.FromResult((T)one);
+            return (T)one;
         }
 
-        private Task<List<T>> Two<T>(string op, params object?[] args)
+        private async Task<List<T>> Two<T>(string op, CancellationToken cancellationToken, params object?[] args)
             where T : Edge
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             Note(op, args);
-            return Task.FromResult(new List<T> { (T)one, (T)two });
+            return new List<T> { (T)one, (T)two };
         }
     }
 
@@ -518,14 +699,18 @@ public class EdgesRecordedTests
     {
         internal List<JsonNode> Calls { get; } = [];
 
-        internal override Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
+        internal override async Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             Calls.Add(new JsonObject { ["op"] = "create", ["input"] = new JsonArray([.. inputData.Select(s => (JsonNode)s)]) });
-            return Task.FromResult(new List<double> { Py.Len(inputData[0]), 0.5 });
+            return new List<double> { Py.Len(inputData[0]), 0.5 };
         }
 
-        internal override Task<List<List<double>>> CreateBatchAsync(List<string> inputDataList, CancellationToken cancellationToken = default)
+        internal override async Task<List<List<double>>> CreateBatchAsync(List<string> inputDataList, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             Calls.Add(new JsonObject { ["op"] = "create_batch", ["input"] = new JsonArray([.. inputDataList.Select(s => (JsonNode)s)]) });
             var result = inputDataList.Select((text, i) => new List<double> { i, Py.Len(text) }).ToList();
             if (delta < 0)
@@ -538,7 +723,7 @@ public class EdgesRecordedTests
                 result.Add([9.0]);
             }
 
-            return Task.FromResult(result);
+            return result;
         }
     }
 

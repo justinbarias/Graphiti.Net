@@ -24,6 +24,12 @@ using Graphiti.Internal;
 using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
 
+internal static partial class Edges
+{
+    // PORT: R5 puts the logger on the module class. The classes of the edge types log, so the logger is internal.
+    internal static ILogger Logger => PortServices.Logger(typeof(Edges));
+}
+
 // PORT: Edge defines __eq__ and __hash__, so it and its subclasses are classes, not records (R7). Edge has no
 // validate_assignment and no validator, so each set accessor is plain.
 internal abstract class Edge
@@ -148,8 +154,8 @@ internal sealed class EpisodicEdge : Edge, IPydanticModel
         .Required("target_node_uuid", PydanticType.Str)
         .Required("created_at", PydanticType.DateTime);
 
-    // PORT: model_copy() (R7). MemberwiseClone copies each property and validates nothing.
-    internal EpisodicEdge ModelCopy() => (EpisodicEdge)MemberwiseClone();
+    // PORT: model_copy(deep=True) (R7). The fields of the class are immutable, so a deep copy copies nothing more.
+    internal EpisodicEdge ModelCopy(bool deep = false) => (EpisodicEdge)MemberwiseClone();
 
     internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)
     {
@@ -411,8 +417,20 @@ internal sealed class EntityEdge : Edge, IPydanticModel
         .Default("reference_time", PydanticType.Optional(PydanticType.DateTime), null, "reference timestamp from the episode that produced this edge")
         .Default("attributes", PydanticType.Dict(PydanticType.Any), new OrderedDictionary<string, object?>(), "Additional attributes of the edge. Dependent on edge name");
 
-    // PORT: model_copy() (R7). MemberwiseClone copies each property and validates nothing.
-    internal EntityEdge ModelCopy() => (EntityEdge)MemberwiseClone();
+    // PORT: model_copy(deep=True) (R7). MemberwiseClone copies each property and validates nothing. A deep copy
+    // replaces each list and the dict with a copy, as Nodes.cs does.
+    internal EntityEdge ModelCopy(bool deep = false)
+    {
+        var copy = (EntityEdge)MemberwiseClone();
+        if (deep)
+        {
+            copy.Episodes = [.. Episodes];
+            copy.FactEmbedding = FactEmbedding is null ? null : [.. FactEmbedding];
+            copy.Attributes = Py.AsDict(Py.DeepCopy(Attributes));
+        }
+
+        return copy;
+    }
 
     internal async Task<List<double>> GenerateEmbeddingAsync(EmbedderClient embedder, CancellationToken cancellationToken = default)
     {
@@ -472,7 +490,8 @@ internal sealed class EntityEdge : Edge, IPydanticModel
         }
 
         // PORT: Edge has no validate_assignment, so Python stores the record value as it is. The property is a
-        // List<double>?, so the value is read as list[float] | None. No rule covers this (see the unit report).
+        // List<double>?, so the value is read as list[float] | None.
+        // PORT: the reader converts or rejects a value that Python stores as it is (R7).
         FactEmbedding = Pydantic.Optional(records[0]["fact_embedding"], x => Pydantic.List(x, Pydantic.Float));
     }
 
@@ -551,26 +570,27 @@ internal sealed class EntityEdge : Edge, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, and else (Part 3). The operation returns an EntityEdge and never null, so a null
-            // edge is the flag that the operation is not implemented.
+            // PORT: try, except, and else (Part 3): a flag that the code sets after the call returned.
             EntityEdge? edge = null;
+            var returned = false;
             try
             {
                 edge = await driver.GraphOperationsInterface.EdgeGetByUuidAsync(typeof(EntityEdge), driver, uuid, cancellationToken);
+                returned = true;
             }
             catch (NotImplementedException)
             {
                 // PORT: Python passes
             }
 
-            if (edge is not null)
+            if (returned)
             {
-                if (groupId is not null && edge.GroupId != groupId)
+                if (groupId is not null && Py.NotNone(edge, "group_id").GroupId != groupId)
                 {
                     throw new EdgeNotFoundException(uuid);
                 }
 
-                return edge;
+                return Py.NotNone(edge, "uuid");
             }
         }
 
@@ -662,26 +682,27 @@ internal sealed class EntityEdge : Edge, IPydanticModel
     {
         if (driver.GraphOperationsInterface is not null)
         {
-            // PORT: try, except, and else (Part 3). The operation returns a list and never null, so a null list is
-            // the flag that the operation is not implemented.
+            // PORT: try, except, and else (Part 3): a flag that the code sets after the call returned.
             List<EntityEdge>? found = null;
+            var returned = false;
             try
             {
                 found = await driver.GraphOperationsInterface.EdgeGetByUuidsAsync(typeof(EntityEdge), driver, uuids, cancellationToken);
+                returned = true;
             }
             catch (NotImplementedException)
             {
                 // PORT: Python passes
             }
 
-            if (found is not null)
+            if (returned)
             {
                 if (groupId is not null)
                 {
-                    found = found.Where(edge => edge.GroupId == groupId).ToList();
+                    found = Py.NotNone(found, "__iter__").Where(edge => edge.GroupId == groupId).ToList();
                 }
 
-                return found;
+                return Py.NotNone(found, "__iter__");
             }
         }
 
@@ -1429,9 +1450,6 @@ internal sealed class NextEpisodeEdge : Edge, IPydanticModel
 
 internal static partial class Edges
 {
-    // PORT: R5 puts the logger on the module class. The classes of the edge types log, so the logger is internal.
-    internal static ILogger Logger => PortServices.Logger(typeof(Edges));
-
     // Edge helpers
     internal static EpisodicEdge GetEpisodicEdgeFromRecord(OrderedDictionary<string, object?> record)
     {
@@ -1535,16 +1553,8 @@ internal static partial class Edges
 
         var factEmbeddings = await embedder.CreateBatchAsync(filteredEdges.Select(edge => edge.Fact).ToList(), cancellationToken);
 
-        // PORT: zip(..., strict=True) compares the counts first (Part 3), with the text of Python's error.
-        if (factEmbeddings.Count != filteredEdges.Count)
-        {
-            throw new ArgumentException(
-                factEmbeddings.Count < filteredEdges.Count
-                    ? "zip() argument 2 is shorter than argument 1"
-                    : "zip() argument 2 is longer than argument 1");
-        }
-
-        foreach (var (edge, factEmbedding) in filteredEdges.Zip(factEmbeddings))
+        // PORT: zip(..., strict=True) (Part 3): each pair is assigned before the error for a count that differs.
+        foreach (var (edge, factEmbedding) in Py.ZipStrict(filteredEdges, factEmbeddings))
         {
             edge.FactEmbedding = factEmbedding;
         }
