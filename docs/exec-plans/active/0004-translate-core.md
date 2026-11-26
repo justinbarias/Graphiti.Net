@@ -195,7 +195,7 @@ The adversarial pass over the layer (Opus 5.5, high effort) gave 3 important fin
 Evidence that waits for a later layer:
 
 - `driver.driver`: no test reads the four index names with their environment variables set. The port has no seam for them.
-- `utils.ontology_utils.entity_types_utils`: the cases that pass the `ExtractedEntities` class stay listed until layer 4 registers it.
+- `utils.ontology_utils.entity_types_utils`: 13 cases that pass a built-in model class as a custom type stay listed under open item O4.
 - `Py.TimeSeconds` reads the system clock, so no test compares the time text of the debug line of `generate_embedding`.
 - The Neo4j branch of each `save` and `get` method runs on a database first in layer 5.
 
@@ -207,3 +207,42 @@ Commands at the tip:
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 957 passed, 0 unexpected, 0 bound and wrong. 276 ids left `expected-failures.txt`, and 1,042 stay. The pull request lists the ids.
 
 Found beside the plan: `scripts/mutate.sh` gave no result on 2026-11-26. Two tests, `PyAstTests.LiteralEval_matches_Python` and `PyAstTests.LiteralEval_of_long_and_deeply_nested_texts_matches_Python`, stop the test host in a mutated build. Stryker then runs them against each mutant, and each mutant gets the status `RuntimeError`. A probe on `PyHash.cs` with 56 mutants took 159 seconds and gave 56 errors. With the two tests skipped it took 8 seconds and killed 56. The probable cause is a stack overflow in the mutated parser. The lead fixes the two tests before the mutation run of layer 5.
+
+### Layer 4, the prompts, 2026-11-27
+
+Four packets ported 10 modules. Two Opus 5.5 high reviewers read each packet group. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Review |
+| --- | --- | --- |
+| P4a | `prompts.extract_nodes`, `prompts.snippets` | One review pair for P4a, P4b, and P4c. The lead made 13 decisions from it. |
+| P4b | `prompts.extract_edges`, `prompts.dedupe_edges`, `prompts.extract_nodes_and_edges` | The same pair. |
+| P4c | `prompts.eval`, `prompts.summarize_nodes`, `prompts.summarize_sagas`, `prompts.names` | The same pair. |
+| P4d | `prompts.lib` | 4 and 12 findings. 15 of 29 seeded defects passed each test before the fix round, and each one fails a test now. |
+
+What the reviews changed:
+
+| Finding | Result |
+| --- | --- |
+| A binding registered only the paths that its own cases named. | Rule R22: the unit of the module that defines a name registers each path of that module that a judge case names. |
+| Five models had a `ResponseModel` member that upstream never passes as a response model. | Removed. |
+| The two section builders of `extract_nodes_and_edges` had typed parameters and a private body for open data. | Each one takes `object?` (rule R20). |
+| No recording called a prompt function by its Python name, and none built a model from its required fields only. | Each recorder does both now. |
+| `prompts.lib`: a null override, an override that returns null, two faults in one call, and object identity had no case. | The recording has 1,000 cases, with each of them. |
+| `prompts.lib`: each read of a legacy prompt function gave a new delegate. | One delegate for each wrapper (rule R17). |
+| `prompts.lib`: a specs entry that is null threw `NullReferenceException`. | It gives the `ValueError` text of Python. |
+
+The lead wrote `tests/Graphiti.Net.JudgeHost/Units/Types.cs`, the decoder for `types:SimpleNamespace`.
+
+Differences that the lead accepted by name under D39: a typed override cannot return a list or a text, and a delegate of another type counts as not callable (rule R15).
+
+Evidence that waits for a later layer:
+
+- `jev_prompt_overrides` and `openai_decisions_prompt_overrides` read this library first in layer 3.
+- The tests of `LLMRuntime` and of `prompt_config` that need the prompt library come with layer 3.
+
+Commands at the tip:
+
+- `scripts/check.sh`: `check: passed`.
+- `dotnet test --project tests/Port.Evaluation`: 10,233 tests, 0 failed, 0 skipped.
+- The four prompt recorders with `--check`: 1,031, 1,532, 734, and 1,000 cases. Each one is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,150 passed, 0 unexpected, 0 bound and wrong. 193 ids left `expected-failures.txt`, and 849 stay. The pull request lists the ids.
