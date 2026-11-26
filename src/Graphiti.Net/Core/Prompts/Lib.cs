@@ -101,9 +101,15 @@ internal sealed class VersionWrapper
     internal VersionWrapper(PromptFunction func)
     {
         Func = func;
+
+        // PORT: the instance is the callable in Python, so each read of the attribute gives the same object (R17).
+        // The delegate is built once here and each read returns it.
+        Function = Call;
     }
 
     internal PromptFunction Func { get; set; }
+
+    internal PromptFunction Function { get; }
 
     // PORT: Call for __call__ (R2). Its method group is a PromptFunction.
     internal List<Message> Call(OrderedDictionary<string, object?> context)
@@ -145,79 +151,79 @@ internal sealed class PromptTypeWrapper :
     }
 
     PromptFunction ExtractNodesPrompt.ExtractMessage =>
-        attributes.TryGetValue("extract_message", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_message");
+        attributes.TryGetValue("extract_message", out var version) ? version.Function : throw new MissingMemberException("extract_message");
 
     PromptFunction ExtractNodesPrompt.ExtractJson =>
-        attributes.TryGetValue("extract_json", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_json");
+        attributes.TryGetValue("extract_json", out var version) ? version.Function : throw new MissingMemberException("extract_json");
 
     PromptFunction ExtractNodesPrompt.ExtractText =>
-        attributes.TryGetValue("extract_text", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_text");
+        attributes.TryGetValue("extract_text", out var version) ? version.Function : throw new MissingMemberException("extract_text");
 
     PromptFunction ExtractNodesPrompt.ClassifyNodes =>
-        attributes.TryGetValue("classify_nodes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("classify_nodes");
+        attributes.TryGetValue("classify_nodes", out var version) ? version.Function : throw new MissingMemberException("classify_nodes");
 
     PromptFunction ExtractNodesPrompt.ExtractAttributes =>
-        attributes.TryGetValue("extract_attributes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_attributes");
+        attributes.TryGetValue("extract_attributes", out var version) ? version.Function : throw new MissingMemberException("extract_attributes");
 
     PromptFunction ExtractNodesPrompt.ExtractSummary =>
-        attributes.TryGetValue("extract_summary", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_summary");
+        attributes.TryGetValue("extract_summary", out var version) ? version.Function : throw new MissingMemberException("extract_summary");
 
     PromptFunction ExtractNodesPrompt.ExtractSummariesBatch =>
-        attributes.TryGetValue("extract_summaries_batch", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_summaries_batch");
+        attributes.TryGetValue("extract_summaries_batch", out var version) ? version.Function : throw new MissingMemberException("extract_summaries_batch");
 
     PromptFunction ExtractNodesPrompt.ExtractEntitySummariesFromEpisodes =>
-        attributes.TryGetValue("extract_entity_summaries_from_episodes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_entity_summaries_from_episodes");
+        attributes.TryGetValue("extract_entity_summaries_from_episodes", out var version) ? version.Function : throw new MissingMemberException("extract_entity_summaries_from_episodes");
 
     PromptFunction DedupeNodesPrompt.Node =>
-        attributes.TryGetValue("node", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("node");
+        attributes.TryGetValue("node", out var version) ? version.Function : throw new MissingMemberException("node");
 
     PromptFunction DedupeNodesPrompt.NodeList =>
-        attributes.TryGetValue("node_list", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("node_list");
+        attributes.TryGetValue("node_list", out var version) ? version.Function : throw new MissingMemberException("node_list");
 
     PromptFunction DedupeNodesPrompt.Nodes =>
-        attributes.TryGetValue("nodes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("nodes");
+        attributes.TryGetValue("nodes", out var version) ? version.Function : throw new MissingMemberException("nodes");
 
     PromptFunction ExtractEdgesPrompt.Edge =>
-        attributes.TryGetValue("edge", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("edge");
+        attributes.TryGetValue("edge", out var version) ? version.Function : throw new MissingMemberException("edge");
 
     PromptFunction ExtractEdgesPrompt.ExtractAttributes =>
-        attributes.TryGetValue("extract_attributes", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_attributes");
+        attributes.TryGetValue("extract_attributes", out var version) ? version.Function : throw new MissingMemberException("extract_attributes");
 
     PromptFunction ExtractEdgesPrompt.ExtractTimestamps =>
-        attributes.TryGetValue("extract_timestamps", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_timestamps");
+        attributes.TryGetValue("extract_timestamps", out var version) ? version.Function : throw new MissingMemberException("extract_timestamps");
 
     PromptFunction ExtractEdgesPrompt.ExtractTimestampsBatch =>
-        attributes.TryGetValue("extract_timestamps_batch", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_timestamps_batch");
+        attributes.TryGetValue("extract_timestamps_batch", out var version) ? version.Function : throw new MissingMemberException("extract_timestamps_batch");
 
     PromptFunction ExtractNodesAndEdgesPrompt.ExtractMessage =>
-        attributes.TryGetValue("extract_message", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("extract_message");
+        attributes.TryGetValue("extract_message", out var version) ? version.Function : throw new MissingMemberException("extract_message");
 
     PromptFunction DedupeEdgesPrompt.ResolveEdge =>
-        attributes.TryGetValue("resolve_edge", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("resolve_edge");
+        attributes.TryGetValue("resolve_edge", out var version) ? version.Function : throw new MissingMemberException("resolve_edge");
 
     PromptFunction SummarizeNodesPrompt.SummarizePair =>
-        attributes.TryGetValue("summarize_pair", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summarize_pair");
+        attributes.TryGetValue("summarize_pair", out var version) ? version.Function : throw new MissingMemberException("summarize_pair");
 
     PromptFunction SummarizeNodesPrompt.SummarizeContext =>
-        attributes.TryGetValue("summarize_context", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summarize_context");
+        attributes.TryGetValue("summarize_context", out var version) ? version.Function : throw new MissingMemberException("summarize_context");
 
     PromptFunction SummarizeNodesPrompt.SummaryDescription =>
-        attributes.TryGetValue("summary_description", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summary_description");
+        attributes.TryGetValue("summary_description", out var version) ? version.Function : throw new MissingMemberException("summary_description");
 
     PromptFunction SummarizeSagasPrompt.SummarizeSaga =>
-        attributes.TryGetValue("summarize_saga", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("summarize_saga");
+        attributes.TryGetValue("summarize_saga", out var version) ? version.Function : throw new MissingMemberException("summarize_saga");
 
     PromptFunction EvalPrompt.QaPrompt =>
-        attributes.TryGetValue("qa_prompt", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("qa_prompt");
+        attributes.TryGetValue("qa_prompt", out var version) ? version.Function : throw new MissingMemberException("qa_prompt");
 
     PromptFunction EvalPrompt.EvalPromptFunction =>
-        attributes.TryGetValue("eval_prompt", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("eval_prompt");
+        attributes.TryGetValue("eval_prompt", out var version) ? version.Function : throw new MissingMemberException("eval_prompt");
 
     PromptFunction EvalPrompt.QueryExpansion =>
-        attributes.TryGetValue("query_expansion", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("query_expansion");
+        attributes.TryGetValue("query_expansion", out var version) ? version.Function : throw new MissingMemberException("query_expansion");
 
     PromptFunction EvalPrompt.EvalAddEpisodeResults =>
-        attributes.TryGetValue("eval_add_episode_results", out var version) ? new PromptFunction(version.Call) : throw new MissingMemberException("eval_add_episode_results");
+        attributes.TryGetValue("eval_add_episode_results", out var version) ? version.Function : throw new MissingMemberException("eval_add_episode_results");
 }
 
 // PORT: R15, the form of the prompt wrappers. PromptLibraryWrapper sets one attribute for each group with
@@ -279,7 +285,7 @@ internal static partial class Lib
         "Prompt overrides must return ChatPrompt(system=..., user=...). "
         + "Returning list[Message] is no longer supported.";
 
-    // Fixed prompt_name -> response_model registry. Schemas are not overridable.
+    /// <summary>Fixed prompt_name → response_model registry. Schemas are not overridable.</summary>
     private static OrderedDictionary<string, PromptSpec> BuiltinSpecs()
     {
         return new OrderedDictionary<string, PromptSpec>
@@ -413,7 +419,7 @@ internal static partial class Lib
     internal static readonly IReadOnlyDictionary<string, PromptSpec> BuiltinPromptSpecs = BuiltinSpecs().AsReadOnly<string, PromptSpec>();
 
     /// <summary>
-    /// Return the fixed schema for <c>promptName</c>, or the caller schema if dynamic.
+    /// Return the fixed schema for <c>prompt_name</c>, or the caller schema if dynamic.
     ///
     /// Raises <c>ValueError</c> for unknown names, missing dynamic schemas, and attempts
     /// to replace a fixed schema.
@@ -449,6 +455,7 @@ internal static partial class Lib
     }
 }
 
+/// <summary>Top-level prompt library ABC. Prefer subclassing; duck-typed libraries also work.</summary>
 // PORT: an ABC whose members are abstract properties (R15). It implements IPromptLibrary: TryGetGroup gives the
 // property of each group name, which is `getattr(library, group_name)`.
 internal abstract class ChatPromptLibrary : IPromptLibrary
@@ -475,22 +482,42 @@ internal abstract class ChatPromptLibrary : IPromptLibrary
 
     public bool TryGetGroup(string name, out IPromptGroup? group)
     {
-        group = name switch
+        // PORT: a known group name is an attribute, so the answer is true even when the property returns null. Python
+        // stores `None` for it and `hasattr` is true (gap 1).
+        switch (name)
         {
-            "extract_nodes" => ExtractNodes,
-            "dedupe_nodes" => DedupeNodes,
-            "extract_edges" => ExtractEdges,
-            "extract_nodes_and_edges" => ExtractNodesAndEdges,
-            "dedupe_edges" => DedupeEdges,
-            "summarize_nodes" => SummarizeNodes,
-            "summarize_sagas" => SummarizeSagas,
-            "eval" => Eval,
-            _ => null,
-        };
-        return group is not null;
+            case "extract_nodes":
+                group = ExtractNodes;
+                return true;
+            case "dedupe_nodes":
+                group = DedupeNodes;
+                return true;
+            case "extract_edges":
+                group = ExtractEdges;
+                return true;
+            case "extract_nodes_and_edges":
+                group = ExtractNodesAndEdges;
+                return true;
+            case "dedupe_edges":
+                group = DedupeEdges;
+                return true;
+            case "summarize_nodes":
+                group = SummarizeNodes;
+                return true;
+            case "summarize_sagas":
+                group = SummarizeSagas;
+                return true;
+            case "eval":
+                group = Eval;
+                return true;
+            default:
+                group = null;
+                return false;
+        }
     }
 }
 
+/// <summary>Built-in Graphiti prompt library.</summary>
 internal sealed class DefaultChatPromptLibrary : ChatPromptLibrary
 {
     private readonly DefaultExtractNodesPrompts extractNodes;
@@ -545,14 +572,15 @@ internal static partial class Lib
     // OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>>.
 }
 
+/// <summary>Group proxy that prefers override callables, else delegates to the base group.</summary>
 // PORT: a class with `__getattr__` implements IPromptGroup and forwards in TryGetFunction (R15). `base: Any` is the
 // group of the base library, an IPromptGroup.
 internal sealed class OverrideGroup : IPromptGroup
 {
-    private readonly IPromptGroup @base;
+    private readonly IPromptGroup? @base;
     private readonly OrderedDictionary<string, ChatPromptFunction> overrides;
 
-    internal OverrideGroup(IPromptGroup @base, OrderedDictionary<string, ChatPromptFunction> overrides)
+    internal OverrideGroup(IPromptGroup? @base, OrderedDictionary<string, ChatPromptFunction> overrides)
     {
         this.@base = @base;
         this.overrides = overrides;
@@ -570,15 +598,24 @@ internal sealed class OverrideGroup : IPromptGroup
             return true;
         }
 
+        // PORT: `getattr(None, name)` raises AttributeError, so a null base has no function.
+        if (@base is null)
+        {
+            function = null;
+            return false;
+        }
+
         return @base.TryGetFunction(name, out function);
     }
 }
 
+/// <summary>Duck-typed library composed from defaults + partial overrides.</summary>
 // PORT: a class with `__getattr__` implements IPromptLibrary and forwards in TryGetGroup and Specs (R15).
 internal sealed class ComposedPromptLibrary : IPromptLibrary
 {
     private readonly ChatPromptLibrary @base;
-    private readonly Dictionary<string, IPromptGroup> groups = [];
+    // PORT: a group is null when the base holds `None` for it.
+    private readonly Dictionary<string, IPromptGroup?> groups = [];
 
     internal ComposedPromptLibrary(
         ChatPromptLibrary @base,
@@ -588,7 +625,7 @@ internal sealed class ComposedPromptLibrary : IPromptLibrary
         foreach (var groupName in Lib.PromptGroups.Keys)
         {
             var groupOverrides = overrides.GetValueOrDefault(groupName, []);
-            if (!@base.TryGetGroup(groupName, out var baseGroup) || baseGroup is null)
+            if (!@base.TryGetGroup(groupName, out var baseGroup))
             {
                 throw new MissingMemberException(groupName);
             }
@@ -732,6 +769,7 @@ internal static partial class Lib
     }
 }
 
+/// <summary>Attach fixed builtin specs to a duck-typed library that lacks them.</summary>
 // PORT: a class with `__getattr__` implements IPromptLibrary and forwards in TryGetGroup (R15). `library: Any` is an
 // IPromptLibrary.
 internal sealed class LibraryWithBuiltinSpecs : IPromptLibrary
@@ -784,8 +822,9 @@ internal static partial class Lib
             }
         }
 
-        // PORT: `Specs` is typed as a mapping of PromptSpec, so the two branches `must be a mapping` and
-        // `must be PromptSpec` cannot be reached. A null `Specs` stands for `not hasattr(library, 'specs')`.
+        // PORT: `Specs` is typed as a mapping, so the branch `must be a mapping` cannot be reached. A null `Specs` stands
+        // for `not hasattr(library, 'specs')`. An entry can still be null at run time, as `None` is in Python, and it
+        // reaches the branch `must be PromptSpec`.
         var specs = library.Specs;
         if (specs is not null)
         {
@@ -794,6 +833,11 @@ internal static partial class Lib
                 if (!specs.TryGetValue(name, out var libSpec))
                 {
                     throw new ArgumentException($"Prompt library specs missing entry: {name}");
+                }
+
+                if (libSpec is null)
+                {
+                    throw new ArgumentException($"Prompt library specs[{Py.Repr(name)}] must be PromptSpec");
                 }
 
                 if (libSpec.DynamicSchema != spec.DynamicSchema)

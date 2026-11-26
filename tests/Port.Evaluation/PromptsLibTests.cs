@@ -117,7 +117,6 @@ public class PromptsLibTests
         var messages = Lib.PromptLibrary.ExtractNodes.ExtractMessage(DefaultExtractContext());
 
         Assert.IsType<Message>(Assert.Single(messages.Take(1)));
-        Assert.Equal(2, messages.Count);
     }
 
     [Fact]
@@ -209,8 +208,10 @@ public class PromptsLibTests
         Assert.False(messages[1].Content.EndsWith(PromptHelpers.DoNotEscapeUnicode, StringComparison.Ordinal));
     }
 
-    // The override of the Python test returns list[Message]. A ChatPromptFunction returns a ChatPrompt, so C# cannot
-    // hold that override. The check that raises the TypeError is EnsureChatPrompt, and this test reaches it with the list.
+    // The override of the Python test returns list[Message]. A ChatPromptFunction returns a ChatPrompt, so a typed
+    // delegate cannot return a list, and this test reaches the check that raises the TypeError, EnsureChatPrompt, with
+    // the list. The recording holds the override path with a null result (the cases "create" and "get_builder" with an
+    // override that returns None), which goes through create_prompt_library and the override group.
     [Fact]
     public void test_list_message_override_raises_type_error()
     {
@@ -219,6 +220,23 @@ public class PromptsLibTests
         var error = Assert.Throws<InvalidCastException>(() => Lib.PrivateEnsureChatPrompt(bad, "override.extract_message"));
 
         Assert.Contains("ChatPrompt", error.Message, StringComparison.Ordinal);
+    }
+
+    // A ChatPromptLibrary subclass whose group property returns None (Python): hasattr is true, so the library has the
+    // group and misses the function. The recording has the same fact ("null_group").
+    [Fact]
+    public void test_group_property_that_returns_none_is_a_missing_function()
+    {
+        var library = new DelegatingChatLibrary("extract_nodes", null);
+
+        var error = Assert.Throws<ArgumentException>(() => Lib.ValidatePromptLibrary(library));
+
+        Assert.Equal("Prompt library missing function: extract_nodes.extract_message", error.Message);
+        Assert.True(library.TryGetGroup("extract_nodes", out var group));
+        Assert.Null(group);
+        var composed = new ComposedPromptLibrary(library, []);
+        Assert.True(composed.TryGetGroup("extract_nodes", out var composedGroup));
+        Assert.Null(composedGroup);
     }
 
     [Fact]

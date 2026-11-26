@@ -31,6 +31,35 @@ internal sealed class HandBuiltLibrary(
     }
 }
 
+/// <summary>
+/// A <see cref="ChatPromptLibrary"/> subclass that gives the groups and the specs of the default library, except that
+/// one group property returns null (the Python subclass whose property returns <c>None</c>) and the specs can be another
+/// mapping.
+/// </summary>
+internal sealed class DelegatingChatLibrary(string? nullGroup, IReadOnlyDictionary<string, PromptSpec>? specs) : ChatPromptLibrary
+{
+    private static DefaultChatPromptLibrary Default => Lib.DefaultChatPromptLibrary;
+
+    internal override ExtractNodesPrompts ExtractNodes => nullGroup == "extract_nodes" ? null! : Default.ExtractNodes;
+
+    internal override DedupeNodesPrompts DedupeNodes => nullGroup == "dedupe_nodes" ? null! : Default.DedupeNodes;
+
+    internal override ExtractEdgesPrompts ExtractEdges => nullGroup == "extract_edges" ? null! : Default.ExtractEdges;
+
+    internal override ExtractNodesAndEdgesPrompts ExtractNodesAndEdges =>
+        nullGroup == "extract_nodes_and_edges" ? null! : Default.ExtractNodesAndEdges;
+
+    internal override DedupeEdgesPrompts DedupeEdges => nullGroup == "dedupe_edges" ? null! : Default.DedupeEdges;
+
+    internal override SummarizeNodesPrompts SummarizeNodes => nullGroup == "summarize_nodes" ? null! : Default.SummarizeNodes;
+
+    internal override SummarizeSagasPrompts SummarizeSagas => nullGroup == "summarize_sagas" ? null! : Default.SummarizeSagas;
+
+    internal override EvalPrompts Eval => nullGroup == "eval" ? null! : Default.Eval;
+
+    internal override IReadOnlyDictionary<string, PromptSpec> Specs => specs ?? Default.Specs;
+}
+
 internal static class PromptsLibSupport
 {
     internal static ChatPrompt Chat(string system, string user) => new()
@@ -112,7 +141,8 @@ internal static class PromptsLibSupport
         IReadOnlySet<string> notGroup,
         IReadOnlySet<(string Group, string Function)> drop,
         IReadOnlySet<(string Group, string Function)> notCallable,
-        IReadOnlyDictionary<string, PromptSpec>? specs)
+        IReadOnlyDictionary<string, PromptSpec>? specs,
+        bool returnsNone = false)
     {
         var groups = new Dictionary<string, IPromptGroup?>();
         foreach (var (group, functions) in Lib.PromptGroups)
@@ -136,9 +166,19 @@ internal static class PromptsLibSupport
                     continue;
                 }
 
-                members[function] = notCallable.Contains((group, function))
-                    ? null
-                    : _ => Chat("hand-built system", "hand-built user");
+                if (notCallable.Contains((group, function)))
+                {
+                    members[function] = null;
+                }
+                else if (returnsNone)
+                {
+                    // An upstream function that returns `None`: a null result of the delegate.
+                    members[function] = _ => null!;
+                }
+                else
+                {
+                    members[function] = _ => Chat("hand-built system", "hand-built user");
+                }
             }
 
             groups[group] = new HandBuiltGroup(members);

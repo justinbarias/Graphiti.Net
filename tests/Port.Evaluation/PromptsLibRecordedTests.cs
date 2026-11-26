@@ -13,7 +13,7 @@ using static Graphiti.Port.Evaluation.PromptsLibSupport;
 
 public class PromptsLibRecordedTests
 {
-    private const int CaseCount = 846;
+    private const int CaseCount = 1000;
 
     private static readonly List<JsonElement> Cases = Load();
 
@@ -60,7 +60,7 @@ public class PromptsLibRecordedTests
     public void The_recording_has_the_expected_number_of_cases()
     {
         Assert.Equal(CaseCount, Cases.Count);
-        foreach (var fn in new[] { "lib_call", "wrapper_partial", "version_wrapper", "create", "validate", "ensure_wrapped", "get_builder", "ensure_chat_prompt", "resolve", "override_group", "composed", "with_builtin_specs", "const" })
+        foreach (var fn in new[] { "lib_call", "wrapper_partial", "version_wrapper", "create", "validate", "ensure_wrapped", "get_builder", "ensure_chat_prompt", "resolve", "override_group", "composed", "with_builtin_specs", "null_group", "identity", "const" })
         {
             Assert.Contains(Cases, c => c.GetProperty("fn").GetString() == fn);
         }
@@ -101,6 +101,8 @@ public class PromptsLibRecordedTests
         "override_group" => OverrideGroupCall(args),
         "composed" => Composed(args),
         "with_builtin_specs" => WithBuiltinSpecs(args),
+        "null_group" => NullGroup(args),
+        "identity" => Identity(Str(args, "fact")),
         "const" => Const((string)args["name"]!),
         _ => throw new InvalidOperationException($"no binding for {fn}"),
     };
@@ -126,6 +128,12 @@ public class PromptsLibRecordedTests
         if (name is "ValueError" or "TypeError")
         {
             payload["msg"] = e.Message;
+        }
+
+        if (name == "AttributeError")
+        {
+            // The port exception carries the member name as its message (a MissingMemberException).
+            payload["name"] = e.Message;
         }
 
         return payload;
@@ -242,6 +250,19 @@ public class PromptsLibRecordedTests
         return Attempt(() => new VersionWrapper(func).Call(Dict(args, "ctx")));
     }
 
+    // An override of the recording: None (a null delegate), a function that returns None, or a function that returns a
+    // ChatPrompt.
+    private static ChatPromptFunction BehaviorOf(object? behavior)
+    {
+        if (behavior is null)
+        {
+            return null!;
+        }
+
+        var o = (OrderedDictionary<string, object?>)behavior;
+        return o.ContainsKey("returns_none") ? _ => null! : Override(Str(o, "system"), Str(o, "user_prefix"));
+    }
+
     private static OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>> BuildOverrides(OrderedDictionary<string, object?> spec)
     {
         var result = new OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>>();
@@ -250,8 +271,7 @@ public class PromptsLibRecordedTests
             result[group] = [];
             foreach (var (function, behavior) in (OrderedDictionary<string, object?>)functions!)
             {
-                var o = (OrderedDictionary<string, object?>)behavior!;
-                result[group][function] = Override(Str(o, "system"), Str(o, "user_prefix"));
+                result[group][function] = BehaviorOf(behavior);
             }
         }
 
@@ -306,6 +326,9 @@ public class PromptsLibRecordedTests
                 case "dyn_flip":
                     d[name] = new PromptSpec { Name = name, ResponseModel = d[name].ResponseModel, DynamicSchema = !d[name].DynamicSchema };
                     break;
+                case "none":
+                    d[name] = null!;
+                    break;
                 case "model_swap":
                     d[name] = new PromptSpec
                     {
@@ -334,7 +357,8 @@ public class PromptsLibRecordedTests
             Names(spec, "notgroup"),
             Pairs(spec, "drop"),
             Pairs(spec, "notcallable"),
-            spec.TryGetValue("specs", out var specs) && specs is List<object?> mods ? BuildSpecs(mods) : null);
+            spec.TryGetValue("specs", out var specs) && specs is List<object?> mods ? BuildSpecs(mods) : null,
+            spec.TryGetValue("returns_none", out var returnsNone) && returnsNone is true);
 
     private static IPromptLibrary NamedLibrary(string name) => name switch
     {
@@ -398,9 +422,17 @@ public class PromptsLibRecordedTests
         return Attempt(() => Lib.GetPromptBuilder(library, Str(args, "name"))(context));
     }
 
-    private static IPromptLibrary GetBuilderLibrary(string name) => name == "default"
-        ? Lib.DefaultChatPromptLibrary
-        : Lib.CreatePromptLibrary(Overrides(("extract_nodes", "extract_message", "S2", "U2 "), ("eval", "qa_prompt", "S3", "U3 ")));
+    private static IPromptLibrary GetBuilderLibrary(string name) => name switch
+    {
+        "default" => Lib.DefaultChatPromptLibrary,
+        "created" => Lib.CreatePromptLibrary(Overrides(("extract_nodes", "extract_message", "S2", "U2 "), ("eval", "qa_prompt", "S3", "U3 "))),
+        "created_none" => Lib.CreatePromptLibrary(
+            new OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>>
+            {
+                ["extract_nodes"] = new() { ["extract_message"] = _ => null! },
+            }),
+        _ => throw new InvalidOperationException(name),
+    };
 
     private static object? EnsureChatPromptCall(OrderedDictionary<string, object?> args)
     {
@@ -427,15 +459,33 @@ public class PromptsLibRecordedTests
     }
 
     private static object? Resolve(OrderedDictionary<string, object?> args) =>
-        Attempt(() => Lib.ResolveResponseModel(Str(args, "name"), args["model"] is string model ? Models[model] : null)?.PythonName);
+        Attempt(() => Lib.ResolveResponseModel(Str(args, "name"), ModelOf(args))?.PythonName);
+
+    // A model of the recording. With `clone`, it is a new class that has the name of the expected model, so only an
+    // identity test tells it from the model of the spec.
+    private static IResponseModel? ModelOf(OrderedDictionary<string, object?> args)
+    {
+        if (args["model"] is not string model)
+        {
+            return null;
+        }
+
+        if (args.TryGetValue("clone", out var clone) && clone is true)
+        {
+            var expected = Lib.BuiltinPromptSpecs[Str(args, "name")].ResponseModel!;
+            Assert.Equal(model, expected.PythonName);
+            return new BuiltinResponseModel(expected.PythonName, expected.ModelJsonSchema);
+        }
+
+        return Models[model];
+    }
 
     private static OrderedDictionary<string, ChatPromptFunction> BuildGroupOverrides(OrderedDictionary<string, object?> spec)
     {
         var result = new OrderedDictionary<string, ChatPromptFunction>();
         foreach (var (function, behavior) in spec)
         {
-            var o = (OrderedDictionary<string, object?>)behavior!;
-            result[function] = Override(Str(o, "system"), Str(o, "user_prefix"));
+            result[function] = BehaviorOf(behavior);
         }
 
         return result;
@@ -509,6 +559,89 @@ public class PromptsLibRecordedTests
         }
 
         return result;
+    }
+
+    private static OrderedDictionary<string, object?> NullGroup(OrderedDictionary<string, object?> args)
+    {
+        var group = Str(args, "group");
+        var first = Lib.PromptGroups[group][0];
+        var context = Dict(args, "ctx");
+        var library = new DelegatingChatLibrary(group, null);
+        var payload = new OrderedDictionary<string, object?>
+        {
+            ["validate"] = Attempt(() =>
+            {
+                Lib.ValidatePromptLibrary(library);
+                return null;
+            }),
+            ["builder"] = Attempt(() => Lib.GetPromptBuilder(library, $"{group}.{first}")(context)),
+        };
+        ComposedPromptLibrary composed;
+        try
+        {
+            composed = new ComposedPromptLibrary(library, BuildOverrides(Dict(args, "overrides")));
+        }
+        catch (Exception e) when (e is not Xunit.Sdk.XunitException)
+        {
+            payload["composed"] = ExceptionPayload(e);
+            return payload;
+        }
+
+        payload["composed"] = new OrderedDictionary<string, object?>
+        {
+            ["group_is_none"] = composed.TryGetGroup(group, out var found) && found is null,
+            ["probes"] = Lib.PromptGroups[group].Select(f => Probe(composed, group, f, context)).ToList(),
+            ["validate"] = Attempt(() =>
+            {
+                Lib.ValidatePromptLibrary(composed);
+                return null;
+            }),
+            ["builder"] = Attempt(() => Lib.GetPromptBuilder(composed, $"{group}.{first}")(context)),
+        };
+        return payload;
+    }
+
+    private static object? GroupOfLibrary(IPromptLibrary library, string group)
+    {
+        Assert.True(library.TryGetGroup(group, out var found));
+        return found;
+    }
+
+    // The identity facts: `is` of Python is ReferenceEquals.
+    private static object? Identity(string fact)
+    {
+        var one = Lib.CreatePromptLibrary(Overrides(("extract_nodes", "extract_message", "I", "J ")));
+        var otherSpecs = new DelegatingChatLibrary(null, new Dictionary<string, PromptSpec>(Lib.BuiltinPromptSpecs));
+        var composedOverOther = new ComposedPromptLibrary(otherSpecs, []);
+        var messages = new List<Message>
+        {
+            new Message { Role = "system", Content = "a" }.Validate(),
+            new Message { Role = "user", Content = "b" }.Validate(),
+        };
+        return fact switch
+        {
+            "create_is_default_library" => ReferenceEquals(Lib.CreatePromptLibrary(), Lib.DefaultChatPromptLibrary),
+            "create_twice" => ReferenceEquals(Lib.CreatePromptLibrary(), Lib.CreatePromptLibrary()),
+            "create_empty_is_default_library" => ReferenceEquals(Lib.CreatePromptLibrary([]), Lib.DefaultChatPromptLibrary),
+            "composed_group_is_default_group" => ReferenceEquals(GroupOfLibrary(one, "eval"), Lib.DefaultChatPromptLibrary.Eval),
+            "composed_overridden_group_is_default_group" =>
+                ReferenceEquals(GroupOfLibrary(one, "extract_nodes"), Lib.DefaultChatPromptLibrary.ExtractNodes),
+            "composed_specs_is_base_specs" => ReferenceEquals(composedOverOther.Specs, otherSpecs.Specs),
+            "composed_specs_is_builtin" => ReferenceEquals(composedOverOther.Specs, Lib.BuiltinPromptSpecs),
+            "composed_group_is_base_group" => ReferenceEquals(GroupOfLibrary(composedOverOther, "eval"), otherSpecs.Eval),
+            "version_wrapper_same_list" => ReferenceEquals(new VersionWrapper(_ => messages).Call([]), messages),
+            "version_wrapper_changed_content" => ChangedContent(messages),
+            "prompt_library_group_twice" => ReferenceEquals(Lib.PromptLibrary.Eval, Lib.PromptLibrary.Eval),
+            "prompt_library_function_twice" => ReferenceEquals(Lib.PromptLibrary.Eval.QaPrompt, Lib.PromptLibrary.Eval.QaPrompt),
+            "prompt_library_other_function" => ReferenceEquals(Lib.PromptLibrary.Eval.QaPrompt, Lib.PromptLibrary.Eval.EvalPromptFunction),
+            _ => throw new InvalidOperationException(fact),
+        };
+    }
+
+    private static List<object?> ChangedContent(List<Message> messages)
+    {
+        new VersionWrapper(_ => messages).Call([]);
+        return messages.Select(m => (object?)m.Content).ToList();
     }
 
     private static object? Const(string name) => name switch

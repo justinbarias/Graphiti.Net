@@ -16,9 +16,11 @@ seed is fixed. A payload longer than 300 characters is stored as zlib and base64
 
 Each case has `fn`, `args` (a JSON value), and `expect`: a payload, a JSON value that the test builds again from
 the result of the port. An exception inside a payload is {"exc": <class name>} and, for a ValueError or a
-TypeError, also {"msg": <text>}. A case is left out when the port cannot hold its input by type: an override that is
-not callable, an override that returns a list or a text, and a specs value that is not a mapping or has an entry
-that is not a PromptSpec. The judge accepts the first three by name (R22).
+TypeError, also {"msg": <text>}; for an AttributeError, {"name": <the attribute name>}. A case is left out when the
+port cannot hold its input by type: an override that is a list or a text, an override that returns a list or a text,
+and a specs value that is not a mapping or has an entry that is not a PromptSpec. A null override and an override that
+returns null the port can hold, so the cases have them (the test compares the exception type and the full text). The
+judge accepts the first three by name (R22).
 """
 from __future__ import annotations
 
@@ -133,6 +135,8 @@ def exc_payload(e):
     out = {'exc': type(e).__name__}
     if isinstance(e, (ValueError, TypeError)):
         out['msg'] = str(e)
+    if isinstance(e, AttributeError):
+        out['name'] = e.name
     return out
 
 
@@ -207,7 +211,7 @@ for partial in PARTIALS:
         [probe(wrapper, g, f, PROMPT_CONTEXT) for g, f in probes])
 
 # ---- VersionWrapper ----
-ROLES = ['system', 'user', 'assistant', 'system', 'tool', '']
+ROLES = ['system', 'user', 'assistant', 'system', 'tool', '', 'System', 'SYSTEM ']
 for i in range(24):
     messages = [[R.choice(ROLES), rstr(6)] for _ in range(R.randint(0, 4))]
     x = rstr(3)
@@ -222,10 +226,18 @@ add('version_wrapper', {'messages': [['system', 'a'], ['user', 'b']], 'ctx': {}}
 
 # ---- create_prompt_library ----
 def make_override(spec):
+    if spec is None:
+        return None
+    if spec.get('returns_none'):
+        return lambda ctx: None
+
     def override(ctx):
         return ChatPrompt(system=SystemMessage(content=spec['system']),
                           user=UserMessage(content=spec['user_prefix'] + ctx['x']))
     return override
+
+
+RETURNS_NONE = {'returns_none': True}
 
 
 def build_overrides(spec):
@@ -258,6 +270,15 @@ CREATE_CASES = [
     {'': {'': ov()}},
     {'extract_nodes': {'extract_message': ov()}, 'dedupe_nodes': {'nope': ov()}},
     {'nope': {'extract_message': ov()}, 'extract_nodes': {'nope': ov()}},
+    # the order of the checks decides the error (the unknown function comes before the unknown group)
+    {'extract_nodes': {'nope': ov()}, 'nope': {'x': ov()}},
+    # an override that is None, and one that returns None
+    {'extract_nodes': {'extract_message': None}},
+    {'extract_nodes': {'nope': ov(), 'extract_message': None}},
+    {'extract_nodes': {'extract_message': None, 'nope': ov()}},
+    {'dedupe_nodes': {'node': ov()}, 'eval': {'qa_prompt': None}},
+    {'extract_nodes': {'extract_message': RETURNS_NONE}},
+    {'extract_nodes': {'extract_message': RETURNS_NONE, 'extract_text': ov()}, 'eval': {'qa_prompt': RETURNS_NONE}},
 ]
 for overrides in CREATE_CASES:
     probes = [['extract_nodes', 'extract_message'], ['extract_nodes', 'extract_text'], ['extract_edges', 'edge'],
@@ -284,6 +305,10 @@ def raw(_context):
     return RAW
 
 
+def raw_none(_context):
+    return None
+
+
 def build_specs(mods):
     d = {n: PromptSpec(name=n, response_model=s.response_model, dynamic_schema=s.dynamic_schema)
          for n, s in L.BUILTIN_PROMPT_SPECS.items()}
@@ -294,6 +319,8 @@ def build_specs(mods):
             del d[name]
         elif mod['mode'] == 'dyn_flip':
             d[name] = PromptSpec(name=name, response_model=old.response_model, dynamic_schema=not old.dynamic_schema)
+        elif mod['mode'] == 'none':
+            d[name] = None
         elif mod['mode'] == 'model_swap':
             d[name] = PromptSpec(name=name, response_model=MODELS[mod['to']] if mod['to'] else None,
                                  dynamic_schema=old.dynamic_schema)
@@ -314,7 +341,8 @@ def build_fake(spec):
         for f in fns:
             if [g, f] in spec.get('drop', []):
                 continue
-            members[f] = 'not callable' if [g, f] in spec.get('notcallable', []) else raw
+            members[f] = 'not callable' if [g, f] in spec.get('notcallable', []) else (
+                raw_none if spec.get('returns_none') else raw)
         ns[g] = SimpleNamespace(**members)
     if spec.get('specs') is not None:
         ns['specs'] = build_specs(spec['specs'])
@@ -331,6 +359,10 @@ def swap(name, to):
 
 def drop(name):
     return {'name': name, 'mode': 'drop'}
+
+
+def none(name):
+    return {'name': name, 'mode': 'none'}
 
 
 FAKES = [
@@ -364,6 +396,16 @@ FAKES = [
     {'notcallable': [['dedupe_nodes', 'nodes']], 'specs': [drop('eval.qa_prompt')]},
     {'drop': [['eval', 'qa_prompt']], 'specs': [drop('extract_nodes.extract_message')]},
     {'absent': ['extract_nodes'], 'notcallable': [['dedupe_nodes', 'node']]},
+    # the order of the checks decides the error: one name with both faults, and two faults in one group
+    {'specs': [flip('eval.qa_prompt'), swap('eval.qa_prompt', None)]},
+    {'specs': [swap('summarize_sagas.summarize_saga', 'Summary'), flip('summarize_sagas.summarize_saga')]},
+    {'notcallable': [['extract_nodes', 'extract_message']], 'drop': [['extract_nodes', 'extract_json']]},
+    {'drop': [['extract_nodes', 'extract_message']], 'notcallable': [['extract_nodes', 'extract_json']]},
+    # an entry that is None, and a library whose functions return None
+    {'specs': [none('eval.qa_prompt')]},
+    {'specs': [none('extract_nodes.extract_message'), drop('eval.qa_prompt')]},
+    {'specs': [drop('extract_nodes.extract_message'), none('eval.qa_prompt')]},
+    {'returns_none': True},
 ]
 for fake_spec in FAKES:
     fake = build_fake(fake_spec)
@@ -409,7 +451,8 @@ BUILDER_NAMES = (
 )
 CREATED = L.create_prompt_library({'extract_nodes': {'extract_message': make_override(ov('S2', 'U2 '))},
                                    'eval': {'qa_prompt': make_override(ov('S3', 'U3 '))}})
-for lib_name, lib in [('default', L.default_chat_prompt_library), ('created', CREATED)]:
+CREATED_NONE = L.create_prompt_library({'extract_nodes': {'extract_message': make_override(RETURNS_NONE)}})
+for lib_name, lib in [('default', L.default_chat_prompt_library), ('created', CREATED), ('created_none', CREATED_NONE)]:
     for name in BUILDER_NAMES:
         add('get_builder', {'lib': lib_name, 'name': name, 'ctx': CTX_X}, attempt(lambda: L.get_prompt_builder(lib, name)(CTX_X)))
 
@@ -453,6 +496,10 @@ for name in SPEC_NAMES + ['', 'nope', 'extract_nodes', 'extract_nodes.', 'EXTRAC
     if spec is not None and spec.response_model is not None:
         add('resolve', {'name': name, 'model': spec.response_model.__name__},
             attempt(lambda: (lambda m: m.__name__ if m else None)(L.resolve_response_model(name, spec.response_model))))
+        # a new class with the name of the expected model: the test is by identity, not by name
+        clone = type(spec.response_model.__name__, (pydantic.BaseModel,), {})
+        add('resolve', {'name': name, 'model': spec.response_model.__name__, 'clone': True},
+            attempt(lambda: (lambda m: m.__name__ if m else None)(L.resolve_response_model(name, clone))))
 for model_name in MODELS:
     for name in ['extract_nodes.extract_attributes', 'extract_edges.extract_attributes', 'dedupe_nodes.node_list',
                  'eval.qa_prompt']:
@@ -513,6 +560,66 @@ for fake_spec in [{}, {'specs': []}, {'absent': ['eval']}, {'notgroup': ['eval']
         else:
             out.append({'same_as_inner': value is getattr(fake, n)})
     add('with_builtin_specs', {'fake': fake_spec}, out)
+
+# ---- a base group that is None (a ChatPromptLibrary subclass whose group property returns None) ----
+def null_group_library(group):
+    return type('NullGroupLibrary', (L.DefaultChatPromptLibrary,), {group: property(lambda self: None)})()
+
+
+for group in ['extract_nodes', 'eval', 'dedupe_edges']:
+    fns = L.PROMPT_GROUPS[group]
+    for with_override in [False, True]:
+        override_spec = {group: {fns[0]: ov('NS', 'NU ')}} if with_override else {}
+        library = null_group_library(group)
+        payload = {
+            'validate': attempt(lambda: L.validate_prompt_library(library)),
+            'builder': attempt(lambda: L.get_prompt_builder(library, f'{group}.{fns[0]}')(CTX_X)),
+        }
+        try:
+            composed = L._ComposedPromptLibrary(library, build_overrides(override_spec))
+        except Exception as e:  # noqa: BLE001
+            payload['composed'] = exc_payload(e)
+        else:
+            payload['composed'] = {
+                'group_is_none': getattr(composed, group) is None,
+                'probes': [probe(composed, group, f, CTX_X) for f in fns],
+                'validate': attempt(lambda: L.validate_prompt_library(composed)),
+                'builder': attempt(lambda: L.get_prompt_builder(composed, f'{group}.{fns[0]}')(CTX_X)),
+            }
+        add('null_group', {'group': group, 'overrides': override_spec, 'ctx': CTX_X}, payload)
+
+
+# ---- object identity ----
+class OtherSpecsLibrary(L.DefaultChatPromptLibrary):
+    @property
+    def specs(self):
+        return OTHER_SPECS
+
+
+OTHER_SPECS = dict(L.BUILTIN_PROMPT_SPECS)
+_one = L.create_prompt_library({'extract_nodes': {'extract_message': make_override(ov('I', 'J '))}})
+_base = OtherSpecsLibrary()
+_composed = L._ComposedPromptLibrary(_base, {})
+_wrapped = [Message(role='system', content='a'), Message(role='user', content='b')]
+_wrapper_result = L.VersionWrapper(lambda ctx: _wrapped)({})
+IDENTITY = {
+    'create_is_default_library': L.create_prompt_library() is L.default_chat_prompt_library,
+    'create_twice': L.create_prompt_library() is L.create_prompt_library(),
+    'create_empty_is_default_library': L.create_prompt_library({}) is L.default_chat_prompt_library,
+    'composed_group_is_default_group': _one.eval is L.default_chat_prompt_library.eval,
+    'composed_overridden_group_is_default_group': _one.extract_nodes is L.default_chat_prompt_library.extract_nodes,
+    'composed_specs_is_base_specs': _composed.specs is _base.specs,
+    'composed_specs_is_builtin': _composed.specs is L.BUILTIN_PROMPT_SPECS,
+    'composed_group_is_base_group': _composed.eval is _base.eval,
+    'version_wrapper_same_list': _wrapper_result is _wrapped,
+    'version_wrapper_changed_content': [m.content for m in _wrapped],
+    'prompt_library_group_twice': L.prompt_library.eval is L.prompt_library.eval,
+    'prompt_library_function_twice': L.prompt_library.eval.qa_prompt is L.prompt_library.eval.qa_prompt,
+    'prompt_library_other_function': L.prompt_library.eval.qa_prompt is L.prompt_library.eval.eval_prompt,
+}
+for fact, value in IDENTITY.items():
+    add('identity', {'fact': fact}, value)
+
 
 # ---- the module constants (R25) ----
 add('const', {'name': 'PROMPT_GROUPS'}, {g: list(fns) for g, fns in L.PROMPT_GROUPS.items()})
