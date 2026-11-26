@@ -574,4 +574,88 @@ internal static class PyText
 
         return sb.ToString();
     }
+
+    // ---- replace and count ----
+
+    /// <summary>
+    /// <c>s.replace(old, new, count)</c>. A <paramref name="count"/> below zero replaces each match, and zero replaces none.
+    /// The matches do not overlap and go from left to right. An empty <paramref name="old"/> matches before each code point
+    /// and at the end. The match works on code points, so a lone surrogate never matches half of an emoji.
+    /// </summary>
+    internal static string Replace(string s, string old, string @new, long count = -1)
+    {
+        var cps = ToCodePoints(s);
+        var oldCps = ToCodePoints(old);
+        var sb = new StringBuilder(s.Length);
+        var replaced = 0L;
+        var i = 0;
+        if (oldCps.Length == 0)
+        {
+            for (; i <= cps.Length; i++)
+            {
+                if (count < 0 || replaced < count)
+                {
+                    sb.Append(@new);
+                    replaced++;
+                }
+
+                if (i < cps.Length)
+                {
+                    AppendCodePoint(sb, cps[i]);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        while (i < cps.Length)
+        {
+            if ((count < 0 || replaced < count)
+                && i <= cps.Length - oldCps.Length
+                && cps.AsSpan(i, oldCps.Length).SequenceEqual(oldCps))
+            {
+                sb.Append(@new);
+                replaced++;
+                i += oldCps.Length;
+            }
+            else
+            {
+                AppendCodePoint(sb, cps[i]);
+                i++;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// <c>s.count(sub)</c>: the number of matches of <paramref name="sub"/> that do not overlap, from left to right.
+    /// An empty <paramref name="sub"/> gives the number of code points plus one.
+    /// </summary>
+    internal static long Count(string s, string sub)
+    {
+        var cps = ToCodePoints(s);
+        var subCps = ToCodePoints(sub);
+        if (subCps.Length == 0)
+        {
+            return cps.Length + 1L;
+        }
+
+        var found = 0L;
+        var i = 0;
+        while (i <= cps.Length - subCps.Length)
+        {
+            if (cps.AsSpan(i, subCps.Length).SequenceEqual(subCps))
+            {
+                found++;
+                i += subCps.Length;
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        return found;
+    }
 }
