@@ -84,7 +84,7 @@ internal static partial class ContentChunking
         var tokens = EstimateTokens(content);
 
         // Short content always processes fine - no need to chunk
-        if (tokens < Helpers.ChunkMinTokens)
+        if (tokens < Helpers.ChunkMinTokens.Value)
         {
             return false;
         }
@@ -147,14 +147,14 @@ internal static partial class ContentChunking
 
             // Estimate density: elements per 1000 tokens
             var density = tokens > 0 ? Py.TrueDiv(elementCount, tokens) * 1000 : 0.0;
-            return density > Helpers.ChunkDensityThreshold * 1000; // Scale threshold
+            return density > Helpers.ChunkDensityThreshold.Value * 1000; // Scale threshold
         }
         else if (data is OrderedDictionary<string, object?> dict)
         {
             // For objects, count keys recursively (shallow)
             var keyCount = CountJsonKeys(dict, maxDepth: 2);
             var density = tokens > 0 ? Py.TrueDiv(keyCount, tokens) * 1000 : 0.0;
-            return density > Helpers.ChunkDensityThreshold * 1000;
+            return density > Helpers.ChunkDensityThreshold.Value * 1000;
         }
         else
         {
@@ -250,7 +250,7 @@ internal static partial class ContentChunking
 
         // Text density threshold is typically lower than JSON
         // A well-written article might have 5-10% named entities
-        return density > Helpers.ChunkDensityThreshold * 500; // Half the JSON threshold
+        return density > Helpers.ChunkDensityThreshold.Value * 500; // Half the JSON threshold
     }
 
     /// <summary>
