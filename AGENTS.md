@@ -2,7 +2,7 @@
 
 Graphiti.Net is a .NET 10 port of [Graphiti](https://github.com/getzep/graphiti), the temporal context graph library by Zep.
 The port is pinned to upstream 0.32.0 ([port/UPSTREAM_PIN](port/UPSTREAM_PIN)).
-Gate 2 closed on 2026-11-25, so the judge in `port/judge/` is read-only. The product projects contain no ported code yet.
+Gate 2 closed on 2026-11-25, so the judge in `port/judge/` is read-only. Gate 3 passed on 2026-11-26. The product projects hold the five pilot units, and plan 0004 ports the other units layer by layer.
 
 ## Read first
 

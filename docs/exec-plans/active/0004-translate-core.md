@@ -64,6 +64,17 @@ After layers 5, 7, and 9, run `scripts/mutate.sh` and apply the pruning rule.
 
 A script that writes [db-schema.md](../../generated/db-schema.md) from the ported query definitions (after layer 5).
 
+## Lead decisions at the start, 2026-11-26
+
+The lead made these decisions under decision D39. The maintainer reads them at the end of the run.
+
+- Each layer is one branch and one pull request, as the table says. Inside a layer, an implementer ports a packet of one to four modules in its own worktree, and packets with no shared file run at the same time. Two reviewers read each packet, so each unit has two reviewers. The lead updates the queue, the state file, and `expected-failures.txt` one time for each layer.
+- Layer 0 has seven packets. Five cover layers 1 to 6, and two cover layers 7 to 9. It merges as two pull requests, so that layer 1 starts after the first one.
+- The skeleton ports in full each member that has no logic to defer: an enum, an abstract class, a constant, and a body that is only `return None` or `raise NotImplementedError` (rule R24).
+- `utils.bulk_utils` moves from layer 1 to layer 7. It imports five modules of `utils.maintenance` and `ingestion.change_set`, and no unit of layers 1 to 6 imports it.
+- A unit with logic delivers a recording of Python results beside the upstream tests, and each Neo4j operations unit delivers a recording through a fake executor (rule R25). The pilot showed that the upstream tests alone find few defects.
+- An implementer and a reviewer write the full report to a file, and the lead reads the file. The reply to the lead is a short summary.
+
 ## Results
 
 None yet.

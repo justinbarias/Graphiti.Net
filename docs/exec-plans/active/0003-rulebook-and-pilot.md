@@ -20,13 +20,15 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | P7 | Done 2026-11-26, except `Fixtures.cs` (debt T18). Judge host: add the decoders for a `$model`, `$enum`, `$ref`, and `$dt` argument. Add the encoder for a `$type` result and the exception rows of open item O2. Write `Fixtures.cs` (R22). Needs P2 and P6. Closes O2 and debt T18. | Lead, Fable 5.2, medium | The gate passes, and the judge case count stays 1999. Own pull request. |
 | P8 | Done 2026-11-26. Runner change for `JudgeTypeRejected` (open item O1, decision D20). The lead writes a patch file outside `port/judge/`. The maintainer applies it. | Lead, Fable 5.2, medium | `run.py --build python` passes each case, and the case count stays 1999. Own pull request. |
 | P9 | Done 2026-11-26. Write the script in `port/tools/` that records `str(exception)` for the `errors` unit (R23, J1). The project `tests/Port.Evaluation` comes with the `errors` unit of the pilot, because a test project with no test fails the test step. | Lead, Fable 5.2, medium | The script records from `.upstream` with Python 3.12. |
-| 6 | In progress. Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). A unit also ports the members of other modules that R24 names. Needs P1 to P9. | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering pure judge cases pass for each unit. `entity_node_ops` has no pure case: build and format only, and its 3 flow cases wait for plan 0004, layer 9. |
-| 7 | Review the pilot. Two fresh reviewers for each unit. If they disagree, a third reviewer decides. | Reviewers, Opus 5.5, high | Findings with inputs. Each finding that shows a missing rule changes `RULES.md`. |
-| 8 | Decide what to do with the pilot output. If a rule changed in a way that the output does not follow, delete the output. | Lead, Fable 5.2, medium | The decision, in `port/STATE.md`. |
+| 6 | Done 2026-11-26. Pilot. Port five units of different kinds using only `port/RULES.md`: `errors` (144 lines), `search.search_filters` (cycle group), `prompts.dedupe_nodes`, `driver.neo4j.operations.entity_node_ops`, `utils.content_chunking` (826 lines). A unit also ports the members of other modules that R24 names. Needs P1 to P9. | Implementers, Sonnet 5.5, medium. Opus 5.5 medium for the cycle group. | Build, format, and the covering pure judge cases pass for each unit. `entity_node_ops` has no pure case: build and format only, and its 3 flow cases wait for plan 0004, layer 9. |
+| 7 | Done 2026-11-26. Review the pilot. Two fresh reviewers for each unit. If they disagree, a third reviewer decides. | Reviewers, Opus 5.5, high | Findings with inputs. Each finding that shows a missing rule changes `RULES.md`. |
+| 8 | Done 2026-11-26. Decide what to do with the pilot output. If a rule changed in a way that the output does not follow, delete the output. | Lead, Fable 5.2, medium | The decision, in `port/STATE.md`. |
 
 ## Gate 3
 
 The maintainer approves `port/RULES.md`.
+
+On 2026-11-26 the lead passed this gate under decision D39, after the five pilot units merged. The gate log of [DECISIONS.md](../../../port/DECISIONS.md) gives the reasons. The maintainer reads the rulebook at the end of the run.
 
 ## Results
 
@@ -502,3 +504,48 @@ Two Opus 5.5 high reviewers read the unit with no contact. Each compared its own
 | `port/queue.json` and `port/STATE.md` did not name the unit. | B | The lead updates both with the unit's pull request. |
 
 The unit is not merged. Its 19 judge bindings need the codec, which merged after the port.
+
+### Tasks 6 and 7, the other four units, 2026-11-26
+
+One implementer ported each unit from the rulebook alone. Two Opus 5.5 high reviewers then read the unit with no contact. The same implementer did one fix round.
+The lead verified each fix round with the gate, the evaluation tests, and the judge. No second review ran on the fixes.
+
+| Unit | Implementer | Judge cases | Evidence beside the judge | Pull request |
+| --- | --- | --- | --- | --- |
+| `search.search_filters` | Opus 5.5, medium | 147 of 150 pass. 3 answer `JudgeTypeRejected` (O4). | 4 upstream tests, and 3 error lists compared with pydantic | 25 |
+| `prompts.dedupe_nodes`, with `prompts.models` and `prompts.prompt_helpers` | Sonnet 5.5, medium | 46 pass. 1 is not bound: it names a model of `prompts.extract_nodes`. | 1,209 recorded Python results | 28 |
+| `utils.content_chunking` | Sonnet 5.5, medium | 190 of 197 pass. 7 answer `JudgeTypeRejected` (O4). | The upstream tests, and 1,505 recorded Python results | 29 |
+| `driver.neo4j.operations.entity_node_ops` | Sonnet 5.5, medium | None. Its 3 flow cases wait for plan 0004, layer 9. | 94 recorded calls through a fake executor, for the 5 methods that do not stop at a skeleton member | 30 |
+
+What the reviews found:
+
+| Finding | Unit | Result |
+| --- | --- | --- |
+| When a bad node label met another bad field, pydantic reported both errors, and the port reported one. Rule R7 ran a field validator after the field reads. | `search_filters` | Fixed before the merge. R7: the validator runs inside the read of its field. |
+| `to_prompt_json(5, indent=-2**40)` gave `OverflowException` from a cast that Python does not have. | `dedupe_nodes` | `PyJson.Dumps` takes a `long?` indent. R11 changed. |
+| `generate_covering_chunks` with a chunk size of 0 or 1 returns the pair chunks in insertion order, where CPython returns the order of its hash table. | `content_chunking` | Accepted as decision D43. The maintainer decides at gate 4. |
+| `Py.Comb` returned a `long` and threw for `comb(100, 20)`. | `content_chunking` | It returns a `BigInteger`. R18 changed. |
+| A `long` that left its range wrapped in silence. | `content_chunking` | The product projects compile with `CheckForOverflowUnderflow` (decision D44). R4 changed. |
+| The ported upstream tests found none of 13 seeded defects. | `content_chunking` | R25: a unit with logic delivers a recording of Python results. In the fix round the recording found 4 of 4 seeded defects, and the judge found 1 of 4. |
+| 10 upstream tests replace a module constant with `monkeypatch.setattr`. | `content_chunking` | `PyPatch<T>` (decision D42, R17). |
+| `Neo4j.Driver` 6.5.1 throws `ProtocolException` for a nested `OrderedDictionary`, a `PyDateTime`, a tuple, a `BigInteger`, and an enum. R6 said that the driver accepts the value model. | `entity_node_ops` | R6 and R9: the Neo4j project converts each parameter value at the driver boundary. Layer 5 builds the conversion in `Neo4jDriver`. |
+| A bad `name_embedding` value in a record gave an error with no class name and no field name. `Node` has `validate_assignment=True`. | `entity_node_ops` | Fixed. R7: the type check at an assignment of open data. |
+| `Transaction.RunAsync` returned the result tuple. None of the 150 upstream `tx.run` sites reads a result. | `entity_node_ops` | It returns `Task`. R9 changed. |
+| A skeleton `Node` had reference equality. With it, a later unit passes its tests with the wrong meaning. | `entity_node_ops` | The unit ports the fields, the label validation, `__eq__`, and `__hash__` of `Node`, and `utc_now`. R24 changed. |
+
+The adversarial review of the support pull request (27) had 11 findings, and each one is fixed there.
+The largest one: `PyPatch<T>` had an implicit conversion, and with it `X == null`, `X.Equals(v)`, and `var x = X` read the holder in silence. The conversion is removed, and code reads `.Value`.
+
+Rule changes: the history table of [RULES.md](../../../port/RULES.md) has one row for each round. It has three new open items:
+
+- O10: a test that replaces a module-level function. The maintainer decides before layer 7.
+- O11: judge host additions. The lead builds them before layer 2.
+- O12: two prompt library shapes. The lead decides before layer 4.
+
+### Task 8, 2026-11-26
+
+The lead keeps the output of each pilot unit.
+
+- `errors` and `search_filters` merged before the last rule changes. The support pull request moved the members of the three search filter models to the order of R7. No other rule change touches the two units.
+- `dedupe_nodes`, `content_chunking`, and `entity_node_ops` applied each changed rule in their fix rounds, before their merge.
+- The rules that changed after the last fix round write down what the output already does.
