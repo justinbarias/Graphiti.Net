@@ -627,7 +627,7 @@ A public call works from any thread and with any `SynchronizationContext`. The t
 | --- | --- |
 | `GraphitiException` and the 14 classes of rule R4 that derive from it | As upstream raises them |
 | `RateLimitException`, `RefusalException`, `EmptyResponseException` | From the chat adapter and the reranker |
-| `ArgumentException` | A value that a ported validator rejects, and each upstream `ValueError` |
+| `ArgumentException` | A value that a ported validator rejects, and each upstream `ValueError`. One exception: a node label that is not safe gives `NodeLabelValidationException` when the check runs outside a model (`nodes.py:685`, `search_filters.py:101` and `:151`, `node_db_queries.py:26`). That class derives from `GraphitiException` only (rule R4). |
 | `InvalidOperationException` | A rerank call with no log probability hook, and each upstream `RuntimeError` |
 | A `Neo4j.Driver` exception | As it arrives. The core never wraps it. |
 | A provider exception | As it arrives, unless the classifier names it a rate limit |
