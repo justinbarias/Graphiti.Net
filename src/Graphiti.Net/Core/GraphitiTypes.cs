@@ -85,7 +85,7 @@ internal static partial class GraphitiTypes
 }
 
 // PORT: a TypedDict (R7) with `total=False`, so each key can be absent.
-// TODO(port): no rule for a TypedDict with `total=False`. Each field is nullable, and null stands for an absent key.
+// PORT: a TypedDict with `total=False` has nullable fields, and null stands for an absent key (R7).
 // generate_prompt_response builds it as the keyword arguments of generate_response.
 internal sealed record GeneratePromptResponseKwargs
 {

@@ -47,7 +47,7 @@ internal interface EvalPrompt
 {
     PromptFunction QaPrompt { get; }
 
-    // TODO(port): no rule for an attribute with the name of its interface. C# does not allow a member named like its
+    // PORT: the suffix Function (R2). C# does not allow a member named like its
     // type (error CS0542), so `eval_prompt` is EvalPromptFunction here. The interface name is the one of R2.
     PromptFunction EvalPromptFunction { get; }
 

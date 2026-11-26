@@ -150,7 +150,7 @@ internal static class DecisionPrompts
 
     // PORT: `library` is a ChatPromptLibrary, which is an IPromptLibrary for get_prompt_builder.
     // TODO(port): jev_prompt_overrides
-    internal static LLMPromptOverrides JevPromptOverrides(ChatPromptLibrary? library = null)
+    internal static LLMPromptOverrides JevPromptOverrides(IPromptLibrary? library = null)
     {
         throw new NotSupportedException("TODO(port): jev_prompt_overrides");
     }

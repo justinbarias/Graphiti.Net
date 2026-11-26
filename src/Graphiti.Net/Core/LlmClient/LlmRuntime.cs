@@ -39,7 +39,7 @@ internal sealed class LLMRuntime
         LLMModel model,
         PromptRoutes? routes = null,
         LLMPromptOverrides? promptOverrides = null,
-        ChatPromptLibrary? library = null)
+        IPromptLibrary? library = null)
     {
         throw new NotSupportedException("TODO(port): LLMRuntime.__init__");
     }

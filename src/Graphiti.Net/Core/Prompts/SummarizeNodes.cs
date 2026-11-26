@@ -20,8 +20,7 @@ namespace Graphiti.Core.Prompts;
 // PORT: each response model has its fields as properties. The unit adds the members of R7.
 internal sealed record Summary
 {
-    // TODO(port): no rule for a field with the name of its class. C# does not allow a member named like its type
-    // (error CS0542), so `summary` is SummaryValue. The wire name stays `summary`.
+    // PORT: the suffix Value (R2). C# does not allow a member named like its type (error CS0542), so `summary` is SummaryValue. The wire name stays `summary`.
     internal required string SummaryValue { get; set; }
 }
 

@@ -22,14 +22,15 @@ using Graphiti.Core.Prompts;
 // PORT: `M = TypeVar('M', bound=str)` has no C# form. A model id is a `string`, so LLMTransport is not generic.
 
 // PORT: a frozen dataclass is a sealed record with init accessors (R7).
-// TODO(port): no rule for a nested class with the name of a field of its class. `ExtractNodes` is both a nested
-// dataclass and, as `extract_nodes`, a field, and C# does not allow two members with one name (error CS0102). Each
-// nested class takes the suffix Group. Its Python name, for `__qualname__` in a message, is
-// `LLMPromptOverrides.ExtractNodes` (R15). The same holds for PromptRoutes.
+// PORT: `ExtractNodes` is both a nested dataclass and, as `extract_nodes`, a field, and C# does not allow two members
+// with one name (error CS0102). Each nested class takes the suffix Group (R2). Its Python name, for `__qualname__` in
+// a message, is `LLMPromptOverrides.ExtractNodes` (R15). The same holds for PromptRoutes.
 internal sealed record LLMPromptOverrides
 {
     internal sealed record ExtractNodesGroup
     {
+        internal const string PythonName = "ExtractNodes";
+
         internal ChatPromptFunction? ExtractMessage { get; init; }
 
         internal ChatPromptFunction? ExtractJson { get; init; }
@@ -49,6 +50,8 @@ internal sealed record LLMPromptOverrides
 
     internal sealed record DedupeNodesGroup
     {
+        internal const string PythonName = "DedupeNodes";
+
         internal ChatPromptFunction? Node { get; init; }
 
         internal ChatPromptFunction? NodeList { get; init; }
@@ -58,6 +61,8 @@ internal sealed record LLMPromptOverrides
 
     internal sealed record ExtractEdgesGroup
     {
+        internal const string PythonName = "ExtractEdges";
+
         internal ChatPromptFunction? Edge { get; init; }
 
         internal ChatPromptFunction? ExtractAttributes { get; init; }
@@ -69,16 +74,22 @@ internal sealed record LLMPromptOverrides
 
     internal sealed record ExtractNodesAndEdgesGroup
     {
+        internal const string PythonName = "ExtractNodesAndEdges";
+
         internal ChatPromptFunction? ExtractMessage { get; init; }
     }
 
     internal sealed record DedupeEdgesGroup
     {
+        internal const string PythonName = "DedupeEdges";
+
         internal ChatPromptFunction? ResolveEdge { get; init; }
     }
 
     internal sealed record SummarizeNodesGroup
     {
+        internal const string PythonName = "SummarizeNodes";
+
         internal ChatPromptFunction? SummarizePair { get; init; }
 
         internal ChatPromptFunction? SummarizeContext { get; init; }
@@ -88,11 +99,15 @@ internal sealed record LLMPromptOverrides
 
     internal sealed record SummarizeSagasGroup
     {
+        internal const string PythonName = "SummarizeSagas";
+
         internal ChatPromptFunction? SummarizeSaga { get; init; }
     }
 
     internal sealed record EvalGroup
     {
+        internal const string PythonName = "Eval";
+
         internal ChatPromptFunction? QueryExpansion { get; init; }
 
         internal ChatPromptFunction? QaPrompt { get; init; }
@@ -162,8 +177,7 @@ internal sealed class LLMTransport
         throw new NotSupportedException("TODO(port): LLMTransport.model");
     }
 
-    // TODO(port): no rule for `__repr__` of a ported class. LLMModel.__post_init__ formats the transport with `!r`.
-    // The method is Repr, as on PyDateTime.
+    // PORT: Repr() for __repr__ (R2). LLMModel.__post_init__ formats the transport with `!r`.
     internal string Repr()
     {
         throw new NotSupportedException("TODO(port): LLMTransport.__repr__");
@@ -183,8 +197,7 @@ internal sealed record LLMModel
 
     internal long? MaxTokens { get; init; }
 
-    // TODO(port): no rule for `__post_init__` of a dataclass. The closest form is Validate() of R7, which each
-    // construction path calls.
+    // PORT: Validate() for __post_init__ (R7). Each construction path calls it.
     internal LLMModel Validate()
     {
         throw new NotSupportedException("TODO(port): LLMModel.__post_init__");
@@ -200,6 +213,8 @@ internal sealed record PromptRoutes
 {
     internal sealed record ExtractNodesGroup
     {
+        internal const string PythonName = "ExtractNodes";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? ExtractMessage { get; init; }
@@ -221,6 +236,8 @@ internal sealed record PromptRoutes
 
     internal sealed record DedupeNodesGroup
     {
+        internal const string PythonName = "DedupeNodes";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? Node { get; init; }
@@ -232,6 +249,8 @@ internal sealed record PromptRoutes
 
     internal sealed record ExtractEdgesGroup
     {
+        internal const string PythonName = "ExtractEdges";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? Edge { get; init; }
@@ -245,6 +264,8 @@ internal sealed record PromptRoutes
 
     internal sealed record ExtractNodesAndEdgesGroup
     {
+        internal const string PythonName = "ExtractNodesAndEdges";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? ExtractMessage { get; init; }
@@ -252,6 +273,8 @@ internal sealed record PromptRoutes
 
     internal sealed record DedupeEdgesGroup
     {
+        internal const string PythonName = "DedupeEdges";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? ResolveEdge { get; init; }
@@ -259,6 +282,8 @@ internal sealed record PromptRoutes
 
     internal sealed record SummarizeNodesGroup
     {
+        internal const string PythonName = "SummarizeNodes";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? SummarizePair { get; init; }
@@ -270,6 +295,8 @@ internal sealed record PromptRoutes
 
     internal sealed record SummarizeSagasGroup
     {
+        internal const string PythonName = "SummarizeSagas";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? SummarizeSaga { get; init; }
@@ -277,6 +304,8 @@ internal sealed record PromptRoutes
 
     internal sealed record EvalGroup
     {
+        internal const string PythonName = "Eval";
+
         internal LLMModel? Default { get; init; }
 
         internal LLMModel? QueryExpansion { get; init; }
@@ -288,9 +317,7 @@ internal sealed record PromptRoutes
         internal LLMModel? EvalAddEpisodeResults { get; init; }
     }
 
-    // TODO(port): no rule for the field type `LLMModel | <Group> | None`. Part 3 gives a sealed record union with
-    // one case for each shape, which needs new types for each of the 8 fields. Each field is `object?`, which holds an LLMModel or the
-    // nested record, and flatten_routes tests it with `is` as Python tests it with isinstance.
+    // PORT: R22 allows object? here. The field holds an LLMModel or the nested record, and flatten_routes tests it with is.
     internal object? ExtractNodes { get; init; }
 
     internal object? DedupeNodes { get; init; }

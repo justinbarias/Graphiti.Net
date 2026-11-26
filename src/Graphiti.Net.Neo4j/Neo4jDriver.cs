@@ -34,6 +34,9 @@ internal static partial class Neo4jDriverModule
 // GraphDriver. The constructor sets Provider. DefaultGroupId already has the value ''.
 internal sealed class Neo4jDriver : GraphDriver
 {
+    // PORT: type(driver).__name__ (R15).
+    internal override string PythonName => "Neo4jDriver";
+
     // PORT: the index build that __init__ starts as a background task is not ported (R17, G20). The unit writes
     // `// PORT: G20` at that place. aoss_client is set to None and only the Neptune driver reads it.
     // TODO(port): no rule for aoss_client, an attribute that the Neo4j driver sets to None
@@ -147,7 +150,7 @@ internal sealed class Neo4jDriver : GraphDriver
     }
 
     // PORT: GraphDriver has no health_check, so this is not an override.
-    // TODO(port): no rule for print() in the except branch
+    // PORT: print(x) is Console.Out.WriteLine(x) (R4).
     // TODO(port): Neo4jDriver.health_check
     internal Task HealthCheckAsync(CancellationToken cancellationToken = default)
     {
@@ -184,7 +187,7 @@ internal sealed class Neo4jDriver : GraphDriver
 internal sealed class Neo4jTransaction : Transaction
 {
     // TODO(port): _Neo4jTransaction.__init__
-    internal Neo4jTransaction(IAsyncTransaction tx)
+    internal Neo4jTransaction(IAsyncQueryRunner tx)
     {
         throw new NotSupportedException("TODO(port): _Neo4jTransaction.__init__");
     }
@@ -203,7 +206,7 @@ internal sealed class Neo4jTransaction : Transaction
 // PORT: Python has no such class. Neo4jDriver.session returns the AsyncSession of the neo4j package, which has the
 // members of GraphDriverSession. A C# session must derive from GraphDriverSession, so this class wraps the
 // IAsyncSession of Neo4j.Driver.
-// TODO(port): no rule for the adapter between IAsyncSession and GraphDriverSession
+// PORT: R9 names this adapter.
 internal sealed class Neo4jSession : GraphDriverSession
 {
     // TODO(port): Neo4jSession constructor

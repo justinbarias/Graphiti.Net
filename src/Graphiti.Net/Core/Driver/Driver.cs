@@ -83,6 +83,9 @@ internal interface IQueryTimeoutSession
 
 internal abstract class GraphDriver : QueryExecutor
 {
+    // PORT: type(driver).__name__ (R15).
+    internal abstract string PythonName { get; }
+
     internal const GraphProvider Relate = GraphProvider.Relate;
 
     internal GraphProvider Provider { get; set; }

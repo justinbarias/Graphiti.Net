@@ -67,7 +67,7 @@ internal static class ExtractNodesAndEdges
         throw new NotSupportedException("TODO(port): _build_custom_instructions_section");
     }
 
-    private const string SystemPrompt = "You build the long-term memory of an AI agent. From each conversation you extract the entities and the relationship facts that the agent will need later to answer questions, personalize responses, and continue work. The original conversation will not be available later: only your entities and facts will remain, so each fact must stand alone.";
+    internal const string SystemPrompt = "You build the long-term memory of an AI agent. From each conversation you extract the entities and the relationship facts that the agent will need later to answer questions, personalize responses, and continue work. The original conversation will not be available later: only your entities and facts will remain, so each fact must stand alone.";
 
     private const string C2InstructionText = """
 # Goal

@@ -19,16 +19,15 @@ namespace Graphiti.Core.LlmClient;
 
 using Graphiti.Core.Prompts;
 using Graphiti.Internal;
+using Graphiti.PyCompat;
 
 // PORT: the module name equals the class name OpenAIDecisionsClient, so the module class has the suffix Module (R2).
 // It is split around the classes to keep the order of the Python file.
 internal static partial class OpenaiDecisionsClientModule
 {
-    // TODO(port): no rule for `_sleep = asyncio.sleep`, a module-level alias that the upstream tests replace with
-    // monkeypatch. The row of PyPatch<T> in R17 does not name it. The skeleton gives the delegate of
-    // `asyncio.sleep(s)` (R8) as a property that throws.
-    internal static Func<double, CancellationToken, Task> Sleep =>
-        throw new NotSupportedException("TODO(port): _sleep");
+    // PORT: an upstream test replaces _sleep (R17).
+    internal static readonly PyPatch<Func<double, CancellationToken, Task>> Sleep =
+        new((seconds, cancellationToken) => Task.Delay(TimeSpan.FromSeconds(seconds), PortServices.Time, cancellationToken));
 }
 
 // PORT: both exception classes stay internal in the file of their module (decision D32, R4). A class with no
@@ -73,10 +72,19 @@ internal sealed class OpenAIDecisionsClient : LLMClient
         double timeoutSeconds = 120.0,
         long maxRetries = 5,
         HttpClient? httpClient = null)
-        : base(config)
+        : base(ResolveConfig(config))
     {
         throw new NotSupportedException("TODO(port): OpenAIDecisionsClient.__init__");
     }
+
+    // TODO(port): OpenAIDecisionsClient.__init__ (the config that Python builds before super().__init__, R4)
+    private static LLMConfig ResolveConfig(LLMConfig? config)
+    {
+        throw new NotSupportedException("TODO(port): OpenAIDecisionsClient.__init__ config");
+    }
+
+    // PORT: type(self).__name__ (R15).
+    internal override string PythonName => "OpenAIDecisionsClient";
 
     internal string ApiKey { get; set; }
 
@@ -141,7 +149,7 @@ internal sealed class OpenAIDecisionsClient : LLMClient
 
     // PORT: a classmethod is a static method (R16). `raw_answers: Any` is a value of the value model (R6).
     // TODO(port): OpenAIDecisionsClient._map_answers
-    private static OrderedDictionary<string, object?> MapAnswers(
+    internal static OrderedDictionary<string, object?> MapAnswers(
         OrderedDictionary<string, OrderedDictionary<string, object?>> questions,
         object? rawAnswers)
     {
@@ -172,7 +180,7 @@ internal sealed class OpenAIDecisionsClient : LLMClient
 internal static partial class OpenaiDecisionsClientModule
 {
     // TODO(port): openai_decisions_prompt_overrides
-    internal static LLMPromptOverrides OpenaiDecisionsPromptOverrides(ChatPromptLibrary? library = null)
+    internal static LLMPromptOverrides OpenaiDecisionsPromptOverrides(IPromptLibrary? library = null)
     {
         throw new NotSupportedException("TODO(port): openai_decisions_prompt_overrides");
     }

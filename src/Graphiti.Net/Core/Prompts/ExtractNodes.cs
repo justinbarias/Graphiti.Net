@@ -29,8 +29,7 @@ internal sealed record ExtractedEntity
 
 internal sealed record ExtractedEntities
 {
-    // TODO(port): no rule for a field with the name of its class. C# does not allow a member named like its type
-    // (error CS0542), so `extracted_entities` is ExtractedEntitiesValue. The wire name stays `extracted_entities`.
+    // PORT: the suffix Value (R2). C# does not allow a member named like its type (error CS0542), so `extracted_entities` is ExtractedEntitiesValue. The wire name stays `extracted_entities`.
     internal required List<ExtractedEntity> ExtractedEntitiesValue { get; set; }
 }
 

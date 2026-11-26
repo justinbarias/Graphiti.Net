@@ -105,7 +105,7 @@ internal sealed class VersionWrapper
 
     internal PromptFunction Func { get; set; }
 
-    // TODO(port): no rule for `__call__` on a class. The method is Call, and its method group is a PromptFunction.
+    // PORT: Call for __call__ (R2). Its method group is a PromptFunction.
     internal List<Message> Call(OrderedDictionary<string, object?> context)
     {
         throw new NotSupportedException("TODO(port): VersionWrapper.__call__");
@@ -404,7 +404,7 @@ internal static partial class Lib
     internal static DefaultChatPromptLibrary DefaultChatPromptLibrary =>
         throw new NotSupportedException("TODO(port): default_chat_prompt_library");
 
-    // TODO(port): no rule for a module-level type alias. `PromptOverrides = dict[str, dict[str, ChatPromptFunction]]`
+    // PORT: no type for a type alias (R2). `PromptOverrides = dict[str, dict[str, ChatPromptFunction]]`
     // has no C# type. Each annotation `PromptOverrides` is
     // OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>>.
 }
@@ -458,8 +458,8 @@ internal static partial class Lib
         throw new NotSupportedException("TODO(port): ensure_chat_prompt");
     }
 
-    // TODO(port): no rule for `_ensure_chat_prompt`, whose name without the underscore is the name of
-    // `ensure_chat_prompt` in the same class. The name takes the prefix Private.
+    // PORT: the prefix Private (R2). `_ensure_chat_prompt` without the underscore is the name of
+    // `ensure_chat_prompt` in the same class.
     internal static ChatPrompt PrivateEnsureChatPrompt(object? result, string label)
     {
         throw new NotSupportedException("TODO(port): _ensure_chat_prompt");

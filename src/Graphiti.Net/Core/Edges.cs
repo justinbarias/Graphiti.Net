@@ -19,7 +19,9 @@ namespace Graphiti.Core;
 
 using Graphiti.Core.Driver;
 using Graphiti.Core.Embedder;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
+using Microsoft.Extensions.Logging;
 
 // PORT: Edge defines __eq__ and __hash__, so it and its subclasses are classes, not records (R7). Edge has no
 // validate_assignment and no validator, so each set accessor is plain.
@@ -313,6 +315,9 @@ internal sealed class NextEpisodeEdge : Edge
 
 internal static class Edges
 {
+    // PORT: R5 puts the logger on the module class.
+    internal static ILogger Logger => PortServices.Logger(typeof(Edges));
+
     // Edge helpers
     // TODO(port): get_episodic_edge_from_record
     internal static EpisodicEdge GetEpisodicEdgeFromRecord(OrderedDictionary<string, object?> record)

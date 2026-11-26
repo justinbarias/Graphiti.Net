@@ -401,12 +401,6 @@ internal sealed class SagaNodeNamespace
 
 internal sealed class NodeNamespace
 {
-    // TODO(port): NodeNamespace.__init__
-    internal NodeNamespace(GraphDriver driver, EmbedderClient embedder)
-    {
-        throw new NotSupportedException("TODO(port): NodeNamespace.__init__");
-    }
-
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
     // TODO(port): NodeNamespace.entity
@@ -426,4 +420,11 @@ internal sealed class NodeNamespace
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
     // TODO(port): NodeNamespace.saga
     internal SagaNodeNamespace Saga => throw new NotSupportedException("TODO(port): NodeNamespace.saga");
+
+    // PORT: the unit adds _driver_name with the constructor body.
+    // TODO(port): NodeNamespace.__init__
+    internal NodeNamespace(GraphDriver driver, EmbedderClient embedder)
+    {
+        throw new NotSupportedException("TODO(port): NodeNamespace.__init__");
+    }
 }

@@ -45,6 +45,5 @@ internal sealed class LLMCache
         throw new NotSupportedException("TODO(port): LLMCache.close");
     }
 
-    // TODO(port): no rule for __del__, which closes the connection and suppresses each exception. A finalizer or
-    // IDisposable are the two forms.
+    // PORT: __del__ is not ported (R16).
 }

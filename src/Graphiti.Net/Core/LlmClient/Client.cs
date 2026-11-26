@@ -46,6 +46,9 @@ internal static class Client
 // the full namespace.
 internal abstract class LLMClient
 {
+    // PORT: type(self).__name__ (R15).
+    internal abstract string PythonName { get; }
+
     // TODO(port): LLMClient.__init__
     internal LLMClient(LLMConfig? config, bool cache = false)
     {
@@ -77,7 +80,7 @@ internal abstract class LLMClient
     }
 
     // TODO(port): LLMClient._clean_input
-    private string CleanInput(string input)
+    internal string CleanInput(string input)
     {
         throw new NotSupportedException("TODO(port): LLMClient._clean_input");
     }
@@ -95,8 +98,8 @@ internal abstract class LLMClient
         throw new NotSupportedException("TODO(port): LLMClient._generate_response_with_retry");
     }
 
-    // TODO(port): no rule for `_generate_response`, whose name without the underscore is the name of
-    // `generate_response` in the same class. The name takes the prefix Private. An abstract method has no body, as in
+    // PORT: the prefix Private (R2). `_generate_response` without the underscore is the name of
+    // `generate_response` in the same class. An abstract method has no body, as in
     // Python.
     internal abstract Task<OrderedDictionary<string, object?>> PrivateGenerateResponseAsync(
         List<Message> messages,
@@ -107,13 +110,13 @@ internal abstract class LLMClient
         CancellationToken cancellationToken = default);
 
     // TODO(port): LLMClient._get_cache_key
-    private string GetCacheKey(List<Message> messages, string? model = null)
+    internal string GetCacheKey(List<Message> messages, string? model = null)
     {
         throw new NotSupportedException("TODO(port): LLMClient._get_cache_key");
     }
 
     // TODO(port): LLMClient._apply_attribute_extraction_preamble
-    private void ApplyAttributeExtractionPreamble(List<Message> messages, bool attributeExtraction)
+    internal void ApplyAttributeExtractionPreamble(List<Message> messages, bool attributeExtraction)
     {
         throw new NotSupportedException("TODO(port): LLMClient._apply_attribute_extraction_preamble");
     }

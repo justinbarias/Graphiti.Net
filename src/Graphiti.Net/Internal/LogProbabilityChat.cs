@@ -1,9 +1,6 @@
 namespace Graphiti.Internal;
 
-/// <summary>One message of a log probability request: <c>{'role': ..., 'content': ...}</c>.</summary>
-/// <param name="Role">The role: <c>system</c> or <c>user</c>.</param>
-/// <param name="Content">The text of the message.</param>
-internal sealed record LogProbabilityChatMessage(string Role, string Content);
+using Graphiti.Core.Prompts;
 
 /// <summary>One item of <c>top_logprobs</c>: a token and its log probability.</summary>
 /// <param name="Token">The text of the token.</param>
@@ -35,7 +32,7 @@ internal sealed record LogProbabilityChatResponse(List<LogProbabilityChoice> Cho
 internal abstract class LogProbabilityChat
 {
     /// <summary><c>chat.completions.create(model, messages, temperature, max_tokens, logit_bias, logprobs, top_logprobs)</c>.</summary>
-    /// <param name="model">The model name.</param>
+    /// <param name="model">The model name. Null means that the chat client uses its own default model.</param>
     /// <param name="messages">The messages of the request, in order.</param>
     /// <param name="temperature">The temperature.</param>
     /// <param name="maxTokens">The limit of reply tokens.</param>
@@ -45,8 +42,8 @@ internal abstract class LogProbabilityChat
     /// <param name="cancellationToken">The token that cancels the call.</param>
     /// <returns>The reply.</returns>
     internal abstract Task<LogProbabilityChatResponse> CreateAsync(
-        string model,
-        List<LogProbabilityChatMessage> messages,
+        string? model,
+        List<Message> messages,
         double temperature,
         long maxTokens,
         OrderedDictionary<string, long> logitBias,

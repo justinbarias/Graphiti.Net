@@ -407,12 +407,6 @@ internal sealed class NextEpisodeEdgeNamespace
 
 internal sealed class EdgeNamespace
 {
-    // TODO(port): EdgeNamespace.__init__
-    internal EdgeNamespace(GraphDriver driver, EmbedderClient embedder)
-    {
-        throw new NotSupportedException("TODO(port): EdgeNamespace.__init__");
-    }
-
     // PORT: Python sets the attribute only when the driver has the operations, and __getattr__ raises
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
     // TODO(port): EdgeNamespace.entity
@@ -437,4 +431,11 @@ internal sealed class EdgeNamespace
     // NotImplementedError for it otherwise. The getter throws NotImplementedException in that case (R15).
     // TODO(port): EdgeNamespace.next_episode
     internal NextEpisodeEdgeNamespace NextEpisode => throw new NotSupportedException("TODO(port): EdgeNamespace.next_episode");
+
+    // PORT: the unit adds _driver_name with the constructor body.
+    // TODO(port): EdgeNamespace.__init__
+    internal EdgeNamespace(GraphDriver driver, EmbedderClient embedder)
+    {
+        throw new NotSupportedException("TODO(port): EdgeNamespace.__init__");
+    }
 }
