@@ -17,6 +17,7 @@ limitations under the License.
 
 namespace Graphiti.Core;
 
+using Graphiti.Core.Utils;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
@@ -87,6 +88,56 @@ internal static class EpisodeTypeExtensions
 
         Nodes.Log.EpisodeTypeNotImplemented(Nodes.Logger, episodeType);
         throw new NotImplementedException(string.Empty);
+    }
+}
+
+internal abstract class Node
+{
+    private List<string> labels = [];
+
+    internal string Uuid { get; set; } = Py.Uuid4();
+
+    internal required string Name { get; set; }
+
+    internal required string GroupId { get; set; }
+
+    // PORT: ConfigDict(validate_assignment=True) with a validator on this field, so the set accessor validates (R7).
+    internal List<string> Labels
+    {
+        get => labels;
+        set => labels = ValidateLabels(value, "labels");
+    }
+
+    internal PyDateTime CreatedAt { get; set; } = DatetimeUtils.UtcNow();
+
+    // PORT: the pydantic error carries the name of the class of the instance (R15).
+    internal abstract string PythonName { get; }
+
+    internal List<string> ValidateLabels(List<string> value, string? field = null)
+    {
+        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), PythonName, field);
+        return value;
+    }
+
+    public override int GetHashCode() => Uuid.GetHashCode(StringComparison.Ordinal);
+
+    public override bool Equals(object? obj) => obj is Node other && Uuid == other.Uuid;
+}
+
+internal sealed class EntityNode : Node
+{
+    internal List<double>? NameEmbedding { get; set; }
+
+    internal string Summary { get; set; } = string.Empty;
+
+    internal OrderedDictionary<string, object?> Attributes { get; set; } = new();
+
+    internal override string PythonName => "EntityNode";
+
+    internal EntityNode Validate()
+    {
+        ValidateLabels(Labels, "labels");
+        return this;
     }
 }
 
