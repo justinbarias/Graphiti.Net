@@ -55,4 +55,16 @@ public class SearchFiltersValidationTests
             Assert.Equal(expected[i].Msg, error.Errors[i].Msg);
         }
     }
+
+    [Fact]
+    public void A_typed_construction_reports_the_validator_error_under_the_field()
+    {
+        // SearchFilters(node_labels=['a b']).errors() gives one error with the location ('node_labels',).
+        var error = Assert.Throws<ValidationException>(() => new SearchFilters { NodeLabels = ["a b"] }.Validate());
+
+        var only = Assert.Single(error.Errors);
+        Assert.Equal(["node_labels"], only.Loc);
+        Assert.Equal("value_error", only.Type);
+        Assert.Equal(LabelError, only.Msg);
+    }
 }

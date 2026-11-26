@@ -142,16 +142,16 @@ internal sealed record SearchFilters : IPydanticModel
     internal List<PropertyFilter>? PropertyFilters { get; set; }
 
     // @field_validator('node_labels'): validate_node_label_filters. PydanticFields puts the field name in front of the
-    // location when ModelValidate reads the field, so the error has no field of its own here.
-    private static List<string>? ValidateNodeLabelFilters(List<string>? value)
+    // location when ModelValidate reads the field, so that call gives no field. Validate() gives the field name.
+    private static List<string>? ValidateNodeLabelFilters(List<string>? value, string? field = null)
     {
-        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), "SearchFilters");
+        Pydantic.Wrap<NodeLabelValidationException>(() => Helpers.ValidateNodeLabels(value), "SearchFilters", field);
         return value;
     }
 
     internal SearchFilters Validate()
     {
-        ValidateNodeLabelFilters(NodeLabels);
+        ValidateNodeLabelFilters(NodeLabels, "node_labels");
         return this;
     }
 
