@@ -505,7 +505,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Helpers.cs",
       "status": "todo",
-      "notes": "The pilot ported validate_node_labels with SAFE_CYPHER_IDENTIFIER_PATTERN for real (rule R24). 13 of its 14 pure cases pass, and 1 answers JudgeTypeRejected (O4). The other members are not ported."
+      "notes": "The pilot ported validate_node_labels with SAFE_CYPHER_IDENTIFIER_PATTERN and the CHUNK_* constants for real (rule R24). 13 of the 14 pure cases of validate_node_labels pass, and 1 answers JudgeTypeRejected (O4). The other members are not ported."
     },
     {
       "order": 24,
@@ -566,9 +566,9 @@
         "typing_extensions",
         "uuid"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Nodes.cs",
       "status": "todo",
-      "notes": ""
+      "notes": "The pilot ported the enum EpisodeType with from_str for real (rule R24). The other members are not ported."
     },
     {
       "order": 27,
@@ -4158,9 +4158,9 @@
         "re",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Utils/ContentChunking.cs",
+      "status": "reviewed",
+      "notes": "Pilot unit (plan 0003, task 6). 197 pure judge cases: 190 pass, and 7 answer JudgeTypeRejected (open item O4). tests/Port.Evaluation/ContentChunkingTests.cs holds the upstream tests, and ContentChunkingValuesTests.cs compares 1505 recorded Python results (port/tools/record_chunking_values.py). Decision D43 records one accepted difference in generate_covering_chunks."
     },
     {
       "order": 182,
