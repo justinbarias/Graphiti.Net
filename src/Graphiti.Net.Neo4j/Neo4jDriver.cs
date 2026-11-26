@@ -39,7 +39,7 @@ internal sealed class Neo4jDriver : GraphDriver
 
     // PORT: the index build that __init__ starts as a background task is not ported (R17, G20). The unit writes
     // `// PORT: G20` at that place. aoss_client is set to None and only the Neptune driver reads it.
-    // TODO(port): no rule for aoss_client, an attribute that the Neo4j driver sets to None
+    // PORT: aoss_client has no member (R9).
     // TODO(port): Neo4jDriver.__init__
     internal Neo4jDriver(string uri, string? user, string? password, string database = "neo4j")
     {
@@ -48,7 +48,7 @@ internal sealed class Neo4jDriver : GraphDriver
 
     // PORT: the public surface design lets a host give its own IDriver (AddNeo4j with a factory). Python has one
     // constructor, which builds the client from uri, user, and password.
-    // TODO(port): no rule for a constructor that takes the host's IDriver
+    // PORT: R9 gives this constructor. The first constructor chains to it.
     internal Neo4jDriver(IDriver client, string database = "neo4j")
     {
         throw new NotSupportedException("TODO(port): Neo4jDriver.__init__ with a host IDriver");

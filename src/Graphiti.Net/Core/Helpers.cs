@@ -87,8 +87,7 @@ internal static class Helpers
         throw new NotSupportedException("TODO(port): lucene_sanitize");
     }
 
-    // TODO(port): no rule for the numpy result type NDArray. The function returns a one-dimensional float array, so it
-    // is List<double>, as the parameter is (R18).
+    // PORT: the numpy result type NDArray is List<double>, as the parameter is (R20).
     // TODO(port): normalize_l2
     internal static List<double> NormalizeL2(List<double> embedding)
     {

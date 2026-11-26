@@ -139,9 +139,7 @@ internal sealed class OpenAIDecisionsClient : LLMClient
         throw new NotSupportedException("TODO(port): OpenAIDecisionsClient._post");
     }
 
-    // TODO(port): no rule for a sync read of the body of `httpx.Response`. httpx holds the body after the request,
-    // and an HttpResponseMessage gives it only through an async read. The other form adds the body text as a
-    // second parameter, which _post reads one time.
+    // PORT: the body is buffered after PostAsync, so response.Content.ReadAsStream() reads it with no wait (R19).
     private static bool IsInputTooLong(HttpResponseMessage response)
     {
         throw new NotSupportedException("TODO(port): OpenAIDecisionsClient._is_input_too_long");
