@@ -17,6 +17,5 @@ limitations under the License.
 
 namespace Graphiti.Core;
 
-// PORT: a shell of the class Graphiti (R2, decision D24), declared by skeleton packet S5 for the decorator of
-// decorators.py. The packet of graphiti.py fills it.
-internal class GraphitiCore;
+// PORT: a shell of the class Graphiti (R2, decision D24). The packet of graphiti.py fills it.
+internal sealed class GraphitiCore;
