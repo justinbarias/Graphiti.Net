@@ -1,0 +1,133 @@
+{
+ "neo4j": "6.1.0",
+ "codes": [
+  {
+   "code": "Neo.ClientError.Schema.ConstraintValidationFailed",
+   "python": "ConstraintError"
+  },
+  {
+   "code": "Neo.ClientError.Schema.ConstraintViolation",
+   "python": "ConstraintError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.ConstraintVerificationFailed",
+   "python": "ConstraintError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.ConstraintViolation",
+   "python": "ConstraintError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.InvalidSyntax",
+   "python": "CypherSyntaxError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.SyntaxError",
+   "python": "CypherSyntaxError"
+  },
+  {
+   "code": "Neo.ClientError.Procedure.TypeError",
+   "python": "CypherTypeError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.InvalidType",
+   "python": "CypherTypeError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.TypeError",
+   "python": "CypherTypeError"
+  },
+  {
+   "code": "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase",
+   "python": "ForbiddenOnReadOnlyDatabase"
+  },
+  {
+   "code": "Neo.ClientError.General.ReadOnly",
+   "python": "Forbidden"
+  },
+  {
+   "code": "Neo.ClientError.Schema.ForbiddenOnConstraintIndex",
+   "python": "Forbidden"
+  },
+  {
+   "code": "Neo.ClientError.Schema.IndexBelongsToConstraint",
+   "python": "Forbidden"
+  },
+  {
+   "code": "Neo.ClientError.Security.Forbidden",
+   "python": "Forbidden"
+  },
+  {
+   "code": "Neo.ClientError.Transaction.ForbiddenDueToTransactionType",
+   "python": "Forbidden"
+  },
+  {
+   "code": "Neo.ClientError.Security.AuthorizationFailed",
+   "python": "AuthError"
+  },
+  {
+   "code": "Neo.ClientError.Security.Unauthorized",
+   "python": "AuthError"
+  },
+  {
+   "code": "Neo.ClientError.Security.TokenExpired",
+   "python": "TokenExpired"
+  },
+  {
+   "code": "Neo.ClientError.Cluster.NotALeader",
+   "python": "NotALeader"
+  },
+  {
+   "code": "Neo.TransientError.General.DatabaseUnavailable",
+   "python": "DatabaseUnavailable"
+  },
+  {
+   "code": "Neo.ClientError.Security.AuthorizationExpired",
+   "python": "TransientError"
+  },
+  {
+   "code": "Neo.TransientError.Transaction.Terminated",
+   "python": "ClientError"
+  },
+  {
+   "code": "Neo.TransientError.Transaction.LockClientStopped",
+   "python": "ClientError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.ParameterMissing",
+   "python": "ClientError"
+  },
+  {
+   "code": "Neo.TransientError.General.OutOfMemoryError",
+   "python": "TransientError"
+  },
+  {
+   "code": "Neo.TransientError.Statement.SyntaxError",
+   "python": "TransientError"
+  },
+  {
+   "code": "Neo.DatabaseError.General.UnknownError",
+   "python": "DatabaseError"
+  },
+  {
+   "code": "Neo.DatabaseError.Statement.SyntaxError",
+   "python": "DatabaseError"
+  },
+  {
+   "code": "Neo.OtherError.General.Something",
+   "python": "Neo4jError"
+  },
+  {
+   "code": "Neo.ClientError.Statement",
+   "python": "DatabaseError"
+  },
+  {
+   "code": "Neo.ClientError.Statement.SyntaxError.Extra",
+   "python": "DatabaseError"
+  },
+  {
+   "code": "NotACode",
+   "python": "DatabaseError"
+  }
+ ]
+}
