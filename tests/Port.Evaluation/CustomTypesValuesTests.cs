@@ -257,44 +257,55 @@ public class CustomTypesValuesTests
         Assert.Equal(["a", "A"], GraphTypeDefinition.Create("T").AddInteger("a").AddInteger("A").Fields.Select(f => f.Name));
     }
 
-    // Decision D25: value equality on the name, the description, and the fields in order. The descriptor is not part of it.
+    // The public surface design, "Public records": a record has value equality on its properties, and a collection
+    // property compares by reference. So the name and the description compare by value, and the field list by
+    // reference. The descriptor is not part of the comparison.
     [Fact]
-    public void Two_definitions_with_equal_values_are_equal()
+    public void A_definition_compares_its_name_and_description_by_value_and_its_field_list_by_reference()
     {
         static GraphTypeDefinition Make() => GraphTypeDefinition.Create("Person", "A person.")
             .AddString("occupation", "The job", true, 20)
             .AddBooleanList("flags");
 
         var a = Make();
+        var copy = a with { };
+        Assert.NotSame(a, copy);
+        Assert.Same(a.Fields, copy.Fields);
+        Assert.Equal(a, copy);
+        Assert.True(a == copy);
+        Assert.Equal(a.GetHashCode(), copy.GetHashCode());
+
+        // Two definitions with no field and one name are equal. Each one builds its own descriptor.
+        var first = GraphTypeDefinition.Create("A", "Text.");
+        var second = GraphTypeDefinition.Create("A", "Text.");
+        Assert.NotSame(first.ToDescriptor(), second.ToDescriptor());
+        Assert.Equal(first, second);
+        Assert.Equal(first.GetHashCode(), second.GetHashCode());
+        Assert.NotEqual(first, GraphTypeDefinition.Create("B", "Text."));
+        Assert.NotEqual(first, GraphTypeDefinition.Create("A", "Text"));
+        Assert.NotEqual(first, GraphTypeDefinition.Create("A"));
+
+        // Two definitions that were built apart have two field lists, so they are not equal. Their fields are.
         var b = Make();
-        Assert.NotSame(a.ToDescriptor(), b.ToDescriptor());
-        Assert.Equal(a, b);
-        Assert.True(a == b);
-        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        Assert.NotSame(a.Fields, b.Fields);
+        Assert.NotEqual(a, b);
+        Assert.False(a == b);
         Assert.Equal(a.Fields[0], b.Fields[0]);
         Assert.Equal(a.Fields[0].GetHashCode(), b.Fields[0].GetHashCode());
-        Assert.Equal(GraphTypeDefinition.Create("A"), GraphTypeDefinition.Create("A"));
-        Assert.Equal(GraphTypeDefinition.Create("A").GetHashCode(), GraphTypeDefinition.Create("A").GetHashCode());
+        Assert.Equal(a.Fields, b.Fields);
 
-        GraphTypeDefinition[] others =
+        GraphFieldDefinition[] others =
         [
-            GraphTypeDefinition.Create("Person2", "A person.").AddString("occupation", "The job", true, 20).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person").AddString("occupation", "The job", true, 20).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person").AddString("occupation", "The job", true, 20).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("occupation", "The job", true, 21).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("occupation", "The job", true).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("occupation", "The job", false, 20).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("occupation", "The Job", true, 20).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("Occupation", "The job", true, 20).AddBooleanList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("occupation", "The job", true, 20).AddNumberList("flags"),
-            GraphTypeDefinition.Create("Person", "A person.").AddBooleanList("flags").AddString("occupation", "The job", true, 20),
-            GraphTypeDefinition.Create("Person", "A person.").AddString("occupation", "The job", true, 20),
+            GraphTypeDefinition.Create("T").AddString("occupation", "The job", true, 21).Fields[0],
+            GraphTypeDefinition.Create("T").AddString("occupation", "The job", true).Fields[0],
+            GraphTypeDefinition.Create("T").AddString("occupation", "The job", false, 20).Fields[0],
+            GraphTypeDefinition.Create("T").AddString("occupation", "The Job", true, 20).Fields[0],
+            GraphTypeDefinition.Create("T").AddString("Occupation", "The job", true, 20).Fields[0],
+            GraphTypeDefinition.Create("T").AddStringList("occupation", "The job", true).Fields[0],
         ];
         foreach (var other in others)
         {
-            Assert.NotEqual(a, other);
-            Assert.False(a == other);
-            Assert.NotEqual(a.GetHashCode(), other.GetHashCode());
+            Assert.NotEqual(a.Fields[0], other);
         }
     }
 

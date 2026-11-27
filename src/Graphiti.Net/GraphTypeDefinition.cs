@@ -31,6 +31,9 @@ public sealed record GraphTypeDefinition
 
     private readonly GraphTypeDescriptor descriptor;
 
+    // One empty list for each definition with no field, so that two such definitions with one name are equal.
+    private static readonly IReadOnlyList<GraphFieldDefinition> NoFields = [];
+
     private GraphTypeDefinition(string name, string? description, IReadOnlyList<GraphFieldDefinition> fields)
     {
         Name = name;
@@ -72,7 +75,7 @@ public sealed record GraphTypeDefinition
     public static GraphTypeDefinition Create(string name, string? description = null)
     {
         ArgumentNullException.ThrowIfNull(name);
-        return new GraphTypeDefinition(name, description, []);
+        return new GraphTypeDefinition(name, description, NoFields);
     }
 
     /// <summary>Adds a text field: <c>str</c>, or <c>str | None = None</c> if it is not required.</summary>
@@ -195,8 +198,9 @@ public sealed record GraphTypeDefinition
     internal GraphTypeDescriptor ToDescriptor() => descriptor;
 
     /// <summary>
-    /// Compares the name, the description, and the fields in order (decision D25). The descriptor that the definition
-    /// builds is not part of the comparison.
+    /// Compares the name and the description by value, and the field list by reference, as each C# record compares a
+    /// collection property (the public surface design, "Public records"). The descriptor that the definition builds
+    /// is not part of the comparison.
     /// </summary>
     /// <param name="other">The definition to compare with.</param>
     /// <returns>True if the two definitions are equal.</returns>
@@ -204,7 +208,7 @@ public sealed record GraphTypeDefinition
         other is not null
         && string.Equals(Name, other.Name, StringComparison.Ordinal)
         && string.Equals(Description, other.Description, StringComparison.Ordinal)
-        && Fields.SequenceEqual(other.Fields);
+        && ReferenceEquals(Fields, other.Fields);
 
     /// <inheritdoc/>
     public override int GetHashCode()
@@ -212,11 +216,7 @@ public sealed record GraphTypeDefinition
         var hash = default(HashCode);
         hash.Add(Name, StringComparer.Ordinal);
         hash.Add(Description, StringComparer.Ordinal);
-        foreach (var field in Fields)
-        {
-            hash.Add(field);
-        }
-
+        hash.Add(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Fields));
         return hash.ToHashCode();
     }
 
