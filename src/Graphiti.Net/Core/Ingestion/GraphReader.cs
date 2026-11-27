@@ -17,65 +17,141 @@ limitations under the License.
 
 namespace Graphiti.Core.Ingestion;
 
+using Graphiti.Core.Search;
+using Graphiti.Core.Utils.Maintenance;
+using Graphiti.PyCompat;
+
 // PORT: the module name equals the class name GraphReader, and the module has no module-level function or constant,
 // so it has no static class (R2).
+
+/// <summary>
+/// The graph reads of the commit and of the enrichment.
+///
+/// The commit reads the graph only through this class, so a test can replace the
+/// class with an in-memory object. Each search uses the stored embedding of the
+/// record and does not call the embedder.
+/// </summary>
 internal class GraphReader
 {
-    // TODO(port): GraphReader.__init__
     internal GraphReader(GraphitiClients clients)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.__init__");
+        Clients = clients;
     }
 
     internal GraphitiClients Clients { get; set; }
 
-    // TODO(port): GraphReader.node_candidates
-    internal virtual Task<List<List<EntityNode>>> NodeCandidatesAsync(
+    /// <summary>Return the dedupe candidates of each node, with the searches of serial ingestion.</summary>
+    internal virtual async Task<List<List<EntityNode>>> NodeCandidatesAsync(
         List<EntityNode> nodes,
         OrderedDictionary<string, List<string>>? identityProperties = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.node_candidates");
+        if (nodes.Count == 0)
+        {
+            return [];
+        }
+
+        return await NodeOperations.CollectCandidateNodesAsync(
+            Clients,
+            nodes,
+            identityProperties: identityProperties,
+            reuseNameEmbeddings: true,
+            cancellationToken: cancellationToken);
     }
 
-    // TODO(port): GraphReader.edge_duplicate_candidates
-    internal virtual Task<List<List<EntityEdge>>> EdgeDuplicateCandidatesAsync(
+    /// <summary>Return the stored edges between the endpoints of each edge, in either direction.</summary>
+    internal virtual async Task<List<List<EntityEdge>>> EdgeDuplicateCandidatesAsync(
         List<EntityEdge> edges,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.edge_duplicate_candidates");
+        var results = await Helpers.SemaphoreGatherAsync(
+            [
+                .. edges.Select(edge => (Func<Task<SearchResults>>)(() => SearchModule.SearchAsync(
+                    Clients,
+                    edge.Fact,
+                    groupIds: [edge.GroupId],
+                    config: SearchConfigRecipes.EdgeHybridSearchRrf,
+                    searchFilter: EdgeOperations.PairSearchFilter(edge),
+                    queryVector: edge.FactEmbedding,
+                    cancellationToken: cancellationToken))),
+            ],
+            Clients.MaxCoroutines,
+            cancellationToken);
+        return [.. Py.ZipStrict(edges, results).Select(pair => EdgeOperations.SamePairEdges(pair.First, pair.Second.Edges))];
     }
 
-    // TODO(port): GraphReader.edge_invalidation_candidates
-    internal virtual Task<List<List<EntityEdge>>> EdgeInvalidationCandidatesAsync(
+    /// <summary>Return the graph-wide contradiction candidates of each edge, with no endpoint filter.</summary>
+    internal virtual async Task<List<List<EntityEdge>>> EdgeInvalidationCandidatesAsync(
         List<EntityEdge> edges,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.edge_invalidation_candidates");
+        var results = await Helpers.SemaphoreGatherAsync(
+            [
+                .. edges.Select(edge => (Func<Task<SearchResults>>)(() => SearchModule.SearchAsync(
+                    Clients,
+                    edge.Fact,
+                    groupIds: [edge.GroupId],
+                    config: SearchConfigRecipes.EdgeHybridSearchRrf,
+                    searchFilter: new SearchFilters().Validate(),
+                    queryVector: edge.FactEmbedding,
+                    cancellationToken: cancellationToken))),
+            ],
+            Clients.MaxCoroutines,
+            cancellationToken);
+        return [.. results.Select(result => new List<EntityEdge>(result.Edges))];
     }
 
-    // TODO(port): GraphReader.nodes_by_uuids
-    internal virtual Task<List<EntityNode>> NodesByUuidsAsync(
+    /// <summary>Return the current state of the nodes that exist.</summary>
+    internal virtual async Task<List<EntityNode>> NodesByUuidsAsync(
         List<string> uuids,
         string groupId,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.nodes_by_uuids");
+        if (uuids.Count == 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await EntityNode.GetByUuidsAsync(Clients.Driver, uuids, groupId: groupId, cancellationToken: cancellationToken);
+        }
+        catch (NodeNotFoundException)
+        {
+            return [];
+        }
     }
 
-    // TODO(port): GraphReader.episodes_by_uuids
-    internal virtual Task<List<EpisodicNode>> EpisodesByUuidsAsync(
+    /// <summary>Return the current state of the episode nodes that exist.</summary>
+    internal virtual async Task<List<EpisodicNode>> EpisodesByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.episodes_by_uuids");
+        if (uuids.Count == 0)
+        {
+            return [];
+        }
+
+        return await EpisodicNode.GetByUuidsAsync(Clients.Driver, uuids, cancellationToken: cancellationToken);
     }
 
-    // TODO(port): GraphReader.edges_by_uuids
-    internal virtual Task<List<EntityEdge>> EdgesByUuidsAsync(
+    /// <summary>Return the current state of the edges that exist.</summary>
+    internal virtual async Task<List<EntityEdge>> EdgesByUuidsAsync(
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): GraphReader.edges_by_uuids");
+        if (uuids.Count == 0)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await EntityEdge.GetByUuidsAsync(Clients.Driver, uuids, cancellationToken: cancellationToken);
+        }
+        catch (Exception error) when (error is EdgeNotFoundException or EdgesNotFoundException)
+        {
+            return [];
+        }
     }
 }
