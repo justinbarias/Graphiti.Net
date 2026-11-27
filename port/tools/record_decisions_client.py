@@ -9,6 +9,9 @@ with real results:
   _contra_strict, edge_e2, _user_text, _encode_payload, assemble_node_answers, and assemble_edge_answers for
   generated inputs, and the two prompt builders _jev_node_builder and _jev_edge_builder with a default builder
   that returns a fixed system text and a fixed user text.
+- openai_decisions_prompt_overrides() and jev_prompt_overrides() (the second one lives in decision_prompts): the prompt
+  names that they override, and the prompt that each builder renders for contexts of this file, with the default
+  library, a library that is passed, and a library of two builders that give the texts of the context.
 - openai_decisions_client: _map_answers for generated answer lists, the arguments of the constructor, and a scripted
   exchange for each scenario. A scenario is a payload and the arguments of generate_response, and a script of
   replies: a reply that passes, a retried status or a transport error, an input that is too long, a reply that is
@@ -35,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import warnings
 import json
 import os
@@ -411,6 +415,77 @@ def record_builders(dp) -> list:
             if 'ok' in result:
                 result = {'ok': {'system': result['ok'].system.content, 'user': result['ok'].user.content}}
             cases.append({'kind': kind, 'context': context, 'r': result})
+    return cases
+
+
+def real_node_context() -> dict:
+    """A context for dedupe_nodes.nodes of the default library."""
+    return {
+        'previous_episodes': [sentence() for _ in range(rng.randint(0, 3))],
+        'episode_content': sentence(),
+        'extracted_nodes': [{'id': i, 'name': word(), 'entity_type': rng.choice(['Person', 'Location', 'Entity'])}
+                            for i in range(rng.randint(0, 4))],
+        'existing_nodes': [{'candidate_id': j, 'name': word(), 'entity_types': ['Entity']}
+                           for j in range(rng.randint(0, 4))],
+    }
+
+
+def real_edge_context() -> dict:
+    """A context for dedupe_edges.resolve_edge of the default library."""
+    return {
+        'existing_edges': [{'idx': i, 'fact': sentence()} for i in range(rng.randint(0, 3))],
+        'edge_invalidation_candidates': [{'idx': 10 + i, 'fact': sentence()} for i in range(rng.randint(0, 3))],
+        'new_edge': sentence(),
+    }
+
+
+def record_prompt_overrides(dp, odc) -> list:
+    """What openai_decisions_prompt_overrides() and jev_prompt_overrides() give: the groups and prompt names that they
+    override (flatten_overrides), and the prompt that each builder renders for contexts of this file (as the SHA-256
+    and the length of each text). The default library gets contexts of the real prompts. A library of two builders that give the texts of the context gets the
+    contexts of record_builders."""
+    from graphiti_core.llm_client.prompt_config import flatten_overrides
+    from graphiti_core.prompts.lib import create_prompt_library
+    from graphiti_core.prompts.models import ChatPrompt, SystemMessage, UserMessage
+
+    def text_builder(context):
+        return ChatPrompt(system=SystemMessage(content=context['system']), user=UserMessage(content=context['user']))
+
+    def described(builder, context):
+        # A rendered prompt is long, and the file has a size limit, so the result holds the SHA-256 of each text and its
+        # length in code points. The test of the port computes the same two values from the prompt that it renders.
+        result = run(lambda: builder(context))
+        if 'ok' in result:
+            texts = {'system': result['ok'].system.content, 'user': result['ok'].user.content}
+            return {'ok': {key: {'sha256': hashlib.sha256(value.encode('utf-8', 'surrogatepass')).hexdigest(),
+                                 'length': len(value)} for key, value in texts.items()}}
+        return result
+
+    cases = []
+    for source, function in (('openai_decisions_prompt_overrides', odc.openai_decisions_prompt_overrides),
+                             ('jev_prompt_overrides', dp.jev_prompt_overrides)):
+        for library_name in ('default', 'default_passed', 'text'):
+            if library_name == 'default':
+                overrides = function()
+            elif library_name == 'default_passed':
+                overrides = function(create_prompt_library())
+            else:
+                overrides = function(create_prompt_library({
+                    'dedupe_nodes': {'nodes': text_builder}, 'dedupe_edges': {'resolve_edge': text_builder}}))
+            if library_name == 'text':
+                node_contexts = [{'system': sentence(), 'user': node_user()} for _ in range(6)]
+                edge_contexts = [{'system': sentence(), 'user': edge_user()} for _ in range(6)]
+            else:
+                count = 3 if library_name == 'default' else 2
+                node_contexts = [real_node_context() for _ in range(count)]
+                edge_contexts = [real_edge_context() for _ in range(count)]
+            cases.append({
+                'source': source,
+                'library': library_name,
+                'flat': list(flatten_overrides(overrides)),
+                'node': [{'context': c, 'r': described(overrides.dedupe_nodes.nodes, c)} for c in node_contexts],
+                'edge': [{'context': c, 'r': described(overrides.dedupe_edges.resolve_edge, c)} for c in edge_contexts],
+            })
     return cases
 
 
@@ -1086,10 +1161,12 @@ def main() -> int:
             'scenarios': scenarios,
             **extra,
         }
+        # Last, so that the generator draws of the other sections stay as they were.
+        data['prompt_overrides'] = record_prompt_overrides(dp, odc)
     # allow_nan keeps inf and nan in the file as the tokens that PyJson.Loads reads.
     text = json.dumps(data, ensure_ascii=True, allow_nan=True, separators=(',', ':')) + '\n'
     count = (len(data['pure']) + len(data['builders']) + len(data['map_answers']) + len(data['constructor']) + len(data['scenarios'])
-             + len(data['async_cases']) + len(data['default_client']) + 2)
+             + len(data['async_cases']) + len(data['default_client']) + len(data['prompt_overrides']) + 2)
     if '--check' in sys.argv[1:]:
         if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
             print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)

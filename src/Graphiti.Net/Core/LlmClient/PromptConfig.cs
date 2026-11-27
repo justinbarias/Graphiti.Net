@@ -26,6 +26,7 @@ using Graphiti.PyCompat;
 // PORT: `ExtractNodes` is both a nested dataclass and, as `extract_nodes`, a field, and C# does not allow two members
 // with one name (error CS0102). Each nested class takes the suffix Group (R2). Its Python name, for `__qualname__` in
 // a message, is `LLMPromptOverrides.ExtractNodes` (R15). The same holds for PromptRoutes.
+/// <summary>Per-prompt builder overrides. Unknown field names are a type / constructor error.</summary>
 internal sealed record LLMPromptOverrides
 {
     internal sealed record ExtractNodesGroup
@@ -355,6 +356,7 @@ internal static partial class PromptConfig
 }
 
 // PORT: `models` is keyword-only in Python. A `frozenset` that code tests with `in` and sorts is a HashSet (R14).
+/// <summary>One provider client plus the model ids it may serve.</summary>
 internal sealed class LLMTransport
 {
     internal LLMTransport(LLMClient client, IReadOnlyList<string>? models = null)
@@ -415,15 +417,11 @@ internal sealed class LLMTransport
 // two models. LLMTransport has no `__eq__`, so a transport compares by identity.
 /// <summary>
 /// A provider model id, plus optional per-model prompt text overrides.
-/// Graphiti does not assign nicknames. Bind this object to a local variable and pass that variable into
+/// Graphiti does not assign nicknames. Bind this object to a local Python variable and pass that variable into
 /// <see cref="PromptRoutes"/>.
 /// </summary>
 internal sealed record LLMModel
 {
-    // PORT: the field `_flat_overrides` (`init=False`, `repr=False`). __post_init__ sets it with
-    // `object.__setattr__`, and Validate() sets it here. A model that has not run Validate() has no value.
-    private IReadOnlyDictionary<string, ChatPromptFunction>? flatOverrides;
-
     internal required string Id { get; init; }
 
     internal required LLMTransport Transport { get; init; }
@@ -431,6 +429,11 @@ internal sealed record LLMModel
     internal LLMPromptOverrides? PromptOverrides { get; init; }
 
     internal long? MaxTokens { get; init; }
+
+    // PORT: the field `_flat_overrides` (`init=False`, `repr=False`). It has the private name PrivateFlatOverrides,
+    // because the property `flat_overrides` takes FlatOverrides (R2), and it is the fifth field (R7). __post_init__ sets
+    // it with `object.__setattr__`, and Validate() sets it here. A model that has not run Validate() has no value.
+    private IReadOnlyDictionary<string, ChatPromptFunction>? PrivateFlatOverrides;
 
     // PORT: Validate() for __post_init__ (R7). Each construction path calls it.
     internal LLMModel Validate()
@@ -452,7 +455,7 @@ internal sealed record LLMModel
             throw new ArgumentException("LLMModel.max_tokens must be positive");
         }
 
-        flatOverrides = new System.Collections.ObjectModel.ReadOnlyDictionary<string, ChatPromptFunction>(
+        PrivateFlatOverrides = new System.Collections.ObjectModel.ReadOnlyDictionary<string, ChatPromptFunction>(
             PromptConfig.FlattenOverrides(PromptOverrides));
         return this;
     }
@@ -465,10 +468,17 @@ internal sealed record LLMModel
         HashCode.Combine(Id, System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Transport), MaxTokens);
 
     internal IReadOnlyDictionary<string, ChatPromptFunction> FlatOverrides =>
-        flatOverrides ?? throw new MissingMemberException("'LLMModel' object has no attribute '_flat_overrides'");
+        PrivateFlatOverrides ?? throw new MissingMemberException("'LLMModel' object has no attribute '_flat_overrides'");
 }
 
 // PORT: a frozen dataclass, as LLMPromptOverrides, with the suffix Group on each nested class.
+/// <summary>
+/// Per-prompt or per-group model routing. Unknown field names are a type error.
+///
+/// Pass an <see cref="LLMModel"/> to route a whole group, or a nested group class to route
+/// individual prompts. Nested <c>default</c> is the group fallback when some methods
+/// are also set.
+/// </summary>
 internal sealed record PromptRoutes
 {
     internal sealed record ExtractNodesGroup

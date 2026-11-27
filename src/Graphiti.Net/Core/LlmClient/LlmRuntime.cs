@@ -33,9 +33,49 @@ internal static class LlmRuntimeModule
 
 /// <summary>
 /// Route prompts across one or more provider transports.
-/// The runtime uses the routed model ID for each prompt. An unrouted prompt uses the default model.
-/// <c>model_size</c> does not select a second model on this path. Route prompts that need a smaller model to that
-/// model explicitly.
+///
+/// Example::
+///
+/// <code>
+/// from typing import Literal
+///
+/// from graphiti_core import Graphiti
+/// from graphiti_core.llm_client.anthropic_client import AnthropicClient
+/// from graphiti_core.llm_client import (
+///     LLMRuntime,
+///     LLMTransport,
+///     OpenAIClient,
+///     PromptRoutes,
+/// )
+///
+/// OpenAIModels = Literal['gpt-5.1', 'gpt-5-nano']
+/// openai = LLMTransport[OpenAIModels](
+///     OpenAIClient(),
+///     models=['gpt-5.1', 'gpt-5-nano'],
+/// )
+/// AnthropicModels = Literal['claude-sonnet-5', 'claude-haiku-5-5']
+/// anthropic = LLMTransport[AnthropicModels](
+///     AnthropicClient(),
+///     models=['claude-sonnet-5', 'claude-haiku-5-5'],
+/// )
+///
+/// runtime = LLMRuntime(
+///     model=openai.model('gpt-5.1'),
+///     routes=PromptRoutes(
+///         extract_nodes=PromptRoutes.ExtractNodes(
+///             extract_attributes=openai.model('gpt-5-nano'),
+///         ),
+///         dedupe_edges=PromptRoutes.DedupeEdges(
+///             resolve_edge=anthropic.model('claude-haiku-5-5'),
+///         ),
+///     ),
+/// )
+/// graphiti = Graphiti(..., llm_runtime=runtime)
+/// </code>
+///
+/// The runtime uses the routed model ID for each prompt. An unrouted prompt
+/// uses the default model. <c>model_size</c> does not select a second model on
+/// this path. Route prompts that need a smaller model to that model explicitly.
 /// </summary>
 internal sealed class LLMRuntime
 {

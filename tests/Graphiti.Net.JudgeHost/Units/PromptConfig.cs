@@ -75,6 +75,30 @@ internal static class PromptConfigBindings
         group.GetField("PythonName", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?.GetRawConstantValue() as string
         ?? throw new JudgeHostErrorException($"The type {group.FullName} has no constant PythonName.");
 
+    // The Python field names of each dataclass, in field order. A keyword that is not in the table is the TypeError of
+    // Python. The C# property of a name has the Pascal case of it (R2), and no other spelling reaches a property.
+    private static readonly Dictionary<Type, string[]> FieldNames = new()
+    {
+        [typeof(LLMPromptOverrides)] = ["extract_nodes", "dedupe_nodes", "extract_edges", "extract_nodes_and_edges", "dedupe_edges", "summarize_nodes", "summarize_sagas", "eval"],
+        [typeof(PromptRoutes)] = ["extract_nodes", "dedupe_nodes", "extract_edges", "extract_nodes_and_edges", "dedupe_edges", "summarize_nodes", "summarize_sagas", "eval"],
+        [typeof(LLMPromptOverrides.ExtractNodesGroup)] = ["extract_message", "extract_json", "extract_text", "classify_nodes", "extract_attributes", "extract_summary", "extract_summaries_batch", "extract_entity_summaries_from_episodes"],
+        [typeof(LLMPromptOverrides.DedupeNodesGroup)] = ["node", "node_list", "nodes"],
+        [typeof(LLMPromptOverrides.ExtractEdgesGroup)] = ["edge", "extract_attributes", "extract_timestamps", "extract_timestamps_batch"],
+        [typeof(LLMPromptOverrides.ExtractNodesAndEdgesGroup)] = ["extract_message"],
+        [typeof(LLMPromptOverrides.DedupeEdgesGroup)] = ["resolve_edge"],
+        [typeof(LLMPromptOverrides.SummarizeNodesGroup)] = ["summarize_pair", "summarize_context", "summary_description"],
+        [typeof(LLMPromptOverrides.SummarizeSagasGroup)] = ["summarize_saga"],
+        [typeof(LLMPromptOverrides.EvalGroup)] = ["query_expansion", "qa_prompt", "eval_prompt", "eval_add_episode_results"],
+        [typeof(PromptRoutes.ExtractNodesGroup)] = ["default", "extract_message", "extract_json", "extract_text", "classify_nodes", "extract_attributes", "extract_summary", "extract_summaries_batch", "extract_entity_summaries_from_episodes"],
+        [typeof(PromptRoutes.DedupeNodesGroup)] = ["default", "node", "node_list", "nodes"],
+        [typeof(PromptRoutes.ExtractEdgesGroup)] = ["default", "edge", "extract_attributes", "extract_timestamps", "extract_timestamps_batch"],
+        [typeof(PromptRoutes.ExtractNodesAndEdgesGroup)] = ["default", "extract_message"],
+        [typeof(PromptRoutes.DedupeEdgesGroup)] = ["default", "resolve_edge"],
+        [typeof(PromptRoutes.SummarizeNodesGroup)] = ["default", "summarize_pair", "summarize_context", "summary_description"],
+        [typeof(PromptRoutes.SummarizeSagasGroup)] = ["default", "summarize_saga"],
+        [typeof(PromptRoutes.EvalGroup)] = ["default", "query_expansion", "qa_prompt", "eval_prompt", "eval_add_episode_results"],
+    };
+
     // A frozen dataclass M(**kwargs): each keyword names a field, and None is the default of each field. A keyword that
     // names no field, and a value that the field cannot hold, are a TypeError in Python or a type rejection here (R22).
     private static T Dataclass<T>(OrderedDictionary<string, object?> data)
@@ -84,10 +108,15 @@ internal static class PromptConfigBindings
             ?? throw new JudgeHostErrorException($"The type {typeof(T).FullName} has no constructor."));
         foreach (var (key, value) in data)
         {
+            if (!FieldNames[typeof(T)].Contains(key, StringComparer.Ordinal))
+            {
+                throw new JudgeTypeRejectedException($"__init__() got an unexpected keyword argument '{key}'");
+            }
+
             var field = typeof(T).GetProperty(
                     string.Concat(PyText.Split(key, "_").Select(PyText.Capitalize)),
                     BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                ?? throw new JudgeTypeRejectedException($"__init__() got an unexpected keyword argument '{key}'");
+                ?? throw new JudgeHostErrorException($"The type {typeof(T).FullName} has no property for the field {key}.");
             if (value is not null)
             {
                 field.SetValue(instance, JudgeTypes.Convert(field.PropertyType, value, $"argument '{key}'"));

@@ -1,8 +1,8 @@
 // Evaluation test for graphiti_core/llm_client/decision_prompts.py and openai_decisions_client.py (port/RULES.md,
 // R23 and R25). values/llm_client_decisions.json holds what port/tools/record_decisions_client.py recorded from
 // Python: the constants, about 800 calls of the pure functions, 20 calls of the two prompt builders, 150 calls of
-// _map_answers, the constructor for 57 argument sets and for 8 timeouts of the default client, about 200 scripted
-// exchanges with the client, the delay of _sleep and a cancel during it, _generate_response, and a redirect. The
+// _map_answers, the two prompt override functions (the default library, a passed one, and a library of texts), the
+// constructor for 57 argument sets and for 8 timeouts of the default client, about 200 scripted exchanges with the client, the delay of _sleep and a cancel during it, _generate_response, and a redirect. The
 // scripted replies come from the recording, and the fake HttpMessageHandler gives them to the client one after the
 // other. The one test of the default client talks to a server on 127.0.0.1. No test here leaves the machine.
 namespace Graphiti.Port.Evaluation;
@@ -185,6 +185,80 @@ public class LlmClientDecisionValuesTests
             Assert.True(S(expected["system"]) == prompt.System.Content, "the system text of " + S(recorded["kind"]));
             Assert.True(S(expected["user"]) == prompt.User.Content, "the user text of " + S(recorded["kind"]));
         }
+    }
+
+    // openai_decisions_prompt_overrides() and jev_prompt_overrides(): the prompt names that they override, and what each
+    // builder renders for a context of the recording. The recording holds the SHA-256 and the length of each text of the
+    // prompt that Python rendered, because a rendered prompt is long. The library of the case is the default library,
+    // the default library passed in, or a library of two builders that give the texts of the context.
+    [Fact]
+    public void The_two_prompt_override_functions_give_the_builders_that_Python_gives()
+    {
+        var cases = L(Document["prompt_overrides"]);
+        Assert.Equal(6, cases.Count);
+        var rendered = 0;
+        foreach (var item in cases)
+        {
+            var recorded = D(item);
+            var source = S(recorded["source"]);
+            var libraryName = S(recorded["library"]);
+            var label = $"{source} with {libraryName}";
+            IPromptLibrary? library = libraryName switch
+            {
+                "default" => null,
+                "default_passed" => Lib.CreatePromptLibrary(),
+                _ => Lib.CreatePromptLibrary(new()
+                {
+                    ["dedupe_nodes"] = new() { ["nodes"] = TextBuilder },
+                    ["dedupe_edges"] = new() { ["resolve_edge"] = TextBuilder },
+                }),
+            };
+
+            var overrides = source == "jev_prompt_overrides"
+                ? DecisionPrompts.JevPromptOverrides(library)
+                : OpenaiDecisionsClientModule.OpenaiDecisionsPromptOverrides(library);
+
+            Assert.Equal(L(recorded["flat"]).Select(S).ToList(), PromptConfig.FlattenOverrides(overrides).Keys.ToList());
+            rendered += AssertRendered(D(recorded)["node"], overrides.DedupeNodes!.Nodes!, label + " nodes");
+            rendered += AssertRendered(D(recorded)["edge"], overrides.DedupeEdges!.ResolveEdge!, label + " resolve_edge");
+        }
+
+        Assert.True(rendered >= 40);
+    }
+
+    private static ChatPrompt TextBuilder(OrderedDictionary<string, object?> context) => new()
+    {
+        System = new SystemMessage { Content = S(context["system"]) }.Validate(),
+        User = new UserMessage { Content = S(context["user"]) }.Validate(),
+    };
+
+    private static string Sha256Hex(string text) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)));
+
+    private static int AssertRendered(object? recordedCases, ChatPromptFunction builder, string label)
+    {
+        var count = 0;
+        foreach (var item in L(recordedCases))
+        {
+            var recorded = D(item);
+            var context = D(recorded["context"]);
+            var expected = D(recorded["r"]);
+            Assert.True(expected.ContainsKey("ok"), $"{label}: Python raised {PyJson.Dumps(expected)}");
+            var texts = D(expected["ok"]);
+
+            var prompt = builder(context);
+
+            foreach (var (key, text) in new[] { ("system", prompt.System.Content), ("user", prompt.User.Content) })
+            {
+                var wanted = D(texts[key]);
+                Assert.True(S(wanted["sha256"]) == Sha256Hex(text), $"{label}: the {key} text of {PyJson.Dumps(context)}");
+                Assert.Equal(Py.AsLong(wanted["length"]), (long)Py.Len(text));
+            }
+
+            count++;
+        }
+
+        return count;
     }
 
     [Fact]
