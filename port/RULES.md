@@ -156,6 +156,8 @@ Catch clauses:
 
 One limit of the integer type. A Python `int` has no size limit, and the port uses `long` (R18).
 `Py.Int` and `Py.FloorDiv` throw `OverflowException` for an integer that a 64-bit `long` cannot hold, where Python returns a value.
+Python int arithmetic that can pass 64 bits, where Python then compares the result, runs in `Int128`: `max_len * LIST_TOTAL_LENGTH_MULTIPLIER` in `attribute_utils`.
+An int outside 64 bits in a model reply throws `OverflowException` at the read (GAPS F41).
 `OverflowException` does not derive from `ArgumentException`, so a `catch` for a Python `ValueError` does not catch it.
 Example: `utils/maintenance/attribute_utils.py:67` calls `int(raw)` inside `except ValueError`. For the environment value `99999999999999999999` Python gets an int, and the port throws out of the function.
 The maintainer chose on 2026-11-26 to document this limit and not to change the helpers. Add no `catch` for it in ported code.
@@ -184,6 +186,8 @@ Upstream has `logger = logging.getLogger(__name__)` in 34 modules and 130 log ca
 - A format spec is applied before the call. `%d` and `%s` take the value. `%r` takes `Py.Repr(value)`. `%.30s` and an f-string spec such as `{x:.0f}` take `Py.Format(value, spec)`. The placeholder then holds the finished text.
 - `extra={...}` becomes `using (Logger.BeginScope(dictionary))` around the call, with the same keys.
 - If an argument needs work to compute, for example a list of UUIDs or a `Py.Repr` call, guard the call with `if (Logger.IsEnabled(LogLevel.<Level>))`.
+- If the analyzer rule CA1873 flags that guard, read the logger into a local first: `var logger = Logger; if (logger.IsEnabled(LogLevel.Debug)) { Log.X(logger, ...); }`. `SearchUtils.cs` shows the form.
+- A message that starts with a level word, for example `WARNING: `, fails the build with LOGGEN008. Put the word in a first placeholder, `{Prefix}`, and pass the text `"WARNING: "`. The line that the logger writes stays the same.
 - Set no event id. Add no log call that Python does not have, and remove none.
 - Security: if the level is above `Debug` and an argument can hold episode text, a prompt, a fact, a model reply, or a credential, port the call and name it in the unit's `notes` in the queue. The lead decides before the unit is `reviewed`. See [SECURITY.md](../docs/SECURITY.md).
 - Tracing follows the same security rule for span attributes. Keep each span name and attribute key exactly (GAPS J6).
@@ -364,6 +368,11 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 - Host services run off the scheduler (decision D33). The lead's adapters in `Graphiti.Internal` call `IChatClient`, `IEmbeddingGenerator`, and a host `ICrossEncoder` through `Asyncio.CallHostAsync(token => ...)`. It starts the call on the thread pool and resumes on the scheduler. Ported code never calls it and never calls a host service directly. The ported reranker calls the lead seam `LogProbabilityChat` (R19).
 - A host delegate that ported code calls in line (`enabled_for_group`, a prompt builder, the failure classifier) is a plain call. Add no wrapper.
 - A canceled token stays canceled, and a Python cancellation arrives one time. Code that runs after a caught cancellation, for example a cleanup call in `except` or `finally`, passes `CancellationToken.None` to each call. The sites are `ingestion/scheduler.py:166`, `ingestion/phases.py:268`, and the `finally` of `GraphDriver.transaction` (`driver/driver.py:167`), which closes the session. The `transaction` override of the Neo4j driver must do the same in its rollback and close path. With the canceled token, `Asyncio.ToThreadAsync` and `SemaphoreSlim.WaitAsync` throw at once, and the cleanup does not run.
+- Two more cleanup sites pass `CancellationToken.None`: the `finally` blocks of `add_nodes_and_edges_bulk` and of `execute_write_with_timeout` in `utils/bulk_utils.py`, which close the session.
+- The work function of `execute_write_with_timeout` takes a token: `Func<Transaction, CancellationToken, Task>`. In the `WaitForAsync` branch it gets the token of the limit, so the limit stops the work, as the cancel of the task does in Python. On Neo4j it gets the token of the call, and the server holds the limit.
+- `semaphore_gather(*[f(x[i]) for i in ...])` builds each coroutine before one runs. Read each argument that can throw, for example `episode_tuples[i]`, before the gather. The error then comes with zero calls, as in Python.
+- A nested coroutine (`async def` inside a function) is a local async function.
+- `max_coroutines or CONSTANT` is `maxCoroutines is null or 0 ? Constant : maxCoroutines`. A negative value goes on to the semaphore, which raises as in Python.
 - The Neo4j driver calls `cancellationToken.ThrowIfCancellationRequested()` before each call of `Neo4j.Driver`: in `Neo4jTransaction.RunAsync`, `Neo4jSession.RunAsync`, `ExecuteWriteAsync`, `HealthCheckAsync`, and at the start of `TransactionAsync`. The package takes no token for these calls. `CloseAsync` has no check, because it is a cleanup call.
 - `Neo4jSession.CloseAsync` and `DisposeAsync` drop the error of a result that no code read, as the `close` of the Python session does (GAPS F28).
 - One token wakes its waiters in reverse order of registration. asyncio wakes them in order. This order is not a contract (GAPS G19).
@@ -432,7 +441,7 @@ var query = "\n" + """
 - The conversion members are on `Neo4jDriver`: `ToDriverParameters`, `ToDriverValue`, `FromDriverRecord`, and `FromDriverValue`, each `internal static`. A record value that is a map or a list of maps is converted at each depth, because `search/search_utils.py` passes items of such a list to the record parsers. `session()` returns the adapter class `Neo4jSession`, which wraps the `IAsyncSession` of the package and has no Python class. A `run` call does not consume its result cursor, as in Python.
 - A record value converts by its driver type. `null`, `bool`, `long`, `double`, `string`, and `byte[]` stay. A `List<object>` becomes a `List<object?>`, and a `Dictionary<string, object>` becomes an `OrderedDictionary<string, object?>`, at each depth. A `ZonedDateTime` becomes a `PyDateTime` with its offset, and a named zone keeps only the offset. A `LocalDateTime` becomes a naive `PyDateTime`. Nanoseconds are cut to microseconds and not rounded, as `to_native()` does. A `LocalDate` becomes a `DateOnly` (R6).
 - These driver types have no place in the value model: `LocalTime`, `OffsetTime`, `Duration`, `Point`, `INode`, `IRelationship`, `IPath`, and a vector. The conversion throws `NotSupportedException` with the type name. No upstream query returns one. Only `properties(n) AS attributes` and `properties(e) AS attributes` can bring one, from a property that another writer stored (GAPS J11).
-- Facts of `Neo4j.Driver` 6.5.1. `Neo4jTransaction` wraps an `IAsyncQueryRunner`: the work function of `IAsyncSession.ExecuteWriteAsync` receives one, and `IAsyncTransaction` extends it. `IDriver` has no `CloseAsync`, so `close()` is `DisposeAsync()`. Only `ExecutableQuery(...).ExecuteAsync` takes a `CancellationToken`. `routing_ = 'r'` is `RoutingControl.Readers`, and a missing key is `Writers`. `session(database)` uses `database or self._database`, so an empty string also gives the default: do not write `??`. The second argument of `ExecuteWriteAsync` carries a timeout (`b => b.WithTimeout(...)`), which is the form for open item O6.
+- Facts of `Neo4j.Driver` 6.5.1. `Neo4jTransaction` wraps an `IAsyncQueryRunner`: the work function of `IAsyncSession.ExecuteWriteAsync` receives one, and `IAsyncTransaction` extends it. `IDriver` has no `CloseAsync`, so `close()` is `DisposeAsync()`. Only `ExecutableQuery(...).ExecuteAsync` takes a `CancellationToken`. `routing_ = 'r'` is `RoutingControl.Readers`, and a missing key is `Writers`. `session(database)` uses `database or self._database`, so an empty string also gives the default: do not write `??`. The second argument of `ExecuteWriteAsync` carries a timeout (`b => b.WithTimeout(...)`), which `Neo4jSession` uses for the write with a timeout of decision D52.
 - `Neo4jDriver` has a second constructor `Neo4jDriver(IDriver client, string database = "neo4j")` for a host that gives its own driver (the public surface design). The first constructor chains to it, so the operations objects are created at one place, as in Python. `aoss_client` has no member: only the Neptune driver reads it.
 - `session.execute_write(func, *args, **kwargs)` passes the extra arguments to `func`. Write a lambda that closes over them: `session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => FuncAsync(tx, a, b)))`. `ExecuteWriteAsync` takes a `Func<Transaction, Task>` and returns `Task`. The work function receives the managed transaction, and each upstream work function calls only `tx.run` on it and returns `None`. So a `tx: GraphDriverSession` annotation of a work function is `Transaction`, and so is the `transaction` parameter of the bulk methods of `GraphOperationsInterface`.
 - Keep the call shape: one `execute_query` call is one call, and the operations of one session or transaction stay in order. The judge captures both shapes.
@@ -597,6 +606,16 @@ A Python set has no stable order, so each run of upstream can differ at these si
 
 If you find another set that code iterates with no sort, and its order can reach a prompt, a query, a result, or a stored value, stop and tell the lead.
 
+Forms that the units of layer 7 use:
+
+- `if x not in s: s.add(x)` is one `if (s.Add(x))` (analyzer rule CA1868). `if k not in d: d[k] = []` is `d.TryAdd(k, [])`, or one `TryGetValue` (CA1854).
+- `zip(a, b, c, strict=True)` with three inputs is two nested calls of `Py.ZipStrict`.
+- `dict(pairs)` on a list of pairs is a loop that sets each key. The last value of a key wins, and the key keeps its first position.
+- `summaries.pop()` is a read of `summaries[^1]` and then `RemoveAt`.
+- `a and b` on two dicts that can be `None` is `is { Count: > 0 }` on each one.
+- A recorder binds the module name `set` to a class that iterates in insertion order, because that is the order of the port (decision D43). It marks each case whose Python result depends on the hash seed with `"set_order": true`.
+- A recorder subclass of a model, for example one that puts `Entity` first in the labels, sets `__name__` and `__qualname__` to the name of its base class. The title of a pydantic error then equals upstream.
+
 ### R15. Duck typing and protocols
 
 No `dynamic` and no reflection, except the one site that the table names. Each `getattr` or `hasattr` site has a typed answer.
@@ -626,6 +645,8 @@ The prompt library is read by name, so it gets two interfaces:
 - One class `PromptTypeWrapper` implements the 8 `<Module>Prompt` interfaces with explicit members, and `PromptLibraryWrapper` implements `PromptLibrary` (Part 5, O12, closed).
 
 A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeDescriptor` (decision D26). The lead writes it. The public `GraphTypeDefinition` builds it. It implements `IResponseModel` (R7), because upstream passes a custom type as the response model of the attribute prompt.
+
+The schema description of a custom type is `PyText.Cleandoc(Doc)`, and `Doc` stays the raw text, as `__doc__` does. The schema holds `maxLength` for a string field with a limit, and each field title follows `PyText.Title`. A field name that pydantic refuses at class creation throws `ArgumentException` at `Add*`: a name that starts with `_`, `model_config`, and the `model_dump` and `model_validate` members of `BaseModel`.
 
 | Python on a custom type class | C# on the descriptor |
 | --- | --- |
@@ -699,6 +720,8 @@ A custom entity or edge type is the internal class `Graphiti.Internal.GraphTypeD
 The ambient holder `Graphiti.Internal.PortServices` (decision D23) has four members for ported code: `Logger(Type)`, `Time` (a `TimeProvider`), `Random` (a `PyRandom`), and `ClassifyModelFailure(Exception)` (R4, decision D31). Ported code never sets a value and never reads `LoggerFactory`, `ModelFailureClassifier`, or `DefaultClassifyModelFailure`: these are for the facade. A test replaces a value with `using (PortServices.Use(time: ..., random: ..., loggerFactory: ..., modelFailureClassifier: ...))`, which holds only for the flow of execution of that test.
 Read the clock, the random source, and loggers only through it. Never use `DateTime.Now`, `DateTimeOffset.UtcNow`, `Stopwatch`, `Random.Shared`, or `new Random()`.
 
+`attribute_utils._warned_invalid_env` is a `PyPatch<HashSet<string>>`: an upstream test replaces the set.
+
 ### R18. Numbers, vectors, hashes, random values, and UUIDs
 
 | Python | C# |
@@ -706,7 +729,7 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
 | `int` | `long`. Use `ulong` for a MinHash value, which goes up to 2^64 - 1 (GAPS F15). Use `int` only for a .NET API that needs it. |
 | `a / b` | `Py.TrueDiv(a, b)`. It returns `double` and throws `DivideByZeroException` for a zero divisor, also for floats. |
 | `a // b`, `a % b` | `Py.FloorDiv(a, b)`, `Py.Mod(a, b)` |
-| `round(x)`, `round(x, n)` | `Py.Round(x)`, `Py.Round(x, n)` |
+| `round(x)` on a float | `Math.Round(x, MidpointRounding.ToEven)`, and then `Py.Int` where Python needs an int. `PyCompat` has no `Py.Round` yet: the lead adds it with the first unit that calls `round(x, n)`. |
 | `int(x)` on a float | `Py.Int(x)`. It cuts toward zero and throws for `nan` and `inf`. |
 | `math.comb`, `math.log2`, `math.ceil`, `math.floor` | `Py.Comb`, `Math.Log2`, `(long)Math.Ceiling(x)`, `(long)Math.Floor(x)`. `Py.Comb` returns a `BigInteger`, because `comb(100, 20)` does not fit in a `long` and upstream compares it with a limit. |
 | `math.isnan(x)` | `double.IsNaN(x)` |
@@ -748,7 +771,10 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
   - `messages` is the `List<Message>` that the unit builds with the ported `Message` of `prompts/models.py`. The call returns a `LogProbabilityChatResponse` with the shape of the Python response: `Choices[0].Logprobs?.Content?[0].TopLogprobs`, and each item has `Token` and `Logprob`. `Logprobs` and `Content` are nullable for the two `is not None` tests of upstream. The unit ports the reads of `openai_reranker_client.py:97-101` one by one.
   - `np.exp(x)` is `Math.Exp(x)`. `except openai.RateLimitError` follows R4.
 - `_is_input_too_long(response)` in `llm_client/openai_decisions_client.py` reads the body of the response with `response.Content.ReadAsStream()`. After `PostAsync` with the default completion option the body is buffered, so the sync read needs no `.Result`.
-- `from neo4j import unit_of_work` in `utils/bulk_utils.py:192`: the core needs a way to ask the driver session for a write with a timeout. That is a new member of the driver contract, which is an ask-first item. The unit is `blocked` until the maintainer decides (open item O6).
+- `from neo4j import unit_of_work` in `utils/bulk_utils.py:192`: the session member `GraphDriverSession.ExecuteWriteAsync(func, double timeout, cancellationToken)` takes the limit in seconds (decision D52). A C# delegate carries no attribute, so the `timeout` attribute of the work function is a parameter.
+  - `Neo4jSession` converts the limit as `tx_timeout_as_ms` of the Python driver 6.1.0 does: whole milliseconds, half to even, and 1 ms for a value between 0 and 0.5 ms. `Neo4j.Driver` rounds up, so the port gives the driver whole milliseconds.
+  - It throws `ArgumentException` for a negative value or `nan`, and `OverflowException` for `inf`, before the driver call. GAPS F46 gives the inputs where the two drivers differ.
+  - Behavior of the Python driver below the contract is copied in the adapter of the Neo4j project, with a `// PORT:` comment. The core never copies it.
 - The pilot (plan 0003, task 6) ports `search.search_filters` alone, although it is in group 10. For each name that it uses from the other 17 modules, it follows the pilot rule of R24. This is the one exception to the rule above.
 
 ### R20. Type hints
@@ -760,6 +786,7 @@ Read the clock, the random source, and loggers only through it. Never use `DateT
 - `EmbedderClient.create` takes `List<string> inputData`: each upstream caller passes a `list[str]`. A `NDArray` of floats is a `List<double>`.
 - Never change the upstream source to add a hint.
 - A function that returns its input unchanged for a type outside its annotation returns `object?`. `parse_db_date(input_date: DateTime | str | None) -> datetime | None` ends with `return input_date`, so an int comes back as an int, and pydantic then reads it as a Unix time in the model that receives it. A typed result would throw where Python returns a value.
+- A reply value that the annotation gives as `str` can have another type in open data: `llm_response.get('summary', '')` in `community_operations`. The port reads it with `Py.AsString`, which throws where Python passes the value on (GAPS F44). The same holds for a `group_id` record value in `get_community_clusters` (GAPS F45).
 
 ### R21. Upstream defects
 
@@ -820,6 +847,7 @@ Wrong-type cases, decision D20 (GAPS F11):
 - The reviewer found 23 more cases with a golden `TypeError` or `AttributeError` whose id does not hold `wrong_type`. The rule is the same for them.
 - A function that ported code calls with a value from open data takes `object?`, because its Python caller passes each value: `parse_db_date` (R20) and `EpisodeType.from_str`, which the record parsers call with a record value. This is not a widened type for a judge case. The judge cases of such a function then run and pass.
 - A case that passes a built-in model class as a custom type (`{"$ref": "graphiti_core.nodes:EntityNode"}` for a `type[BaseModel]` parameter) gets a `GraphTypeDescriptor` that the bindings file of the model builds from `M.ModelFields`: the name and `IsRequired` of each field. The descriptor has no kind for a `datetime` or a `dict` field, so a case that reads the kind of such a field stays listed (Part 5, O4).
+- A built-in model with no `ModelFields` (`ExtractedEntity`, `NodeDuplicate`, `NodeResolutions`) gets a descriptor that its bindings file writes by hand: the name and `is_required()` of each Python field. Its schema and its validation are not the ones of Python, and a `// PORT:` comment names each difference. No case reads them.
 - Part 5 lists the wrong-type cases that this rule does not settle.
 
 Cases that now pass:
@@ -867,6 +895,7 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 - A skeleton member never throws `NotImplementedException`. Ported code catches that type to fall back from a driver operation (71 sites), and such a `catch` must not hide a member that is not ported yet.
 - A call of a member that only the Neptune driver has (`save_to_aoss`, `run_aoss_query`) keeps a `// TODO(port)` marker and throws `NotSupportedException` at the call (decision D10). The code of the branch after the call is not ported, because the compiler rejects code after a throw. The marker does not block the unit. [STATE.md](STATE.md) lists each site, and the maintainer accepts or rejects each one at gate 4.
 - Not allowed in product code: `dynamic`, the null-forgiving `!` operator, `#pragma warning disable`, `[SuppressMessage]`, an empty `catch` block that Python does not have, `async void`, `.Result`, `.Wait()`, and `.GetAwaiter().GetResult()` on a task that can still run.
+- Where Python reads a value with no test and the C# type is nullable, write `Py.NotNone(value, "<attribute>")`, and not `!`. `scripts/check.sh` does not find the operator yet (debt T28).
 - A Python `except X: pass` is a `catch` block with the comment `// PORT: Python passes`.
 - If the same mistake shows up in two units, the lead changes this file and the affected units are ported again. Nobody patches output by hand.
 
@@ -896,6 +925,9 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 - `asyncio.run` cancels the tasks that a failed call leaves and runs them to their end. `Asyncio.Run` returns at once, and the tasks run on. So the test of a recorded call that fails or is canceled gives the scheduler 50 turns before it reads the event list (`SearchValuesTests`).
 - A recording of a filter with a limit has an input on the limit and an input that the filter removes. If an earlier filter uses the same limit, check that it leaves such inputs for the later one.
 - A recording keeps the calls and the log lines in one ordered list, so that a log line that moves across a call fails the test. It calls each method with its defaults one time, and it records `a == b` and `hash(a)` for the pairs of GAPS J2.
+- A recording calls each function one time with each optional argument left out, on both sides. A changed default then fails a test.
+- A value that the code reads from the first item of a list gets a case where the items differ: episodes of two groups, with another content and another `valid_at`.
+- The theory that cancels at call k compares with Python. The recorder runs the same cancel on Python, and it records the count of attempts and the log events after call k. A point where the port makes one more attempt is the late cancel of GAPS F33. A list `LateCancel` of the test names each such point, and a listed point that agrees with Python fails the test.
 - A values file stays under 1.5 MiB (1,572,864 bytes). A recording stores a long rendered text as its SHA-256 and its length, and the test hashes the text of the port (`record_decisions_client.py`).
 - Do not drop a test because it is hard to port. Mark it `// TODO(port)` and set the unit to `blocked`.
 - Write no new unit test that restates the implementation. A gap in coverage gets a judge case, a property test, or an end-to-end test.
@@ -911,7 +943,7 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | --- | --- | --- |
 | `Py` | `Repr`, `Str`, `Format`, `Truthy`, `Len`, `Get`, `GetNullable`, `SetDefault`, `Unpack2`, `DeepCopy`, `EnumValue` | `repr`, `str`, format specs, `bool(x)`, `len`, `dict.get`, `dict.setdefault`, tuple unpacking, `copy.deepcopy`, `enum.value`. `Format` has the specs that upstream uses and throws `InvalidOperationException` for `e`, `g`, `%`, `n`, `#`, and grouping with `0`. |
 | `Py` | `AsBool`, `AsLong`, `AsDouble`, `AsString`, `AsList`, `AsTuple`, `AsDict`, `AsPyDict`, `AsDate`, `AsDateTime`, `AsBytes`, `AsEnum<T>` | A typed read from the value model. A wrong type throws `InvalidCastException`. |
-| `Py` | `TrueDiv`, `FloorDiv`, `Mod`, `Round`, `Int`, `Float`, `Comb` | `/`, `//`, `%`, `round`, `int()`, `float()`, `math.comb` |
+| `Py` | `TrueDiv`, `FloorDiv`, `Mod`, `Int`, `Float`, `Comb` | `/`, `//`, `%`, `int()`, `float()`, `math.comb` |
 | `Py` | `At`, `Slice`, `CompareStrings`, `StringComparer` | Indexing and slicing by code point with negative indexes, string order by code point |
 | `Py` | `Contains`, `IndexOf`, `Remove`, `Count`, `SortInPlace`, `LessThan`, `Combinations`, `ZipLongest` | `in`, `list.index`, `list.remove`, `list.count` with the identity test first, `list.sort` with the comparisons of CPython, `<` on two values, `itertools.combinations`, `itertools.zip_longest` |
 | `Py` | `Uuid4`, `Uuid4Hex`, `Uuid5`, `NamespaceUrl`, `TimeSeconds` | `str(uuid4())`, `uuid4().hex`, `str(uuid5(...))`, `uuid.NAMESPACE_URL`, `time.time()` |
@@ -927,6 +959,9 @@ If a unit needs a helper that does not exist, stop and tell the lead.
 | `PyEnv` | `Str`, `Int`, `Float`, `Truthy`, `Use` | `os.getenv` with the conversions of R17. `Use` is the seam for tests. |
 | `PyPatch<T>` | Type. `Value`, `Use(value)` | A module-level value that an upstream test replaces with `monkeypatch.setattr` (R17, R25) |
 | `Py.NotNone(value, "attribute")` | Method | A method call on a value from open data that can be `None`: the value, or `MissingMemberException` with the text of Python (R4) |
+| `PyText.Title(s)` | Method | `str.title()`, with the Unicode tables of Python: the title of a schema field (R15) |
+| `PyText.Cleandoc(s)` | Method | `inspect.cleandoc(s)`: the schema description of a custom type (R15) |
+| `PydanticType.StrMaxLength` | Member | `Field(max_length=n)` on a `str` field: the `maxLength` key of the schema (R7) |
 | `Py.Receiver<T>(value, "method")` | Method | A method call on a value from open data: the value as `T`, or `MissingMemberException` with the text of Python for `None` and for another type (R4) |
 | `Py.Int(value)` | Method | `int(x)` on a value from open data: a bool, an int, a float, text, or bytes. Another type throws the `TypeError` of Python (R4) |
 | `Py.ZipStrict(a, b)` | Method | `zip(a, b, strict=True)`: the pairs, then `ArgumentException` with the text of Python if one input is longer (Part 3) |
@@ -1079,7 +1114,7 @@ R4 holds the exception rules. R16 holds decorators and generators.
 | A fixture | Constructor setup, `IAsyncLifetime`, or a class or collection fixture |
 | `tmp_path` | A temp folder created in the constructor and removed in `Dispose` |
 | `monkeypatch.setattr(module, 'NAME', value)` on a module-level value | `using (Module.Name.Use(value))` on the `PyPatch<T>` field of R17 |
-| `monkeypatch.setattr` or `mock.patch` on a module-level function or on a method of a class | No form yet (Part 5, O10). Mark the test `// TODO(port): O10`, and name it in the `notes` of the unit. This does not block the unit. One case has a form and needs no marker: the real function reads an object of the fake before its own work, as `edge_similarity_search` reads `driver.search_interface`. The test then puts the replacement on that object and runs the real function. |
+| `monkeypatch.setattr` or `mock.patch` on a module-level function or on a method of a class | The test runs the real function in two cases. In the first, a fake at the network boundary gives the result that the patched function returns, and no assertion reads the arguments of the patch. In the second, the arguments of the patch pass unchanged into one call that the fake sees, and the test asserts that call. A `// PORT:` comment names the patch and the fake, and the Python oracle must show that the fake gives the result of the patch. Each other test keeps `// TODO(port): O10` with the name of the recorded case that covers the same behavior, and the `notes` of the unit name it (Part 5, O10). This does not block the unit. |
 | `monkeypatch`, `mock.patch` on an object that the code receives | An injected interface with a fake. Use `PortServices.Use(time: ...)` for clocks and a stub `HttpMessageHandler` for HTTP. Never assign `PortServices.Time` in a test: tests run at the same time. |
 | `pytest.raises(X, match=...)` | `Assert.Throws<X>`, then an assertion on the message |
 | `caplog` | A fake `ILoggerFactory` in `PortServices.Use(loggerFactory: ...)` that collects entries |
@@ -1201,6 +1236,12 @@ Each entry of [GAPS.md](GAPS.md) and the rule that answers it.
 | F36 | The timeout of an `HttpClient` that the host gives | R19 |
 | F37 | `tx.run` with a statement that fails at once | R8, R9 |
 | F38 | A cancel at the end of a transaction body | R8 |
+| F41 | An int outside 64 bits in a model reply | R4 |
+| F42 | A `nan` limit of `execute_write_with_timeout` | R8 |
+| F43 | The recursion depth of `UnionFind.find` | R4 |
+| F44 | A community summary reply that is not a string | R20 |
+| F45 | A `group_id` record value that is not a string in `get_community_clusters` | R20 |
+| F46 | A transaction timeout outside the range of the .NET driver | R19 |
 
 ## Part 5. Open items
 
@@ -1213,11 +1254,11 @@ These items need the lead or the maintainer. An implementer that meets one stops
 | O3 | Closed on 2026-11-25. [The public surface design](../docs/design-docs/public-surface-design.md) and decisions D24 to D35 answer it: R1, R2, R3, R4, R8, R15, and R19 hold the rules. | | |
 | O4 | 22 cases with `wrong_type` in the id have a golden result that is not `TypeError` or `AttributeError`, and so do 23 more cases with other ids. The skeleton reviews added 25 cases, in the two tables at the end of this part. The tables below give the proposed answer for each group. Decision D40 keeps each of these cases in `expected-failures.txt` with the answer `JudgeTypeRejected` until then. | Maintainer, by name at gate 4 | Gate 4 |
 | O5 | Closed on 2026-11-26 (D38). The lead removes a passing case from `port/judge/expected-failures.txt`, and the deny list leaves that one file open (pull request 22). R22 holds the rule. | | |
-| O6 | `utils/bulk_utils.py:192` calls `neo4j.unit_of_work` from core code to set a transaction timeout. The port needs a new member on the driver session contract for a write with a timeout. That is an interface change, so it is an ask-first item (R19). | Maintainer | Layer 7 of plan 0004 |
+| O6 | Closed on 2026-11-27 by decision D52. The session contract has `ExecuteWriteAsync(func, double timeout, cancellationToken)`, and `Neo4jSession` gives the limit to the driver (R19). | | |
 | O8 | Closed on 2026-11-26. `.editorconfig` makes IDE0065 an error for each C# file, so a `using` directive above the namespace fails the build (plan 0003, task P1). | | |
 | O7 | Closed on 2026-11-27. `Neo4jSession.ExecuteWriteAsync` is the first library callback, and it enters the scheduler again through `Asyncio.OnLoopAsync` (R8). The test `A_session_runs_a_query_and_a_write_function_and_closes` fails without that call. | | |
-| O9 | `Asyncio.WaitForAsync` returns only after its call ends. A session call of Neo4j.Driver 6.5.1 takes no `CancellationToken`, so the write budgets of `ingestion/phases.py:1292` to `:1319` and of `utils/bulk_utils.py:197` do not hold if the ported save goes through a session. The adversarial review of the `Asyncio` helpers found it. | Maintainer | Layer 7 of plan 0004 |
-| O10 | About 250 sites of the upstream tests replace a module-level function or a method with `monkeypatch.setattr` or `mock.patch`, for example `edge_ops.semaphore_gather` and `EntityNode.get_by_uuid`. C# cannot replace a static method. A seam for each such name changes the product code at each call. Most of these tests cover `utils/maintenance` and `ingestion`. | Maintainer: a seam, another test for the same behavior, or no port of these tests | Layer 7 of plan 0004 |
+| O9 | `Asyncio.WaitForAsync` returns only after its call ends. A session call of Neo4j.Driver 6.5.1 takes no `CancellationToken`, so the write budgets of `ingestion/phases.py:1292` to `:1319` and of `utils/bulk_utils.py:197` do not hold if the ported save goes through a session. The adversarial review of the `Asyncio` helpers found it. Since layer 7 the work function of `execute_write_with_timeout` gets the token of the limit, so the limit holds for each call inside that reads its token. | Maintainer | Layer 8 of plan 0004 |
+| O10 | About 250 sites of the upstream tests replace a module-level function or a method with `monkeypatch.setattr` or `mock.patch`, for example `edge_ops.semaphore_gather` and `EntityNode.get_by_uuid`. C# cannot replace a static method. A seam for each such name changes the product code at each call. Most of these tests cover `utils/maintenance` and `ingestion`. On 2026-11-27 the lead decided a reading under D49 (Part 3, the row of `monkeypatch.setattr` on a function): a test that a fake at the network boundary can serve is ported, and each other test keeps its marker. | Maintainer: accept the tests that keep a marker, or ask for a seam | Gate 4 |
 | O11 | The judge host lacks three members, and `tests/Graphiti.Net.JudgeHost/Core/` changes in its own pull request: a helper for a model constructor (each model unit writes the same private helper today), a mark for a keyword-only parameter in `Signature`, and `Fixtures.cs` (debt T18). | Lead | Layer 2 of plan 0004 |
 | O12 | Closed on 2026-11-27. One class `PromptTypeWrapper` implements the 8 `<Module>Prompt` interfaces with explicit members. No caller in `graphiti_core/` tests the class of a group or iterates its attributes, and the 19 reads go through the `PromptLibrary` interface. The review of skeleton packet S3 kept the form. | Lead | Done |
 
@@ -1299,3 +1340,4 @@ The review of skeleton packet S6 found 2 more cases. Each one stays in `expected
 | 2026-11-27 | After two reviews of each layer 5 packet. R2: the other option keys of the driver. R4: the text of a driver error in a log line. R6: the truth test of a typed parameter, and a typed parameter that Python binds again to open data. R21: the marker of an upstream defect at each site. R8: the token checks of the Neo4j driver, and the close of a session. R9: a lone surrogate and an odd offset in a parameter. R25: a slow fake, and the check for a function that does not end. R25: the token theory for a later call. | The layer 5 units, in their fix rounds: `driver.neo4j_driver` and the operations of `driver.neo4j.operations`. The pilot unit `entity_node_ops` gets its U1 markers in the same round. |
 | 2026-11-27 | After two reviews of each layer 6 packet. R6: named arguments with a spread, and a result row of FalkorDB. R7: `==` of a record with a list member. R8: a cancel that arrives late. R24: a member that only the Neptune driver has. R25: each fake records its token, a Python fake yields, the fakes count the calls in flight, each async test has a time limit and a loop guard, the turns for the tasks that a failed call leaves, and a replacement on an object that the real function reads first (Part 3). | None. The fix rounds of the layer 6 packets applied each change. |
 | 2026-11-27 | After the reviews of skeleton packets S6 and S7. R2: a module that imports a class with its name, two classes with one name, a `**kwargs` dict that a function spreads into one call, a name that ends in `_`, overloads for `A \| list[A]`, and an alias of a union of models. R14: a dict keyed by `id(obj)`. R15: `type(error).__name__` in a stored reason (decision D50). R16: `sqlite3.Row`. R18: a float32 matrix. R22: more typed reads, and an argument for a union record. Part 3: the name and the place of a union record. | None. No unit of these modules is ported. |
+| 2026-11-27 | After two reviews of each layer 7 packet. R4: `Int128` for int arithmetic past 64 bits. R5: the logger local form and a level word in a placeholder. R8: two more cleanup sites, the token of a work function with a limit, eager arguments of a gather, a nested coroutine, and `max_coroutines or CONSTANT`. R14: the forms for CA1868 and CA1854, `zip` with three inputs, `dict(pairs)`, `pop()`, and two recorder forms. R15: the schema description, `maxLength`, the field title, and a refused field name of a custom type. R17: `_warned_invalid_env`. R18: no `Py.Round`. R19: the write with a timeout (decision D52). R20: a reply value that is not a string. R22: a built-in model with no `ModelFields`. R24: `Py.NotNone` in place of `!`. R25: defaults, items that differ, and a cancel that is compared with Python. Part 3: the reading of open item O10. O6 is closed. | None. Each unit of layer 7 follows them after its fix round. |

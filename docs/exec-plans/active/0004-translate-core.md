@@ -473,3 +473,64 @@ Commands at the tip, after the rebase on `main`:
 - `scripts/check.sh --test`: `check: passed`, 15,776 tests.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,375 passed, 624 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong.
 - `scan_port.py src --allow-todo`: 606 `TODO(port)` markers in 144 files. The other 176 findings are `NotImplementedException` sites that rules R4 and R24 give.
+
+### Layer 7, maintenance, 2026-11-27
+
+Seven packets ported 10 modules and built the custom type. Two Opus 5.5 high reviewers read each packet except P7g. One implementer did each fix round: Sonnet 5.5 for five packets, and Opus 5.5 for P7f.
+
+| Packet | Modules | Review |
+| --- | --- | --- |
+| P7a | `dedup_helpers`, `attribute_utils`, `temporal_edge_utils`, `dangling_endpoints`, `graph_data_operations` | 4 and 9 findings. 10 of 72 seeded defects passed each test before the fix round. |
+| P7b | `node_operations` | 3 and 6 findings. 9 of 62 seeded defects passed. |
+| P7c | `edge_operations` | 3 and 7 findings. 6 of 73 seeded defects passed. |
+| P7d | `combined_extraction`, `community_operations` | 6 and 9 findings. 22 of 78 seeded defects passed. |
+| P7e | `utils.bulk_utils` | 5 and 10 findings. 18 of 69 seeded defects passed. |
+| P7f | The custom type descriptor and the public `GraphTypeDefinition` (debt T18) | 6 and 5 findings. 14 of 55 seeded defects passed. |
+| P7g | The write with a transaction timeout (open item O6) | No review pair. The builder ran 4 seeds, and the adversarial pass reads it. |
+
+Each seeded defect that passed fails a test now, except the ones that a reviewer showed to change nothing.
+
+Differences in the product code that the reviews found, and their fix:
+
+| Finding | Result |
+| --- | --- |
+| The aggregate cap of `attribute_utils` multiplied in 64 bits, where a Python int has no limit. | The product and its comparison run in `Int128` (rule R4). |
+| `filter_existing_duplicate_of_edges` skipped a record value that is a list or a dict, where Python raises `TypeError`. | It throws `InvalidCastException`, as rule R4 says. |
+| `write_timeout` of `add_nodes_and_edges_bulk` did not stop the work. The work function kept the token of the caller, and one test asserted that. | The work function takes the token of the limit (rule R8). The recording holds the sequence of Python: a rollback, a close, and `TimeoutError`. |
+| `dedupe_nodes_bulk` made three calls before it failed on a short episode list, where Python fails with zero calls. | It reads each episode tuple before the gather (rule R8). |
+| `UnionFind.find` had no depth limit. | A stack guard throws before the stack ends. The depth still differs from Python (GAPS F43). |
+| The schema of a custom type skipped `inspect.cleandoc`, had no `maxLength`, and gave a wrong title for a field name that is not ASCII or that ends in `_`. | `PyText.Cleandoc`, `PyText.Title`, and a `maxLength` member of the schema builder, each with values recorded from Python. |
+| Two `!` operators in `combined_extraction`, which rule R24 forbids. | `Py.NotNone`. `scripts/check.sh` does not find the operator (debt T28). |
+
+What the reviews changed in the evidence:
+
+- Each recording calls each function one time with its defaults. Each value that the code reads from the first item of a list has a case where the items differ. Each numeric limit has an input on it.
+- The theory that cancels at call k now compares with Python: the recorder runs the same cancel on Python and records the attempts and the log events. A port that catches a cancel and writes a warning passed each test of four packets before this change.
+- A recorder subclass of a model takes the name of its base class. Before that, a recorded pydantic error had the title of the subclass, and the tests left the message out of the comparison.
+- `label_propagation` runs on a thread with a time limit in its test. A seeded tie rule made the test run hang.
+- 21 more upstream tests are ported: 5 of `remove_communities`, 6 of the configurable prompts of the community units, and 10 that the first version marked for open item O10.
+
+Decisions of the lead under D49, for the maintainer at gate 4:
+
+- D52 closes open item O6. `GraphDriverSession` has `ExecuteWriteAsync(func, double timeout, cancellationToken)`. The rulebook gave the item to the maintainer. The contract is internal, and each commit of an episode on Neo4j needs the member.
+- Open item O10 has a reading (Part 3 of the rulebook). A test that a fake at the network boundary can serve is ported. 14 tests of the layer keep a `TODO(port): O10` marker, each with the recorded case that covers the same behavior.
+- The public builder has six forms that the design does not give. [The public surface design](../../design-docs/public-surface-design.md) lists them at the end of the section "Custom entity types and edge types".
+- `.editorconfig` turns the analyzer rule CA1720 off for `GraphFieldKind.cs` only. The design names the members `String` and `Integer`.
+
+Differences that the lead accepted by name: GAPS F41 to F46, and 14 more cancel points of GAPS F33 (6 in `node_operations`, 1 in `combined_extraction`, and 7 in `community_operations`). The review of `community_operations` also found upstream defect U20: a `null` summary of the model becomes the text `None` in the next prompt.
+
+The write with a timeout on the real Neo4j, `WriteTimeoutOnNeo4jTests` (23 tests):
+
+- A write inside the limit commits, and the test reads the node back.
+- A write that waits for a lock past its limit fails. The server ends the transaction, so the result does not depend on the speed of the machine. Both drivers give `Neo.ClientError.Transaction.LockClientStopped` after one attempt, and no node of the group stays.
+- The Python driver 6.1.0 sends whole milliseconds and rounds half to even. `Neo4j.Driver` 6.5.1 rounds up. `Neo4jSession` converts the limit the Python way, so the value on the wire is the same.
+
+Two `TODO(port)` markers are new, and `port/STATE.md` lists them: on FalkorDB and Neptune the entity-node bulk query is a list (rule R24).
+
+Evidence that waits for a later layer:
+
+- The trace paths of `node_operations`, `edge_operations`, and `bulk_utils` are recorded with `trace=None`. Packet P8b of layer 8 records them with a `ResolutionTrace`.
+- `graph_data_operations` has no pure case and keeps the status `tests_pass` until layer 9.
+- Four covering cases stay listed under open item O4: two of `lsh_bands` and two wrong-type cases of `bulk_utils`.
+- The three built-in models that the judge host registers as custom types have descriptors that are written by hand. No case reads their schema or their validation.
+- Inputs of `ModelValidate` that are not JSON values, for example a `datetime` from a stored attribute, have no recorded case.
