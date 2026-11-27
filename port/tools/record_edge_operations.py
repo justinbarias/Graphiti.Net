@@ -18,6 +18,9 @@ client, the embedder, the cross-encoder, and the graph driver:
 - The LLM client replaces generate_response. It records the prompt name, the response model name, the model size,
   max_tokens, group_id, attribute_extraction, and the role, the SHA-256, and the length of each message. It answers by
   a fixed rule: the first reply of the case for the prompt name whose needle is in the last message.
+- The cases of review_cases() come after the others and hold the inputs that the reviews of the packet asked for: a record
+  value that is a list or a dict, the reference time of an edge, an exact match with another endpoint, an episode whose
+  valid_at is not its created_at, the limit of the last gather, and two episodes with one instant.
 - The embedder gives the vector [i, 1.0] to the i-th distinct text of the case.
 - The driver has a search interface and a graph operations interface. The search interface answers each edge search
   from the tables of the case by the fact (or by the fact that has the vector) and by the kind of filter: "pair" for
@@ -340,11 +343,12 @@ def record_sync(eo, EntityEdge, EntityNode, CommunityNode, models) -> None:
 # Async scenarios
 
 
-def ep(uuid: str, valid_at: datetime | None = None, group_id: str = 'g', content: str = 'Ana works at Acme.') -> dict:
+def ep(uuid: str, valid_at: datetime | None = None, group_id: str = 'g', content: str = 'Ana works at Acme.',
+       created_at: datetime | None = None) -> dict:
     return {'uuid': uuid, 'name': 'episode ' + uuid, 'group_id': group_id, 'labels': [], 'source': 'message',
             'source_description': 'chat', 'content': content,
             'valid_at': dt(valid_at or datetime(2025, 1, 1, tzinfo=timezone.utc)),
-            'created_at': dt(datetime(2025, 1, 1, tzinfo=timezone.utc))}
+            'created_at': dt(created_at or datetime(2025, 1, 1, tzinfo=timezone.utc))}
 
 
 def node(uuid: str, name: str, labels: list[str] | None = None, group_id: str = 'g') -> dict:
@@ -565,6 +569,94 @@ def resolve_cases() -> list[dict]:
     return cases
 
 
+def review_cases() -> list[dict]:
+    """The cases that the reviews of the packet added. They come after the other cases, so that the index of each earlier
+    case stays the same."""
+    cases = []
+    stored = [node('n-ana', 'Ana', ['Entity', 'Person']), node('n-acme', 'Acme', ['Entity', 'Company']),
+              node('n-paris', 'Paris', ['Entity', 'Place'])]
+    old_work = edge('s-work', 'n-ana', 'n-acme', 'Ana works at Acme', 'WORKS_AT', valid_at=PAST, episodes=['ep0'])
+    old_live = edge('s-live', 'n-ana', 'n-paris', 'Ana lives in Lyon', 'LIVES_IN', valid_at=PAST)
+    e_live = edge('x-live', 'n-ana', 'n-paris', 'Ana lives in Paris', 'LIVES_IN', episodes=['ep1'], valid_at=REF)
+    e_work = edge('x-work', 'n-ana', 'n-acme', 'Ana works at Acme', 'WORKS_AT', episodes=['ep1'])
+    e_free = edge('x-free', 'n-ana', 'n-acme', 'Ana joined Acme', 'WORKS_AT', episodes=['ep1'], attributes={'role': 'x'})
+
+    # filter_existing_duplicate_of_edges: a record value that is a list or a dict has no hash (TypeError in Python);
+    # the source value is hashed before the target value; an int is hashable and finds no pair
+    filters = {'fn': 'filter_existing_duplicate_of_edges', 'provider': 'neo4j', 'pairs': [['n-ana', 'n-acme']],
+               'stored_nodes': stored}
+    for records in (
+        [{'source_uuid': ['n-ana'], 'target_uuid': 'n-acme'}],
+        [{'source_uuid': {'a': 1}, 'target_uuid': 'n-acme'}],
+        [{'source_uuid': 'n-ana', 'target_uuid': ['x']}],
+        [{'source_uuid': 'n-ana', 'target_uuid': {'b': 2}}],
+        [{'source_uuid': {'a': 1}, 'target_uuid': ['x']}],
+        [{'source_uuid': 5, 'target_uuid': 'n-acme'}, {'source_uuid': 'n-ana', 'target_uuid': 'n-acme'}],
+    ):
+        cases.append({**filters, 'records': records})
+
+    # _extract_edge_timestamps: the reference time of the edge comes before the valid_at of the episode
+    timestamps = {'fn': '_extract_edge_timestamps', 'routing': False}
+    cases.append({**timestamps, 'episode': ep('ep1', REF),
+                  'edge': edge('x-ref', 'n-ana', 'n-acme', 'Ana will join Acme',
+                               reference_time=datetime(2020, 5, 1, 12, 0, tzinfo=timezone(timedelta(hours=1)))),
+                  'replies': [ts_reply('Ana will join Acme', '2026-01-01T00:00:00Z')]})
+    # the case of test_extract_edge_timestamps_prefers_edge_reference_time
+    cases.append({**timestamps, 'episode': ep('episode_uuid', datetime(2024, 2, 1, tzinfo=timezone.utc)),
+                  'edge': edge('x-ref2', 'source_uuid', 'target_uuid', 'Alice knows Bob.', 'KNOWS',
+                               reference_time=datetime(2024, 1, 1, tzinfo=timezone.utc)),
+                  'replies': [ts_reply('Alice knows Bob.', '2024-01-02T00:00:00Z')]})
+
+    # the exact match of resolve_extracted_edge keeps the dates of the stored edge, and ends no stored edge
+    exact = edge('s-exact', 'n-ana', 'n-acme', 'ana works at  acme', 'WORKS_AT', valid_at=PAST,
+                 invalid_at=datetime(2024, 1, 1, tzinfo=timezone.utc), episodes=['ep0'])
+    single = {'fn': 'resolve_extracted_edge', 'episode': ep('ep1', REF), 'routing': False}
+    cases.append({**single, 'edge': e_work, 'related': [exact], 'existing': [], 'candidates': None, 'replies': []})
+    cases.append({**single, 'edge': e_work, 'related': [exact], 'existing': [old_live], 'candidates': TYPES_ALL,
+                  'replies': []})
+
+    # the exact match needs the same source and the same target
+    decide = {'fn': 'decide_edge_against_candidates', 'routing': False}
+    cases.append({**decide, 'edge': e_work, 'existing': [],
+                  'related': [edge('s-ac', 'n-ana', 'n-paris', 'Ana works at Acme')],
+                  'replies': [resolve_reply('Ana works at Acme', [], [])]})
+    cases.append({**decide, 'edge': e_work, 'existing': [],
+                  'related': [edge('s-bc', 'n-bob', 'n-acme', 'Ana works at Acme')],
+                  'replies': [resolve_reply('Ana works at Acme', [], [])]})
+
+    # an episode whose valid_at is not its created_at; the attribute prompt holds the valid_at and the attributes of the
+    # edge that is resolved
+    ep_late = ep('ep1', datetime(2025, 3, 3, tzinfo=timezone.utc), created_at=datetime(2025, 3, 9, tzinfo=timezone.utc))
+    attributes = reply('extract_edges.extract_attributes', 'Ana joined Acme', {'role': 'lead', 'since': '2020'})
+    single_late = {**single, 'episode': ep_late}
+    cases.append({**single_late, 'edge': e_free, 'related': [], 'existing': [old_work], 'candidates': ['WORKS_AT'],
+                  'replies': [resolve_reply('Ana joined Acme', [], []), attributes]})
+    cases.append({**single_late, 'edge': e_free, 'related': [], 'existing': [], 'candidates': ['WORKS_AT'],
+                  'replies': [attributes]})
+    cases.append({**single_late, 'edge': e_free, 'existing': [], 'candidates': ['WORKS_AT'],
+                  'related': [edge('s-work2', 'n-ana', 'n-acme', 'Ana at Acme', 'WORKS_AT', attributes={'role': 'dev'})],
+                  'replies': [resolve_reply('Ana joined Acme', [0], []),
+                              reply('extract_edges.extract_attributes', 'Ana at Acme', {'role': 'lead', 'since': '2020'})]})
+
+    # the limit of the last gather: the resolved edge and the invalidated edge are both embedded, with the limit 1
+    for limit in (1, None):
+        cases.append({
+            'fn': 'resolve_extracted_edges', 'episode': ep('ep1', REF), 'entities': stored[:2], 'stored_nodes': stored,
+            'types': TYPES_ALL, 'type_map': MAP_A, 'override': None, 'strict': False, 'invalidated_by': True,
+            'max_coroutines': limit, 'routing': False, 'edges': [e_live],
+            'search': {'Ana lives in Paris': {'pair': {'bm25': [old_live], 'cos': []}, 'all': {'bm25': [], 'cos': []}}},
+            'replies': [resolve_reply('Ana lives in Paris', [], [0])]})
+
+    # extract_edges: max() keeps the first of two episodes with the same instant and other offsets
+    plus = datetime(2025, 1, 1, 10, 0, tzinfo=timezone(timedelta(hours=1)))
+    utc = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+    for first, second in ((plus, utc), (utc, plus)):
+        cases.append({'fn': 'extract_edges', 'episode': [ep('ep1', first), ep('ep2', second, content='Ana moved.')],
+                      'nodes': NODES, 'previous': [], 'type_map': MAP_A, 'group_id': '', 'types': None, 'strict': False,
+                      'instructions': None, 'replies': [reply('extract_edges.edge', '', {'edges': []})]})
+    return cases
+
+
 # The replies after the replies of each case: an attribute reply with known, unknown, and over-long values, and a
 # timestamp reply with no dates.
 FALLBACK_REPLIES = [
@@ -730,7 +822,7 @@ async def run_case(case: dict, mods) -> dict:
 
 def record_async(mods) -> list[dict]:
     out = []
-    for case in extract_cases() + resolve_cases():
+    for case in extract_cases() + resolve_cases() + review_cases():
         events.clear()
         state.update(in_flight=0, max_in_flight=0)
         try:

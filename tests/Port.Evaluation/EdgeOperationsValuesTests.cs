@@ -62,6 +62,15 @@ public class EdgeOperationsValuesTests
         Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("max_coroutines") is 2L && List(Dict(c["in"])["edges"]).Count > 2 && (long)Dict(c["out"])["max_in_flight"]! == 4);
         Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("max_coroutines") is 1L && (long)Dict(c["out"])["max_in_flight"]! == 1);
         Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("max_coroutines") is null && (long)Dict(c["out"])["max_in_flight"]! == 8);
+
+        // The last gather embeds the resolved edges and the invalidated edges, so it has two calls. With the limit 1 it has
+        // one call in flight, and with no limit it has two.
+        bool ResolvesAndInvalidates(OrderedDictionary<string, object?> c) =>
+            (string)Dict(c["in"])["fn"]! == "resolve_extracted_edges"
+            && Dict(c["out"]).GetValueOrDefault("ok") is OrderedDictionary<string, object?> ok
+            && List(ok["invalidated"]).Count > 0;
+        Assert.Contains(AsyncCases, c => ResolvesAndInvalidates(c) && Dict(c["in"]).GetValueOrDefault("max_coroutines") is 1L && (long)Dict(c["out"])["max_in_flight"]! == 1);
+        Assert.Contains(AsyncCases, c => ResolvesAndInvalidates(c) && Dict(c["in"]).GetValueOrDefault("max_coroutines") is null && (long)Dict(c["out"])["max_in_flight"]! == 2);
     }
 
     [Fact]
@@ -104,7 +113,7 @@ public class EdgeOperationsValuesTests
             {
                 output["ok"] = await LoopGuard.RunAsync(() => CallAsync(run, source.Token));
             }
-            catch (Exception e) when (e is ValidationException or KeyNotFoundException or ArgumentException or InvalidOperationException)
+            catch (Exception e) when (e is ValidationException or KeyNotFoundException or ArgumentException or InvalidOperationException or InvalidCastException)
             {
                 output["error"] = ErrorView(e);
             }
@@ -228,6 +237,7 @@ public class EdgeOperationsValuesTests
         {
             ValidationException => "ValidationError",
             KeyNotFoundException => "LookupError",
+            InvalidCastException => "TypeError",
             ArgumentException => "ValueError",
             _ => "RuntimeError",
         },

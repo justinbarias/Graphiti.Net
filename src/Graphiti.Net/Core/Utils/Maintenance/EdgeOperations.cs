@@ -257,8 +257,9 @@ internal static partial class EdgeOperations
         // Prepare context for LLM
         // Use the latest episode's timestamp as the primary reference time
         // PORT: max(..., key=...) returns the first of equal items, as MaxBy does (R14). A naive and an aware valid_at
-        // throw InvalidCastException in the comparison, as Python raises TypeError.
-        var latestEpisode = episodes.MaxBy(ep => ep.ValidAt)!;
+        // throw InvalidCastException in the comparison, as Python raises TypeError. An empty list is a ValueError in
+        // Python; episodes[0] above throws first, so no input reaches the throw.
+        var latestEpisode = episodes.MaxBy(ep => ep.ValidAt) ?? throw new ArgumentException("max() iterable argument is empty");
         var context = new OrderedDictionary<string, object?>
         {
             ["episode_content"] = TextUtils.ConcatenateEpisodes(episodes),
@@ -1494,6 +1495,9 @@ internal static partial class EdgeOperations
         {
             // PORT: the record values are open data. A key of the map holds two strings, so a pair with a value of
             // another type finds no entry, as in Python. A found value is a pair of nodes, which is always true.
+            // The lookup hashes the tuple, so a list or a dict is a TypeError, the source value first.
+            ThrowIfUnhashable(Py.Get(record, "source_uuid"));
+            ThrowIfUnhashable(Py.Get(record, "target_uuid"));
             if (Py.Get(record, "source_uuid") is string sourceUuid
                 && Py.Get(record, "target_uuid") is string targetUuid
                 && duplicateNodesMap.ContainsKey((sourceUuid, targetUuid)))
@@ -1503,6 +1507,14 @@ internal static partial class EdgeOperations
         }
 
         return [.. duplicateNodesMap.Values];
+    }
+
+    private static void ThrowIfUnhashable(object? value)
+    {
+        if (value is List<object?> or OrderedDictionary<string, object?>)
+        {
+            throw new InvalidCastException($"unhashable type: '{Py.TypeName(value)}'");
+        }
     }
 
     private static partial class Log

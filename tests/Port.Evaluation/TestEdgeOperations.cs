@@ -7,18 +7,22 @@
 // the real function with the fake embedder EdgeTestEmbedder, and a patch of `semaphore_gather` with a gather that runs
 // the calls one after the other is the real gather. `EntityEdge.get_between_nodes` has no caller in the module.
 //
-// TODO(port): O10. These tests patch a function of the module itself, which has no C# form:
-// - test_resolve_extracted_edge_keeps_caller_attributes_without_schema (`_extract_edge_timestamps`)
-// - test_resolve_extracted_edge_clears_attributes_when_schema_omits_type (`_extract_edge_timestamps`)
+// PORT: a test that patches `_extract_edge_timestamps` with `AsyncMock(return_value=None)` runs the real function, and the
+// fake model client answers its prompt with no date (`EdgeTimestamps(valid_at=None, invalid_at=None)`), so that the edge
+// keeps its dates, as with the patch. The tests have a form under two conditions: a fake at the network boundary gives
+// the result that the patched function returns, and no assertion reads the arguments of the patched function. Each of
+// them was run against Python with the patch removed and the same fake reply (the oracle gave the same result).
+// test_extract_edge_timestamps_prefers_edge_reference_time patches the prompt function and `apply_extracted_timestamps`;
+// it reads the reference time in the prompt that the fake model client gets, and the dates of the edge after the real
+// `apply_extracted_timestamps`.
+//
+// TODO(port): O10. These tests patch a function of the module itself and assert on the arguments of the patch, which has
+// no C# form:
 // - test_resolve_extracted_edges_fast_path_deduplication (`_dedupe_extracted_edge`)
 // - test_resolve_extracted_edges_fast_path_deduplicates_reverse_direction_by_fact (`_dedupe_extracted_edge`)
-// - test_resolve_extracted_edge_overcap_attribute_preserves_prior (`_extract_edge_timestamps`)
-// - test_resolve_extracted_edge_keeps_initial_null_attributes (`_extract_edge_timestamps`)
 // - test_resolve_extracted_edges_merges_override_candidates (`_dedupe_extracted_edge`)
-// - test_resolve_extracted_edge_retries_timestamps_for_untagged_pairwise (`_extract_edge_timestamps`)
-// - test_extract_edge_timestamps_prefers_edge_reference_time (`prompt_library.extract_edges.extract_timestamps`,
-//   `apply_extracted_timestamps`)
-// The recording of the unit (EdgeOperationsValuesTests) covers the paths of each one.
+// The recording of the unit (EdgeOperationsValuesTests) has cases of the paths that these three tests reach, but it does
+// not read the arguments of the patched function.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
@@ -102,6 +106,50 @@ public class TestEdgeOperations
         (resolvedEdge, _, _) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgeAsync(
             mockLlmClient, extractedEdge, [existingEdge], [], episode, edgeTypeCandidates: null, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(["episode_0", "episode_1", "episode_2"], resolvedEdge.Episodes);
+    }
+
+    // PORT: the Python test patches `_extract_edge_timestamps`. The real function runs (see the header).
+    [Fact(Timeout = 5000)]
+    public async Task test_resolve_extracted_edge_keeps_caller_attributes_without_schema()
+    {
+        var mockLlmClient = LlmWithoutTimestamps(NoDuplicates());
+
+        var extracted = Edge("source_uuid", "target_uuid", "VIEWED", "Customer viewed listing 42", ["episode_1"]);
+        extracted.Attributes = new() { ["event_name"] = "car_viewed", ["event_id"] = "42" };
+
+        var (resolvedEdge, duplicateEdges, invalidated) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgeAsync(
+            mockLlmClient,
+            extracted,
+            [],
+            MockExistingEdges(),
+            MockCurrentEpisode(),
+            edgeTypeCandidates: null,
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(new OrderedDictionary<string, object?> { ["event_name"] = "car_viewed", ["event_id"] = "42" }, resolvedEdge.Attributes);
+        Assert.Empty(duplicateEdges);
+        Assert.Empty(invalidated);
+    }
+
+    // PORT: the Python test patches `_extract_edge_timestamps`. The real function runs (see the header).
+    [Fact(Timeout = 5000)]
+    public async Task test_resolve_extracted_edge_clears_attributes_when_schema_omits_type()
+    {
+        var mockLlmClient = LlmWithoutTimestamps(NoDuplicates());
+
+        var extracted = Edge("source_uuid", "target_uuid", "VIEWED", "Customer viewed listing 42", ["episode_1"]);
+        extracted.Attributes = new() { ["event_name"] = "car_viewed" };
+
+        var (resolvedEdge, _, _) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgeAsync(
+            mockLlmClient,
+            extracted,
+            [],
+            MockExistingEdges(),
+            MockCurrentEpisode(),
+            edgeTypeCandidates: new(),
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Empty(resolvedEdge.Attributes);
     }
 
     [Fact(Timeout = 5000)]
@@ -502,6 +550,77 @@ public class TestEdgeOperations
         Assert.Contains("Do not derive a new relation_type", promptText, StringComparison.Ordinal);
     }
 
+    private static readonly GraphTypeDescriptor EmploymentEdge = new(
+        "_EmploymentEdge",
+        "Edge attribute schema mirroring a customer's EMPLOYMENT relation.",
+        [
+            new GraphFieldDescriptor("title", GraphFieldKind.String, false, null, false, null),
+            new GraphFieldDescriptor("is_current", GraphFieldKind.String, false, null, false, null),
+        ]);
+
+    // End-to-end: when the LLM bleeds meta-reasoning into one attribute, the
+    // cap drops that field and the merge logic falls back to the prior on-edge
+    // value, without affecting fields the LLM legitimately updated.
+    //
+    // PORT: the Python test patches `_extract_edge_timestamps`. The real function runs (see the header).
+    [Fact(Timeout = 5000)]
+    public async Task test_resolve_extracted_edge_overcap_attribute_preserves_prior()
+    {
+        // The LLM returns a clean update for `title` but bleeds 9 KB of meta-reasoning into
+        // `is_current`: the kind of failure the customer reported.
+        var bleed = string.Concat(Enumerable.Repeat(
+            "true (implied by context, but no new information explicitly stated. "
+            + "I should ideally remove it or set it to null. However, the instruction "
+            + "is to preserve existing values...) ",
+            30));
+        var llmClient = LlmWithoutTimestamps(new() { ["title"] = "Senior Engineer", ["is_current"] = bleed });
+
+        var extractedEdge = Edge("person_uuid", "company_uuid", "EMPLOYMENT", "Sam was promoted to Senior Engineer at Northwind", []);
+        extractedEdge.Attributes = new() { ["title"] = "Engineer", ["is_current"] = "true" };
+        var episode = Episode("episode_uuid", "Episode", "desc", "Sam was promoted to Senior Engineer.");
+
+        var (resolved, dupes, invalidated) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgeAsync(
+            llmClient,
+            extractedEdge,
+            [],
+            [],
+            episode,
+            edgeTypeCandidates: new() { ["EMPLOYMENT"] = EmploymentEdge },
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        // Title should reflect the legitimate LLM update.
+        Assert.Equal("Senior Engineer", resolved.Attributes["title"]);
+
+        // is_current was bleed-dropped, so the prior value must be preserved (not the
+        // 9 KB rant, not None, not absent).
+        Assert.Equal("true", resolved.Attributes["is_current"]);
+        Assert.Empty(dupes);
+        Assert.Empty(invalidated);
+    }
+
+    // PORT: the Python test patches `_extract_edge_timestamps`. The real function runs (see the header).
+    [Fact(Timeout = 5000)]
+    public async Task test_resolve_extracted_edge_keeps_initial_null_attributes()
+    {
+        var llmClient = LlmWithoutTimestamps(new() { ["title"] = "Senior Engineer", ["is_current"] = null });
+
+        var extractedEdge = Edge("person_uuid", "company_uuid", "EMPLOYMENT", "Sam is a Senior Engineer at Northwind", []);
+        var episode = Episode("episode_uuid", "Episode", "desc", "Sam is a Senior Engineer at Northwind.");
+
+        var (resolved, dupes, invalidated) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgeAsync(
+            llmClient,
+            extractedEdge,
+            [],
+            [],
+            episode,
+            edgeTypeCandidates: new() { ["EMPLOYMENT"] = EmploymentEdge },
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(new OrderedDictionary<string, object?> { ["title"] = "Senior Engineer", ["is_current"] = null }, resolved.Attributes);
+        Assert.Empty(dupes);
+        Assert.Empty(invalidated);
+    }
+
     // An extracted (A -> B) edge must see an existing (B -> A) edge as a
     // duplicate candidate; the directed exact-fact fast path can't claim it, so
     // the LLM judges and the extracted edge resolves onto the reverse edge.
@@ -647,9 +766,73 @@ public class TestEdgeOperations
         Assert.All(driver.Vectors, v => Assert.Equal(sentinelEmbedding, v));
     }
 
+    // PORT: the Python test patches `_extract_edge_timestamps` and asserts that it was awaited once with the model client,
+    // the edge, and the episode. The real function runs, and its one call of the fake model client is the call of the
+    // timestamp prompt, with the fact of the edge and the time of the episode (see the header). The assertion of the
+    // arguments of the patched function has no other form.
+    [Fact(Timeout = 5000)]
+    public async Task test_resolve_extracted_edge_retries_timestamps_for_untagged_pairwise()
+    {
+        var llmClient = LlmWithoutTimestamps(new());
+        var extractedEdge = Edge("source_uuid", "target_uuid", "KNOWS", "Alice knows Bob.", ["episode_1"]);
+        var episode = Episode("episode_uuid", "Episode", "desc", "Alice knows Bob.");
+
+        await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgeAsync(
+            llmClient,
+            extractedEdge,
+            [],
+            [],
+            episode,
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        var call = Assert.Single(llmClient.Calls);
+        Assert.Equal("extract_edges.extract_timestamps", call.PromptName);
+        var promptText = string.Join("\n", call.Messages.Select(m => m.Content));
+        Assert.Contains("Alice knows Bob.", promptText, StringComparison.Ordinal);
+        Assert.Contains(episode.ValidAt.IsoFormat(), promptText, StringComparison.Ordinal);
+    }
+
+    // PORT: the Python test patches the prompt function `extract_timestamps` and `apply_extracted_timestamps`, and asserts
+    // their arguments. The real functions run. The prompt that the fake model client gets holds the reference time of the
+    // edge, and the real `apply_extracted_timestamps` gives the date of the reply to the edge.
+    [Fact(Timeout = 5000)]
+    public async Task test_extract_edge_timestamps_prefers_edge_reference_time()
+    {
+        var edgeReferenceTime = PyDateTime.FromIsoFormat("2024-01-01T00:00:00+00:00");
+        var episodeReferenceTime = PyDateTime.FromIsoFormat("2024-02-01T00:00:00+00:00");
+        var edge = Edge("source_uuid", "target_uuid", "KNOWS", "Alice knows Bob.", ["episode_1"]);
+        edge.ReferenceTime = edgeReferenceTime;
+        var episode = Episode("episode_uuid", "Episode", "desc", edge.Fact);
+        episode.ValidAt = episodeReferenceTime;
+        var llmClient = new EdgeTestLlm(new() { ["valid_at"] = "2024-01-02T00:00:00Z", ["invalid_at"] = null });
+
+        await LoopGuard.RunAsync(() => EdgeOperations.ExtractEdgeTimestampsAsync(
+            llmClient, edge, episode, cancellationToken: TestContext.Current.CancellationToken));
+
+        var call = Assert.Single(llmClient.Calls);
+        Assert.Equal("extract_edges.extract_timestamps", call.PromptName);
+        var promptText = string.Join("\n", call.Messages.Select(m => m.Content));
+        Assert.Contains(edge.Fact, promptText, StringComparison.Ordinal);
+        Assert.Contains(edgeReferenceTime.IsoFormat(), promptText, StringComparison.Ordinal);
+        Assert.DoesNotContain(episodeReferenceTime.IsoFormat(), promptText, StringComparison.Ordinal);
+        Assert.Equal(PyDateTime.FromIsoFormat("2024-01-02T00:00:00+00:00"), edge.ValidAt);
+        Assert.Null(edge.InvalidAt);
+    }
+
     private static PyDateTime DaysAgo(int days) => PyDateTime.FromDateTimeOffset(TimeProvider.System.GetUtcNow().AddDays(-days));
 
     private static PyDateTime NowUtc() => PyDateTime.UtcNow(TimeProvider.System);
+
+    // A fake model client that answers each prompt with `returnValue` and the timestamp prompt with no date.
+    private static EdgeTestLlm LlmWithoutTimestamps(OrderedDictionary<string, object?> returnValue)
+    {
+        var llm = new EdgeTestLlm(returnValue);
+        var other = llm.Respond;
+        llm.Respond = (messages, promptName) => promptName == "extract_edges.extract_timestamps"
+            ? new OrderedDictionary<string, object?> { ["valid_at"] = null, ["invalid_at"] = null }
+            : other(messages, promptName);
+        return llm;
+    }
 
     private static OrderedDictionary<string, object?> NoDuplicates() => new()
     {
