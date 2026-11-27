@@ -16,7 +16,8 @@ cross-encoder, and the tracer:
   recorded exception.
 
 Each fake first yields to the loop (`await asyncio.sleep(0)`), then records the call (R25). The calls, the spans, and
-the log lines of the `graphiti_core` loggers are one list in the order of their time. The clock is a constant here and real in the
+the log lines of the `graphiti_core` loggers are one list in the order of their time. A call is in flight from its entry
+to its return, and each case keeps the largest count of calls in flight over the three fakes (`max_in_flight`). The clock is a constant here and real in the
 test, so the test removes the time from a log line. A vector of more than 16 items is recorded as its length and its sum.
 
 The cases run each of the 16 recipes with no center node and with one, and again with a limit of 2 and a
@@ -24,6 +25,11 @@ reranker_min_score of 0.5. Configs given as JSON reach each reranker of each sco
 0, a config with no scope, and an episode-only config, which takes the zero vector. The other cases hold an empty
 query, a query with line breaks, the group ids None, [], [''], and an invalid id, a given query vector, a
 max_coroutines of 1, and direct calls of the four scope functions with no config and with no tracer.
+Other cases give the cross-encoder of the community and episode scope a reranker_min_score at and above a score, give
+the edge and node scopes a sim_min_score and a bfs_max_depth that differ from the defaults, give an MMR reranker with no
+cosine method, an empty list of breadth-first origins, and a max_coroutines of 1 and 2 for a hybrid config of each scope.
+The cancel cases cancel the task of the search while the k-th query returns. The search then ends with CancelledError,
+which is a BaseException, so the spans keep no status.
 
 The tool writes tests/Port.Evaluation/values/search.json. --check writes nothing and exits 1 if the file differs from
 what the run would write. The tool needs Python 3.12 and the pinned upstream in .upstream/graphiti, or the path in
@@ -37,6 +43,7 @@ import logging
 import math
 import os
 import sys
+import warnings
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -142,9 +149,21 @@ TABLES = {
     'node_fulltext': [node('n-1', 'Alice'), node('n-2', 'Bob'), node('n-3', 'Carol')],
     'node_similarity': [node('n-3', 'Carol'), node('n-4', 'Alice'), node('n-1', 'Alice')],
     'node_bfs': [node('n-5', 'Eve'), node('n-2', 'Bob')],
-    'episode_fulltext': [episode('ep-1', 'c1'), episode('ep-2', 'c2'), episode('ep-3', 'c1')],
+    'episode_fulltext': [
+        episode('ep-1', 'c1'),
+        episode('ep-2', 'c2'),
+        episode('ep-3', 'c1'),
+        episode('ep-4', 'c3'),
+        episode('ep-5', 'c4'),
+        episode('ep-6', 'c5'),
+    ],
     'community_fulltext': [community('c-1', 'Comm A'), community('c-2', 'Comm B')],
-    'community_similarity': [community('c-2', 'Comm B'), community('c-3', 'Comm A')],
+    'community_similarity': [
+        community('c-2', 'Comm B'),
+        community('c-3', 'Comm A'),
+        community('c-4', 'Comm C'),
+        community('c-5', 'Comm D'),
+    ],
 }
 EMBEDDINGS = {
     'e-1': [1.0, 0.0],
@@ -160,6 +179,8 @@ EMBEDDINGS = {
     'c-1': [1.0, 0.0],
     'c-2': [0.0, 1.0],
     'c-3': [0.6, 0.8],
+    'c-4': [0.8, 0.6],
+    'c-5': [0.0, -1.0],
 }
 # node_distance_reranker: the nodes next to the center node.
 CONNECTED = ['n-2', 'n-3', 'n-5']
@@ -203,7 +224,83 @@ CUSTOM = {
         'reranker_min_score': 0.5,
     },
     'no_scope': {},
+    # B1: the cross-encoder gives the scores 1.0, 0.75, 0.5, 0.25, so 0.75 is a boundary and 0.8 drops one more.
+    'community_cross_min_075': {'community_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.75},
+    'community_cross_min_08': {'community_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.8},
+    'episode_cross_min_075': {'episode_config': {'search_methods': ['bm25'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.75},
+    # The episode cross-encoder reads the reciprocal rank fusion with the same minimum first. It scores 1, 0.5, 0.33,
+    # 0.25, 0.2, and 0.17 for ep-1 to ep-6. A minimum of 0.25 keeps four episodes and holds the cross-encoder score
+    # 0.25 at its boundary. A minimum of 0.16 keeps all six, which are five contents, and drops the score 0.0.
+    'episode_cross_min_025': {'episode_config': {'search_methods': ['bm25'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.25},
+    'episode_cross_min_016': {'episode_config': {'search_methods': ['bm25'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.16},
+    'episode_cross_min_08': {'episode_config': {'search_methods': ['bm25'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.8},
+    # B2: values that differ from the defaults (sim_min_score 0.6, bfs_max_depth 3).
+    'edge_sim_03': {'edge_config': {'search_methods': ALL_EDGE, 'reranker': 'reciprocal_rank_fusion', 'sim_min_score': 0.3}},
+    'node_sim_03': {'node_config': {'search_methods': ALL_EDGE, 'reranker': 'reciprocal_rank_fusion', 'sim_min_score': 0.3}},
+    'node_bfs_only_depth_1': {'node_config': {'search_methods': ['breadth_first_search'], 'reranker': 'reciprocal_rank_fusion', 'bfs_max_depth': 1}},
+    'node_bfs_only_depth_2': {'node_config': {'search_methods': ['breadth_first_search'], 'reranker': 'reciprocal_rank_fusion', 'bfs_max_depth': 2}},
+    'edge_bfs_only_depth_2': {'edge_config': {'search_methods': ['breadth_first_search'], 'reranker': 'reciprocal_rank_fusion', 'bfs_max_depth': 2}},
+    # With no origins given, the search expands the breadth-first search from the nodes that it found, to the same depth.
+    'edge_all_depth_2': {'edge_config': {'search_methods': ALL_EDGE, 'reranker': 'reciprocal_rank_fusion', 'bfs_max_depth': 2}},
+    'node_all_depth_2': {'node_config': {'search_methods': ALL_EDGE, 'reranker': 'reciprocal_rank_fusion', 'bfs_max_depth': 2}},
+    # B3: an MMR reranker with no cosine method. Python embeds the query for it.
+    'edge_mmr_bm25': {'edge_config': {'search_methods': ['bm25'], 'reranker': 'mmr'}},
+    'node_mmr_bm25': {'node_config': {'search_methods': ['bm25'], 'reranker': 'mmr'}},
+    # B5: a hybrid config for each scope, to see the limit of the inner gather.
+    'community_rrf_hybrid': {'community_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'reciprocal_rank_fusion'}},
 }
+
+
+# (recipe, max_coroutines, k): the caller cancels the search while the k-th query returns. The port sees a cancel only
+# where code passes its token, and Python delivers it at the next await of each task. So a cancel that arrives while a
+# task waits to resume after a finished call can end the search later in the port, with more spans or a full result.
+# These points are left out: late cancel, see GAPS. Each point below is one where the port and Python agree.
+CANCEL_POINTS = [
+    ('COMBINED_HYBRID_SEARCH_RRF', None, 1),
+    ('COMBINED_HYBRID_SEARCH_RRF', 1, 1),
+    ('COMBINED_HYBRID_SEARCH_RRF', 1, 3),
+    ('COMBINED_HYBRID_SEARCH_RRF', 1, 6),
+    ('COMBINED_HYBRID_SEARCH_RRF', 2, 1),
+    ('COMBINED_HYBRID_SEARCH_MMR', None, 1),
+    ('COMBINED_HYBRID_SEARCH_MMR', None, 8),
+    ('COMBINED_HYBRID_SEARCH_MMR', None, 9),
+    ('COMBINED_HYBRID_SEARCH_MMR', 1, 1),
+    ('COMBINED_HYBRID_SEARCH_MMR', 1, 3),
+    ('COMBINED_HYBRID_SEARCH_MMR', 1, 4),
+    ('COMBINED_HYBRID_SEARCH_MMR', 1, 6),
+    ('COMBINED_HYBRID_SEARCH_MMR', 1, 8),
+    ('COMBINED_HYBRID_SEARCH_MMR', 2, 1),
+    ('COMBINED_HYBRID_SEARCH_MMR', 2, 5),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', None, 1),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', None, 8),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', None, 9),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 1),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 2),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 3),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 4),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 5),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 6),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 8),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 2, 1),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 2, 5),
+    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 2, 6),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', None, 1),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', None, 3),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 1, 1),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 1, 2),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 1, 3),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 2, 1),
+    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 2, 3),
+    ('COMMUNITY_HYBRID_SEARCH_MMR', None, 1),
+    ('COMMUNITY_HYBRID_SEARCH_MMR', 1, 1),
+    ('COMMUNITY_HYBRID_SEARCH_MMR', 2, 1),
+    ('EDGE_HYBRID_SEARCH_RRF', None, 1),
+    ('EDGE_HYBRID_SEARCH_RRF', 1, 1),
+    ('EDGE_HYBRID_SEARCH_RRF', 2, 1),
+    ('NODE_HYBRID_SEARCH_RRF', None, 1),
+    ('NODE_HYBRID_SEARCH_RRF', 1, 1),
+    ('NODE_HYBRID_SEARCH_RRF', 2, 1),
+]
 
 
 def cases():
@@ -225,6 +322,21 @@ def cases():
     out.append({'fn': 'search', 'config': 'episode_rrf', 'query_vector': [0.5]})
     out.append({'fn': 'search', 'recipe': 'COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 'max_coroutines': 1, 'center': 'n-1'})
     out.append({'fn': 'search', 'recipe': 'COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 'no_tracer': True})
+    # B2: an empty list of origins is not None, so the search does not expand the breadth-first search.
+    for name in ('edge_rrf_all', 'node_rrf_all', 'edge_bfs_only', 'node_bfs_only'):
+        out.append({'fn': 'search', 'config': name, 'bfs': []})
+    out.append({'fn': 'search', 'recipe': 'COMBINED_HYBRID_SEARCH_RRF', 'bfs': []})
+    # B5: the limit of the inner gather of each scope, and of the gather of the scopes.
+    for name in ('edge_rrf_all', 'node_rrf_all', 'community_rrf_hybrid'):
+        for limit in (1, 2):
+            out.append({'fn': 'search', 'config': name, 'max_coroutines': limit})
+    # B6: the caller cancels the search while the k-th query returns (see CANCEL_POINTS).
+    for recipe, max_coroutines, k in CANCEL_POINTS:
+        case = {'fn': 'search', 'recipe': recipe}
+        if max_coroutines is not None:
+            case['max_coroutines'] = max_coroutines
+        case['cancel_at_query'] = k
+        out.append(case)
     for fn in ('edge_search', 'node_search', 'episode_search', 'community_search'):
         out.append({'fn': fn, 'config': None})
         out.append({'fn': fn, 'config': 'all_scopes_min_score', 'no_tracer': True})
@@ -298,6 +410,8 @@ def respond(query, params):
 
 
 def main() -> int:
+    # A canceled search leaves coroutines that never ran, and Python warns about each one. The warning is no result.
+    warnings.filterwarnings('ignore', message='coroutine .* was never awaited', category=RuntimeWarning)
     sys.path.insert(0, str(UPSTREAM))
     from graphiti_core.driver.driver import GraphProvider
     from graphiti_core.search import search as search_module
@@ -325,6 +439,10 @@ def main() -> int:
     logger.propagate = False
     logger.addHandler(Capture())
 
+    # The count of calls that run at the same time, over the driver, the embedder, and the cross-encoder. A call runs
+    # from its entry to its return. `main` is the task that runs the case, which a cancel at a query ends.
+    state = {'in_flight': 0, 'max_in_flight': 0, 'queries': 0, 'cancel_at_query': None, 'main': None}
+
     class FakeDriver:
         provider = GraphProvider.NEO4J
         fulltext_syntax = ''
@@ -332,23 +450,41 @@ def main() -> int:
         graph_operations_interface = None
 
         async def execute_query(self, cypher_query_, **kwargs):
-            await asyncio.sleep(0)
-            events.append(
-                {'kind': 'query', 'query': cypher_query_, 'keys': list(kwargs), 'values': [encode(compact(v)) for v in kwargs.values()]}
-            )
-            return json.loads(json.dumps(respond(cypher_query_, kwargs))), None, None
+            state['in_flight'] += 1
+            state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
+            try:
+                await asyncio.sleep(0)
+                events.append(
+                    {'kind': 'query', 'query': cypher_query_, 'keys': list(kwargs), 'values': [encode(compact(v)) for v in kwargs.values()]}
+                )
+                state['queries'] += 1
+                if state['queries'] == state['cancel_at_query']:
+                    state['main'].cancel()
+                return json.loads(json.dumps(respond(cypher_query_, kwargs))), None, None
+            finally:
+                state['in_flight'] -= 1
 
     class FakeEmbedder:
         async def create(self, input_data):
-            await asyncio.sleep(0)
-            events.append({'kind': 'embed', 'input': encode(input_data)})
-            return [1.0, 0.0]
+            state['in_flight'] += 1
+            state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
+            try:
+                await asyncio.sleep(0)
+                events.append({'kind': 'embed', 'input': encode(input_data)})
+                return [1.0, 0.0]
+            finally:
+                state['in_flight'] -= 1
 
     class FakeCrossEncoder:
         async def rank(self, query, passages):
-            await asyncio.sleep(0)
-            events.append({'kind': 'rank', 'query': query, 'passages': list(passages)})
-            return [(passage, 1.0 - 0.25 * i) for i, passage in enumerate(reversed(passages))]
+            state['in_flight'] += 1
+            state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
+            try:
+                await asyncio.sleep(0)
+                events.append({'kind': 'rank', 'query': query, 'passages': list(passages)})
+                return [(passage, 1.0 - 0.25 * i) for i, passage in enumerate(reversed(passages))]
+            finally:
+                state['in_flight'] -= 1
 
     class RecordingSpan:
         def __init__(self):
@@ -401,6 +537,7 @@ def main() -> int:
         driver = FakeDriver()
         tracer = NoOpTracer() if case.get('no_tracer') else RecordingTracer()
         fn = case['fn']
+        state['main'] = asyncio.current_task()
         if fn == 'search':
             clients = SimpleNamespace(
                 driver=driver,
@@ -448,14 +585,20 @@ def main() -> int:
     results = []
     for case in cases():
         events.clear()
+        state.update(in_flight=0, max_in_flight=0, queries=0, cancel_at_query=case.get('cancel_at_query'), main=None)
         outcome = {}
         try:
             outcome['result'] = asyncio.run(run(case))
             outcome['error'] = None
+        except asyncio.CancelledError as error:
+            # CancelledError is a BaseException, so `except Exception` in the library does not see it.
+            outcome['result'] = None
+            outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
             outcome['result'] = None
             outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
         outcome['events'] = list(events)
+        outcome['max_in_flight'] = state['max_in_flight']
         results.append({'input': case, 'output': outcome})
 
     document = {

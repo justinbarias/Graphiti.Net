@@ -10,7 +10,7 @@ using Graphiti.PyCompat;
 
 public class TestSearchTracing
 {
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_search_emits_trace_spans_for_edge_similarity()
     {
         var tracer = new RecordingTracer();
@@ -51,11 +51,11 @@ public class TestSearchTracing
         Assert.Equal(0L, executeScopesSpan.Attributes["result.edges"]);
 
         var embedSpan = tracer.Spans.First(span => span.Name == "search.embed_query_vector");
-        Assert.Equal(Py.Len("where is the edge"), embedSpan.Attributes["query.length"]);
+        Assert.Equal(17L, embedSpan.Attributes["query.length"]);
         Assert.Equal(3L, embedSpan.Attributes["query_vector.dimension"]);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_search_uses_noop_tracer_when_client_has_no_tracer()
     {
         // PORT: `tracer` is a required field of GraphitiClients, and a SimpleNamespace with no `tracer` reads as None
@@ -83,7 +83,7 @@ public class TestSearchTracing
         Assert.Empty(results.Edges);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_edge_search_uses_noop_tracer_when_none_is_passed()
     {
         var (edges, scores) = await Asyncio.Run(() => SearchModule.EdgeSearchAsync(
@@ -101,20 +101,58 @@ public class TestSearchTracing
         Assert.Empty(scores);
     }
 
+    // PORT: no Python original. Python has no token, so this test checks rule R8 by itself: the embedder and the search
+    // interface of the driver each get the token that the caller gave to the search.
+    [Fact(Timeout = 5000)]
+    public async Task test_search_passes_its_token_to_the_embedder_and_the_search_interface()
+    {
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var searchInterface = new EmptySearchInterface();
+        var embedder = new FakeEmbedder();
+        var clients = new GraphitiClients
+        {
+            Driver = new FakeDriver(searchInterface),
+            LlmClient = null!,
+            Embedder = embedder,
+            CrossEncoder = null!,
+            Tracer = new RecordingTracer(),
+        };
+
+        await Asyncio.Run(() => SearchModule.SearchAsync(
+            clients,
+            query: "where is the edge",
+            groupIds: null,
+            config: new SearchConfig
+            {
+                EdgeConfig = new EdgeSearchConfig { SearchMethods = [EdgeSearchMethod.CosineSimilarity] },
+            },
+            searchFilter: new SearchFilters(),
+            cancellationToken: source.Token));
+
+        Assert.Equal([source.Token], embedder.Tokens);
+        Assert.Equal([source.Token], searchInterface.Tokens);
+    }
+
     // PORT: monkeypatch.setattr on `graphiti_core.search.search.edge_similarity_search` has no C# form (O10). The
     // function reads the search interface of the driver first, so a driver whose interface returns [] gives the same
     // answer as the patched function. The driver itself is never called.
     private sealed record EmptySearchInterface : SearchInterface
     {
-        internal override Task<List<EntityEdge>> EdgeSimilaritySearchAsync(GraphDriver driver, List<double> searchVector, string? sourceNodeUuid, string? targetNodeUuid, SearchFilters searchFilter, List<string>? groupIds = null, long limit = 100, double minScore = 0.7, CancellationToken cancellationToken = default) =>
-            Task.FromResult<List<EntityEdge>>([]);
+        internal List<CancellationToken> Tokens { get; } = [];
+
+        internal override async Task<List<EntityEdge>> EdgeSimilaritySearchAsync(GraphDriver driver, List<double> searchVector, string? sourceNodeUuid, string? targetNodeUuid, SearchFilters searchFilter, List<string>? groupIds = null, long limit = 100, double minScore = 0.7, CancellationToken cancellationToken = default)
+        {
+            Tokens.Add(cancellationToken);
+            await Task.Yield();
+            return [];
+        }
     }
 
     private sealed class FakeDriver : GraphDriver
     {
-        internal FakeDriver()
+        internal FakeDriver(EmptySearchInterface? searchInterface = null)
         {
-            SearchInterface = new EmptySearchInterface();
+            SearchInterface = searchInterface ?? new EmptySearchInterface();
         }
 
         internal override string PythonName => "SimpleNamespace";
@@ -135,8 +173,14 @@ public class TestSearchTracing
 
     private sealed class FakeEmbedder : EmbedderClient
     {
-        internal override Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default) =>
-            Task.FromResult<List<double>>([0.1, 0.2, 0.3]);
+        internal List<CancellationToken> Tokens { get; } = [];
+
+        internal override async Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
+        {
+            Tokens.Add(cancellationToken);
+            await Task.Yield();
+            return [0.1, 0.2, 0.3];
+        }
     }
 
     private sealed class RecordingSpan(string name) : TracerSpan

@@ -2,7 +2,9 @@
 // The recording is values/search.json, which port/tools/record_search.py wrote from Python. Fakes replace the graph
 // driver, the embedder, the cross-encoder, and the tracer on both sides. The test asserts on the ranked uuids and the
 // scores, and on one ordered list of the queries, the embedder and cross-encoder calls, the spans with their
-// attributes and status, and the log lines.
+// attributes and status, and the log lines. It also compares the largest count of calls that ran at the same time,
+// and the cases that cancel the search while a query returns. Python has no token, so the test also asserts that each
+// call of a fake got the token that the test gave to the search.
 namespace Graphiti.Port.Evaluation;
 
 using System.Text.Json;
@@ -43,7 +45,7 @@ public class SearchValuesTests
             ["community_search", "edge_search", "episode_search", "node_search", "search"],
             inputs.Select(i => i.GetProperty("fn").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
         Assert.Equal(
-            ["GroupIdValidationError", "SearchRerankerError"],
+            ["CancelledError", "GroupIdValidationError", "SearchRerankerError"],
             Cases.Select(c => c.GetProperty("output").GetProperty("error")).Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => e.GetProperty("type").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
 
@@ -66,7 +68,13 @@ public class SearchValuesTests
         }
     }
 
-    [Theory]
+    // The cases with `cancel_at_query` cancel the search while the k-th query returns. Python cancels the task of the
+    // search, and the port cancels the token source. The test compares the exception type and the span list, so a span of
+    // a canceled search that ends with an error status fails it. A cancel can arrive while a task waits to resume after a
+    // call that finished. Python then raises where the task resumes, and the port reads the token at the next call, so
+    // the port can run more spans or return a full result. The recording leaves out each such point: late cancel, see
+    // GAPS.
+    [Theory(Timeout = 5000)]
     [MemberData(nameof(CaseIndexes))]
     public async Task Each_result_call_span_and_log_line_matches_Python(int index)
     {
@@ -77,16 +85,30 @@ public class SearchValuesTests
         using var factory = new CaptureFactory(events);
         using var scope = PortServices.Use(loggerFactory: factory);
 
+        // PORT: a live token source. Python has no token, so the test checks that each fake got this token (R8, R25).
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var probe = new Probe(source, input.TryGetProperty("cancel_at_query", out var cancelAt) ? cancelAt.GetInt32() : null);
+
         JsonNode? result = null;
         Exception? error = null;
         try
         {
-            result = await Asyncio.Run(() => RunAsync(input, events, TestContext.Current.CancellationToken));
+            result = await Asyncio.Run(() => RunAsync(input, events, probe, source.Token));
         }
-        catch (GraphitiException e)
+        catch (Exception e) when (e is GraphitiException or OperationCanceledException)
         {
             error = e;
         }
+
+        // asyncio.run ends the tasks that a failed search leaves, and a span of such a task ends in this time. The
+        // port runs the same tasks on its scheduler, so the test lets the scheduler run before it reads the events.
+        await Asyncio.Run(async () =>
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                await Task.Yield();
+            }
+        });
 
         var expectedError = output.GetProperty("error");
         if (expectedError.ValueKind == JsonValueKind.Null)
@@ -98,7 +120,12 @@ public class SearchValuesTests
         {
             Assert.NotNull(error);
             Assert.Equal(expectedError.GetProperty("type").GetString(), PythonName(error));
-            Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
+
+            // The text of a CancelledError is empty in Python, and the text of an OperationCanceledException is not.
+            if (error is not OperationCanceledException)
+            {
+                Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
+            }
         }
 
         var expectedEvents = output.GetProperty("events").EnumerateArray().ToList();
@@ -109,12 +136,26 @@ public class SearchValuesTests
         {
             AssertSame(Untimed(JsonNode.Parse(expectedEvents[i].GetRawText())!), Untimed(events[i]));
         }
+
+        Assert.Equal(output.GetProperty("max_in_flight").GetInt32(), probe.MaxInFlight);
+
+        // Each call of a fake got the token of the test. A call that a cancel ended before its record has a token too.
+        Assert.All(probe.Tokens, token => Assert.Equal(source.Token, token));
+        var recordedCalls = events.Count(e => e["kind"]!.GetValue<string>() is "query" or "embed" or "rank");
+        if (error is null)
+        {
+            Assert.Equal(recordedCalls, probe.Tokens.Count);
+        }
+        else
+        {
+            Assert.True(probe.Tokens.Count >= recordedCalls);
+        }
     }
 
     // PORT: no Python original. Python has no cancellation token, so this test checks rule R8 by itself. Each async
     // function passes its token on and awaits the call. A fake that is canceled throws OperationCanceledException after
     // a yield, so a dropped token or a missing await does not give the exception.
-    [Theory]
+    [Theory(Timeout = 5000)]
     [InlineData("search")]
     [InlineData("edge_search")]
     [InlineData("node_search")]
@@ -122,18 +163,18 @@ public class SearchValuesTests
     [InlineData("community_search")]
     public async Task Each_async_function_passes_its_token_and_awaits_the_call(string fn)
     {
-        using var canceled = new CancellationTokenSource();
+        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await canceled.CancelAsync();
         var input = Cases.Select(c => c.GetProperty("input")).First(i =>
             i.GetProperty("fn").GetString() == fn
             && (fn == "search" || (i.GetProperty("config").ValueKind == JsonValueKind.String && !i.TryGetProperty("defaults", out _))));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Asyncio.Run(() => RunAsync(input, [], canceled.Token)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Asyncio.Run(() => RunAsync(input, [], new Probe(canceled, null), canceled.Token)));
     }
 
-    private static async Task<JsonNode?> RunAsync(JsonElement input, List<JsonNode> events, CancellationToken token)
+    private static async Task<JsonNode?> RunAsync(JsonElement input, List<JsonNode> events, Probe probe, CancellationToken token)
     {
-        var driver = new FakeDriver(events);
+        var driver = new FakeDriver(events, probe);
         Tracer tracer = input.TryGetProperty("no_tracer", out var nt) && nt.GetBoolean() ? new NoOpTracer() : new RecordingTracer(events);
         var fn = input.GetProperty("fn").GetString()!;
         if (fn == "search")
@@ -142,8 +183,8 @@ public class SearchValuesTests
             {
                 Driver = driver,
                 LlmClient = null!,
-                Embedder = new FakeEmbedder(events),
-                CrossEncoder = new FakeCrossEncoder(events),
+                Embedder = new FakeEmbedder(events, probe),
+                CrossEncoder = new FakeCrossEncoder(events, probe),
                 Tracer = tracer,
                 MaxCoroutines = input.TryGetProperty("max_coroutines", out var mc) ? mc.GetInt64() : null,
             };
@@ -171,7 +212,7 @@ public class SearchValuesTests
         }
 
         var config = input.GetProperty("config").ValueKind == JsonValueKind.Null ? null : ConfigFor(input);
-        var crossEncoder = new FakeCrossEncoder(events);
+        var crossEncoder = new FakeCrossEncoder(events, probe);
         const string query = "who works where";
         List<double> queryVector = [1.0, 0.0];
         List<string> groups = ["g"];
@@ -348,6 +389,7 @@ public class SearchValuesTests
     private static string PythonName(Exception e) => e switch
     {
         SearchRerankerException => "SearchRerankerError",
+        OperationCanceledException => "CancelledError",
         GroupIdValidationException => "GroupIdValidationError",
         _ => e.GetType().Name,
     };
@@ -454,7 +496,38 @@ public class SearchValuesTests
         return document.RootElement.Clone();
     }
 
-    private sealed class FakeDriver(List<JsonNode> events) : GraphDriver
+    // The calls in flight, the token of each call, and the cancel at the k-th query. A call is in flight from its entry
+    // to its return. Python counts the same way in port/tools/record_search.py.
+    private sealed class Probe(CancellationTokenSource source, int? cancelAtQuery)
+    {
+        internal List<CancellationToken> Tokens { get; } = [];
+
+        internal int MaxInFlight { get; private set; }
+
+        private int inFlight;
+        private int queries;
+
+        internal void Enter(CancellationToken token)
+        {
+            Tokens.Add(token);
+            inFlight++;
+            MaxInFlight = Math.Max(MaxInFlight, inFlight);
+        }
+
+        internal void Exit() => inFlight--;
+
+        // Python: `main_task.cancel()` after the query is recorded.
+        internal void AfterQuery()
+        {
+            queries++;
+            if (queries == cancelAtQuery)
+            {
+                source.Cancel();
+            }
+        }
+    }
+
+    private sealed class FakeDriver(List<JsonNode> events, Probe probe) : GraphDriver
     {
         internal override string PythonName => "FakeDriver";
 
@@ -463,16 +536,25 @@ public class SearchValuesTests
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            cancellationToken.ThrowIfCancellationRequested();
-            events.Add(new JsonObject
+            probe.Enter(cancellationToken);
+            try
             {
-                ["kind"] = "query",
-                ["query"] = cypherQuery,
-                ["keys"] = new JsonArray([.. parameters.Keys.Select(k => (JsonNode)k)]),
-                ["values"] = new JsonArray([.. parameters.Values.Select(Encode)]),
-            });
-            return (Respond(cypherQuery, parameters), null, null);
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                events.Add(new JsonObject
+                {
+                    ["kind"] = "query",
+                    ["query"] = cypherQuery,
+                    ["keys"] = new JsonArray([.. parameters.Keys.Select(k => (JsonNode)k)]),
+                    ["values"] = new JsonArray([.. parameters.Values.Select(Encode)]),
+                });
+                probe.AfterQuery();
+                return (Respond(cypherQuery, parameters), null, null);
+            }
+            finally
+            {
+                probe.Exit();
+            }
         }
 
         internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");
@@ -484,31 +566,47 @@ public class SearchValuesTests
         internal override Task BuildIndicesAndConstraintsAsync(bool deleteExisting = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed class FakeEmbedder(List<JsonNode> events) : EmbedderClient
+    private sealed class FakeEmbedder(List<JsonNode> events, Probe probe) : EmbedderClient
     {
         internal override async Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            cancellationToken.ThrowIfCancellationRequested();
-            events.Add(new JsonObject { ["kind"] = "embed", ["input"] = Encode(inputData) });
-            return [1.0, 0.0];
+            probe.Enter(cancellationToken);
+            try
+            {
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                events.Add(new JsonObject { ["kind"] = "embed", ["input"] = Encode(inputData) });
+                return [1.0, 0.0];
+            }
+            finally
+            {
+                probe.Exit();
+            }
         }
     }
 
     // Returns the passages in reverse order with the scores 1.0, 0.75, 0.5, and so on.
-    private sealed class FakeCrossEncoder(List<JsonNode> events) : CrossEncoderClient
+    private sealed class FakeCrossEncoder(List<JsonNode> events, Probe probe) : CrossEncoderClient
     {
         internal override async Task<List<(string, double)>> RankAsync(string query, List<string> passages, CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            cancellationToken.ThrowIfCancellationRequested();
-            events.Add(new JsonObject
+            probe.Enter(cancellationToken);
+            try
             {
-                ["kind"] = "rank",
-                ["query"] = query,
-                ["passages"] = new JsonArray([.. passages.Select(p => (JsonNode)p)]),
-            });
-            return [.. Enumerable.Reverse(passages).Select((passage, i) => (passage, 1.0 - (0.25 * i)))];
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                events.Add(new JsonObject
+                {
+                    ["kind"] = "rank",
+                    ["query"] = query,
+                    ["passages"] = new JsonArray([.. passages.Select(p => (JsonNode)p)]),
+                });
+                return [.. Enumerable.Reverse(passages).Select((passage, i) => (passage, 1.0 - (0.25 * i)))];
+            }
+            finally
+            {
+                probe.Exit();
+            }
         }
     }
 
