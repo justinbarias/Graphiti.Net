@@ -12,7 +12,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 0 | `port/skeleton` | In progress. Types and signatures for all 114 units, with no bodies | 114 | | Opus 5.5, medium |
 | 1 | `port/foundations` | Done 2026-11-27. `errors`, `helpers`, `graphiti_types`, `tracer`, `decorators`, `graph_queries`, `utils` (6 modules), `models`, `namespaces` | 20 | 4,277 | Sonnet 5.5, medium |
 | 2 | `port/graph-types` | Done 2026-11-27. `nodes`, `edges`, and the driver contract: `driver.driver`, `driver.operations`, `driver.graph_operations`, `driver.search_interface`, `driver.query_executor`, `driver.record_parsers`, the `driver` package root | 21 | 5,147 | Opus 5.5, medium. One cycle group holds most of this layer. |
-| 3 | `port/models-boundary` | In progress. `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
+| 3 | `port/models-boundary` | Done 2026-11-27. `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
 | 4 | `port/prompts` | Done 2026-11-27. `prompts` | 14 | 3,052 | Sonnet 5.5, medium |
 | 5 | `port/neo4j` | In progress. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
 | 6 | `port/search` | In progress. `search` | 7 | 3,456 | Opus 5.5, medium |
@@ -248,3 +248,65 @@ Commands at the tip:
 - `dotnet test --project tests/Port.Evaluation`: 10,233 tests, 0 failed, 0 skipped.
 - The four prompt recorders with `--check`: 1,031, 1,532, 734, and 1,000 cases. Each one is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,150 passed, 0 unexpected, 0 bound and wrong. 193 ids left `expected-failures.txt`, and 849 stay. The pull request lists the ids.
+
+### Layer 3, the model boundary, 2026-11-27
+
+Seven packets ported 13 modules and wrote the `Microsoft.Extensions.AI` adapters. Two Opus 5.5 high reviewers read each packet group. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Review |
+| --- | --- | --- |
+| P3a | `llm_client.config`, `llm_client.errors`, `llm_client.utils`, `llm_client.token_tracker` | One review pair for P3a, P3b, and P3e: 7 and 18 findings. 23 of 58 seeded defects passed each test before the fix round. |
+| P3b | `llm_client.client`, `embedder.client`, `cross_encoder.client` | The same pair. |
+| P3e | `llm_client.cache`, `cross_encoder.openai_reranker_client` | The same pair. |
+| P3c | `llm_client.prompt_config`, `llm_client.llm_runtime` | One review pair for P3c and P3d: 13 and 11 findings. 18 of 68 seeded defects passed each test before the fix round. |
+| P3d | `llm_client.decision_prompts`, `llm_client.openai_decisions_client` | The same pair. |
+| P3f | The adapters `ChatClientLlmClient`, `EmbeddingGeneratorEmbedder`, `CrossEncoderBridge`, and `ChatClientLogProbabilityChat` (Opus 5.5, medium effort) | No review pair. The adversarial pass reads them. |
+| P3g | The evidence of `prompt_config` and `llm_runtime` that needs the prompt library of layer 4 | No review pair. 15 of 16 seeded defects fail a test. |
+
+What the reviews changed:
+
+| Finding | Result |
+| --- | --- |
+| The default HTTP client of the decisions client followed a redirect and had a timeout of 100 seconds. httpx does neither. | `new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })` with no timeout of its own (rule R19). |
+| The cache had no busy timeout, so two processes on one cache file failed at once. | A busy timeout of 5 seconds, as the `sqlite3` module of Python has. |
+| The path of `generate_response` with the cache on had no test. | The recording has three scenarios of the cache path, with 10 calls. |
+| A cancel during a retried failure left as the provider error. | It leaves as `OperationCanceledException`, and a test holds it. |
+| A reply that is not UTF-8, a byte order mark, and a charset header were read in another way. | `response.json()` reads the bytes as strict UTF-8. GAPS F34 names what stays different. |
+| `int(x)` of open data, a method call on a value of another type, and `x in c` on open data threw other exceptions. | `Py.Int`, `Py.Receiver`, and four private members of `DecisionPrompts` (rule R6). |
+| `parse_list` returned a typed list, so JSON text that is not a list could not pass. | It returns `object?` (rule R20). One O4 case is closed. |
+| Five tests of the runtime had upstream names and other assertions, and a helper built a runtime with no constructor call. | Each one is a port of its upstream test, and each test calls the constructor. |
+| The runtime had no recording. | `port/tools/record_llm_runtime.py` holds 553 cases, with 60 sets of calls that run at the same time. |
+
+Decision D48: two outputs above debug level keep the text of a provider exception, as upstream does.
+
+The adapters follow [the public surface design](../../design-docs/public-surface-design.md). The design left five points open, and the lead chose one reading for each. The maintainer reads them at gate 4:
+
+- The adapter sends a temperature only if the option `Llm.Temperature` has a value. It is a `double?` parameter of the adapter, apart from `LLMConfig.Temperature`.
+- The classifier of the host runs first. If it is absent or returns `None`, the default classifier decides. The chat adapter and the reranker follow the same order.
+- The test for a filtered reply comes before the test for an empty reply. A filtered reply with no text gives `RefusalException`.
+- The usage of a reply is recorded before the test that the JSON is an object, as upstream does.
+- The embedding adapter has one constructor for `Embedding<float>` and one for `Embedding<double>`. `ModelCallInfo.Model` is null for an embed call and for a rerank call, because neither has a route. The reranker model goes to `ChatOptions.ModelId`.
+
+Differences that the lead accepted by name under D39: GAPS F34, F35, and F36, the R4 row for a base URL with no `http` scheme, and one seeded defect of packet P3g that no test can see. With the defect, `LLMRuntime.set_tracer` sets the tracer of a shared client two times, and the second call changes nothing.
+
+The adversarial pass over the layer (Opus 5.5, high effort) said that each of the five readings is a fair reading of the design. It gave 1 important finding and 5 small ones, and the lead fixed each one:
+
+- The reranker used the classifier of the host with no default behind it, so a host classifier that returns `None` for status 429 gave `HttpRequestException` there and `RateLimitException` in the chat adapter. Both paths now use the host classifier first and then the default.
+- A rerank call set `ModelCallInfo.Model` to the reranker model, against the design text. It is null now.
+- `edge_e2` gave another `TypeError` text than Python for a list, a tuple, or a text plus a value of another type. It gives the Python text now, and eight literal cases from Python hold it.
+- The adapters had no test of the token rule, and a dropped token passed each test. Each fake host now records if the cancel of the caller reaches its token.
+- One comment named the wrong upstream client, and rule R4 had one sentence two times.
+
+Evidence that waits for a later layer:
+
+- Two tests of `test_jev_client.py` and one of `test_openai_decisions_client.py` wait for the unit `jev_client`, which is out of the MVP.
+- `tests/test_graphiti_configurable_prompts.py` waits for the `Graphiti` class of layer 9.
+- No test compares the time text of the debug line of `generate_embedding`, because `Py.TimeSeconds` reads the system clock.
+- No test reads the usage record of a reply that is not a JSON object through the adapter.
+
+Commands at the tip:
+
+- `scripts/check.sh --test`: `check: passed`, 10,855 tests.
+- `dotnet test --project tests/Port.Evaluation`: 10,462 tests, 0 failed, 0 skipped.
+- The seven recorders of the layer with `--check`: 189, 931, 159, 1,193, 553, and 1,213 cases, and the 2 fixture texts. Each one is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,206 passed, 0 unexpected, 0 bound and wrong. 56 ids left `expected-failures.txt`, and 793 stay. The pull request lists the ids.

@@ -80,8 +80,16 @@ internal static class PortServices
     /// </summary>
     internal static ILogger Logger(Type moduleClass) => LoggerFactory.CreateLogger(moduleClass);
 
-    /// <summary>Says what kind of failure an exception from a model call is (rule R4).</summary>
-    internal static ModelCallFailure ClassifyModelFailure(Exception error) => ModelFailureClassifier(error);
+    /// <summary>
+    /// Says what kind of failure an exception from a model call is (rule R4). The classifier of the
+    /// option runs first. If it says <see cref="ModelCallFailure.None"/>, the default classifier decides
+    /// (decision D31).
+    /// </summary>
+    internal static ModelCallFailure ClassifyModelFailure(Exception error)
+    {
+        var failure = ModelFailureClassifier(error);
+        return failure == ModelCallFailure.None ? DefaultClassifyModelFailure(error) : failure;
+    }
 
     /// <summary>
     /// The default classifier. It knows <see cref="HttpRequestException"/> only: status 429 is a rate
