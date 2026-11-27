@@ -246,7 +246,9 @@ public partial class DriverContractValuesTests
         var error = await CatchAsync(() => driver.TransactionAsync(
             async tx =>
             {
-                await source.CancelAsync();
+                // A fake cancels with Cancel(), which runs the callbacks of the token at once on the scheduler thread, as
+                // `task.cancel()` acts at one point of the loop in Python. CancelAsync runs them on the thread pool (RULES.md R25).
+                source.Cancel();
                 await tx.RunAsync("Q", new(), source.Token);
             },
             source.Token));
@@ -564,6 +566,9 @@ public partial class DriverContractValuesTests
         }
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("not used");
+
+        internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("not used");
     }
 

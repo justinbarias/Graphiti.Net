@@ -392,7 +392,9 @@ public class Neo4jSearchOperationsTests
             calls++;
             if (calls == cancelAfter)
             {
-                await cancelSource!.CancelAsync();
+                // A fake cancels with Cancel(), which runs the callbacks of the token at once on the scheduler thread, as
+                // `task.cancel()` acts at one point of the loop in Python. CancelAsync runs them on the thread pool (RULES.md R25).
+                cancelSource!.Cancel();
             }
 
             return (records, null, null);

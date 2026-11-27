@@ -48,7 +48,6 @@ The pull request of the layer that builds a feature also updates this table and 
 
 | Feature | Why verify cannot cover it now | Built by | Step that the skill gains |
 | --- | --- | --- | --- |
-| Maintenance, `utils.maintenance` | Its bodies are not ported. Its judge cases stay in `expected-failures.txt`. | Plan 0004, layer 7 | Step 3 and step 4 cover its cases and recorders. |
 | Ingestion | Not ported. No test ingests episodes in parallel. | Plan 0004, layer 8 | Step 5 gains the test that finds no lost update. |
 | The `Graphiti` class, `AddEpisodeAsync`, `SearchAsync` | Not ported. All 34 flow cases of the judge fail as not bound. | Plan 0004, layer 9 | Step 3 covers the flow cases. Step 5 gains `AddEpisodeAsync`, then `SearchAsync`, then a read of the graph. |
 | The quickstart in `examples/Quickstart` | The folder does not exist. It needs a real LLM key. | Plan 0005, task 4 | A step that runs the quickstart against Neo4j. |

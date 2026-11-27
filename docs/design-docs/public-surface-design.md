@@ -415,9 +415,20 @@ What the port reads from a definition, and where upstream reads it:
 - An optional field has the default `None`, and its schema is `anyOf` of the kind and `null`, as pydantic writes it for `str | None = Field(default=None, ...)`.
 - The five judge fixtures (`Person`, `Product`, `Company`, `Likes`, `WorksAt`) use only optional strings with a description. The judge pins their schema text through the flow cases.
 - The `title` of a field is pydantic's: the name with each `_` as a space, then Python `str.title()`. `home_city` gives `Home City`.
-- Pydantic writes `inspect.cleandoc` of the docstring into the schema, and `__doc__` holds the raw text. One `Description` serves both, so the two are equal only for a description of one paragraph with no indent. The documents say so. The five fixtures have one line each.
+- Pydantic writes `inspect.cleandoc` of the docstring into the schema, and `__doc__` holds the raw text. One `Description` serves both: the descriptor keeps the raw text for `__doc__`, and it writes `PyText.Cleandoc` of that text into the schema, as pydantic does.
 - A field kind outside the closed set is not possible in M1. The documents say so.
 - Inside ported code, a `type[BaseModel]` parameter for a custom type becomes the internal `GraphTypeDescriptor` that the definition builds. This answers the `type[BaseModel]` row of rulebook Part 3 and the three `attribute_utils` sites of rule R15.
+
+Layer 7 of plan 0004 built `GraphTypeDefinition`. This section gave no form for six points, and the lead chose one for each. The maintainer accepts or rejects each one at gate 4.
+
+| Point | Form that the lead chose |
+| --- | --- |
+| The names of the four list kinds of `GraphFieldKind` | `StringList`, `IntegerList`, `NumberList`, and `BooleanList` |
+| The type of `maxLength` | `int?` on `AddString` and on `GraphFieldDefinition.MaxLength` |
+| The default of `description` | `null` on `Create` and on each `Add*` |
+| A second `Add*` call | It returns a new definition. A definition never changes (D25). |
+| A field name that pydantic refuses at class creation | `Add*` throws `ArgumentException`: a name that starts with `_`, `model_config`, and the `model_dump` and `model_validate` members of `BaseModel` |
+| Equality of two definitions | The name and the description compare by value, and the field list by reference, as "Public records" says. The internal descriptor is not part of it. |
 
 ## The chat adapter
 

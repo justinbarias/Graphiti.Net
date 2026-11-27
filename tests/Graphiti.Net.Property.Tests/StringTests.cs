@@ -40,6 +40,12 @@ public class StringTests
     public void Capitalize_matches_Python() => CheckText("capitalize", c => PyText.Capitalize(Str(c, "s")));
 
     [Fact]
+    public void Title_matches_Python() => CheckText("title", c => PyText.Title(Text(c, "s")));
+
+    [Fact]
+    public void Cleandoc_matches_Python() => CheckText("cleandoc", c => PyText.Cleandoc(Text(c, "s")));
+
+    [Fact]
     public void IsUpper_matches_Python() => CheckBool("is_upper", c => PyText.IsUpper(Str(c, "s")));
 
     [Fact]

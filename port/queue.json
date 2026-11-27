@@ -1796,8 +1796,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/DedupHelpers.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. `_cached_shingles` is a `PyLruCache` whose field is internal for the test. Two covering cases stay listed under open item O4: `pure.dedupe.lsh_bands.strings` and `.tuple_input`. The recorder binds the name `set` to an insertion-ordered class and marks each case that depends on the hash seed."
     },
     {
       "order": 83,
@@ -1815,8 +1815,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/AttributeUtils.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. The aggregate cap runs in `Int128`. `_warned_invalid_env` is a `PyPatch`. R5: two warnings hold the text of an environment value and an attribute name, as in Python."
     },
     {
       "order": 84,
@@ -1851,8 +1851,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7b. R5: three warnings can hold model text, as in Python: `node_operations.py:1342` (30 characters of an entity name), `:525` and `:560` (the exception text of a lookup). GAPS F41: an int outside 64 bits in a reply throws. GAPS F33: six cancel points are in the `LateCancel` list. The trace paths are recorded in layer 8 (`record_resolution_trace.py`)."
     },
     {
       "order": 85,
@@ -1943,8 +1943,8 @@
         "logging"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/DanglingEndpoints.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. R5: one warning holds a count and a group id."
     },
     {
       "order": 89,
@@ -1963,8 +1963,8 @@
         "re"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/TemporalEdgeUtils.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. The three patterns follow rule R13, and the recording holds the edge cases of case mapping (U+017F, U+0130, U+0131, U+212A)."
     },
     {
       "order": 90,
@@ -2006,8 +2006,8 @@
         "typing_extensions"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/EdgeOperations.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7c. R5: the lines at `edge_operations.py:344`, `:743`, `:749`, and `:878` can hold text of the model reply, as in Python. Two upstream tests keep `TODO(port): O10`: `test_resolve_extracted_edges_merges_override_candidates` (async case 16 of `values/edge_operations.json` covers it) and `test_resolve_extracted_edges_forwards_clients_only_for_prompt_routing` (async cases 16 and 13). GAPS F33: 55 cancel points are in the `LateCancel` list. Two ported tests (`test_edge_type_signatures_map_*`) call no product code and go to the pruning rule. No input reaches the `max()` error near line 261. The trace paths are recorded in layer 8."
     },
     {
       "order": 91,
@@ -2063,8 +2063,8 @@
         "time"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/CombinedExtraction.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7d. R5: the warning of failed batch timestamps passes the exception, which can hold a value of the model reply. GAPS F33: one cancel point is in the `LateCancel` list."
     },
     {
       "order": 93,
@@ -2084,8 +2084,8 @@
         "typing_extensions"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "tests_pass",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. It has no pure case, so it waits for the flow cases of layer 9. The recording holds each query of `clear_data` and `retrieve_episodes`."
     },
     {
       "order": 94,
@@ -2122,8 +2122,8 @@
         "typing_extensions"
       ],
       "target": "src/Graphiti.Net/Core/Utils/BulkUtils.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packets P7e and P7g. The Neo4j branch of `execute_write_with_timeout` uses the session member of decision D52, with 23 tests on the real Neo4j. Two `TODO(port)` markers stay: the entity-node bulk query is a list on FalkorDB and Neptune (rule R24). Nine upstream tests of `test_bulk_utils.py` keep `TODO(port): O10`. Each one follows with the async case of `values/bulk_utils.json` that covers it: `test_dedupe_nodes_bulk_reuses_canonical_nodes` (32), `test_dedupe_nodes_bulk_merges_identity_matches_before_name_comparison` (34 and 59), `test_dedupe_nodes_bulk_uuid_map_respects_direction` (36), `test_dedupe_nodes_bulk_missing_canonical_falls_back` (58), `test_dedupe_edges_bulk_deduplicates_within_episode` (61), `test_dedupe_edges_bulk_merges_episode_provenance_for_duplicates` (39 and 63), `test_extract_nodes_and_edges_bulk_passes_edge_ontology_to_combined_extractor` (71), `test_extract_nodes_and_edges_bulk_passes_custom_instructions_to_extract_edges` (28), and `test_extract_nodes_and_edges_bulk_defaults_to_combined_extraction` (67). GAPS F33: 11 cancel points are in the `LateCancel` list, and one of them makes two more attempts than Python. GAPS F42, F43, and F46. Two wrong-type cases stay listed under open item O4: `_build_directed_uuid_map.wrong_type_short_pair` and `compress_uuid_map.wrong_type_short_pair`."
     },
     {
       "order": 95,
@@ -2254,8 +2254,8 @@
         "pydantic"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7d. GAPS F44 and F45: a reply value or a group id that is not a string throws at the read. A real client can return such a reply. GAPS F33: seven cancel points are in the `LateCancel` list. `test_build_communities_uses_configured_prompt_library` keeps `TODO(port): O10`, and async case 58 of `values/community_operations.json` covers it."
     },
     {
       "order": 101,

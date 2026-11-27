@@ -572,4 +572,45 @@ internal sealed class Neo4jSession : GraphDriverSession
         cancellationToken.ThrowIfCancellationRequested();
         await session.ExecuteWriteAsync(tx => Asyncio.OnLoopAsync(() => func(new Neo4jTransaction(tx))));
     }
+
+    // PORT: AsyncSession.execute_write of a work function that `unit_of_work(timeout=timeout)` marks (decision D52,
+    // open item O6). The timeout goes in the transaction configuration of Neo4j.Driver 6.5.1 (R9). The work function
+    // runs as in the member above.
+    internal override async Task ExecuteWriteAsync(
+        Func<Transaction, Task> func,
+        double timeout,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var txTimeout = TxTimeout(timeout);
+        await session.ExecuteWriteAsync(
+            tx => Asyncio.OnLoopAsync(() => func(new Neo4jTransaction(tx))),
+            b => b.WithTimeout(txTimeout));
+    }
+
+    // PORT: tx_timeout_as_ms of the Python driver (neo4j 6.1.0, neo4j/_async/io/_bolt.py:1052), which sends the
+    // timeout to the server in whole milliseconds. Python rounds half to even and sends 1 for a value in (0, 0.5 ms).
+    // Neo4j.Driver 6.5.1 rounds a TimeSpan up to the next millisecond, so the conversion makes a TimeSpan of whole
+    // milliseconds, and the driver sends the same number as Python. A negative value and nan raise ValueError
+    // (ArgumentException, R4), and an infinity raises OverflowError (OverflowException). Python sends a value up to
+    // 2**63 - 1 ms. A TimeSpan holds at most 922337203685477 ms (about 29,000 years): above that, this throws
+    // OverflowException, where Python sends the value.
+    private static TimeSpan TxTimeout(double timeout)
+    {
+        if (timeout < 0)
+        {
+            throw new ArgumentException("Timeout must be a positive number or 0.");
+        }
+
+        var ms = Py.Int(Math.Round(1000 * timeout, MidpointRounding.ToEven));
+        if (ms == 0 && timeout > 0)
+        {
+            // Special case for 0 < timeout < 0.5 ms.
+            // This would be rounded to 0 ms, but the server interprets this as
+            // infinite timeout. So we round to the smallest possible timeout: 1 ms.
+            ms = 1;
+        }
+
+        return TimeSpan.FromTicks(checked(ms * TimeSpan.TicksPerMillisecond));
+    }
 }

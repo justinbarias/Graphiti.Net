@@ -816,6 +816,9 @@ public partial class NodesValuesTests
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("not used");
+
+        internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("not used");
     }
 
     private sealed class FakeEmbedder(List<JsonObject> calls, string mode) : EmbedderClient
