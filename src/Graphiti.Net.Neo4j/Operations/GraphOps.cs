@@ -85,6 +85,7 @@ internal sealed class Neo4jGraphMaintenanceOperations : GraphMaintenanceOperatio
         CancellationToken cancellationToken = default)
     {
         var communityClusters = new List<List<EntityNode>>();
+        object? groupIdsValue = groupIds;
 
         if (groupIds is null)
         {
@@ -97,14 +98,13 @@ internal sealed class Neo4jGraphMaintenanceOperations : GraphMaintenanceOperatio
 """ + "\n                ",
                 new(),
                 cancellationToken);
-            // PORT: R6. The value is open data. None is a missing list, and a list reads as text items.
-            groupIds = groupIdValues.Count > 0
-                ? groupIdValues[0]["group_ids"] is null ? [] : [.. Py.AsList(groupIdValues[0]["group_ids"]).Select(Py.AsString)]
-                : [];
+            // PORT: R6. Python binds group_ids again to a value of a record, which is open data. The local holds it,
+            // and the loop below reads it with Py.Iter and passes each item on as it is.
+            groupIdsValue = groupIdValues.Count > 0 ? groupIdValues[0]["group_ids"] : new List<object?>();
         }
 
-        var resolvedGroupIds = groupIds ?? [];
-        foreach (var groupId in resolvedGroupIds)
+        var resolvedGroupIds = Py.Truthy(groupIdsValue) ? groupIdsValue : new List<object?>();
+        foreach (var groupId in Py.Iter(resolvedGroupIds))
         {
             var projection = new OrderedDictionary<string, List<Neighbor>>();
 
@@ -115,7 +115,7 @@ internal sealed class Neo4jGraphMaintenanceOperations : GraphMaintenanceOperatio
                 WHERE n.group_id IN $group_ids
                 RETURN
 """ + "\n                " + NodeDbQueries.GetEntityNodeReturnQuery(GraphProvider.Neo4j),
-                new OrderedDictionary<string, object?> { ["group_ids"] = new List<string> { groupId }, ["routing_"] = "r" },
+                new OrderedDictionary<string, object?> { ["group_ids"] = new List<object?> { groupId }, ["routing_"] = "r" },
                 cancellationToken);
             var nodes = nodeRecords.Select(RecordParsers.EntityNodeFromRecord).ToList();
 

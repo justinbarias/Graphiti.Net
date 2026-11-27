@@ -137,6 +137,8 @@ def record_sets(cls_name: str) -> dict[str, list[dict]]:
         'no_created_at': [{k: v for k, v in make('r-1', 'g').items() if k != 'created_at'}],
         'null_created_at': [{**make('r-1', 'g'), 'created_at': None}],
         'bad_date': [{**make('r-1', 'g'), 'created_at': 'garbage'}],
+        # two defects: the parser reads uuid first, so the error is a KeyError and not the error of the date
+        'no_uuid_bad_date': [{**{k: v for k, v in make('r-1', 'g').items() if k != 'uuid'}, 'created_at': 'not-a-date'}],
         'int_group_id': [{**make('r-1', 'g'), 'group_id': 5}],
         'second_bad': [make('r-1', 'g'), {**make('r-2', 'g'), 'uuid': None}],
     }

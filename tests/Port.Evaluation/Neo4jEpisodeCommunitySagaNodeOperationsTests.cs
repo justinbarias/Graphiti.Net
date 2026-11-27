@@ -284,6 +284,12 @@ public class Neo4jEpisodeCommunitySagaNodeOperationsTests
                                     return await ops.RetrieveEpisodesAsync(executor, referenceTime, cancellationToken: cancellationToken);
                                 }
 
+                                // group_ids and no saga argument: the default of saga decides the branch
+                                if (input.TryGetProperty("group_ids_only", out _))
+                                {
+                                    return await ops.RetrieveEpisodesAsync(executor, referenceTime, groupIds: Texts("group_ids_only"), cancellationToken: cancellationToken);
+                                }
+
                                 var groupIds = input.GetProperty("group_ids").ValueKind == JsonValueKind.Null ? null : Texts("group_ids");
                                 return await ops.RetrieveEpisodesAsync(
                                     executor, referenceTime, input.GetProperty("last_n").GetInt64(), groupIds, NullableText("source"), NullableText("saga"), cancellationToken);

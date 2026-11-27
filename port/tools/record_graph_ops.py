@@ -150,6 +150,11 @@ def cluster_cases(rng):
     case(None, one)
     case(None, {**one, 'group_records': [{'group_ids': ['g-1', 'g-1']}]})
     case(None, {**one, 'group_records': [{'group_ids': []}, {'group_ids': ['g-1']}]})
+    # a value of the record that is not a list of text: Python binds group_ids again to open data (rule R6)
+    group_nodes = {'a': [node_record('a1', 'Ann', 'a')], 'b': [node_record('b1', 'Ben', 'b')], '5': [], '': []}
+    group_edges = {'a1': [], 'b1': []}
+    for value in ('ab', '', [5], 0, [None]):
+        case(None, {'group_records': [{'group_ids': value}], 'nodes': group_nodes, 'edges': group_edges})
     # group ids given
     case([], one)
     case(['g-1'], empty)
@@ -285,6 +290,8 @@ def main() -> int:
             self.case = case
             self.events = events
             self.count = 0
+            self.in_flight = 0
+            self.max_in_flight = 0
 
         def respond(self, index, query, kwargs):
             graph = self.case.get('graph')
@@ -302,7 +309,15 @@ def main() -> int:
             raise AssertionError(query)
 
         async def execute_query(self, cypher_query_, **kwargs):
-            await asyncio.sleep(0)
+            self.in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self.in_flight)
+            try:
+                await asyncio.sleep(0)
+                return self.run_call(cypher_query_, kwargs)
+            finally:
+                self.in_flight -= 1
+
+        def run_call(self, cypher_query_, kwargs):
             index = self.count
             self.count += 1
             records = copy.deepcopy(self.respond(index, cypher_query_, kwargs))
@@ -415,6 +430,7 @@ def main() -> int:
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
             outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
         outcome['events'] = list(events)
+        outcome['max_in_flight'] = executor.max_in_flight
         results.append({'input': case, 'output': outcome})
 
     document = {

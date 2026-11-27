@@ -1,13 +1,15 @@
 // Evaluation test for graphiti_core/driver/neo4j/operations/graph_ops.py (port/RULES.md, R23, R25).
 // The recording is values/neo4j_graph_ops.json, which port/tools/record_graph_ops.py wrote from Python.
 // get_community_clusters runs label_propagation, which does not end for some graphs (upstream defect U11, GAPS F6).
-// The recording leaves out each graph for which Python does not end, and each case here has a time limit of 5 seconds.
+// The recording leaves out each graph for which Python does not end. Before each recorded cluster case, the test runs
+// label_propagation for the case on its own thread with a time limit of 5 seconds, and it fails the case if the call does not end.
 namespace Graphiti.Port.Evaluation;
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Graphiti.Core;
 using Graphiti.Core.Driver;
+using Graphiti.Core.Driver.Operations;
 using Graphiti.Internal;
 using Graphiti.Neo4j.Operations;
 using Graphiti.PyCompat;
@@ -27,20 +29,6 @@ public class Neo4jGraphOperationsTests
 
         return data;
     }
-
-    public static TheoryData<string> Methods() =>
-        [
-            "clear_data",
-            "clear_data_with_groups",
-            "build_indices_and_constraints",
-            "build_indices_and_constraints_delete_existing",
-            "delete_all_indexes",
-            "get_community_clusters",
-            "get_community_clusters_with_groups",
-            "determine_entity_community",
-            "get_mentioned_nodes",
-            "get_communities_by_nodes",
-        ];
 
     [Fact]
     public void The_recording_reaches_each_method_and_each_branch()
@@ -110,6 +98,11 @@ public class Neo4jGraphOperationsTests
         var executor = new FakeExecutor(events, responses, failAt);
         var operations = new Neo4jGraphMaintenanceOperations();
         var token = TestContext.Current.CancellationToken;
+
+        if (method == "get_community_clusters")
+        {
+            AssertLabelPropagationEnds(input);
+        }
 
         List<string>? GroupIds() => input.GetProperty("group_ids").ValueKind == JsonValueKind.Null
             ? null
@@ -226,6 +219,9 @@ public class Neo4jGraphOperationsTests
             }
         }
 
+        // The largest count of calls that ran at the same time (R25).
+        Assert.Equal(output.GetProperty("max_in_flight").GetInt32(), executor.MaxInFlight);
+
         // The calls and the log lines are one ordered list, so that a log line that moves across a call fails.
         Assert.Equal(expectedEvents.Count, events.Count);
         for (var i = 0; i < events.Count; i++)
@@ -249,15 +245,81 @@ public class Neo4jGraphOperationsTests
         }
     }
 
-    // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8).
+    // The number of awaited calls of each method for the scripted answers of ScriptedExecutor.
+    private static readonly Dictionary<string, int> CallCounts = new()
+    {
+        ["clear_data"] = 1,
+        ["clear_data_with_groups"] = 4,
+        ["build_indices_and_constraints"] = 31,
+        ["build_indices_and_constraints_delete_existing"] = 32,
+        ["delete_all_indexes"] = 1,
+        ["get_community_clusters"] = 5,
+        ["get_community_clusters_with_groups"] = 4,
+        ["determine_entity_community"] = 2,
+        ["get_mentioned_nodes"] = 1,
+        ["get_communities_by_nodes"] = 1,
+    };
+
+    public static TheoryData<string> Methods() => [.. CallCounts.Keys];
+
+    // One row for each call that follows the call k: the token is canceled while call k runs.
+    public static TheoryData<string, int> LaterCalls()
+    {
+        var data = new TheoryData<string, int>();
+        foreach (var (method, count) in CallCounts)
+        {
+            for (var k = 0; k < count - 1; k++)
+            {
+                data.Add(method, k);
+            }
+        }
+
+        return data;
+    }
+
+    // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8)
+    // and makes no call.
     [Theory]
     [MemberData(nameof(Methods))]
     public async Task Each_async_method_with_a_canceled_token_throws_OperationCanceledException(string method)
     {
         using var source = new CancellationTokenSource();
         await source.CancelAsync();
-        var token = source.Token;
-        var executor = new FakeExecutor([], [], -1);
+        var events = new List<Event>();
+        var executor = new ScriptedExecutor(events, source, -1);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(CallOf(method, executor, source.Token));
+        Assert.Empty(events);
+    }
+
+    // A test with no Python original: the token is canceled while call k runs. Call k is the last call that the fake records,
+    // and the method throws OperationCanceledException at each call that follows (R8). It must pass its token to each call.
+    [Theory]
+    [MemberData(nameof(LaterCalls))]
+    public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(string method, int k)
+    {
+        using var source = new CancellationTokenSource();
+        var events = new List<Event>();
+        var executor = new ScriptedExecutor(events, source, k);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(CallOf(method, executor, source.Token));
+        Assert.Equal(k + 1, events.Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(Methods))]
+    public async Task The_declared_count_of_calls_is_the_count_of_the_method(string method)
+    {
+        using var source = new CancellationTokenSource();
+        var events = new List<Event>();
+        var executor = new ScriptedExecutor(events, source, -1);
+
+        await CallOf(method, executor, source.Token)();
+        Assert.Equal(CallCounts[method], events.Count);
+    }
+
+    private static Func<Task> CallOf(string method, QueryExecutor executor, CancellationToken token)
+    {
         var operations = new Neo4jGraphMaintenanceOperations();
         var entity = new EntityNode { Uuid = "u", Name = "n", GroupId = "g" };
         var episode = new EpisodicNode
@@ -271,7 +333,7 @@ public class Neo4jGraphOperationsTests
             ValidAt = PyDateTime.FromIsoFormat("2024-01-01T00:00:00+00:00"),
         };
 
-        Func<Task> call = method switch
+        return method switch
         {
             "clear_data" => () => Asyncio.Run(() => operations.ClearDataAsync(executor, null, token)),
             "clear_data_with_groups" => () => Asyncio.Run(() => operations.ClearDataAsync(executor, ["g"], token)),
@@ -284,8 +346,90 @@ public class Neo4jGraphOperationsTests
             "get_mentioned_nodes" => () => Asyncio.Run(() => operations.GetMentionedNodesAsync(executor, [episode], token)),
             _ => () => Asyncio.Run(() => operations.GetCommunitiesByNodesAsync(executor, [entity], token)),
         };
+    }
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(call);
+    // The label propagation of each group of a recorded case, as get_community_clusters builds it. Python ends on each recorded
+    // graph, so a graph that does not end here is a difference from Python (upstream defect U11, GAPS F6). A synchronous loop
+    // has no token to stop it, and the test must not start the product call for it, because the call would hold the
+    // exclusive scheduler for the rest of the run. So the test runs the loop on its own background thread and waits 5 seconds
+    // for it. If the loop does not end, the thread stays busy until the test process ends, and the exclusive scheduler stays free.
+    private static void AssertLabelPropagationEnds(JsonElement input)
+    {
+        var graph = input.GetProperty("graph");
+        var groups = new List<string?>();
+        var source = input.GetProperty("group_ids");
+        if (source.ValueKind == JsonValueKind.Null)
+        {
+            source = graph.GetProperty("group_records").GetArrayLength() > 0
+                ? graph.GetProperty("group_records")[0].GetProperty("group_ids")
+                : default;
+        }
+
+        switch (source.ValueKind)
+        {
+            case JsonValueKind.String:
+                groups.AddRange(source.GetString()!.EnumerateRunes().Select(r => (string?)r.ToString()));
+                break;
+            case JsonValueKind.Array:
+                groups.AddRange(source.EnumerateArray().Select(g => g.ValueKind == JsonValueKind.String ? g.GetString() : null));
+                break;
+        }
+
+        var nodes = graph.GetProperty("nodes");
+        var edges = graph.GetProperty("edges");
+        foreach (var group in groups)
+        {
+            var projection = new OrderedDictionary<string, List<Neighbor>>();
+            try
+            {
+                if (group is not null && nodes.TryGetProperty(group, out var records))
+                {
+                    foreach (var record in records.EnumerateArray())
+                    {
+                        var uuid = record.GetProperty("uuid").GetString()!;
+                        var neighbors = new List<Neighbor>();
+                        if (edges.TryGetProperty(uuid, out var list))
+                        {
+                            foreach (var edge in list.EnumerateArray())
+                            {
+                                neighbors.Add(Neighbor.ModelValidate(new OrderedDictionary<string, object?>
+                                {
+                                    ["node_uuid"] = Read(edge.GetProperty("uuid")),
+                                    ["edge_count"] = Read(edge.GetProperty("count")),
+                                }));
+                            }
+                        }
+
+                        projection[uuid] = neighbors;
+                    }
+                }
+            }
+            catch (Exception e) when (e is KeyNotFoundException or InvalidOperationException or InvalidCastException or ValidationException)
+            {
+                // The product call ends with an error before label_propagation, as the recorder expects.
+                return;
+            }
+
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    GraphUtils.LabelPropagation(projection);
+                }
+                catch (Exception e) when (e is KeyNotFoundException or InvalidOperationException or InvalidCastException)
+                {
+                    // An error is a result that the recording keeps.
+                }
+            })
+            {
+                IsBackground = true,
+            };
+            thread.Start();
+            if (!thread.Join(5000))
+            {
+                Assert.Fail("label_propagation did not end within 5 seconds for a graph on which it ends in Python (upstream defect U11).");
+            }
+        }
     }
 
     private static int NonTerminatingLeftOut()
@@ -358,6 +502,46 @@ public class Neo4jGraphOperationsTests
     private sealed class FakeExecutor(List<Event> events, List<JsonElement> responses, int failAt) : QueryExecutor
     {
         private int count;
+        private int inFlight;
+
+        // The largest count of calls that ran at the same time.
+        internal int MaxInFlight { get; private set; }
+
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+            string cypherQuery,
+            OrderedDictionary<string, object?> parameters,
+            CancellationToken cancellationToken = default)
+        {
+            inFlight++;
+            MaxInFlight = Math.Max(MaxInFlight, inFlight);
+            try
+            {
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                var index = count++;
+                events.Add(new Event("call", cypherQuery, [.. parameters.Keys], [.. parameters.Values.Select(Encode)], null, null));
+                if (failAt == index)
+                {
+                    throw new InvalidOperationException("boom");
+                }
+
+                // The records come from the recording, one list for each call, and each call reads them new.
+                var records = index < responses.Count
+                    ? responses[index].EnumerateArray().Select(r => (OrderedDictionary<string, object?>)Read(r)!).ToList()
+                    : [];
+                return (records, null, null);
+            }
+            finally
+            {
+                inFlight--;
+            }
+        }
+    }
+
+    // A fake with scripted answers for the cancellation tests. It cancels the source while call cancelAt runs, after it records the call.
+    private sealed class ScriptedExecutor(List<Event> events, CancellationTokenSource source, int cancelAt) : QueryExecutor
+    {
+        private int count;
 
         internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
@@ -368,16 +552,44 @@ public class Neo4jGraphOperationsTests
             cancellationToken.ThrowIfCancellationRequested();
             var index = count++;
             events.Add(new Event("call", cypherQuery, [.. parameters.Keys], [.. parameters.Values.Select(Encode)], null, null));
-            if (failAt == index)
+            if (index == cancelAt)
             {
-                throw new InvalidOperationException("boom");
+                await source.CancelAsync();
             }
 
-            // The records come from the recording, one list for each call, and each call reads them new.
-            var records = index < responses.Count
-                ? responses[index].EnumerateArray().Select(r => (OrderedDictionary<string, object?>)Read(r)!).ToList()
-                : [];
-            return (records, null, null);
+            return (Answer(cypherQuery, parameters), null, null);
+        }
+
+        private static OrderedDictionary<string, object?> NodeRecord(string uuid) => new()
+        {
+            ["uuid"] = uuid,
+            ["name"] = uuid,
+            ["group_id"] = "g",
+            ["created_at"] = "2024-05-06T07:08:09+00:00",
+            ["summary"] = "about",
+            ["labels"] = new List<object?> { "Entity", "Entity_g" },
+            ["attributes"] = new OrderedDictionary<string, object?>(),
+        };
+
+        // Two entity nodes with one edge between them, in one group: the graph of get_community_clusters, which ends.
+        private static List<OrderedDictionary<string, object?>> Answer(string query, OrderedDictionary<string, object?> parameters)
+        {
+            if (query.Contains("collect(DISTINCT n.group_id)", StringComparison.Ordinal))
+            {
+                return [new() { ["group_ids"] = new List<object?> { "g" } }];
+            }
+
+            if (parameters.ContainsKey("group_id") && parameters.ContainsKey("uuid"))
+            {
+                return [new() { ["uuid"] = (string)parameters["uuid"]! == "a" ? "b" : "a", ["count"] = 1L }];
+            }
+
+            if (query.Contains("WHERE n.uuid IN $uuids", StringComparison.Ordinal) || (query.Contains("n.group_id IN $group_ids", StringComparison.Ordinal) && query.Contains("RETURN", StringComparison.Ordinal)))
+            {
+                return [NodeRecord("a"), NodeRecord("b")];
+            }
+
+            return [];
         }
     }
 

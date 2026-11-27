@@ -148,6 +148,7 @@ def episode_record_sets():
         [episode_record(name=None)],
         [episode_record(created_at=0)],
         [episode_record(created_at='not-a-date')],
+        [episode_record(uuid=Ellipsis, created_at='not-a-date')],
         [episode_record(extra='ignored', source='text')],
         [good, episode_record(valid_at=None)],
     ]
@@ -169,6 +170,7 @@ def community_record_sets():
         [community_record(summary=Ellipsis)],
         [community_record(name=None)],
         [community_record(created_at='not-a-date')],
+        [community_record(uuid=Ellipsis, created_at='not-a-date')],
         [community_record(extra='ignored')],
     ]
 
@@ -186,6 +188,8 @@ def saga_record_sets():
         [saga_record(uuid=Ellipsis)],
         [saga_record(name=None)],
         [saga_record(created_at='not-a-date')],
+        # two defects: the parser reads uuid first, so the error is a KeyError and not the error of the date
+        [saga_record(uuid=Ellipsis, created_at='not-a-date')],
         [saga_record(created_at=0)],
         [saga_record(extra='ignored')],
     ]
@@ -258,6 +262,8 @@ def cases():
         add('episode', 'get_by_entity_node_uuid', uuid='n-1', records=rec)
     add('episode', 'retrieve_episodes', defaults=True, reference_time=REF_TIME, records=[records[1][0]])
     add('episode', 'retrieve_episodes', defaults=True, reference_time=REF_TIME_NAIVE, records=[])
+    # group_ids and no saga argument: the default of saga decides the branch
+    add('episode', 'retrieve_episodes', group_ids_only=['g-1'], reference_time=REF_TIME, records=[records[1][0]])
     for last_n in (5, 0):
         for group_ids in (None, [], ['g-1'], ['g-1', 'g-2'], ['']):
             for source in (None, '', 'message'):
@@ -384,7 +390,7 @@ def main() -> int:
         ops = operations[module]
         cls = node_class[module]
         fn = getattr(ops, method)
-        optional = not case.get('defaults')
+        optional = not case.get('defaults') and 'group_ids_only' not in case
         if method in ('save', 'delete'):
             kwargs = {'tx': tx} if optional else {}
             return await fn(executor, cls(**decode(case['node'])), **kwargs)
@@ -407,6 +413,8 @@ def main() -> int:
                 if optional
                 else {}
             )
+            if 'group_ids_only' in case:
+                kwargs = {'group_ids': case['group_ids_only']}
             return await fn(executor, decode(case['reference_time']), **kwargs)
         node = cls(**decode(case['node']))
         await fn(executor, node)

@@ -54,6 +54,7 @@ internal static partial class SagaNodeOps
 
 internal sealed class Neo4jSagaNodeOperations : SagaNodeOperations
 {
+    // PORT: upstream defect U2 (R21, GAPS U2). The save query lacks five parameters.
     internal override async Task SaveAsync(
         QueryExecutor executor,
         SagaNode node,
@@ -80,6 +81,7 @@ internal sealed class Neo4jSagaNodeOperations : SagaNodeOperations
         SagaNodeOps.Log.SavedSagaNodeToGraph(SagaNodeOps.Logger, node.Uuid);
     }
 
+    // PORT: upstream defect U2 (R21, GAPS U2). The save query lacks five parameters.
     internal override async Task SaveBulkAsync(
         QueryExecutor executor,
         List<SagaNode> nodes,
@@ -115,6 +117,7 @@ internal sealed class Neo4jSagaNodeOperations : SagaNodeOperations
         SagaNodeOps.Log.DeletedNode(SagaNodeOps.Logger, node.Uuid);
     }
 
+    // PORT: upstream defect U1 (R21, GAPS U1). The batched delete fails in a transaction.
     internal override async Task DeleteByGroupIdAsync(
         QueryExecutor executor,
         string groupId,
@@ -138,6 +141,7 @@ internal sealed class Neo4jSagaNodeOperations : SagaNodeOperations
         }
     }
 
+    // PORT: upstream defect U1 (R21, GAPS U1). The batched delete fails in a transaction.
     internal override async Task DeleteByUuidsAsync(
         QueryExecutor executor,
         List<string> uuids,

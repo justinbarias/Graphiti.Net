@@ -146,6 +146,7 @@ internal sealed class Neo4jEntityNodeOperations : EntityNodeOperations
         EntityNodeOps.Log.DeletedNode(EntityNodeOps.Logger, node.Uuid);
     }
 
+    // PORT: upstream defect U1 (R21, GAPS U1). The batched delete fails in a transaction.
     internal override async Task DeleteByGroupIdAsync(
         QueryExecutor executor,
         string groupId,
@@ -169,6 +170,7 @@ internal sealed class Neo4jEntityNodeOperations : EntityNodeOperations
         }
     }
 
+    // PORT: upstream defect U1 (R21, GAPS U1). The batched delete fails in a transaction.
     internal override async Task DeleteByUuidsAsync(
         QueryExecutor executor,
         List<string> uuids,
