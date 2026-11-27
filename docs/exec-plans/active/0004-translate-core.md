@@ -438,8 +438,8 @@ Evidence that waits for a later layer:
 
 Commands at the tip:
 
-- `scripts/check.sh --test`: `check: passed`, 15,649 tests.
-- `dotnet test --project tests/Port.Evaluation`: 15,194 tests, 0 failed, 0 skipped.
+- `scripts/check.sh --test`: `check: passed`, 15,775 tests.
+- `dotnet test --project tests/Port.Evaluation`: 15,320 tests, 0 failed, 0 skipped.
 - `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 63 tests, 0 failed, 0 skipped.
 - The five recorders of the layer with `--check`, each one current: 510 cases (the configuration, the recipes, and the helpers), 1,322 (`search_utils`), 432 (the decorator), 172 (`search`) with the 153 points of the cancel grid, and the end-to-end values of the recipes on Neo4j.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,375 passed, 0 unexpected, 0 bound and wrong. 146 ids left `expected-failures.txt`, and 624 stay. The pull request lists the ids.
