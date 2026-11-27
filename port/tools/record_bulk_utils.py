@@ -38,8 +38,7 @@ insertion order and puts `Entity` first, which is the order of the port. It bind
 attribute_utils, and edge_operations, and the EntityNode of node_operations, as the recorders of packets P7a, P7b, and
 P7c do.
 
-Paths that the recording does not reach, because the port throws there at the start commit:
-- extract_nodes_and_edges_bulk with combined extraction and at least one episode (combined_extraction is packet P7d).
+Path that the recording does not reach, because the port throws there (R24):
 - a Cypher bulk query of an entity node on FalkorDB or Neptune, which is a list of queries.
 
 Packet P7g (decision D52, open item O6) adds the cases of timeout_cases at the end, so that the index of each earlier
@@ -48,6 +47,13 @@ provider, with a work function that returns and one that raises. The session rec
 that unit_of_work(timeout=...) of the neo4j package puts on the work function, and None for a plain work function. The
 limits are floats (7.5, 2.5, 0.0, -1.0), because the port takes a double: an int limit reaches the fake as an int.
 
+The fix round of packet P7e (the two reviews) adds the cases of review_cases() at the end: a write whose embedder sleeps
+past the limit (the work gets the token of the limit, and the session records a rollback with CancelledError), the
+query_timeout_ms of the session on each path (the `close` fake records it too), a limit of 1.0019 and a limit below 1 ms,
+two edges of one episode, the fallback to the canonical node, an identity match whose second value differs, the
+similarity limit (0.6 and 0.55), the group of each episode in the separate extraction, episodes with another content and
+another valid_at, an `IndexError` of dedupe_nodes_bulk, and one call of each method with each optional argument left out.
+
 It writes tests/Port.Evaluation/values/bulk_utils.json. --check writes nothing and exits 1 if the file differs from
 what the run would write. The tool needs Python 3.12 and the pinned upstream in the folder of the variable
 GRAPHITI_UPSTREAM, or .upstream/graphiti. It changes nothing there. Nothing here uses the network.
@@ -55,13 +61,16 @@ GRAPHITI_UPSTREAM, or .upstream/graphiti. It changes nothing there. Nothing here
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 import logging
+import math
 import os
 import random
 import re
 import sys
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -194,6 +203,7 @@ def pair_inputs() -> list[list[list[str]]]:
         [['b', 'a'], ['a', 'b']],
         [['a', 'a']],
         [['Z', 'a'], ['é', '\U0001F600'], ['\U0001F600', 'Z']],
+        [['\uff21', '\U0001F600']],  # U+FF21 sorts above U+1F600 in UTF-16 order, and below it by code point
     ]
     generated = []
     for _ in range(60):
@@ -497,6 +507,89 @@ def timeout_cases() -> list[dict]:
     return cases
 
 
+def review_cases() -> list[dict]:
+    """The cases of the fix round of packet P7e. They come last, so that the index of each earlier case stays."""
+    later = lambda month: datetime(2025, month, month, tzinfo=timezone.utc)  # noqa: E731
+    varied = [ep('ep1'), ep('ep2', content='Second episode text.', valid_at=later(2)),
+              ep('ep3', content='Third episode, with Ally J.', valid_at=later(3))]
+    plain = [ep('ep1'), ep('ep2'), ep('ep3')]
+
+    # The write: a limit that the work must see, the value of query_timeout_ms, and a limit below one millisecond.
+    write = {'fn': 'add_nodes_and_edges_bulk', 'episodes': [ep('ep1')], 'episodic_edges': [],
+             'nodes': [node('n-plain', 'Plain Node', ['Entity'])], 'edges': [], 'ops': False, 'provider': 'relate',
+             'timeout_session': True}
+    cases = [
+        {**write, 'write_timeout': 0.2, 'slow_embed': True},
+        {**write, 'write_timeout': 1.0019},
+        {**write, 'write_timeout': 0.0005, 'block_write': True},
+    ]
+
+    # dedupe_nodes_bulk
+    stored_alice = node('s-alice', 'Alice Johnson', ['Entity', 'Person'], summary='Stored Alice.')
+    nodes_base = dedupe_node_cases()[0]
+    identity = copy.deepcopy(dedupe_node_cases()[2])
+    identity['nodes'][1][0]['attributes']['email'] = ' shared@example.com '
+    varied_nodes = copy.deepcopy(dedupe_node_cases()[4])
+    varied_nodes['episodes'] = varied
+    cases += [
+        {**nodes_base, 'nodes': [[node('a1', 'Alice Johnson')], []], 'episodes': plain[:1]},
+        {**nodes_base, 'nodes': [[node('a1', 'alice johnson')], [node('a1', 'Alice Johnson')]], 'episodes': plain[:2],
+         'exact': [stored_alice]},
+        identity,
+        varied_nodes,
+    ]
+
+    # dedupe_edges_bulk
+    edges_base = dedupe_edge_cases()[0]
+    limit_vectors = {'Red apples': [1.0, 0.0], 'Blue sky': [0.6, 0.8], 'Green leaf': [1.0, 0.0],
+                     'Dark night': [0.55, math.sqrt(1 - 0.55 ** 2)]}
+    varied_edges = [
+        [edge('d-1', 'n-a', 'n-b', 'Alice works at Acme', episodes=['ep1'])],
+        [edge('d-2', 'n-a', 'n-b', 'Alice is employed at Acme', episodes=[])],
+        [edge('d-3', 'n-a', 'n-b', 'Acme employs Alice', episodes=[])],
+    ]
+    cases += [
+        {**edges_base, 'edges': [[edge('w-1', 'n-a', 'n-b', 'Alice likes tea', episodes=['ep1']),
+                                  edge('w-2', 'n-a', 'n-b', 'Alice likes coffee', episodes=['ep1'])]],
+         'replies': [], 'vectors': {}, 'episodes': plain[:1]},
+        {**edges_base, 'edges': [[edge('l-1', 'n-a', 'n-b', 'Red apples', episodes=['ep1']),
+                                  edge('l-2', 'n-a', 'n-b', 'Blue sky', episodes=['ep1']),
+                                  edge('l-3', 'n-c', 'n-d', 'Green leaf', episodes=['ep1']),
+                                  edge('l-4', 'n-c', 'n-d', 'Dark night', episodes=['ep1'])]],
+         'replies': [], 'vectors': limit_vectors, 'episodes': plain[:1]},
+        {**edges_base, 'edges': varied_edges, 'episodes': varied, 'vectors': {},
+         'replies': [resolve_reply('Alice is employed at Acme', [0]), resolve_reply('Acme employs Alice', [1])]},
+    ]
+
+    # The group of each episode in the separate extraction.
+    extract = extract_cases()[0]
+    combined_replies = [
+        reply('extract_nodes_and_edges.extract_message', 'Alice Johnson works', {
+            'extracted_entities': [{'name': 'Alice Johnson', 'entity_type_id': 0}, {'name': 'Acme', 'entity_type_id': 0}],
+            'edges': [{'source_entity_name': 'Alice Johnson', 'target_entity_name': 'Acme', 'relation_type': 'WORKS_AT',
+                       'fact': 'Alice Johnson works at Acme', 'episode_indices': [0]}]}),
+        reply('extract_nodes_and_edges.extract_message', '', {'extracted_entities': [], 'edges': []}),
+        reply('extract_edges.extract_timestamps_batch', '', {'timestamps': [{'valid_at': None, 'invalid_at': None}]}),
+    ]
+    groups = [[ep('ep1'), []], [ep('ep2', group_id='h', content='Bob knows Alice Johnson.'), [ep('ep0', content='Earlier.')]]]
+    cases += [
+        {**extract, 'episode_tuples': groups},
+        # One call of each method with each optional argument left out.
+        {**retrieve_cases()[0], 'defaults': True},
+        {**write, 'provider': 'neo4j', 'timeout_session': False, 'write_timeout': None, 'defaults': True},
+        {**extract, 'replies': combined_replies + extract['replies'], 'defaults': True},
+        {**extract, 'replies': combined_replies + extract['replies'], 'fn': 'extract_nodes_and_edges_bulk_combined',
+         'defaults': True},
+        {**extract, 'fn': 'extract_nodes_and_edges_bulk_separate', 'defaults': True},
+        {**nodes_base, 'defaults': True},
+        # The combined extraction with each argument: the ontology, the exclusion, the strict flag, and the instructions.
+        {**extract, 'combined': True, 'episode_tuples': [[ep('ep1'), []]], 'entity_types': ['Person', 'Company'],
+         'edge_types': ['WORKS_AT'], 'excluded': ['Company'], 'instructions': 'Prefer full names.', 'strict': True,
+         'replies': combined_replies},
+    ]
+    return cases
+
+
 async def run_case(case: dict, mods) -> dict:
     (bu, EntityEdge, EntityNode, EpisodicNode, EpisodicEdge, GraphitiClients, GraphProvider, default_library, models,
      GraphOperationsInterface, SearchInterface) = mods
@@ -548,6 +641,10 @@ async def run_case(case: dict, mods) -> dict:
 
     class FakeEmbedder:
         async def create(self, input_data):
+            if case.get('slow_embed'):
+                # A call that sleeps past the limit of the write and gives up when the limit cancels it.
+                await enter('embed_start', {'input': list(input_data)})
+                await asyncio.sleep(30)
             await enter('embed', {'input': list(input_data)})
             return vector(input_data[0])
 
@@ -620,12 +717,22 @@ async def run_case(case: dict, mods) -> dict:
     class FakeSession:
         async def execute_write(self, func, *args, **kwargs):
             # `timeout` is the attribute that unit_of_work(timeout=...) puts on the work function (Neo4j branch).
-            await enter('execute_write', {'query_timeout_ms': getattr(self, 'query_timeout_ms', None),
-                                          'timeout': getattr(func, 'timeout', None)})
-            return await func(FakeTx(), *args, **kwargs)
+            record = {'query_timeout_ms': getattr(self, 'query_timeout_ms', None),
+                      'timeout': getattr(func, 'timeout', None)}
+            if case.get('block_write'):
+                # The call records at once and then waits for the limit to cancel it, so that a limit below one
+                # millisecond cannot race the record.
+                events.append({'kind': 'execute_write', **record})
+                await asyncio.Event().wait()
+            await enter('execute_write', record)
+            try:
+                return await func(FakeTx(), *args, **kwargs)
+            except BaseException as error:
+                events.append({'kind': 'rollback', 'error': type(error).__name__})
+                raise
 
         async def close(self):
-            await enter('close', {}, counted=False)
+            await enter('close', {'query_timeout_ms': getattr(self, 'query_timeout_ms', None)}, counted=False)
 
     class TimeoutSession(FakeSession):
         query_timeout_ms = None
@@ -688,8 +795,11 @@ async def run_case(case: dict, mods) -> dict:
         if fn == 'add_nodes_and_edges_bulk_tx':
             await bu.add_nodes_and_edges_bulk_tx(FakeTx(), episodes, episodic_edges, nodes, edges, embedder, driver)
         else:
-            await bu.add_nodes_and_edges_bulk(driver, episodes, episodic_edges, nodes, edges, embedder,
-                                              write_timeout=case['write_timeout'])
+            if case.get('defaults'):
+                await bu.add_nodes_and_edges_bulk(driver, episodes, episodic_edges, nodes, edges, embedder)
+            else:
+                await bu.add_nodes_and_edges_bulk(driver, episodes, episodic_edges, nodes, edges, embedder,
+                                                  write_timeout=case['write_timeout'])
         return {'nodes': [node_view(n) for n in nodes], 'edges': [edge_view(e) for e in edges]}
     if fn == 'execute_write_with_timeout':
         async def work(tx, value):
@@ -703,22 +813,35 @@ async def run_case(case: dict, mods) -> dict:
         return None
     if fn == 'retrieve_previous_episodes_bulk':
         episodes = [EpisodicNode(**decode(e)) for e in case['episodes']]
-        result = await bu.retrieve_previous_episodes_bulk(driver, episodes, max_coroutines=case['max_coroutines'])
+        if case.get('defaults'):
+            result = await bu.retrieve_previous_episodes_bulk(driver, episodes)
+        else:
+            result = await bu.retrieve_previous_episodes_bulk(driver, episodes, max_coroutines=case['max_coroutines'])
         return {'tuples': [[e.uuid, [p.uuid for p in previous]] for e, previous in result]}
-    if fn == 'extract_nodes_and_edges_bulk':
-        nodes_bulk, edges_bulk = await bu.extract_nodes_and_edges_bulk(
-            clients, tuples_of(case['episode_tuples']), type_map, entity_types=types_of(case['entity_types']),
-            excluded_entity_types=case['excluded'], edge_types=types_of(case['edge_types']),
-            custom_extraction_instructions=case['instructions'], use_combined_extraction=case['combined'],
-            strict_edge_types=case['strict'])
+    if fn in ('extract_nodes_and_edges_bulk', 'extract_nodes_and_edges_bulk_combined',
+              'extract_nodes_and_edges_bulk_separate'):
+        if case.get('defaults'):
+            target = {'extract_nodes_and_edges_bulk': bu.extract_nodes_and_edges_bulk,
+                      'extract_nodes_and_edges_bulk_combined': bu._extract_nodes_and_edges_bulk_combined,
+                      'extract_nodes_and_edges_bulk_separate': bu._extract_nodes_and_edges_bulk_separate}[fn]
+            nodes_bulk, edges_bulk = await target(clients, tuples_of(case['episode_tuples']), type_map)
+        else:
+            nodes_bulk, edges_bulk = await bu.extract_nodes_and_edges_bulk(
+                clients, tuples_of(case['episode_tuples']), type_map, entity_types=types_of(case['entity_types']),
+                excluded_entity_types=case['excluded'], edge_types=types_of(case['edge_types']),
+                custom_extraction_instructions=case['instructions'], use_combined_extraction=case['combined'],
+                strict_edge_types=case['strict'])
         return {'nodes': [[node_view(n) for n in nodes] for nodes in nodes_bulk],
                 'edges': [[edge_view(e) for e in edges] for edges in edges_bulk]}
     if fn == 'dedupe_nodes_bulk':
         extracted = [nodes_of(items) for items in case['nodes']]
         episode_tuples = [(EpisodicNode(**decode(e)), []) for e in case['episodes']]
-        by_episode, uuid_map = await bu.dedupe_nodes_bulk(
-            clients, extracted, episode_tuples, entity_types=types_of(case['entity_types']),
-            identity_properties=case['identity_properties'], trace=None)
+        if case.get('defaults'):
+            by_episode, uuid_map = await bu.dedupe_nodes_bulk(clients, extracted, episode_tuples)
+        else:
+            by_episode, uuid_map = await bu.dedupe_nodes_bulk(
+                clients, extracted, episode_tuples, entity_types=types_of(case['entity_types']),
+                identity_properties=case['identity_properties'], trace=None)
         return {'by_episode': [[k, [node_view(n) for n in v]] for k, v in by_episode.items()],
                 'uuid_map': [[k, v] for k, v in uuid_map.items()],
                 'extracted': [[node_view(n) for n in items] for items in extracted]}
@@ -735,7 +858,7 @@ async def run_case(case: dict, mods) -> dict:
 def record_async(mods) -> list[dict]:
     out = []
     for case in (write_cases() + retrieve_cases() + extract_cases() + dedupe_node_cases() + dedupe_edge_cases()
-                 + timeout_cases()):
+                 + timeout_cases() + review_cases()):
         events.clear()
         state.update(in_flight=0, max_in_flight=0, count=0)
         try:
@@ -757,6 +880,9 @@ def main() -> int:
         raise SystemExit(f'Python 3.12 is needed, and this is {sys.version.split()[0]}')
     sys.path.insert(0, str(UPSTREAM))
     os.environ.pop('GRAPHITI_ATTRIBUTE_MAX_LENGTH', None)
+    # dedupe_nodes_bulk builds its first coroutine and then raises IndexError for the second one (the case with more node
+    # lists than episode tuples), so the first coroutine is never awaited. Python warns of it, as it does for upstream.
+    warnings.filterwarnings('ignore', message=r"coroutine '.*' was never awaited", category=RuntimeWarning)
     from pydantic import BaseModel, Field, create_model
 
     import graphiti_core

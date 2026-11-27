@@ -146,7 +146,7 @@ public sealed partial class WriteTimeoutOnNeo4jTests(Neo4jSidecar neo4j) : IAsyn
         await Asyncio.Run(() => BulkUtils.ExecuteWriteWithTimeoutAsync(
             driver,
             30.0,
-            tx => tx.RunAsync("CREATE (:WriteTimeoutProbe {group_id: $g, kind: 'inside'})", new() { ["g"] = group }, Ct),
+            (tx, _) => tx.RunAsync("CREATE (:WriteTimeoutProbe {group_id: $g, kind: 'inside'})", new() { ["g"] = group }, Ct),
             Ct));
 
         Assert.Equal([30_000L], begins.TxTimeouts());
@@ -187,7 +187,7 @@ public sealed partial class WriteTimeoutOnNeo4jTests(Neo4jSidecar neo4j) : IAsyn
             var error = await Assert.ThrowsAsync<ClientException>(() => Asyncio.Run(() => BulkUtils.ExecuteWriteWithTimeoutAsync(
                 driver,
                 1.0,
-                async tx =>
+                async (tx, _) =>
                 {
                     attempts++;
                     await tx.RunAsync("CREATE (:WriteTimeoutProbe {group_id: $g, kind: 'new'})", new() { ["g"] = group }, Ct);

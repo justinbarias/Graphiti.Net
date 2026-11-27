@@ -18,6 +18,7 @@ limitations under the License.
 namespace Graphiti.Core.Utils;
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Embedder;
 using Graphiti.Core.Ingestion;
@@ -184,12 +185,12 @@ internal static partial class BulkUtils
     {
         if (writeTimeout is not null)
         {
-            // PORT: the extra arguments of Python are closed over by the work function (R9). It takes the token of
-            // the call that runs it.
+            // PORT: the extra arguments of Python are closed over by the work function (R9). It takes the token that
+            // the call gives it: the token of the limit on a provider other than Neo4j.
             await ExecuteWriteWithTimeoutAsync(
                 driver,
                 writeTimeout.Value,
-                tx => AddNodesAndEdgesBulkTxAsync(
+                (tx, token) => AddNodesAndEdgesBulkTxAsync(
                     tx,
                     episodicNodes,
                     episodicEdges,
@@ -197,7 +198,7 @@ internal static partial class BulkUtils
                     entityEdges,
                     embedder,
                     driver: driver,
-                    cancellationToken: cancellationToken),
+                    cancellationToken: token),
                 cancellationToken);
             return;
         }
@@ -229,6 +230,9 @@ internal static partial class BulkUtils
     // Decision D52 closes open item O6: `unit_of_work(timeout=timeout)(func)` is the session write that takes the
     // timeout in seconds as a parameter. Open item O9 (R8) still holds for the asyncio.wait_for branch: its budget does
     // not hold for a session call that takes no token.
+    // PORT: Python cancels the task of the work at the limit. The port gives the work function the token of the limit
+    // (R8), so a call of the work that reads its token ends at the limit. On Neo4j the server holds the limit, and the
+    // work gets the token of the call.
 
     /// <summary>
     /// Run a write function in a new session with a time limit in seconds.
@@ -242,7 +246,7 @@ internal static partial class BulkUtils
     internal static async Task ExecuteWriteWithTimeoutAsync(
         GraphDriver graphDriver,
         double timeout,
-        Func<Transaction, Task> func,
+        Func<Transaction, CancellationToken, Task> func,
         CancellationToken cancellationToken = default)
     {
         var session = graphDriver.Session();
@@ -250,7 +254,7 @@ internal static partial class BulkUtils
         {
             if (graphDriver.Provider == GraphProvider.Neo4j)
             {
-                await session.ExecuteWriteAsync(func, timeout, cancellationToken);
+                await session.ExecuteWriteAsync(tx => func(tx, cancellationToken), timeout, cancellationToken);
                 return;
             }
 
@@ -260,7 +264,7 @@ internal static partial class BulkUtils
             }
 
             // PORT: asyncio.wait_for (R8). The limit holds only for a session call that reads its token (open item O9).
-            await Asyncio.WaitForAsync(token => session.ExecuteWriteAsync(func, token), timeout, PortServices.Time, cancellationToken);
+            await Asyncio.WaitForAsync(token => session.ExecuteWriteAsync(tx => func(tx, token), token), timeout, PortServices.Time, cancellationToken);
         }
         finally
         {
@@ -453,7 +457,13 @@ internal static partial class BulkUtils
         }
 
         // PORT: the query builder returns `str | Any` (object?), and tx.run takes the text, as EntityNodeOps reads it.
-        var query = Py.AsString(NodeDbQueries.GetEntityNodeUpdateBulkQuery(driver.Provider, nodes));
+        if (NodeDbQueries.GetEntityNodeUpdateBulkQuery(driver.Provider, nodes) is not string query)
+        {
+            // TODO(port): no rule for a list of queries in tx.run. On FalkorDB and Neptune the query builder returns a
+            // list, Python passes it to tx.run, and the port has no transaction that takes a list (D10).
+            throw new NotSupportedException("TODO(port): no rule for a list of queries in tx.run");
+        }
+
         await tx.RunAsync(query, new OrderedDictionary<string, object?> { ["nodes"] = nodes }, cancellationToken);
     }
 
@@ -502,8 +512,15 @@ internal static partial class BulkUtils
                 NodeDbQueries.GetEpisodeNodeSaveBulkQuery(driver.Provider),
                 new OrderedDictionary<string, object?> { ["episodes"] = episodes },
                 cancellationToken);
+            if (NodeDbQueries.GetEntityNodeSaveBulkQuery(driver.Provider, nodes) is not string nodeQuery)
+            {
+                // TODO(port): no rule for a list of queries in tx.run. On FalkorDB and Neptune the query builder returns
+                // a list, Python passes it to tx.run, and the port has no transaction that takes a list (D10).
+                throw new NotSupportedException("TODO(port): no rule for a list of queries in tx.run");
+            }
+
             await tx.RunAsync(
-                Py.AsString(NodeDbQueries.GetEntityNodeSaveBulkQuery(driver.Provider, nodes)),
+                nodeQuery,
                 new OrderedDictionary<string, object?> { ["nodes"] = nodes },
                 cancellationToken);
             await tx.RunAsync(
@@ -704,10 +721,13 @@ internal static partial class BulkUtils
         var firstPassResults = await Helpers.SemaphoreGatherAsync(
             [
                 .. extractedNodes.Index().Select<(int, List<EntityNode>), Func<Task<(List<EntityNode>, OrderedDictionary<string, string>, List<(EntityNode, EntityNode)>)>>>(
-                    item => () => ResolveNodesAsync(
-                        item.Item2,
-                        episodeTuples[item.Item1].Item1,
-                        episodeTuples[item.Item1].Item2)),
+                    item =>
+                    {
+                        // PORT: Python builds each coroutine with its arguments, so the read of the episode tuple
+                        // happens before the gather.
+                        var (episode, previousEpisodes) = episodeTuples[item.Item1];
+                        return () => ResolveNodesAsync(item.Item2, episode, previousEpisodes);
+                    }),
             ],
             clients.MaxCoroutines,
             cancellationToken);
@@ -1010,8 +1030,12 @@ internal sealed class UnionFind
 
     internal Dictionary<string, string> Parent { get; set; }
 
+    // PORT: Python raises RecursionError near a depth of 1000. The port goes deeper, and then throws
+    // InsufficientExecutionStackException in place of a process stop (GAPS F43).
     internal string Find(string x)
     {
+        RuntimeHelpers.EnsureSufficientExecutionStack();
+
         // path‐compression
         if (Parent[x] != x)
         {

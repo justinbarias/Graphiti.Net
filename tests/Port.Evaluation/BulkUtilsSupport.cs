@@ -104,6 +104,9 @@ internal sealed class BulkUtilsRun
 
     internal List<(string Kind, CancellationToken Token)> Tokens { get; } = [];
 
+    // The prompt name and the messages of each LLM call, for a test that reads the text that the port sends.
+    internal List<(string? PromptName, List<Message> Messages)> Prompts { get; } = [];
+
     internal List<string> Texts { get; } = [];
 
     internal List<(List<double> Vector, string Text)> Vectors { get; } = [];
@@ -206,6 +209,7 @@ internal sealed class BulkUtilsRun
             string? model = null,
             CancellationToken cancellationToken = default)
         {
+            run.Prompts.Add((promptName, messages));
             await run.EnterAsync(
                 "llm",
                 new OrderedDictionary<string, object?>
@@ -241,6 +245,13 @@ internal sealed class BulkUtilsRun
     {
         internal override async Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default)
         {
+            if (run.Input.GetValueOrDefault("slow_embed") is true)
+            {
+                // A call that sleeps past the limit of the write and gives up when the token cancels it.
+                await run.EnterAsync("embed_start", new() { ["input"] = inputData.Select(x => (object?)x).ToList() }, cancellationToken);
+                await Task.Delay(30_000, cancellationToken);
+            }
+
             await run.EnterAsync("embed", new() { ["input"] = inputData.Select(x => (object?)x).ToList() }, cancellationToken);
             return run.Vector(inputData[0]);
         }
@@ -416,7 +427,7 @@ internal sealed class BulkUtilsRun
             throw new InvalidOperationException("not used");
 
         internal override Task CloseAsync(CancellationToken cancellationToken = default) =>
-            run.EnterAsync("close", new(), cancellationToken, counted: false);
+            run.EnterAsync("close", new() { ["query_timeout_ms"] = (this as IQueryTimeoutSession)?.QueryTimeoutMs }, cancellationToken, counted: false);
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
             ExecuteWriteAsync(func, null, cancellationToken);
@@ -427,11 +438,33 @@ internal sealed class BulkUtilsRun
 
         private async Task ExecuteWriteAsync(Func<Transaction, Task> func, double? timeout, CancellationToken cancellationToken)
         {
-            await run.EnterAsync(
-                "execute_write",
-                new() { ["query_timeout_ms"] = (this as IQueryTimeoutSession)?.QueryTimeoutMs, ["timeout"] = timeout },
-                cancellationToken);
-            await func(new FakeTx(run));
+            OrderedDictionary<string, object?> record = new() { ["query_timeout_ms"] = (this as IQueryTimeoutSession)?.QueryTimeoutMs, ["timeout"] = timeout };
+            if (run.Input.GetValueOrDefault("block_write") is true)
+            {
+                // The Python fake records at once and then waits for the limit to cancel it, so that a limit below one
+                // millisecond cannot race the record.
+                run.Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "execute_write", ["query_timeout_ms"] = record["query_timeout_ms"], ["timeout"] = record["timeout"] });
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                return;
+            }
+
+            await run.EnterAsync("execute_write", record, cancellationToken);
+            try
+            {
+                await func(new FakeTx(run));
+            }
+            catch (Exception e)
+            {
+                // R4: the Python class of the exception that the session rolls back on.
+                var name = e switch
+                {
+                    OperationCanceledException => "CancelledError",
+                    InvalidOperationException => "RuntimeError",
+                    _ => e.GetType().Name,
+                };
+                run.Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "rollback", ["error"] = name });
+                throw;
+            }
         }
     }
 

@@ -5,6 +5,7 @@
 // list.
 namespace Graphiti.Port.Evaluation;
 
+using System.Runtime.ExceptionServices;
 using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Utils;
@@ -120,6 +121,100 @@ public class BulkUtilsValuesTests
         }
 
         Assert.Contains(AsyncCases, c => (string?)Dict(c["in"]).GetValueOrDefault("provider") == "neo4j" && Dict(c["out"]).GetValueOrDefault("error") is OrderedDictionary<string, object?> e && (string)e["type"]! == "RuntimeError" && (string?)Dict(List(Dict(c["out"])["events"])[^1])["kind"] == "close");
+
+        // The fix round: a work function that the limit cancels (a rollback with CancelledError, and no write), a limit of
+        // 1.0019 (1001 ms), a limit below one millisecond (1 ms), an IndexError with no call, the fallback to the canonical
+        // node, the similarity limit, two groups, and a call of each method with its defaults.
+        List<object?> EventsOf(OrderedDictionary<string, object?> c) => List(Dict(c["out"])["events"]);
+        Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("slow_embed") is true && EventsOf(c).Any(e => (string?)Dict(e)["kind"] == "rollback" && (string?)Dict(e)["error"] == "CancelledError") && Dict(c["out"]).ContainsKey("error"));
+        foreach (var ms in new[] { 1001L, 1L })
+        {
+            Assert.Contains(AsyncCases, c => EventsOf(c).Any(e => (string?)Dict(e)["kind"] == "close" && Dict(e).GetValueOrDefault("query_timeout_ms") is long v && v == ms) && Dict(c["in"]).GetValueOrDefault("write_timeout") is double and < 1.1);
+        }
+
+        Assert.Contains(AsyncCases, c => Dict(c["out"]).GetValueOrDefault("error") is OrderedDictionary<string, object?> e && (string)e["type"]! == "IndexError" && (long)Dict(c["out"])["count"]! == 0);
+        Assert.Contains(AsyncCases, c => EventsOf(c).Any(e => (string?)Dict(e)["kind"] == "log" && ((string?)Dict(e)["message"])!.StartsWith("Canonical node", StringComparison.Ordinal)));
+        Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("vectors") is OrderedDictionary<string, object?> v && v.ContainsKey("Dark night"));
+        Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("defaults") is true && (string)Dict(c["in"])["fn"]! == "extract_nodes_and_edges_bulk" && Dict(c["in"])["combined"] is false);
+    }
+
+    // A chain of decreasing UUIDs: the pair k+1 -> k for k from n-2 down to 0. The union goes onto the smallest UUID, so
+    // the chain has depth n, and the first Find of compress_uuid_map walks all of it.
+    private static List<(string, string)> ChainPairs(int n)
+    {
+        var uuids = Enumerable.Range(0, n).Select(i => i.ToString("D6", System.Globalization.CultureInfo.InvariantCulture)).ToList();
+        return [.. Enumerable.Range(0, n - 1).Reverse().Select(k => (uuids[k + 1], uuids[k]))];
+    }
+
+    private static T OnThread<T>(int stackBytes, Func<T> body)
+    {
+        T? result = default;
+        Exception? error = null;
+        var thread = new Thread(
+            () =>
+            {
+                try
+                {
+                    result = body();
+                }
+                catch (Exception e)
+                {
+                    error = e;
+                }
+            },
+            stackBytes);
+        thread.Start();
+        Assert.True(thread.Join(30_000), "the thread did not end");
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Capture(error).Throw();
+        }
+
+        return result!;
+    }
+
+    // PORT: Python raises RecursionError for a chain of about 1000 and more (GAPS F43). The port goes deeper and returns,
+    // as long as the stack holds. The map is the one of the chain, with a literal: each key resolves to the smallest UUID.
+    [Fact]
+    public void compress_uuid_map_returns_for_a_chain_of_3000_where_python_raises_RecursionError()
+    {
+        var map = OnThread(16 << 20, () => BulkUtils.CompressUuidMap(ChainPairs(3000)));
+
+        Assert.Equal(3000, map.Count);
+        Assert.All(map.Values, value => Assert.Equal("000000", value));
+        Assert.Equal("002999", map.Keys.First());
+    }
+
+    // PORT: with a chain that is deeper than the stack holds, Find throws InsufficientExecutionStackException in place of
+    // a process stop (GAPS F43). The thread has a stack of 1 MiB, so the guard fires long before the chain ends, and the
+    // test host lives.
+    [Fact]
+    public void compress_uuid_map_throws_InsufficientExecutionStackException_for_a_chain_that_the_stack_cannot_hold()
+    {
+        Assert.Throws<InsufficientExecutionStackException>(() => OnThread(1 << 20, () => BulkUtils.CompressUuidMap(ChainPairs(200_000))));
+    }
+
+    // A test with no Python original (R24): on FalkorDB and Neptune the query builder of the entity nodes returns a list of
+    // queries. Python passes the list to tx.run. The port has no transaction that takes a list, so it marks the site with a
+    // TODO(port) and throws NotSupportedException. The episode query before it still runs.
+    [Theory(Timeout = 5000)]
+    [InlineData("falkordb")]
+    [InlineData("neptune")]
+    public async Task A_list_of_queries_for_the_entity_nodes_throws_NotSupportedException_with_the_marker(string provider)
+    {
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var run = new BulkUtilsRun(new() { ["provider"] = provider, ["ops"] = false }, source, cancelAt: -1);
+        var node = new EntityNode { Name = "Embedded", GroupId = "g", Labels = ["Entity"], NameEmbedding = [0.5, 0.25] }.Validate();
+
+        var update = await Assert.ThrowsAsync<NotSupportedException>(() => LoopGuard.RunAsync(() => BulkUtils.UpdateEntityNodesTxAsync(
+            new BulkUtilsRun.FakeTx(run), [node], run.Embedder, run.Driver, source.Token)));
+        Assert.StartsWith("TODO(port):", update.Message, StringComparison.Ordinal);
+        Assert.Empty(run.Events);
+
+        var add = await Assert.ThrowsAsync<NotSupportedException>(() => LoopGuard.RunAsync(() => BulkUtils.AddNodesAndEdgesBulkTxAsync(
+            new BulkUtilsRun.FakeTx(run), [], [], [node], [], run.Embedder, run.Driver, source.Token)));
+        Assert.StartsWith("TODO(port):", add.Message, StringComparison.Ordinal);
+        Assert.Equal(["tx_run"], run.Events.Select(e => (string?)Dict(e)["kind"]));
     }
 
     [Fact]
@@ -181,6 +276,12 @@ public class BulkUtilsValuesTests
                 // R4: RuntimeError is InvalidOperationException. The work function of a case raises it.
                 output["error"] = new OrderedDictionary<string, object?> { ["type"] = "RuntimeError", ["text"] = e.Message };
             }
+            catch (ArgumentOutOfRangeException)
+            {
+                // R4: IndexError is ArgumentOutOfRangeException. The text is the one of Python, as a test of an IndexError
+                // compares the type only.
+                output["error"] = new OrderedDictionary<string, object?> { ["type"] = "IndexError", ["text"] = "list index out of range" };
+            }
         }
 
         output["events"] = run.Events;
@@ -202,16 +303,19 @@ public class BulkUtilsValuesTests
         Assert.Equal(PyJson.Dumps(expected["count"]), PyJson.Dumps(actual["count"]));
 
         // Each fake got the token of the call (R25). With a write timeout on a provider other than Neo4j,
-        // asyncio.wait_for gives execute_write a token that the limit or the call cancels (R8). On Neo4j the session
-        // gets the token of the call with the timeout (decision D52).
+        // asyncio.wait_for gives the session write a token that the limit or the call cancels (R8), and the work
+        // function of the write passes that token to each call that it makes: the embedder, the transaction, and the
+        // interface. Python cancels the task of the work at the limit. On Neo4j the session gets the token of the call
+        // with the timeout, and the server holds the limit (decision D52).
         var waitFor = (string?)input.GetValueOrDefault("provider") != "neo4j"
             && (input.GetValueOrDefault("write_timeout") is not null || (string)input["fn"]! == "execute_write_with_timeout");
         foreach (var (kind, token) in run.Tokens)
         {
-            if (kind == "execute_write" && waitFor)
+            if (waitFor)
             {
                 Assert.True(token.CanBeCanceled);
                 Assert.NotEqual(source.Token, token);
+                Assert.Equal(run.Tokens[0].Token, token);
             }
             else
             {
@@ -419,6 +523,10 @@ public class BulkUtilsValuesTests
                     {
                         await BulkUtils.AddNodesAndEdgesBulkTxAsync(new BulkUtilsRun.FakeTx(run), episodes, episodicEdges, nodes, edges, embedder, driver, cancellationToken);
                     }
+                    else if (input.GetValueOrDefault("defaults") is true)
+                    {
+                        await BulkUtils.AddNodesAndEdgesBulkAsync(driver, episodes, episodicEdges, nodes, edges, embedder, cancellationToken: cancellationToken);
+                    }
                     else
                     {
                         double? writeTimeout = input["write_timeout"] is null ? null : Number(input["write_timeout"]);
@@ -436,9 +544,9 @@ public class BulkUtilsValuesTests
                     await BulkUtils.ExecuteWriteWithTimeoutAsync(
                         driver,
                         Number(input["timeout"]),
-                        async tx =>
+                        async (tx, token) =>
                         {
-                            await tx.RunAsync("RETURN $value", new() { ["value"] = value }, cancellationToken);
+                            await tx.RunAsync("RETURN $value", new() { ["value"] = value }, token);
                             if (raises)
                             {
                                 throw new InvalidOperationException("work failed");
@@ -451,7 +559,9 @@ public class BulkUtilsValuesTests
             case "retrieve_previous_episodes_bulk":
                 {
                     List<EpisodicNode> episodes = [.. List(input["episodes"]).Select(Episode)];
-                    var result = await BulkUtils.RetrievePreviousEpisodesBulkAsync(driver, episodes, maxCoroutines: (long?)input["max_coroutines"], cancellationToken: cancellationToken);
+                    var result = input.GetValueOrDefault("defaults") is true
+                        ? await BulkUtils.RetrievePreviousEpisodesBulkAsync(driver, episodes, cancellationToken: cancellationToken)
+                        : await BulkUtils.RetrievePreviousEpisodesBulkAsync(driver, episodes, maxCoroutines: (long?)input["max_coroutines"], cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?>
                     {
                         ["tuples"] = result.Select(t => (object?)new List<object?> { t.Item1.Uuid, t.Item2.Select(p => (object?)p.Uuid).ToList() }).ToList(),
@@ -459,18 +569,29 @@ public class BulkUtilsValuesTests
                 }
 
             case "extract_nodes_and_edges_bulk":
+            case "extract_nodes_and_edges_bulk_combined":
+            case "extract_nodes_and_edges_bulk_separate":
                 {
-                    var (nodesBulk, edgesBulk) = await BulkUtils.ExtractNodesAndEdgesBulkAsync(
-                        run.Clients,
-                        TuplesOf(input["episode_tuples"]),
-                        TypeMap(input["type_map"]),
-                        entityTypes: TypesOf(input["entity_types"]),
-                        excludedEntityTypes: input["excluded"] is List<object?> excluded ? [.. excluded.Select(x => (string)x!)] : null,
-                        edgeTypes: TypesOf(input["edge_types"]),
-                        customExtractionInstructions: (string?)input["instructions"],
-                        useCombinedExtraction: (bool)input["combined"]!,
-                        strictEdgeTypes: (bool)input["strict"]!,
-                        cancellationToken: cancellationToken);
+                    (List<List<EntityNode>> nodesBulk, List<List<EntityEdge>> edgesBulk) = (input["fn"], input.GetValueOrDefault("defaults") is true) switch
+                    {
+                        ("extract_nodes_and_edges_bulk", true) => await BulkUtils.ExtractNodesAndEdgesBulkAsync(
+                            run.Clients, TuplesOf(input["episode_tuples"]), TypeMap(input["type_map"]), cancellationToken: cancellationToken),
+                        ("extract_nodes_and_edges_bulk_combined", true) => await BulkUtils.ExtractNodesAndEdgesBulkCombinedAsync(
+                            run.Clients, TuplesOf(input["episode_tuples"]), TypeMap(input["type_map"]), cancellationToken: cancellationToken),
+                        ("extract_nodes_and_edges_bulk_separate", true) => await BulkUtils.ExtractNodesAndEdgesBulkSeparateAsync(
+                            run.Clients, TuplesOf(input["episode_tuples"]), TypeMap(input["type_map"]), cancellationToken: cancellationToken),
+                        _ => await BulkUtils.ExtractNodesAndEdgesBulkAsync(
+                            run.Clients,
+                            TuplesOf(input["episode_tuples"]),
+                            TypeMap(input["type_map"]),
+                            entityTypes: TypesOf(input["entity_types"]),
+                            excludedEntityTypes: input["excluded"] is List<object?> excluded ? [.. excluded.Select(x => (string)x!)] : null,
+                            edgeTypes: TypesOf(input["edge_types"]),
+                            customExtractionInstructions: (string?)input["instructions"],
+                            useCombinedExtraction: (bool)input["combined"]!,
+                            strictEdgeTypes: (bool)input["strict"]!,
+                            cancellationToken: cancellationToken),
+                    };
                     return new OrderedDictionary<string, object?>
                     {
                         ["nodes"] = nodesBulk.Select(n => (object?)NodeViews(n)).ToList(),
@@ -492,14 +613,16 @@ public class BulkUtilsValuesTests
                         }
                     }
 
-                    var (byEpisode, uuidMap) = await BulkUtils.DedupeNodesBulkAsync(
-                        run.Clients,
-                        extracted,
-                        episodeTuples,
-                        entityTypes: TypesOf(input["entity_types"]),
-                        identityProperties: identityProperties,
-                        trace: null,
-                        cancellationToken: cancellationToken);
+                    var (byEpisode, uuidMap) = input.GetValueOrDefault("defaults") is true
+                        ? await BulkUtils.DedupeNodesBulkAsync(run.Clients, extracted, episodeTuples, cancellationToken: cancellationToken)
+                        : await BulkUtils.DedupeNodesBulkAsync(
+                            run.Clients,
+                            extracted,
+                            episodeTuples,
+                            entityTypes: TypesOf(input["entity_types"]),
+                            identityProperties: identityProperties,
+                            trace: null,
+                            cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?>
                     {
                         ["by_episode"] = byEpisode.Select(e => (object?)new List<object?> { e.Key, NodeViews(e.Value) }).ToList(),
