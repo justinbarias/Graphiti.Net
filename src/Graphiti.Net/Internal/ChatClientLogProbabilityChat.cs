@@ -65,7 +65,10 @@ internal sealed class ChatClientLogProbabilityChat : LogProbabilityChat
         }
 
         var topCount = checked((int)topLogprobs);
-        var info = new ModelCallInfo("rerank", null, null, null, model, null);
+        // DESIGN: `Model` is the `model` argument of `_generate_response`, which is null with no route. A rerank call
+        // has no route, so `Model` is null, as for an embed call. The host reads the reranker model from
+        // `ChatOptions.ModelId`.
+        var info = new ModelCallInfo("rerank", null, null, null, null, null);
 
         // The hook runs on the thread pool with the chat call (decision D33).
         var first = await GraphitiModelCall.CallHostAsync(

@@ -140,7 +140,7 @@ public class ModelAdapterCrossEncoderTests
     }
 
     [Fact]
-    public async Task Inside_a_rerank_call_Current_names_the_operation_and_the_model_and_outside_it_is_null()
+    public async Task Inside_a_rerank_call_Current_names_the_operation_with_no_model_and_outside_it_is_null()
     {
         var chat = EchoPassage();
 
@@ -153,7 +153,8 @@ public class ModelAdapterCrossEncoderTests
 
         Assert.Null(after);
         Assert.Null(GraphitiModelCall.Current);
-        Assert.Equal(new ModelCallInfo("rerank", null, null, null, "rr", null), chat.Calls[0].Info);
+        Assert.Equal(new ModelCallInfo("rerank", null, null, null, null, null), chat.Calls[0].Info);
+        Assert.Equal("rr", chat.Calls[0].Options?.ModelId);
     }
 
     // ---- the bridge of a host ICrossEncoder ----

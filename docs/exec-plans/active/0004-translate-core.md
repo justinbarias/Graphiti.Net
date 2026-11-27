@@ -282,12 +282,20 @@ Decision D48: two outputs above debug level keep the text of a provider exceptio
 The adapters follow [the public surface design](../../design-docs/public-surface-design.md). The design left five points open, and the lead chose one reading for each. The maintainer reads them at gate 4:
 
 - The adapter sends a temperature only if the option `Llm.Temperature` has a value. It is a `double?` parameter of the adapter, apart from `LLMConfig.Temperature`.
-- The classifier of the host runs first. If it is absent or returns `None`, the default classifier decides.
+- The classifier of the host runs first. If it is absent or returns `None`, the default classifier decides. The chat adapter and the reranker follow the same order.
 - The test for a filtered reply comes before the test for an empty reply. A filtered reply with no text gives `RefusalException`.
 - The usage of a reply is recorded before the test that the JSON is an object, as upstream does.
-- The embedding adapter has one constructor for `Embedding<float>` and one for `Embedding<double>`. `ModelCallInfo.Model` is null for an embed call.
+- The embedding adapter has one constructor for `Embedding<float>` and one for `Embedding<double>`. `ModelCallInfo.Model` is null for an embed call and for a rerank call, because neither has a route. The reranker model goes to `ChatOptions.ModelId`.
 
 Differences that the lead accepted by name under D39: GAPS F34, F35, and F36, the R4 row for a base URL with no `http` scheme, and one seeded defect of packet P3g that no test can see. With the defect, `LLMRuntime.set_tracer` sets the tracer of a shared client two times, and the second call changes nothing.
+
+The adversarial pass over the layer (Opus 5.5, high effort) said that each of the five readings is a fair reading of the design. It gave 1 important finding and 5 small ones, and the lead fixed each one:
+
+- The reranker used the classifier of the host with no default behind it, so a host classifier that returns `None` for status 429 gave `HttpRequestException` there and `RateLimitException` in the chat adapter. Both paths now use the host classifier first and then the default.
+- A rerank call set `ModelCallInfo.Model` to the reranker model, against the design text. It is null now.
+- `edge_e2` gave another `TypeError` text than Python for a list, a tuple, or a text plus a value of another type. It gives the Python text now, and eight literal cases from Python hold it.
+- The adapters had no test of the token rule, and a dropped token passed each test. Each fake host now records if the cancel of the caller reaches its token.
+- One comment named the wrong upstream client, and rule R4 had one sentence two times.
 
 Evidence that waits for a later layer:
 
@@ -298,7 +306,7 @@ Evidence that waits for a later layer:
 
 Commands at the tip:
 
-- `scripts/check.sh`: `check: passed`.
-- `dotnet test --project tests/Port.Evaluation`: 10,444 tests, 0 failed, 0 skipped.
+- `scripts/check.sh --test`: `check: passed`, 10,855 tests.
+- `dotnet test --project tests/Port.Evaluation`: 10,462 tests, 0 failed, 0 skipped.
 - The seven recorders of the layer with `--check`: 189, 931, 159, 1,193, 553, and 1,213 cases, and the 2 fixture texts. Each one is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,206 passed, 0 unexpected, 0 bound and wrong. 56 ids left `expected-failures.txt`, and 793 stay. The pull request lists the ids.

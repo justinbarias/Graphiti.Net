@@ -18,6 +18,12 @@ internal sealed class ScriptedChatClient(Func<int, IReadOnlyList<ChatMessage>, C
 
     internal List<HostCall> Calls { get; } = [];
 
+    /// <summary>An action of the test that runs inside each call, for example a cancel of the caller's token.</summary>
+    internal Action? DuringCall { get; set; }
+
+    /// <summary>For each call: whether the token that the host got was canceled after <see cref="DuringCall"/>.</summary>
+    internal List<bool> CanceledDuringCall { get; } = [];
+
     /// <summary>A reply with the given text, finish reason, and usage.</summary>
     internal static ChatResponse Reply(string? text, ChatFinishReason? finishReason = null, UsageDetails? usage = null)
     {
@@ -37,6 +43,8 @@ internal sealed class ScriptedChatClient(Func<int, IReadOnlyList<ChatMessage>, C
             index = Calls.Count;
             Calls.Add(new HostCall(
                 list.Select(m => (m.Role.Value, m.Text)).ToList(), options, GraphitiModelCall.Current, Asyncio.IsOnLoop));
+            DuringCall?.Invoke();
+            CanceledDuringCall.Add(cancellationToken.IsCancellationRequested);
         }
 
         return Task.FromResult(script(index, list));
@@ -61,6 +69,10 @@ internal sealed class ScriptedEmbeddingGenerator<T>(Func<string, T[]> vectorOf) 
 {
     internal List<(List<string> Inputs, EmbeddingGenerationOptions? Options, ModelCallInfo? Info, bool OnLoop)> Calls { get; } = [];
 
+    internal Action? DuringCall { get; set; }
+
+    internal List<bool> CanceledDuringCall { get; } = [];
+
     public Task<GeneratedEmbeddings<Embedding<T>>> GenerateAsync(
         IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -68,6 +80,8 @@ internal sealed class ScriptedEmbeddingGenerator<T>(Func<string, T[]> vectorOf) 
         lock (Calls)
         {
             Calls.Add((inputs, options, GraphitiModelCall.Current, Asyncio.IsOnLoop));
+            DuringCall?.Invoke();
+            CanceledDuringCall.Add(cancellationToken.IsCancellationRequested);
         }
 
         return Task.FromResult(new GeneratedEmbeddings<Embedding<T>>(inputs.Select(i => new Embedding<T>(vectorOf(i)))));
@@ -111,10 +125,16 @@ internal sealed class ScriptedCrossEncoder(IReadOnlyList<(string Passage, double
 {
     internal List<(string Query, List<string> Passages, ModelCallInfo? Info, bool OnLoop)> Calls { get; } = [];
 
+    internal Action? DuringCall { get; set; }
+
+    internal List<bool> CanceledDuringCall { get; } = [];
+
     public Task<IReadOnlyList<(string Passage, double Score)>> RankAsync(
         string query, IReadOnlyList<string> passages, CancellationToken cancellationToken = default)
     {
         Calls.Add((query, passages.ToList(), GraphitiModelCall.Current, Asyncio.IsOnLoop));
+        DuringCall?.Invoke();
+        CanceledDuringCall.Add(cancellationToken.IsCancellationRequested);
         return Task.FromResult(result);
     }
 }

@@ -139,8 +139,10 @@ internal sealed class ChatClientLlmClient : LLMClient
             throw;
         }
 
-        // DESIGN: the reply table does not order the two tests. A filtered reply often has no text, and upstream's OpenAI
-        // client tests the refusal before the content, so the filter test comes first and the reply is not retried.
+        // DESIGN: the reply table does not order the two tests, and it says that a filtered reply is not retried. A
+        // filtered reply often has no text, so the filter test comes first. Upstream's Gemini client also tests the
+        // finish reason first. Upstream's OpenAI clients test the content first, so a filtered reply with JSON text
+        // gives RefusalException here and a result there.
         if (response.FinishReason == ChatFinishReason.ContentFilter)
         {
             throw new RefusalException("The model provider filtered the reply.");
@@ -197,10 +199,12 @@ internal sealed class ChatClientLlmClient : LLMClient
     }
 
     // DESIGN: "Llm.ClassifyFailure, then the default classifier" is read as: the host classifier first, and the default
-    // classifier when the host classifier is absent or says None.
+    // classifier when the host classifier is absent or says None. The host classifier is the constructor argument. With
+    // no argument, or if it says None, PortServices.ClassifyModelFailure decides, as it does for the reranker: the
+    // classifier of PortServices first, and then the default classifier.
     private ModelCallFailure Classify(Exception e)
     {
         var failure = classifyFailure?.Invoke(e) ?? ModelCallFailure.None;
-        return failure == ModelCallFailure.None ? PortServices.DefaultClassifyModelFailure(e) : failure;
+        return failure == ModelCallFailure.None ? PortServices.ClassifyModelFailure(e) : failure;
     }
 }

@@ -226,6 +226,42 @@ public class LlmClientDecisionValuesTests
         Assert.True(rendered >= 40);
     }
 
+    // The texts come from Python 3.12 with the pinned upstream:
+    //   from graphiti_core.llm_client import decision_prompts as dp
+    //   dp.edge_e2("<EXISTING FACTS>\n[]\n</EXISTING FACTS>\n<FACT INVALIDATION CANDIDATES>\n{}\n"
+    //              "</FACT INVALIDATION CANDIDATES>\n<NEW FACT>\nAlice works at Acme\n</NEW FACT>")
+    [Theory]
+    [InlineData("[]", "{}", "can only concatenate list (not \"dict\") to list")]
+    [InlineData("\"\"", "[]", "can only concatenate str (not \"list\") to str")]
+    [InlineData("[]", "\"\"", "can only concatenate list (not \"str\") to list")]
+    [InlineData("\"\"", "{}", "can only concatenate str (not \"dict\") to str")]
+    [InlineData("()", "[]", "can only concatenate tuple (not \"list\") to tuple")]
+    [InlineData("[]", "()", "can only concatenate list (not \"tuple\") to list")]
+    [InlineData("{}", "{}", "unsupported operand type(s) for +: 'dict' and 'dict'")]
+    [InlineData("[]", "None", "'NoneType' object is not iterable")]
+    public void edge_e2_gives_the_TypeError_text_of_Python_for_two_bodies_that_do_not_add(
+        string existing, string candidates, string expected)
+    {
+        var user = $"<EXISTING FACTS>\n{existing}\n</EXISTING FACTS>\n<FACT INVALIDATION CANDIDATES>\n{candidates}\n"
+            + "</FACT INVALIDATION CANDIDATES>\n<NEW FACT>\nAlice works at Acme\n</NEW FACT>";
+
+        var error = Assert.Throws<InvalidCastException>(() => DecisionPrompts.EdgeE2(user));
+
+        Assert.Equal(expected, error.Message);
+    }
+
+    [Theory]
+    [InlineData("[]", "[]")]
+    [InlineData("()", "()")]
+    [InlineData("\"\"", "\"\"")]
+    public void edge_e2_accepts_two_empty_bodies_of_one_type(string existing, string candidates)
+    {
+        var user = $"<EXISTING FACTS>\n{existing}\n</EXISTING FACTS>\n<FACT INVALIDATION CANDIDATES>\n{candidates}\n"
+            + "</FACT INVALIDATION CANDIDATES>\n<NEW FACT>\nAlice works at Acme\n</NEW FACT>";
+
+        Assert.Empty(DecisionPrompts.EdgeE2(user).Questions);
+    }
+
     private static ChatPrompt TextBuilder(OrderedDictionary<string, object?> context) => new()
     {
         System = new SystemMessage { Content = S(context["system"]) }.Validate(),

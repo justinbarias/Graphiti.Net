@@ -214,6 +214,10 @@ internal static class DecisionPrompts
         (List<object?> first, List<object?> second) => first.Concat(second),
         (PyTuple first, PyTuple second) => Py.Iter(first).Concat(Py.Iter(second)),
         (string first, string second) => Py.Iter(first + second),
+
+        // PORT: list, tuple, and str have their own text for a right operand of another type.
+        (List<object?> or PyTuple or string, _) => throw new InvalidCastException(
+            $"can only concatenate {Py.TypeName(a)} (not \"{Py.TypeName(b)}\") to {Py.TypeName(a)}"),
         _ => throw new InvalidCastException($"unsupported operand type(s) for +: '{Py.TypeName(a)}' and '{Py.TypeName(b)}'"),
     };
 
