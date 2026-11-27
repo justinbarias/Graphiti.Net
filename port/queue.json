@@ -1406,7 +1406,7 @@
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EntityEdgeOps.cs",
       "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_between_nodes and get_by_node_uuid, and compares the result with Python."
     },
     {
       "order": 67,
@@ -1455,7 +1455,7 @@
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EpisodeNodeOps.cs",
       "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_by_entity_node_uuid and retrieve_episodes, and compares the result with Python."
     },
     {
       "order": 69,

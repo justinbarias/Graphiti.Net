@@ -84,7 +84,7 @@ A member keeps the meaning of its Python name. Do not rename a member to make it
 
 - Every ported type and member is `internal`, or `private` by R2. One family is `public`: the exception classes of `errors.py` and `llm_client/errors.py` (R4), with their constructors and properties.
 - [The public surface design](../docs/design-docs/public-surface-design.md) names each other public type. Those types are lead code, not ported code. Never add `public` to another ported type.
-- The `PyCompat` project grants `InternalsVisibleTo` to the five assemblies in its project file. The core project grants it to `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, and `Port.Evaluation`. The Neo4j project grants it to `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.E2E.Tests`. The three product projects grant it to `Graphiti.Net.E2E.Tests`, because a test on Neo4j uses the internal driver and the internal models until the public facade exists (layer 9). A test that needs a real Neo4j is in `tests/Graphiti.Net.E2E.Tests`, never in `tests/Port.Evaluation`. The lead adds `Graphiti.Net.Property.Tests` when that project first needs it. Only the lead changes that list.
+- The `PyCompat` project grants `InternalsVisibleTo` to the six assemblies in its project file. The core project grants it to `Graphiti.Net.Neo4j`, `Graphiti.Net.JudgeHost`, and `Port.Evaluation`. The Neo4j project grants it to `Graphiti.Net.JudgeHost`, `Port.Evaluation`, and `Graphiti.Net.E2E.Tests`. The three product projects grant it to `Graphiti.Net.E2E.Tests`, because a test on Neo4j uses the internal driver and the internal models until the public facade exists (layer 9). A test that needs a real Neo4j is in `tests/Graphiti.Net.E2E.Tests`, never in `tests/Port.Evaluation`. Only the lead changes that list.
 - `PyCompat` members are `internal` too. The `PyCompat` project grants `InternalsVisibleTo` to the two product projects and to the test projects.
 - The core project never references `Neo4j.Driver`. A type from `Neo4j.Driver` appears only in `src/Graphiti.Net.Neo4j`.
 - The public facade `IGraphiti` is lead code. It maps public records to ported types and calls `GraphitiCore`. A ported unit never refers to a public record or to `IGraphiti`.
@@ -1173,6 +1173,8 @@ Each entry of [GAPS.md](GAPS.md) and the rule that answers it.
 | F34 | The charset of a reply of the decisions client | R19 |
 | F35 | Two wrong questions in one call of the decisions client | R6 |
 | F36 | The timeout of an `HttpClient` that the host gives | R19 |
+| F37 | `tx.run` with a statement that fails at once | R8, R9 |
+| F38 | A cancel at the end of a transaction body | R8 |
 
 ## Part 5. Open items
 

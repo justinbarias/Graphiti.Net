@@ -165,12 +165,13 @@ Decided on 2026-11-25 for the public surface: D24 to D35. Decided on 2026-11-26 
 - Five units follow the rulebook. Each one had two reviews and one fix round, and no second review ran on the fixes.
 - The Neo4j driver and its operations ran on one database: Neo4j 5.26.2 of `docker-compose.yml`, as a single instance. No test ran on a cluster, on Aura, or on another version.
 - No flow case of the judge ran against the .NET build. The units of layer 5 with no pure case wait for layer 9 of plan 0004.
-- The layer 5 packets had two reviews and one fix round. No second review ran on the fixes. The end-to-end test of the graph types had no review pair.
+- The layer 5 packets had two reviews and one fix round. One adversarial pass read the fixes and the end-to-end test of the graph types. No review ran after the fixes of that pass.
+- On a database that already has the Graphiti indexes, the two index tests on Neo4j pass with no index build. The test with a fake of the driver package holds the build, and so does a run on an empty database, as in CI.
 - One adversarial review ran on the public surface design and its rule changes. No second review ran after the fixes. No code follows the design yet.
 - The `Microsoft.Extensions.AI.Abstractions` facts of the design come from Learn pages for version 10.11.0, not from the 11.0.1 assembly. Debt T21.
 - The model adapters of layer 3 had no review pair, and no test ran them against a real model provider. The fakes implement `IChatClient` and `IEmbeddingGenerator`.
 - The decisions client and the reranker ran against fakes at the HTTP boundary and at the chat seam. No test called a real endpoint.
-- Decision D22 depends on a rule at each library boundary (RULES.md, open item O7). No code tested it, and the pilot had no library callback.
+- Decision D22 depends on a rule at each library boundary. One callback exists, `Neo4jSession.ExecuteWriteAsync`, and a test fails without `Asyncio.OnLoopAsync` there (open item O7, closed). No other library callback is ported yet.
 - The site lists in the rulebook (regular expressions, sets, `getattr` calls, validators) come from `grep` over the 114 MVP modules. A site that the patterns missed is not in the lists. The rulebook tells an implementer to stop at such a site.
 - Nobody applied the pruning rule. On two Stryker runs on `PyCompat`, the script listed 13 and 14 tests (plan 0003, task 5).
 - The devcontainer and the Claude cloud session hook were not started. See [docs/RELIABILITY.md](../docs/RELIABILITY.md).

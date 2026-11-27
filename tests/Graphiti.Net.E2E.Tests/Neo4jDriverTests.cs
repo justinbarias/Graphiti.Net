@@ -80,6 +80,30 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_map_from_Neo4j_keeps_the_key_order_of_the_server_as_the_Python_driver_does()
+    {
+        // The Python driver on the same server (Neo4j 5.26.2) gives these key orders. They are the order of the server,
+        // which is not the order of the query text and not the sorted order:
+        //   RETURN {zeta: 1, alpha: 2, mid: 3, beta: 4, omega: 5, kappa: 6} AS m
+        //     -> ['alpha', 'kappa', 'zeta', 'mid', 'beta', 'omega']
+        //   RETURN {b: 1, a: {y: 1, x: 2, w: 3}, c: [{q: 1, p: 2}]} AS m
+        //     -> ['b', 'c', 'a'], with ['w', 'y', 'x'] for `a` and ['q', 'p'] for the map in `c`
+        var (flat, _, _) = await Asyncio.Run(() => driver.ExecuteQueryAsync(
+            "RETURN {zeta: 1, alpha: 2, mid: 3, beta: 4, omega: 5, kappa: 6} AS m", [], Ct));
+        var (nested, _, _) = await Asyncio.Run(() => driver.ExecuteQueryAsync(
+            "RETURN {b: 1, a: {y: 1, x: 2, w: 3}, c: [{q: 1, p: 2}]} AS m", [], Ct));
+
+        var flatMap = Assert.IsType<OrderedDictionary<string, object?>>(Assert.Single(flat)["m"]);
+        Assert.Equal(["alpha", "kappa", "zeta", "mid", "beta", "omega"], flatMap.Keys.ToList());
+
+        var outer = Assert.IsType<OrderedDictionary<string, object?>>(Assert.Single(nested)["m"]);
+        Assert.Equal(["b", "c", "a"], outer.Keys.ToList());
+        Assert.Equal(["w", "y", "x"], Assert.IsType<OrderedDictionary<string, object?>>(outer["a"]).Keys.ToList());
+        var inList = Assert.IsType<OrderedDictionary<string, object?>>(Assert.Single(Assert.IsType<List<object?>>(outer["c"])));
+        Assert.Equal(["q", "p"], inList.Keys.ToList());
+    }
+
+    [Fact]
     public async Task Values_inside_a_list_and_a_dict_make_the_round_trip_at_each_depth()
     {
         // Python: {'k': [1, 2.5, 'é', None, True, {'n': b'\x01'}]} comes back equal.

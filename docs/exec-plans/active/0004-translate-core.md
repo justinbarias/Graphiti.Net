@@ -347,13 +347,23 @@ The end-to-end test of the plan row, `GraphTypesOnNeo4jTests`:
 - It saves and loads each node type and each edge type on Neo4j, through the model classes and through the 9 operations classes. Python recorded the expected values on the same database.
 - It found no difference between the port and Python in a stored form, a loaded value, a type, an offset, an embedding, or an error code.
 - It builds the indexes two times and reads `SHOW INDEXES` after each build. The two lists are equal, and each of the 31 indexes of Python is in the list.
+- It does not call four methods of the operations classes: `get_between_nodes`, `get_by_node_uuid`, `get_by_entity_node_uuid`, and `retrieve_episodes`. The recorded calls with a fake cover them.
 - It holds upstream defects U1, U2, and U7 as they are: the batched deletes fail, the saga save through the driver fails, and a save with no embedding fails.
 
 `scripts/db_schema.py` writes [db-schema.md](../../generated/db-schema.md) from the ported query definitions.
 
-Differences that the lead accepted by name under D39: GAPS F26, F27, F28, F29, and F30. The maintainer reads F28 at gate 4: a bare `session.run` with a statement that fails at once raises in Python and is silent in the port. Two upstream sites call `session.run`, each with a fixed statement.
+Differences that the lead accepted by name under D39: GAPS F26, F27, F28, F29, F30, F37, and F38. The maintainer reads F28 at gate 4: a bare `session.run` with a statement that fails at once raises in Python and is silent in the port. Three upstream sites call `session.run`, each with a fixed statement.
 
 Open item O7 is closed. The driver has the first library callback, and a test fails without `Asyncio.OnLoopAsync`.
+
+The adversarial pass over the layer (Opus 5.5, high effort) ran each command of this section and got the same counts. It gave 1 important finding and 8 small ones. The lead resolved each one:
+
+- Inside a transaction or `execute_write`, a statement that fails at once raises at `tx.run` in Python. In the port the rest of the body runs, and the error arrives at the commit. `Neo4j.Driver` has no call that waits for the answer to the statement alone, so the lead accepted the difference as GAPS F37. The stored data is the same. The maintainer reads it at gate 4.
+- A cancel at the end of a transaction body: GAPS F38.
+- A port that sorts the keys of a map from Neo4j passed each test. One test on Neo4j now compares the key order with Python.
+- The schema document left out three stored forms of the save methods of the operations classes. It has a section for them now.
+- On a database that already has the indexes, the two index tests on Neo4j pass with no index build. The test with a fake holds the build, and so does a run on an empty database, as in CI.
+- Four records were wrong or stale: two queue notes, the count of `session.run` sites, a line of `port/STATE.md`, and a count in rule R3.
 
 Evidence that waits for a later layer:
 

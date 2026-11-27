@@ -90,6 +90,17 @@ There are 27 range indexes and 4 full-text indexes.
 | `community_name` | FULLTEXT | label `Community` | `name`, `group_id` |
 | `edge_name_and_fact` | FULLTEXT | relationship type `RELATES_TO` | `name`, `fact`, `group_id` |
 
+## Save paths that store another form
+
+The tables above give the form of the save of one object through its model class. The operations classes of the Neo4j driver have their own save methods, and three of them store another form, as upstream does.
+The end-to-end values in `tests/Graphiti.Net.E2E.Tests/values/graph_types_e2e.json` hold what Python stored on Neo4j for each of them. The bulk save of `utils/bulk_utils.py` is not ported yet, and this page does not list it.
+
+| Save path | Difference |
+| --- | --- |
+| `save_bulk` of the entity node operations | Each `Entity` node also gets a property `labels`, a list of its labels. |
+| `save_bulk` of the entity edge operations | The `RELATES_TO` relationship gets the properties `source_node_uuid` and `target_node_uuid`, and not `source_uuid` and `target_uuid`. It gets no `reference_time` property. |
+| `save` of the entity edge operations | The `RELATES_TO` relationship gets no `reference_time` property. |
+
 ## Ingestion state
 
 The ingestion state store uses SQLite. Its tables are defined upstream in `graphiti_core/ingestion/sqlite_state_store.py`.
