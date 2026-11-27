@@ -15,7 +15,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 3 | `port/models-boundary` | Done 2026-11-27. `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
 | 4 | `port/prompts` | Done 2026-11-27. `prompts` | 14 | 3,052 | Sonnet 5.5, medium |
 | 5 | `port/neo4j` | Done 2026-11-27. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
-| 6 | `port/search` | In progress. `search` | 7 | 3,456 | Opus 5.5, medium |
+| 6 | `port/search` | Done 2026-11-27. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
 | 8 | `port/ingestion` | `ingestion` | 9 | 4,159 | Opus 5.5, medium |
 | 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
@@ -54,7 +54,7 @@ Each subagent start needs the maintainer's approval first.
 | After layer | Flow |
 | --- | --- |
 | 5 | Done 2026-11-27. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
-| 6 | In progress. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
+| 6 | Done 2026-11-27. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
 | 8 | Ingest episodes in parallel into one group, and find no lost update. |
 | 9 | `AddEpisodeAsync`, then `SearchAsync`. A contradicting episode closes the old fact's validity window and deletes nothing. |
 
@@ -381,3 +381,56 @@ Commands at the tip:
 - `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 46 tests, 0 failed, 0 skipped.
 - The eight recorders of the layer with `--check`, each one current: 267 cases (`entity_node_ops`), 587 (the other node operations), 617 (the edge operations), 126 (`graph_ops`), 305 (`search_ops`), 643 (the namespaces), the index queries of the driver, and the end-to-end values of the graph types on Neo4j. `python3 scripts/db_schema.py --check` says that the schema document is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,229 passed, 0 unexpected, 0 bound and wrong. 23 ids left `expected-failures.txt`, and 770 stay. The pull request lists the ids.
+
+### Layer 6, search, 2026-11-27
+
+Three packets ported 6 modules, and one packet wrote the end-to-end test. Two Opus 5.5 high reviewers read each packet group. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Review |
+| --- | --- | --- |
+| P6a | `search.search_config`, `search.search_config_recipes`, `search.search_helpers`, `decorators` | One review pair for P6a and P6b: 3 and 7 findings. 10 of 58 seeded defects passed each test before the fix round, and 1 made the test run hang. |
+| P6b | `search.search_utils` | The same pair. |
+| P6c | `search.search` | 2 and 7 findings. 21 of 34 seeded defects passed each test before the fix round. |
+| E6 | The end-to-end test of the search recipes on Neo4j | No review pair. The adversarial pass reads it. |
+
+Reviewer A of each pair found no difference in behavior that needs a code change: no product line of the six modules changed after the reviews. Each seeded defect that passed fails a test now.
+
+What the reviews changed:
+
+| Finding | Result |
+| --- | --- |
+| The canceled-token theory proved only that some call reads the token. A token that one call dropped passed each test. | Each fake records the token that it gets, and the test compares each one with the token of the caller (rule R25). |
+| No test saw a concurrency limit. A port that runs the searches one after the other passed. | The fakes yield first on both sides and count the calls in flight. The recordings have cases with more calls than the limit. |
+| A call that blocks the scheduler thread made the whole test run hang, also with a time limit on the test. | A loop guard ends the test host with a message (rule R25). |
+| The filters of a reranker had no input on the limit and none below it. Four configuration values had only their default. | The recording of `search` has 204 cases, where it had 117. |
+| No test read the spans of a canceled search. | The recording holds 44 cancel points with the exception and the span list of Python. |
+| The 19 judge cases of `fulltext_query` had no binding for a driver. | The judge host binds a `types:SimpleNamespace` as a driver. Each of the 19 passes. |
+
+The end-to-end test of the plan row, `SearchRecipesOnNeo4jTests`:
+
+- Python seeds one graph on Neo4j and runs the upstream `search` for each of the 16 recipes and 3 queries. The graph has 23 entities, 18 facts, 8 episodes, and 5 communities. The port seeds the same graph in its own group and runs the ported `search`.
+- Each ranked list of the port equals the list of Python, in order, and each reranker score agrees within 1e-6. The test found no difference.
+- The embedder and the cross-encoder are fakes at the network boundary. Each one is a pure function of its text, so both sides compute the same values.
+- A second group holds nodes and edges with the same query words. A result from that group fails the test, so each query must keep its group filter.
+- Three seeded defects fail it: a sort direction, the group filter of one query, and a limit factor.
+- It does not reach these paths: the Neptune and FalkorDB branches, a search interface of the driver, an empty query, a `query_vector` of the caller, a `reranker_min_score` above 0, and a full-text query that is too long. The recordings with a fake driver cover them.
+
+Differences that the lead accepted by name under D39: GAPS F31, F32, and F33. The maintainer reads F33 at gate 4. A cancel that arrives while a driver call returns is seen at once in Python, and at the next call in the port. At 64 of 108 tested cancel points the port then differs: it returns the full result, or it throws with other span events, or it throws the error that comes first.
+
+Five `TODO(port)` markers stay, and `port/STATE.md` lists them. Four are new: the Neptune branch of each full-text search calls `driver.run_aoss_query`, which only the Neptune driver has (rule R24).
+
+Evidence that waits for a later layer:
+
+- No flow case of the judge runs against the .NET build. `search.search` and `decorators` have no pure case and keep the status `tests_pass` until layer 9.
+- No test compares the time text of the debug line of `search`, because `Py.TimeSeconds` reads the system clock.
+- `Asyncio.Run` does not cancel the tasks that a failed call leaves, where `asyncio.run` does. The test of a recorded call that fails gives the scheduler 50 turns before it reads the events.
+- No judge case passes a driver namespace that lacks an attribute after the group ids pass.
+- Three covering cases stay listed under open item O4: one of `search_config` and two of `rrf`.
+
+Commands at the tip:
+
+- `scripts/check.sh --test`: `check: passed`, 15,649 tests.
+- `dotnet test --project tests/Port.Evaluation`: 15,194 tests, 0 failed, 0 skipped.
+- `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 63 tests, 0 failed, 0 skipped.
+- The five recorders of the layer with `--check`, each one current: 510 cases (the configuration, the recipes, and the helpers), 1,322 (`search_utils`), 432 (the decorator), 204 (`search`), and the end-to-end values of the recipes on Neo4j.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,375 passed, 0 unexpected, 0 bound and wrong. 146 ids left `expected-failures.txt`, and 624 stay. The pull request lists the ids.
