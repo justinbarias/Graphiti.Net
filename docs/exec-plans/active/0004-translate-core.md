@@ -16,8 +16,8 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 4 | `port/prompts` | Done 2026-11-27. `prompts` | 14 | 3,052 | Sonnet 5.5, medium |
 | 5 | `port/neo4j` | Done 2026-11-27. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
 | 6 | `port/search` | Done 2026-11-27. `search` | 7 | 3,456 | Opus 5.5, medium |
-| 7 | `port/maintenance` | `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
-| 8 | `port/ingestion` | `ingestion` | 9 | 4,159 | Opus 5.5, medium |
+| 7 | `port/maintenance` | Done 2026-11-27. `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
+| 8 | `port/ingestion` | In progress. `ingestion` | 9 | 4,159 | Opus 5.5, medium |
 | 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
 
 Layer 0 is the skeleton that the porting skill requires, so every later layer compiles against fixed shapes.
