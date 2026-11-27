@@ -2,7 +2,8 @@
 // The recording is values/search_utils.json, which port/tools/record_search_utils.py wrote from Python. Fakes replace
 // the graph driver, its search interface, and its graph operations interface, and the test asserts on one ordered list
 // of their calls and the log lines. A float compares with a tolerance of 1e-6, because np.dot and np.linalg.norm go
-// through BLAS (R18, GAPS G17).
+// through BLAS (R18, GAPS G17). Each fake yields before it records, counts the calls in flight, and records its token,
+// so that the test compares the concurrency of the recording and shows the token of each call (R25).
 namespace Graphiti.Port.Evaluation;
 
 using System.Runtime.CompilerServices;
@@ -15,6 +16,42 @@ using Graphiti.Core.Search;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
+
+// A time limit for a body that runs on the scheduler (R25). [Fact(Timeout)] cannot end a test whose body blocks the one
+// thread of the scheduler: xunit waits for the test, and each later test queues behind the blocked thread, so a
+// blocking call in ported code hangs the whole run. The guard waits for the body with a limit, and it ends the process
+// with a message if the scheduler does not answer after the limit, so that the run fails and does not hang.
+internal static class LoopGuard
+{
+    internal static async Task<T> RunAsync<T>(Func<Task<T>> body)
+    {
+        var task = Asyncio.Run(body);
+        try
+        {
+            return await task.WaitAsync(TimeSpan.FromSeconds(4));
+        }
+        catch (TimeoutException)
+        {
+            try
+            {
+                await Asyncio.Run(() => Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(1));
+            }
+            catch (TimeoutException)
+            {
+                Environment.FailFast("The scheduler of the port is blocked: a call in ported code blocks its thread (R8, R25).");
+            }
+
+            throw;
+        }
+    }
+
+    internal static async Task RunAsync(Func<Task> body) =>
+        await RunAsync<object?>(async () =>
+        {
+            await body();
+            return null;
+        });
+}
 
 public class SearchUtilsValuesTests
 {
@@ -64,13 +101,20 @@ public class SearchUtilsValuesTests
             ["none", "raise", "return"],
             inputs.Where(i => i.TryGetProperty("operations", out _)).Select(i => i.GetProperty("operations").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
         Assert.Contains(inputs, i => i.TryGetProperty("limit", out var limit) && limit.ValueKind == JsonValueKind.Number && limit.GetInt64() == 0);
+
+        // The limit of semaphore_gather shows: a hybrid search of 22 searches ran 20 at one time (SEMAPHORE_LIMIT).
+        Assert.Contains(
+            Cases,
+            c => c.GetProperty("input").GetProperty("fn").GetString() == "hybrid_node_search"
+                && c.GetProperty("input").GetProperty("queries").GetArrayLength() + c.GetProperty("input").GetProperty("embeddings").GetArrayLength() > Helpers.SemaphoreLimit
+                && c.GetProperty("output").GetProperty("max_in_flight").GetInt64() == Helpers.SemaphoreLimit);
         Assert.Equal(
             ["GroupIdValidationError", "NotImplementedError", "TypeError", "ValueError", "ZeroDivisionError"],
             Cases.Select(c => c.GetProperty("output").GetProperty("error")).Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => e.GetProperty("type").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
     }
 
-    [Theory]
+    [Theory(Timeout = 5000)]
     [MemberData(nameof(CaseIndexes))]
     public async Task Each_result_call_and_log_line_matches_Python(int index)
     {
@@ -78,7 +122,13 @@ public class SearchUtilsValuesTests
         var output = Cases[index].GetProperty("output");
         var fn = input.GetProperty("fn").GetString()!;
         var events = new List<JsonNode>();
-        var driver = MakeDriver(input, events);
+        var probe = new Probe();
+        var driver = MakeDriver(input, events, probe);
+
+        // A live token: each fake records the token that it gets, and it is this one for each call. It is linked to the
+        // token of the test, so that the time limit of the test reaches the call.
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var token = source.Token;
 
         using var factory = new CaptureFactory(events);
         using var scope = PortServices.Use(loggerFactory: factory);
@@ -87,7 +137,7 @@ public class SearchUtilsValuesTests
         Exception? error = null;
         try
         {
-            value = await Asyncio.Run(() => RunAsync(fn, input, driver, TestContext.Current.CancellationToken));
+            value = await LoopGuard.RunAsync(() => RunAsync(fn, input, driver, token));
         }
         catch (Exception e) when (e is GraphitiException or ArgumentException or InvalidCastException or NotImplementedException
             or DivideByZeroException or KeyNotFoundException)
@@ -133,27 +183,47 @@ public class SearchUtilsValuesTests
         {
             AssertSame(Untimed(expectedEvents[i]), Untimed(events[i]), lenient);
         }
+
+        // The largest count of calls that ran at the same time: the limit of semaphore_gather shows in it.
+        Assert.Equal(output.GetProperty("max_in_flight").GetInt32(), probe.Max);
+
+        // Each call that reached a fake carried the token of the caller.
+        Assert.Equal(expectedEvents.Count(IsCall), probe.Tokens.Count);
+        Assert.All(probe.Tokens, recorded => Assert.Equal(token, recorded));
     }
+
+    // A call of a fake: a query of the driver, or an operation of an interface. build_fulltext_query is a sync method.
+    private static bool IsCall(JsonElement e) =>
+        e.GetProperty("kind").GetString() == "query"
+        || (e.GetProperty("kind").GetString() == "op" && e.GetProperty("op").GetString() != "build_fulltext_query");
+
+    private static bool IsCall(JsonNode e) => IsCall(JsonSerializer.SerializeToElement(e));
 
     // PORT: no Python original. Python has no cancellation token, so this test checks rule R8 by itself. Each async
     // function passes its token to the driver and to the interfaces, and awaits the call. A fake that is canceled throws
-    // OperationCanceledException after a yield, so a dropped token or a missing await does not give the exception.
-    [Theory]
+    // OperationCanceledException after a yield, so a dropped token or a missing await does not give the exception. The
+    // fake records no call. The theory runs the first case of each function, provider, and interface mode, and of each
+    // shape of a hybrid search (so that the similarity call is the first call in one case). The test of the recording
+    // checks the token of each later call.
+    [Theory(Timeout = 5000)]
     [MemberData(nameof(CanceledCalls))]
     public async Task Each_async_function_passes_its_token_and_awaits_the_call(int index)
     {
-        using var canceled = new CancellationTokenSource();
+        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await canceled.CancelAsync();
         var input = Cases[index].GetProperty("input");
-        var driver = MakeDriver(input, []);
+        var events = new List<JsonNode>();
+        var driver = MakeDriver(input, events, new Probe());
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => Asyncio.Run(() => RunAsync(input.GetProperty("fn").GetString()!, input, driver, canceled.Token)));
+            () => LoopGuard.RunAsync(() => RunAsync(input.GetProperty("fn").GetString()!, input, driver, canceled.Token)));
+
+        Assert.DoesNotContain(events, IsCall);
     }
 
     public static TheoryData<int> CanceledCalls()
     {
-        // The first case of each async function that reaches the driver or an interface with no error.
+        // The first case of each async function, provider, and mode that reaches the driver or an interface with no error.
         var data = new TheoryData<int>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < Cases.Count; i++)
@@ -161,9 +231,14 @@ public class SearchUtilsValuesTests
             var input = Cases[i].GetProperty("input");
             var output = Cases[i].GetProperty("output");
             var fn = input.GetProperty("fn").GetString()!;
-            var mode = input.TryGetProperty("search_interface", out var si) ? si.GetString() : input.TryGetProperty("operations", out var op) ? op.GetString() : "none";
+            var mode = (input.TryGetProperty("search_interface", out var si) ? si.GetString() : "none")
+                + "/" + (input.TryGetProperty("operations", out var op) ? op.GetString() : "none");
+            var provider = input.TryGetProperty("provider", out var p) ? p.GetString() : "none";
+            var shape = fn == "hybrid_node_search"
+                ? (input.GetProperty("queries").GetArrayLength() > 0 ? "q" : "-") + (input.GetProperty("embeddings").GetArrayLength() > 0 ? "e" : "-")
+                : string.Empty;
             if (input.TryGetProperty("args", out _) || output.GetProperty("error").ValueKind != JsonValueKind.Null
-                || output.GetProperty("events").GetArrayLength() == 0 || !seen.Add(fn + "/" + mode))
+                || !output.GetProperty("events").EnumerateArray().Any(IsCall) || !seen.Add($"{fn}/{provider}/{mode}/{shape}"))
             {
                 continue;
             }
@@ -174,23 +249,23 @@ public class SearchUtilsValuesTests
         return data;
     }
 
-    private static FakeDriver MakeDriver(JsonElement input, List<JsonNode> events)
+    private static FakeDriver MakeDriver(JsonElement input, List<JsonNode> events, Probe probe)
     {
         var provider = input.TryGetProperty("provider", out var p) ? PyEnum.FromValue<GraphProvider>(p.GetString()) : GraphProvider.Neo4j;
-        return new FakeDriver(events, RowsFor(input), input.TryGetProperty("header", out var header) ? Read(header) : null)
+        return new FakeDriver(events, probe, RowsFor(input), input.TryGetProperty("header", out var header) ? Read(header) : null)
         {
             Provider = provider,
             FulltextSyntax = input.TryGetProperty("syntax", out var syntax) ? syntax.GetString()! : string.Empty,
             SearchInterface = (input.TryGetProperty("search_interface", out var si) ? si.GetString() : "none") switch
             {
                 "raise" => new RaisingSearchInterface(),
-                "return" => new ReturningSearchInterface(events),
+                "return" => new ReturningSearchInterface(events, probe),
                 _ => null,
             },
             GraphOperationsInterface = (input.TryGetProperty("operations", out var ops) ? ops.GetString() : "none") switch
             {
                 "raise" => new RaisingOperations(),
-                "return" => new ReturningOperations(events),
+                "return" => new ReturningOperations(events, probe),
                 _ => null,
             },
         };
@@ -689,7 +764,26 @@ public class SearchUtilsValuesTests
     private static JsonObject Op(string name, params object?[] args) =>
         new() { ["kind"] = "op", ["op"] = name, ["args"] = new JsonArray([.. args.Select(Encode)]) };
 
-    private sealed class FakeDriver(List<JsonNode> events, List<List<OrderedDictionary<string, object?>>> responses, object? header) : GraphDriver
+    // The calls in flight of one case, and the token of each call. A call is in flight from the entry of a fake method to its
+    // return. The scheduler runs one thread, so the counters need no lock.
+    private sealed class Probe
+    {
+        private int now;
+
+        internal int Max { get; private set; }
+
+        internal List<CancellationToken> Tokens { get; } = [];
+
+        internal void Enter(CancellationToken token)
+        {
+            Tokens.Add(token);
+            Max = Math.Max(Max, ++now);
+        }
+
+        internal void Leave() => now--;
+    }
+
+    private sealed class FakeDriver(List<JsonNode> events, Probe probe, List<List<OrderedDictionary<string, object?>>> responses, object? header) : GraphDriver
     {
         internal override string PythonName => "FakeDriver";
 
@@ -698,23 +792,31 @@ public class SearchUtilsValuesTests
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            cancellationToken.ThrowIfCancellationRequested();
-            events.Add(new JsonObject
+            probe.Enter(cancellationToken);
+            try
             {
-                ["kind"] = "query",
-                ["query"] = cypherQuery,
-                ["keys"] = new JsonArray([.. parameters.Keys.Select(k => (JsonNode)k)]),
-                ["values"] = new JsonArray([.. parameters.Values.Select(Encode)]),
-            });
-            List<OrderedDictionary<string, object?>> records = [];
-            if (responses.Count > 0)
-            {
-                records = responses[0];
-                responses.RemoveAt(0);
-            }
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                events.Add(new JsonObject
+                {
+                    ["kind"] = "query",
+                    ["query"] = cypherQuery,
+                    ["keys"] = new JsonArray([.. parameters.Keys.Select(k => (JsonNode)k)]),
+                    ["values"] = new JsonArray([.. parameters.Values.Select(Encode)]),
+                });
+                List<OrderedDictionary<string, object?>> records = [];
+                if (responses.Count > 0)
+                {
+                    records = responses[0];
+                    responses.RemoveAt(0);
+                }
 
-            return (records, header, null);
+                return (records, header, null);
+            }
+            finally
+            {
+                probe.Leave();
+            }
         }
 
         internal override string BuildFulltextQuery(string query, List<string>? groupIds = null, long maxQueryLength = 128)
@@ -738,7 +840,7 @@ public class SearchUtilsValuesTests
     private sealed record RaisingOperations : GraphOperationsInterface;
 
     // Records each call with the arguments after the driver, as the Python recorder does, and returns fixed values.
-    private sealed record ReturningSearchInterface(List<JsonNode> Events) : SearchInterface
+    private sealed record ReturningSearchInterface(List<JsonNode> Events, Probe Probe) : SearchInterface
     {
         private static EntityEdge Edge() => EntityEdge.ModelValidate(With(Data("entity_edge"), ("uuid", "si-1")));
 
@@ -818,13 +920,21 @@ public class SearchUtilsValuesTests
 
         private async Task Note(string name, CancellationToken cancellationToken, params object?[] args)
         {
-            await Task.Yield();
-            cancellationToken.ThrowIfCancellationRequested();
-            Events.Add(Op(name, args));
+            Probe.Enter(cancellationToken);
+            try
+            {
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                Events.Add(Op(name, args));
+            }
+            finally
+            {
+                Probe.Leave();
+            }
         }
     }
 
-    private sealed record ReturningOperations(List<JsonNode> Events) : GraphOperationsInterface
+    private sealed record ReturningOperations(List<JsonNode> Events, Probe Probe) : GraphOperationsInterface
     {
         internal override async Task<List<EntityNode>> GetMentionedNodesAsync(GraphDriver driver, List<EpisodicNode> episodes, CancellationToken cancellationToken = default)
         {
@@ -859,9 +969,17 @@ public class SearchUtilsValuesTests
 
         private async Task Note(string name, CancellationToken cancellationToken, params object?[] args)
         {
-            await Task.Yield();
-            cancellationToken.ThrowIfCancellationRequested();
-            Events.Add(Op(name, args));
+            Probe.Enter(cancellationToken);
+            try
+            {
+                await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
+                Events.Add(Op(name, args));
+            }
+            finally
+            {
+                Probe.Leave();
+            }
         }
     }
 

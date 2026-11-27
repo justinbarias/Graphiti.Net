@@ -15,7 +15,7 @@ public class SearchUtilsTest
     private static EntityNode Node(string uuid, string name) =>
         new EntityNode { Uuid = uuid, Name = name, Labels = ["Entity"], GroupId = "1" }.Validate();
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_hybrid_node_search_deduplication()
     {
         // Mock the database driver
@@ -27,7 +27,7 @@ public class SearchUtilsTest
         // Call the function with test data
         List<string> queries = ["Alice", "Bob"];
         List<List<double>> embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]];
-        var results = await Asyncio.Run(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), cancellationToken: TestContext.Current.CancellationToken));
+        var results = await LoopGuard.RunAsync(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), cancellationToken: TestContext.Current.CancellationToken));
 
         // Assertions
         Assert.Equal(3, results.Count);
@@ -39,7 +39,7 @@ public class SearchUtilsTest
         Assert.Equal(2, mockSearch.SimilarityCalls.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_hybrid_node_search_empty_results()
     {
         var mockSearch = new MockSearch([], []);
@@ -47,12 +47,12 @@ public class SearchUtilsTest
 
         List<string> queries = ["NonExistent"];
         List<List<double>> embeddings = [[0.1, 0.2, 0.3]];
-        var results = await Asyncio.Run(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), cancellationToken: TestContext.Current.CancellationToken));
+        var results = await LoopGuard.RunAsync(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Empty(results);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_hybrid_node_search_only_fulltext()
     {
         var mockSearch = new MockSearch([[Node("1", "Alice")]], []);
@@ -60,7 +60,7 @@ public class SearchUtilsTest
 
         List<string> queries = ["Alice"];
         List<List<double>> embeddings = [];
-        var results = await Asyncio.Run(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), cancellationToken: TestContext.Current.CancellationToken));
+        var results = await LoopGuard.RunAsync(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Single(results);
         Assert.Equal("Alice", results[0].Name);
@@ -68,7 +68,7 @@ public class SearchUtilsTest
         Assert.Empty(mockSearch.SimilarityCalls);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_hybrid_node_search_with_limit()
     {
         var mockSearch = new MockSearch(
@@ -79,7 +79,7 @@ public class SearchUtilsTest
         List<string> queries = ["Test"];
         List<List<double>> embeddings = [[0.1, 0.2, 0.3]];
         long limit = 1;
-        var results = await Asyncio.Run(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), ["1"], limit, TestContext.Current.CancellationToken));
+        var results = await LoopGuard.RunAsync(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), ["1"], limit, TestContext.Current.CancellationToken));
 
         // We expect 4 results because the limit is applied per search method
         // before deduplication, and we're not actually limiting the results
@@ -92,7 +92,7 @@ public class SearchUtilsTest
         MockSearch.AssertCalledWith(mockSearch.SimilarityCalls, mockDriver, new List<double> { 0.1, 0.2, 0.3 }, ["1"], 2);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_hybrid_node_search_with_limit_and_duplicates()
     {
         var mockSearch = new MockSearch(
@@ -103,7 +103,7 @@ public class SearchUtilsTest
         List<string> queries = ["Test"];
         List<List<double>> embeddings = [[0.1, 0.2, 0.3]];
         long limit = 2;
-        var results = await Asyncio.Run(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), ["1"], limit, TestContext.Current.CancellationToken));
+        var results = await LoopGuard.RunAsync(() => SearchUtils.HybridNodeSearchAsync(queries, embeddings, mockDriver, new SearchFilters(), ["1"], limit, TestContext.Current.CancellationToken));
 
         // We expect 3 results because:
         // 1. The limit of 2 is applied to each search method
@@ -126,16 +126,19 @@ public class SearchUtilsTest
 
         internal List<Call> SimilarityCalls { get; } = [];
 
-        internal override Task<List<EntityNode>> NodeFulltextSearchAsync(GraphDriver driver, string query, SearchFilters searchFilter, List<string>? groupIds = null, long limit = 100, CancellationToken cancellationToken = default)
+        internal override async Task<List<EntityNode>> NodeFulltextSearchAsync(GraphDriver driver, string query, SearchFilters searchFilter, List<string>? groupIds = null, long limit = 100, CancellationToken cancellationToken = default)
         {
+            // A fake that returns a task yields first, then records the call (R25).
+            await Task.Yield();
             FulltextCalls.Add(new(driver, query, searchFilter, groupIds, limit));
-            return Task.FromResult(Next(FulltextResults, FulltextCalls.Count));
+            return Next(FulltextResults, FulltextCalls.Count);
         }
 
-        internal override Task<List<EntityNode>> NodeSimilaritySearchAsync(GraphDriver driver, List<double> searchVector, SearchFilters searchFilter, List<string>? groupIds = null, long limit = 100, double minScore = 0.7, CancellationToken cancellationToken = default)
+        internal override async Task<List<EntityNode>> NodeSimilaritySearchAsync(GraphDriver driver, List<double> searchVector, SearchFilters searchFilter, List<string>? groupIds = null, long limit = 100, double minScore = 0.7, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
             SimilarityCalls.Add(new(driver, searchVector, searchFilter, groupIds, limit));
-            return Task.FromResult(Next(SimilarityResults, SimilarityCalls.Count));
+            return Next(SimilarityResults, SimilarityCalls.Count);
         }
 
         // assert_called_with checks the last call: the driver, the query or the vector, SearchFilters(), the group ids,

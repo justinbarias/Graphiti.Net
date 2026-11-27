@@ -15,7 +15,7 @@ public class TestEpisodeMentionsReranker
     private static MockDriver Driver(params (string Uuid, long Score)[] records) =>
         new([.. records.Select(r => new OrderedDictionary<string, object?> { ["uuid"] = r.Uuid, ["score"] = r.Score })]);
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_episode_mentions_reranker_orders_by_descending_mentions()
     {
         var driver = Driver(("low", 1), ("high", 10), ("mid", 5));
@@ -26,7 +26,7 @@ public class TestEpisodeMentionsReranker
         Assert.Equal([10.0, 5.0, 1.0], scores);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_episode_mentions_reranker_unmentioned_nodes_rank_last()
     {
         var driver = Driver(("mentioned", 3));
@@ -38,7 +38,7 @@ public class TestEpisodeMentionsReranker
         Assert.Equal([3.0, 0.0], scores);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_episode_mentions_reranker_min_score_filters_unmentioned_nodes()
     {
         var driver = Driver(("mentioned", 3));
@@ -53,7 +53,7 @@ public class TestEpisodeMentionsReranker
         Assert.Equal([3.0], scores);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_episode_mentions_reranker_all_unmentioned_returns_empty_when_filtered()
     {
         var driver = Driver();
@@ -68,11 +68,15 @@ public class TestEpisodeMentionsReranker
     {
         internal override string PythonName => "AsyncMock";
 
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>((records, null, null));
+            CancellationToken cancellationToken = default)
+        {
+            // A fake that returns a task yields first, then records the call (R25).
+            await Task.Yield();
+            return (records, null, null);
+        }
 
         internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");
 

@@ -3,7 +3,13 @@
 The upstream test file checks six calls with one result shape. This file runs the wrapper over each branch
 (no group ids, an empty list, one id equal to the database of the driver, one other id, two ids, three ids,
 two equal ids) with each result shape (list, SearchResults, tuple of two lists), each provider (FalkorDB, Neo4j),
-a host with no `clients`, a caller driver or none, and max_coroutines of None or 1 (port/RULES.md, R25).
+a host with no `clients`, a caller driver or none, and max_coroutines of None, 1, or 2 (port/RULES.md, R25).
+
+The case records one ordered list of events: each clone call of the fake driver, the entry of the decorated function
+(before its first yield), and its record of the call (after the yield). The list shows where the wrapper clones the
+driver: in the task of a group, after the task has its place under the limit of semaphore_gather. The case also records
+the largest count of calls of the function that ran at the same time (max_in_flight), from the entry of a call to its
+return, which shows the limit of max_coroutines.
 
     .upstream/graphiti/.venv/bin/python port/tools/record_handle_multiple_group_ids.py
     .upstream/graphiti/.venv/bin/python port/tools/record_handle_multiple_group_ids.py --check
@@ -27,23 +33,23 @@ ROOT = Path(__file__).resolve().parents[2]
 UPSTREAM = Path(os.environ.get('GRAPHITI_UPSTREAM') or ROOT / '.upstream' / 'graphiti')
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'handle_multiple_group_ids.json'
 
-GROUPS = [None, [], ['reggraph'], ['other'], ['a', 'b'], ['a', 'b', 'c'], ['a', 'a']]
+GROUPS = [None, [], ['reggraph'], ['other'], ['a', 'b'], ['a', 'b', 'c'], ['a', 'a'], ['a', 'b', 'c', 'd']]
 SHAPES = ['list', 'search', 'tuple']
 PROVIDERS = ['falkordb', 'neo4j', 'none']
 
 
 async def run_case(decorator, GraphProvider, SearchResults, provider, shape, group_ids, caller, max_coroutines):
+    events = []
+    flight = {'now': 0, 'max': 0}
+
     class FakeDriver:
         def __init__(self, database, prov):
             self._database = database
             self.provider = prov
-            self.clone_calls = []
 
         def clone(self, database):
-            self.clone_calls.append(database)
+            events.append(['clone', database])
             return FakeDriver(database, self.provider)
-
-    seen = []
 
     class Host:
         def __init__(self, driver):
@@ -53,19 +59,25 @@ async def run_case(decorator, GraphProvider, SearchResults, provider, shape, gro
 
         @decorator
         async def run(self, group_ids=None, driver=None):
-            # The C# fake yields before it records the call (port/RULES.md, R25). This one does the same.
-            await asyncio.sleep(0)
             db = getattr(driver, '_database', None) if driver is not None else None
-            seen.append([group_ids, db])
-            ids = group_ids or []
-            if shape == 'list':
-                return [f'{group_ids}:{db}']
-            if shape == 'search':
-                return SearchResults(
-                    edge_reranker_scores=[float(sum(ord(c) for c in ''.join(ids)))],
-                    node_reranker_scores=[float(len(ids))],
-                )
-            return ([f'a:{group_ids}:{db}'], [db or '-'])
+            events.append(['enter', group_ids, db])
+            flight['now'] += 1
+            flight['max'] = max(flight['max'], flight['now'])
+            try:
+                # The C# fake yields before it records the call (port/RULES.md, R25). This one does the same.
+                await asyncio.sleep(0)
+                events.append(['seen', group_ids, db])
+                ids = group_ids or []
+                if shape == 'list':
+                    return [f'{group_ids}:{db}']
+                if shape == 'search':
+                    return SearchResults(
+                        edge_reranker_scores=[float(sum(ord(c) for c in ''.join(ids)))],
+                        node_reranker_scores=[float(len(ids))],
+                    )
+                return ([f'a:{group_ids}:{db}'], [db or '-'])
+            finally:
+                flight['now'] -= 1
 
     clients_driver = None if provider == 'none' else FakeDriver('reggraph', GraphProvider.FALKORDB if provider == 'falkordb' else GraphProvider.NEO4J)
     host = Host(clients_driver)
@@ -77,7 +89,7 @@ async def run_case(decorator, GraphProvider, SearchResults, provider, shape, gro
         result = {'edge': result.edge_reranker_scores, 'node': result.node_reranker_scores}
     elif shape == 'tuple':
         result = [result[0], result[1]]
-    return {'result': result, 'seen': seen, 'clone_calls': [] if clients_driver is None else clients_driver.clone_calls}
+    return {'result': result, 'events': events, 'max_in_flight': flight['max']}
 
 
 def main() -> int:
@@ -94,7 +106,7 @@ def main() -> int:
         for shape in SHAPES:
             for group_ids in GROUPS:
                 for caller in (False, True):
-                    for max_coroutines in (None, 1):
+                    for max_coroutines in (None, 1, 2):
                         out = asyncio.run(run_case(handle_multiple_group_ids, GraphProvider, SearchResults,
                                                    provider, shape, group_ids, caller, max_coroutines))
                         cases.append({'provider': provider, 'shape': shape, 'group_ids': group_ids, 'caller': caller,

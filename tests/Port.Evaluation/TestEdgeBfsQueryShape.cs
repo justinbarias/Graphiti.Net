@@ -10,7 +10,7 @@ using Graphiti.Core.Search;
 
 public class TestEdgeBfsQueryShape
 {
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_edge_bfs_search_consumes_path_relationships_directly()
     {
         var driver = new RecordingDriver();
@@ -34,7 +34,7 @@ public class TestEdgeBfsQueryShape
     /// The fulltext variant of this rewrite belongs to #1500; this change is
     /// scoped to the BFS query and must leave the fulltext query alone.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_edge_fulltext_search_not_rewritten_by_bfs_fix()
     {
         var driver = new RecordingDriver();
@@ -45,7 +45,7 @@ public class TestEdgeBfsQueryShape
         Assert.DoesNotContain("type(e) = 'RELATES_TO'", driver.CypherQuery, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_neptune_generic_edge_searches_return_reference_time()
     {
         var driver = new RecordingDriver { Provider = GraphProvider.Neptune };
@@ -76,14 +76,16 @@ public class TestEdgeBfsQueryShape
 
         internal override string PythonName => "RecordingDriver";
 
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
+            // A fake that returns a task yields first, then records the call (R25).
+            await Task.Yield();
             CypherQuery = cypherQuery;
             Params = parameters;
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>(([], null, null));
+            return ([], null, null);
         }
 
         internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");

@@ -11,10 +11,14 @@ using Graphiti.PyCompat;
 
 internal sealed class FakeGroupDriver : GraphDriver
 {
-    internal FakeGroupDriver(string database, GraphProvider provider = GraphProvider.Falkordb)
+    // The ordered list of events of a recording: each clone call is one entry, ["clone", database] (R25).
+    private readonly List<object?>? events;
+
+    internal FakeGroupDriver(string database, GraphProvider provider = GraphProvider.Falkordb, List<object?>? events = null)
     {
         Database = database;
         Provider = provider;
+        this.events = events;
     }
 
     internal List<string> CloneCalls { get; } = [];
@@ -24,7 +28,8 @@ internal sealed class FakeGroupDriver : GraphDriver
     internal override GraphDriver Clone(string database)
     {
         CloneCalls.Add(database);
-        return new FakeGroupDriver(database, Provider);
+        events?.Add(new List<object?> { "clone", database });
+        return new FakeGroupDriver(database, Provider, events);
     }
 
     internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
@@ -49,9 +54,9 @@ internal sealed class GroupIdsHost(GraphDriver? clientsDriver)
 
     internal List<string?> SeenDrivers { get; } = [];
 
-    internal Task<List<string>> SearchAsync(string query, List<string>? groupIds = null, GraphDriver? driver = null) =>
+    internal Task<List<string>> SearchAsync(string query, List<string>? groupIds = null, GraphDriver? driver = null, CancellationToken cancellationToken = default) =>
         Decorators.HandleMultipleGroupIdsAsync(
-            ClientsDriver, MaxCoroutines, groupIds, driver, (ids, d) => SearchCoreAsync(query, ids, d));
+            ClientsDriver, MaxCoroutines, groupIds, driver, (ids, d) => SearchCoreAsync(query, ids, d), cancellationToken);
 
     private async Task<List<string>> SearchCoreAsync(string query, List<string>? groupIds, GraphDriver? driver)
     {
@@ -67,16 +72,16 @@ internal sealed class GroupIdsHost(GraphDriver? clientsDriver)
 
 public class TestHandleMultipleGroupIds
 {
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_falkor_single_group_id_clones_driver_when_database_differs()
     {
         // Single group_id must route to that graph, not the driver's default (#1659).
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             var driver = new FakeGroupDriver("reggraph");
             var host = new GroupIdsHost(driver);
 
-            var result = await host.SearchAsync("q", ["acptprobe"]);
+            var result = await host.SearchAsync("q", ["acptprobe"], cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(["acptprobe"], driver.CloneCalls);
             // Shared driver must not be reassigned (call-scoped clone only)
@@ -87,15 +92,15 @@ public class TestHandleMultipleGroupIds
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_falkor_single_group_id_skips_clone_when_already_on_graph()
     {
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             var driver = new FakeGroupDriver("acptprobe");
             var host = new GroupIdsHost(driver);
 
-            var result = await host.SearchAsync("q", ["acptprobe"]);
+            var result = await host.SearchAsync("q", ["acptprobe"], cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Empty(driver.CloneCalls);
             Assert.Equal([null], host.SeenDrivers); // uses default path without injecting driver
@@ -103,15 +108,15 @@ public class TestHandleMultipleGroupIds
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_falkor_multi_group_ids_still_clones_each()
     {
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             var driver = new FakeGroupDriver("reggraph");
             var host = new GroupIdsHost(driver);
 
-            var result = await host.SearchAsync("q", ["a", "b"]);
+            var result = await host.SearchAsync("q", ["a", "b"], cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(["a", "b"], driver.CloneCalls);
             Assert.Same(driver, host.ClientsDriver);
@@ -120,15 +125,15 @@ public class TestHandleMultipleGroupIds
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_non_falkor_single_group_id_is_passthrough()
     {
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             var driver = new FakeGroupDriver("neo4j", GraphProvider.Neo4j);
             var host = new GroupIdsHost(driver);
 
-            var result = await host.SearchAsync("q", ["tenant"]);
+            var result = await host.SearchAsync("q", ["tenant"], cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Empty(driver.CloneCalls);
             Assert.Equal([null], host.SeenDrivers);
@@ -136,16 +141,16 @@ public class TestHandleMultipleGroupIds
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_falkor_multi_group_ids_with_positional_driver()
     {
         // A positional `driver` must not collide with the injected keyword (#1758).
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             var driver = new FakeGroupDriver("reggraph");
             var host = new GroupIdsHost(driver);
 
-            var result = await host.SearchAsync("q", ["a", "b"], driver);
+            var result = await host.SearchAsync("q", ["a", "b"], driver, TestContext.Current.CancellationToken);
 
             Assert.Equal(["a", "b"], driver.CloneCalls);
             Assert.Same(driver, host.ClientsDriver);
@@ -154,16 +159,16 @@ public class TestHandleMultipleGroupIds
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 5000)]
     public async Task test_falkor_multi_group_ids_with_positional_group_ids_and_kwarg_driver()
     {
         // `group_ids` positional with `driver` as a keyword.
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             var driver = new FakeGroupDriver("reggraph");
             var host = new GroupIdsHost(driver);
 
-            var result = await host.SearchAsync("q", ["a", "b"], driver: driver);
+            var result = await host.SearchAsync("q", ["a", "b"], driver: driver, cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(["a", "b"], driver.CloneCalls);
             Assert.Same(driver, host.ClientsDriver);

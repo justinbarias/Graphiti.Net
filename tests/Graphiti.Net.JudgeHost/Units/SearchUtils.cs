@@ -5,9 +5,10 @@ using Graphiti.JudgeHost.Core;
 
 /// <summary>The bindings of <c>graphiti_core/search/search_utils.py</c>.</summary>
 /// <remarks>
-/// The 19 cases of <c>fulltext_query</c> pass a <c>types:SimpleNamespace</c> as the driver. The lead owns the decode
-/// of that path (rule R22), so the binding is here and the path is not registered. The cases read the attributes
-/// <c>provider</c> and <c>fulltext_syntax</c>, and <c>build_fulltext_query</c> for a FalkorDB provider.
+/// The 19 cases of <c>fulltext_query</c> pass a <c>types:SimpleNamespace</c> as the driver. The binding wraps the
+/// namespace in <see cref="TypesBindings.NamespaceDriver"/>, which gives the attributes <c>provider</c> and
+/// <c>fulltext_syntax</c>. A namespace that lacks an attribute that Python reads gives the <c>AttributeError</c> after
+/// the validation of the group ids, as in Python.
 /// </remarks>
 internal static class SearchUtilsBindings
 {
@@ -16,7 +17,21 @@ internal static class SearchUtilsBindings
     internal static void Register(BindingTable table)
     {
         table.Pure.Add(Module + "calculate_cosine_similarity", call => call.Signature("vector1", "vector2").InvokeAsync(SearchUtils.CalculateCosineSimilarity));
-        table.Pure.Add(Module + "fulltext_query", call => call.Signature("query", "group_ids", "driver").InvokeAsync(SearchUtils.FulltextQuery));
+        table.Pure.Add(Module + "fulltext_query", call =>
+        {
+            var arguments = call.Signature("query", "group_ids", "driver");
+            var query = arguments.String("query");
+            var groupIds = arguments.NullableList<string>("group_ids");
+            if (arguments.Value("driver") is not TypesBindings.Namespace source)
+            {
+                return arguments.InvokeAsync(SearchUtils.FulltextQuery);
+            }
+
+            var driver = new TypesBindings.NamespaceDriver(source);
+            var result = SearchUtils.FulltextQuery(query, groupIds, driver);
+            driver.ThrowIfAttributeRead(groupIds);
+            return Codec.Result(result);
+        });
         table.Pure.Add(Module + "rrf", call => call.Signature("results", "rank_const", "min_score").InvokeAsync(SearchUtils.Rrf));
         table.Pure.Add(
             Module + "maximal_marginal_relevance",

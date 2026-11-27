@@ -21,6 +21,11 @@ The calls to the driver and to an interface, and the log lines, are one list in 
 time. The clock of search_utils.py is a constant here and real in the test, so the test removes the time
 from the two log lines.
 
+Each fake task method (execute_query and each interface method) yields with asyncio.sleep(0) before it
+records, as each C# fake runs Task.Yield() first (R25). Each fake also counts the calls in flight, from
+its entry to its return, and the recording keeps the largest count of each case (max_in_flight): the
+concurrency limit of semaphore_gather shows in it (R25).
+
 Inputs that the port cannot reproduce by a rule are left out, and the report of plan 0004 packet P6b
 names them: the Neptune branch of the four full-text searches (driver.run_aoss_query, which only the
 Neptune driver has).
@@ -272,6 +277,11 @@ def relevant_cases():
                     out.append({'fn': function, 'provider': provider, 'filters': filters, 'count': count, 'rows': 2})
             out.append({'fn': function, 'provider': provider, 'filters': 'labels', 'count': 2, 'rows': 0, 'limit': 0, 'min_score': 0.0})
         out.append({'fn': function, 'provider': 'neo4j', 'filters': 'none', 'count': 2, 'rows': 2, 'defaults': True})
+    # The Neptune score filter is `score > min_score`. The scores of the rows are 1.0, 0.0, and 0.6, so a min_score of 0.6
+    # and of 1.0 sits on a score.
+    for function in ('get_relevant_edges', 'get_edge_invalidation_candidates'):
+        for min_score in (0.6, 1.0):
+            out.append({'fn': function, 'provider': 'neptune', 'filters': 'none', 'count': 2, 'rows': 2, 'min_score': min_score})
     return out
 
 
@@ -314,6 +324,10 @@ def hybrid_cases():
             out.append({'fn': 'hybrid_node_search', 'provider': 'neo4j', 'queries': queries, 'embeddings': embeddings, 'group_ids': groups, 'filters': 'labels', 'limit': 3})
     out.append({'fn': 'hybrid_node_search', 'provider': 'neo4j', 'queries': ['q1'], 'embeddings': [[1.0, 0.0]], 'group_ids': None, 'filters': 'none', 'defaults': True})
     out.append({'fn': 'hybrid_node_search', 'provider': 'neo4j', 'queries': ['q1', 'q2'], 'embeddings': [[1.0, 0.0]], 'group_ids': ['g'], 'filters': 'none', 'limit': 2, 'search_interface': 'return'})
+    # More searches than the limit of semaphore_gather (SEMAPHORE_LIMIT, 20): 11 + 11 = 22 searches run, 20 at one time.
+    wide_queries = [f'q{i}' for i in range(11)]
+    wide_embeddings = [[1.0, round(i / 11, 3)] for i in range(11)]
+    out.append({'fn': 'hybrid_node_search', 'provider': 'neo4j', 'queries': wide_queries, 'embeddings': wide_embeddings, 'group_ids': ['g'], 'filters': 'none', 'limit': 3})
     return out
 
 
@@ -456,6 +470,16 @@ def main() -> int:
 
     rng = random.Random(SEED)
     events: list[dict] = []
+    # Calls in flight: a call counts from the entry of a fake method to its return.
+    flight = {'now': 0, 'max': 0}
+
+    class InFlight:
+        def __enter__(self):
+            flight['now'] += 1
+            flight['max'] = max(flight['max'], flight['now'])
+
+        def __exit__(self, *exc):
+            flight['now'] -= 1
     # A constant clock keeps the two timed log lines the same on each run.
     search_utils.time = lambda: 100.0
 
@@ -481,9 +505,11 @@ def main() -> int:
             self.header = header
 
         async def execute_query(self, cypher_query_, **kwargs):
-            events.append({'kind': 'query', 'query': cypher_query_, 'keys': list(kwargs), 'values': [encode(v) for v in kwargs.values()]})
-            records = self.responses.pop(0) if self.responses else []
-            return records, self.header, None
+            with InFlight():
+                await asyncio.sleep(0)
+                events.append({'kind': 'query', 'query': cypher_query_, 'keys': list(kwargs), 'values': [encode(v) for v in kwargs.values()]})
+                records = self.responses.pop(0) if self.responses else []
+                return records, self.header, None
 
         def build_fulltext_query(self, query, group_ids=None, max_query_length=128):
             events.append({'kind': 'op', 'op': 'build_fulltext_query', 'args': [encode(query), encode(group_ids), encode(max_query_length)]})
@@ -514,8 +540,10 @@ def main() -> int:
 
         def make(name):
             async def method(self, *args):
-                note(name, args)
-                return values[name]
+                with InFlight():
+                    await asyncio.sleep(0)
+                    note(name, args)
+                    return values[name]
 
             return method
 
@@ -536,8 +564,10 @@ def main() -> int:
 
         def make(name):
             async def method(self, *args):
-                note(name, args)
-                return values[name]
+                with InFlight():
+                    await asyncio.sleep(0)
+                    note(name, args)
+                    return values[name]
 
             return method
 
@@ -680,6 +710,8 @@ def main() -> int:
 
     def record(case, call):
         events.clear()
+        flight['now'] = 0
+        flight['max'] = 0
         outcome = {}
         try:
             value = call()
@@ -689,6 +721,7 @@ def main() -> int:
             outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
             outcome['result'] = None
         outcome['events'] = list(events)
+        outcome['max_in_flight'] = flight['max']
         results.append({'input': case, 'output': outcome})
 
     for case in pure_cases(rng):
