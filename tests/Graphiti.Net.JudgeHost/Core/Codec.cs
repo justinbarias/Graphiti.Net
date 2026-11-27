@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
 
 /// <summary>
@@ -55,6 +56,9 @@ internal static partial class Codec
                 return Class(ClassName(type));
             case JudgeClass judgeClass:
                 return Class(judgeClass.PythonName);
+            case GraphTypeDescriptor customType:
+                // A custom type stands for a pydantic class (RULES.md R15), which a result holds as the class.
+                return Class(customType.PythonName);
             case Exception error:
                 return new JsonObject { ["$exc"] = PythonExceptionName(error) ?? throw NoPythonName(error.GetType()) };
             case IJudgeModel model:
