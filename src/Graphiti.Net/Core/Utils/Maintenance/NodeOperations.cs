@@ -592,7 +592,7 @@ internal static partial class NodeOperations
         return candidatesByNode;
     }
 
-    // PORT: the nested coroutine _lookup_node is a lambda for Helpers.SemaphoreGatherAsync (R8).
+    // PORT: the nested coroutine _lookup_node is the local function LookupNodeAsync, and each lambda that Helpers.SemaphoreGatherAsync gets calls it (R8).
     internal static async Task<List<List<EntityNode>>> CollectIdentityPropertyCandidateNodesAsync(
         GraphitiClients clients,
         List<EntityNode> extractedNodes,

@@ -56,14 +56,23 @@ public partial class NodeOperationsValuesTests
 
         internal List<CancellationToken> Tokens { get; } = [];
 
-        // The count of the calls that take the token.
+        // The count of the calls that take the token and record themselves.
         internal long Count { get; private set; }
+
+        // The count of the calls that start, before a fake reads its token (R25).
+        internal long Attempts { get; private set; }
+
+        // The count of the attempts and the length of the event list at the moment that a fake cancels the token source.
+        internal long AttemptsAtCancel { get; private set; } = -1;
+
+        internal int EventsAtCancel { get; private set; } = -1;
 
         private Dictionary<string, long> InFlight { get; } = new(StringComparer.Ordinal);
 
-        // A call that takes the token: it counts itself in flight, yields, reads the token, and records itself.
+        // A call that takes the token: it counts an attempt and itself in flight, yields, reads the token, and records itself.
         internal async Task EnterAsync(string kind, OrderedDictionary<string, object?> record, CancellationToken token)
         {
+            Attempts++;
             InFlight[kind] = InFlight.GetValueOrDefault(kind) + 1;
             MaxInFlight[kind] = Math.Max(MaxInFlight.GetValueOrDefault(kind), InFlight[kind]);
             try
@@ -75,6 +84,8 @@ public partial class NodeOperationsValuesTests
                 Count++;
                 if (Count - 1 == cancelAt)
                 {
+                    AttemptsAtCancel = Attempts;
+                    EventsAtCancel = Events.Count;
                     await source.CancelAsync();
                 }
             }

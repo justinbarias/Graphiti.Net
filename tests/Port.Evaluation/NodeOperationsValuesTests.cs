@@ -31,6 +31,10 @@ public partial class NodeOperationsValuesTests
 
     private static readonly Regex Ms = new(@" in \d+ ms\z", RegexOptions.CultureInvariant);
 
+    // PORT: PyCompat writes the text of pydantic up to the type of each error. It leaves out the input value, the input
+    // type, and the link of each error, so the test removes them from the Python text (R25).
+    private static readonly Regex PydanticInput = new(@", input_value=.*?, input_type=\w+\]\n    For further information visit \S+", RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
     private static readonly string[] ExtraKeys = ["node_uuid", "group_id", "identity_type", "extracted_node_count", "group_count"];
 
     private static MaintenanceFixedClock Clock => new(PyDateTime.FromIsoFormat(Str(Values["fixed_now"])).ToDateTimeOffset());
@@ -68,6 +72,12 @@ public partial class NodeOperationsValuesTests
             Assert.Contains(messages, m => m.StartsWith(start, StringComparison.Ordinal));
         }
 
+        // The exact-name lookup that is not implemented falls back to the query of EntityNode.get_by_names.
+        Assert.Contains(
+            AsyncCases,
+            c => Dict(c["input"]).GetValueOrDefault("exact") is "$not_implemented"
+                && List(Dict(c["output"])["events"]).Any(e => Str(Dict(e)["kind"]) == "execute_query"));
+
         // Each function with a concurrency limit has a case with more calls than the limit (R25).
         var limited = AsyncCases.Where(c => Dict(Dict(c["input"])["clients"]).GetValueOrDefault("max_coroutines") is long).ToList();
         foreach (var kind in new[] { "search", "embed", "identity", "llm" })
@@ -95,8 +105,13 @@ public partial class NodeOperationsValuesTests
             }
             catch (Exception error) when (error is not InvalidOperationException)
             {
-                got = PyJson.Dumps(new OrderedDictionary<string, object?> { ["err"] = new List<object?> { PythonName(error) } });
-                result = result.TryGetValue("err", out var err) ? new() { ["err"] = new List<object?> { List(err)[0] } } : result;
+                // The type of each error, and the message of a ValidationError (R25). The text of another error is not a contract.
+                got = PyJson.Dumps(new OrderedDictionary<string, object?> { ["err"] = new List<object?> { PythonName(error), error is ValidationException ? error.Message : null } });
+                if (result.TryGetValue("err", out var err))
+                {
+                    var type = Str(List(err)[0]);
+                    result = new() { ["err"] = new List<object?> { type, type == "ValidationError" ? PydanticInput.Replace(Str(List(err)[1]), "]") : null } };
+                }
             }
 
             var want = PyJson.Dumps(result);
@@ -137,14 +152,11 @@ public partial class NodeOperationsValuesTests
         Assert.All(run.Tokens, token => Assert.Equal(source.Token, token));
     }
 
-    // The scenarios of the cancellation tests: the first two recorded cases of each function that make from 1 to 12
-    // calls that take the token and that end with no error.
+    // The scenarios of the cancellation tests: the cases that the recorder ran again with a cancel at each call k but
+    // the last (cancel_scenarios in port/tools/record_node_operations.py).
     private static readonly List<int> Scenarios = AsyncCases
         .Index()
-        .Where(c => Dict(c.Item["output"])["error"] is null)
-        .Where(c => List(Dict(c.Item["output"])["events"]).Count(e => KindOf(Str(Dict(e)["kind"])) is not null) is >= 1 and <= 12)
-        .GroupBy(c => Str(Dict(c.Item["input"])["fn"]))
-        .SelectMany(g => g.Take(2))
+        .Where(c => c.Item.ContainsKey("cancel"))
         .Select(c => c.Index)
         .ToList();
 
@@ -155,10 +167,9 @@ public partial class NodeOperationsValuesTests
         var data = new TheoryData<int, int>();
         foreach (var index in Scenarios)
         {
-            var calls = List(Dict(AsyncCases[index]["output"])["events"]).Count(e => KindOf(Str(Dict(e)["kind"])) is not null);
-            for (var k = 0; k < calls - 1; k++)
+            foreach (var recorded in List(AsyncCases[index]["cancel"]).Select(Dict).Where(r => (long)r["k"]! >= 0))
             {
-                data.Add(index, k);
+                data.Add(index, (int)(long)recorded["k"]!);
             }
         }
 
@@ -169,8 +180,10 @@ public partial class NodeOperationsValuesTests
     public void Each_async_function_has_a_cancellation_scenario() =>
         Assert.Equal(6, Scenarios.Select(i => Str(Dict(AsyncCases[i]["input"])["fn"])).Distinct().Count());
 
-    // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8)
-    // and makes no call that takes the token.
+    // Each async method with a canceled token throws OperationCanceledException (R8). The recorder canceled the task of
+    // the call before its first await (k = -1), so the test compares the attempts, the recorded calls, and the events
+    // that the method writes before it reads the token. A fake that is canceled throws after a yield, so a dropped token
+    // or a caught cancel gives other counts.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(ScenarioIndexes))]
     public async Task Each_async_method_with_a_canceled_token_throws_OperationCanceledException(int index)
@@ -180,12 +193,25 @@ public partial class NodeOperationsValuesTests
         await source.CancelAsync();
         var run = new Run(input, source, cancelAt: -1);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
-        Assert.Equal(0, run.Count);
+        using (PortServices.Use(loggerFactory: new EventCapture(run.Events), time: Clock))
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
+            await LoopGuard.RunAsync(Turns);
+        }
+
+        AssertCancelPoint(index, -1, run, 0);
     }
 
-    // A test with no Python original: the token is canceled while call k runs. Call k is the last call that a fake
-    // records, and the method throws OperationCanceledException at the call that follows (R8).
+    // The token is canceled while call k runs. Call k is the last call that a fake records. Python lets a CancelledError
+    // through each `except Exception` (it is a BaseException). The recorder cancelled the task of the call at the same
+    // point, so the test compares the count of the attempts (each fake counts an attempt before it reads its token),
+    // the count of the calls that a fake recorded, and the events after call k (the log lines and the later calls). The
+    // calls that a failed gather leaves run on, so the test gives the scheduler 50 turns before it counts (R25).
+    // A point in LateCancel is the late cancel of GAPS F33: the call that cancels is the last call of a gather, and Python
+    // raises CancelledError where the task of the caller resumes, so it makes no more attempt and writes no more line.
+    // The port reads the token at the next call of a fake, so it makes one more attempt, and that attempt throws. At the
+    // last search call it also writes the two debug lines that come before the LLM call ("attempts+after"). A point that
+    // agrees with Python must not be in the list, and a point in the list must differ in the way that its kind says.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(LaterCalls))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(int index, int k)
@@ -194,8 +220,66 @@ public partial class NodeOperationsValuesTests
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var run = new Run(input, source, cancelAt: k);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
-        Assert.Equal(k + 1, run.Count);
+        using (PortServices.Use(loggerFactory: new EventCapture(run.Events), time: Clock))
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
+            await LoopGuard.RunAsync(Turns);
+        }
+
+        AssertCancelPoint(index, k, run, run.EventsAtCancel);
+    }
+
+    private static void AssertCancelPoint(int index, int k, Run run, int eventsAtCancel)
+    {
+        var recorded = List(AsyncCases[index]["cancel"]).Select(Dict).Single(r => (long)r["k"]! == k);
+        var got = Normalize(new OrderedDictionary<string, object?>
+        {
+            ["k"] = (long)k,
+            ["error"] = "CancelledError",
+            ["attempts"] = run.Attempts,
+            ["count"] = run.Count,
+            ["after"] = run.Events.Skip(eventsAtCancel).ToList(),
+        });
+        var differences = string.Join(
+            "+",
+            CancelFields.Where(key => PyJson.Dumps(recorded[key]) != PyJson.Dumps(got[key])));
+        var listed = LateCancel.Where(e => e.Case == index && e.K == k).Select(e => e.Kind).ToList();
+        if (listed.Count == 0)
+        {
+            Assert.True(differences.Length == 0, $"case {index}, call {k}: the port differs from Python in {differences}: {PyJson.Dumps(recorded)} and {PyJson.Dumps(got)}");
+        }
+        else
+        {
+            Assert.Equal(listed.Single(), differences);
+        }
+    }
+
+    [Fact]
+    public void Each_late_cancel_entry_names_one_point_of_the_recording()
+    {
+        Assert.Equal(LateCancel.Length, LateCancel.Select(e => (e.Case, e.K)).Distinct().Count());
+        Assert.All(LateCancel, e => Assert.Contains(e.K, List(AsyncCases[e.Case]["cancel"]).Select(r => (int)(long)Dict(r)["k"]!)));
+    }
+
+    private static readonly string[] CancelFields = ["attempts", "count", "after"];
+
+    // The points where the port makes one more attempt than Python (GAPS F33).
+    private static readonly (int Case, int K, string Kind)[] LateCancel =
+    [
+        (75, 6, "attempts+after"),
+        (76, 6, "attempts+after"),
+        (179, 0, "attempts"),
+        (180, 0, "attempts"),
+        (245, 2, "attempts"),
+        (245, 7, "attempts+after"),
+    ];
+
+    private static async Task Turns()
+    {
+        for (var i = 0; i < 50; i++)
+        {
+            await Task.Yield();
+        }
     }
 
     // ------------------------------------------------------------ one async case
@@ -522,13 +606,22 @@ public partial class NodeOperationsValuesTests
         return (T)Walk(value)!;
     }
 
-    // The text that the test compares. The text of a pydantic error and of an IndexError is not a contract (R25).
+    // The text that the test compares. A pydantic message is compared without the parts that hold the input (R25). The text
+    // of an IndexError is not a contract.
     private static string Comparable(OrderedDictionary<string, object?> output)
     {
         var copy = (OrderedDictionary<string, object?>)Py.DeepCopy(output)!;
-        if (copy["error"] is OrderedDictionary<string, object?> error && Str(error["type"]) is "ValidationError" or "IndexError")
+        if (copy["error"] is OrderedDictionary<string, object?> error)
         {
-            error["text"] = null;
+            switch (Str(error["type"]))
+            {
+                case "ValidationError":
+                    error["text"] = PydanticInput.Replace(Str(error["text"]), "]");
+                    break;
+                case "IndexError":
+                    error["text"] = null;
+                    break;
+            }
         }
 
         return PyJson.Dumps(copy, indent: 1);

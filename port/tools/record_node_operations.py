@@ -12,10 +12,16 @@ The sync helpers get plain arguments. The async functions get fakes at the netwo
 - a driver with a graph operations interface (node_get_by_names, node_get_by_attribute_values) and a search
   interface (node_similarity_search), each with a scripted answer or a scripted failure.
 
-Each fake yields once (asyncio.sleep(0)) and then records its call. It also counts the calls in flight, and the case
-keeps the highest count of each kind (R25). The calls and the log lines of graphiti_core are one ordered list. A log
+Each fake counts an attempt, yields once (asyncio.sleep(0)), and then records its call. It also counts the calls in
+flight, and the case keeps the highest count of each kind (R25). The calls and the log lines of graphiti_core are one ordered list. A log
 line keeps its level, its text, the keys of `extra` that the module writes, and the type of the exception of
 `exc_info`.
+
+For a set of cases (cancel_scenarios) the tool also runs the case again with a cancel: once for k = -1, where the task is
+canceled before its first await, and once for each call k except the last, where the fake that makes call k records it
+and then cancels the task of the call (the port cancels a token source). The case keeps the count of the attempts of
+the run, the count of the recorded calls, and the events after call k. Python lets a CancelledError through each
+`except Exception`, so the port must make the same attempts and write the same log lines (R25).
 
 Fixed values on both sides:
 - node_operations.utc_now gives FIXED_NOW. The C# test gives the port a clock with the same time.
@@ -54,6 +60,7 @@ import os
 import random
 import re
 import sys
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -69,6 +76,9 @@ EXTRA_KEYS = ['node_uuid', 'group_id', 'identity_type', 'extracted_node_count', 
 LONG_TEXT = 400
 
 rng = random.Random(SEED)
+
+# A cancel leaves the coroutines of a gather that never started. Python warns about each one, and that is no result.
+warnings.filterwarnings('ignore', message='coroutine .* was never awaited', category=RuntimeWarning)
 
 # The event list of the run in progress. The log handler appends to it.
 CURRENT: dict = {'events': None}
@@ -229,13 +239,25 @@ class Run:
         self.in_flight = {}
         self.max_in_flight = {}
         self.llm_index = {}
+        self.attempts = 0
+        self.count = 0
+        self.cancel_at = None
+        self.main = None
+        self.events_at_cancel = None
 
     async def enter(self, kind, record):
+        self.attempts += 1
         self.in_flight[kind] = self.in_flight.get(kind, 0) + 1
         self.max_in_flight[kind] = max(self.max_in_flight.get(kind, 0), self.in_flight[kind])
-        await asyncio.sleep(0)
-        self.events.append(record)
-        self.in_flight[kind] -= 1
+        try:
+            await asyncio.sleep(0)
+            self.events.append(record)
+            self.count += 1
+            if self.cancel_at is not None and self.count - 1 == self.cancel_at:
+                self.events_at_cancel = len(self.events)
+                self.main.cancel()
+        finally:
+            self.in_flight[kind] -= 1
 
 
 def build_world(case, m):
@@ -380,15 +402,21 @@ def error_view(error):
     return {'type': type(error).__name__, 'text': str(error)}
 
 
-def call_async(m, case):
+def call_async(m, case, cancel_at=None):
     case = expand(case)
     run, clients, make_nodes = build_world(case, m)
+    run.cancel_at = cancel_at
     a = case['args']
     nodes = make_nodes(a.get('nodes', []))
     fn = case['fn']
     out = {}
 
     async def body():
+        run.main = asyncio.current_task()
+        if cancel_at == -1:
+            # A task that is canceled before its first await: the first suspension raises CancelledError.
+            run.events_at_cancel = 0
+            run.main.cancel()
         entity_types = make_types(a.get('entity_types'), m)
         previous = None if a.get('previous') is None else [m.EpisodicNode(**copy.deepcopy(e)) for e in a['previous']]
         if fn == 'extract_nodes':
@@ -464,9 +492,17 @@ def call_async(m, case):
     try:
         out['result'] = plain(asyncio.run(body()))
         out['error'] = None
+    except asyncio.CancelledError:
+        out['result'] = None
+        out['error'] = {'type': 'CancelledError', 'text': ''}
     except Exception as error:  # noqa: BLE001 - the recording keeps each exception
         out['result'] = None
         out['error'] = error_view(error)
+    if cancel_at is not None:
+        # The attempts of the whole run, and the events after call k (the log lines and the later calls).
+        out['attempts'] = run.attempts
+        out['count'] = run.count
+        out['after'] = run.events[run.events_at_cancel:] if run.events_at_cancel is not None else None
     out['events'] = run.events
     out['nodes_after'] = [node_view(n) for n in nodes]
     out['max_in_flight'] = dict(sorted(run.max_in_flight.items()))
@@ -701,6 +737,98 @@ def attribute_cases():
     return cases
 
 
+CALL_KINDS = {'llm', 'embed_create', 'embed_batch', 'get_by_names', 'get_by_attribute_values', 'node_similarity_search',
+              'execute_query'}
+
+
+def call_count(output) -> int:
+    return sum(1 for e in output['events'] if e['kind'] in CALL_KINDS)
+
+
+def cancel_scenarios(async_cases):
+    """The cases that the tool runs again with a cancel: for each function the first two cases that end with no error and
+    make from 1 to 12 calls, and each case with the key `cancel` (three identity lookups at the same time)."""
+    chosen: dict[str, list[int]] = {}
+    flagged = [i for i, case in enumerate(async_cases) if case['input'].get('cancel')]
+    for index, case in enumerate(async_cases):
+        output = case['output']
+        if case['input'].get('cancel'):
+            continue
+        if output['error'] is None and 1 <= call_count(output) <= 12:
+            chosen.setdefault(case['input']['fn'], [])
+            if len(chosen[case['input']['fn']]) < 2:
+                chosen[case['input']['fn']].append(index)
+    return sorted(flagged + [i for indexes in chosen.values() for i in indexes])
+
+
+def summary_case(nodes, replies, extra_args=None, **clients):
+    """One extract_attributes_from_nodes case that runs only the summary batch, with the replies of the batch prompt."""
+    args = {'nodes': nodes, 'episode': episode_data(1), 'previous': [], 'skip_attribute_extraction': True}
+    args.update(extra_args or {})
+    return {'fn': 'extract_attributes_from_nodes', 'clients': dict(clients),
+            'llm': {'extract_nodes.extract_summaries_batch': [{'summaries': replies}]}, 'args': args}
+
+
+def limit_cases():
+    """Inputs on a limit (R25): each value that a comparison of the module uses, on both sides of the limit."""
+    cases = []
+    # A summary of exactly 2 * MAX_SUMMARY_CHARS code points (some of them outside the BMP) stays as it is, and one more
+    # code point goes to the LLM.
+    exact = rep('a\U0001F600', 1000)
+    cases.append(summary_case(
+        [node_data('lim-0', 'Exact', summary=exact), node_data('lim-1', 'Over', summary=rep('b', 2001))],
+        [{'name': 'Over', 'summary': 'Shortened.'}]))
+    # A reply summary of exactly MAX_SUMMARY_CHARS characters with no sentence end, and one more or one less.
+    cases.append(summary_case(
+        [node_data('lim-2', 'Alpha'), node_data('lim-3', 'Beta'), node_data('lim-4', 'Gamma'), node_data('lim-5', 'Delta')],
+        [{'name': 'Alpha', 'summary': rep('a', 1000)}, {'name': 'Beta', 'summary': rep('b', 1001)},
+         {'name': 'Gamma', 'summary': rep('c', 999)}, {'name': 'Delta', 'summary': rep('One sentence. ', 71)}]))
+    # Exactly 20 unresolved nodes go to the LLM, and the debug line lists the first 10 ids and the last 10.
+    nodes = [node_data(f'twenty-{j}', f'Quux {j}', labels=['Entity']) for j in range(20)]
+    cases.append({'fn': 'resolve_extracted_nodes', 'clients': {}, 'exact': [], 'identity': {},
+                  'search': {n['name']: [node_data(f'twenty-c-{j}', n['name'] + 'x')] for j, n in enumerate(nodes)},
+                  'llm': {'dedupe_nodes.nodes': [resolution_reply(20)]},
+                  'args': {'nodes': nodes, 'episode': episode_data(1), 'previous': []}})
+    return cases
+
+
+def group_cases():
+    """A summary flight whose nodes are in two groups: the LLM call gets the group of the first node."""
+    cases = []
+    for order in (('h', 'g'), ('g', 'h')):
+        nodes = [node_data(f'grp-{order[0]}-{j}', f'Node {g}', group_id=g) for j, g in enumerate(order)]
+        cases.append(summary_case(nodes, [{'name': f'Node {g}', 'summary': f'Summary of {g}.'} for g in order]))
+    return cases
+
+
+def lower_cases():
+    """Names that change under full case mapping: the reply name matches the node name after str.lower()."""
+    nodes = [node_data('low-0', '\u0130stanbul'), node_data('low-1', '\u039f\u0394\u039f\u03a3'),
+             node_data('low-2', '\u1e9e'), node_data('low-3', '\u01c5x')]
+    replies = [{'name': 'i\u0307stanbul', 'summary': 'A city.'}, {'name': '\u03bf\u03b4\u03bf\u03c2', 'summary': 'A road.'},
+               {'name': '\u00df', 'summary': 'A letter.'}, {'name': '\u01c6x', 'summary': 'Titlecase.'}]
+    return [summary_case(nodes, replies)]
+
+
+def concurrency_cases():
+    """Three identity lookups that run at the same time, and an exact-name lookup that is not implemented."""
+    cases = []
+    people = [node_data(f'idc-{j}', f'Person {j}', labels=['Entity', 'Person'], attributes={'email': f'p{j}@x.io'}) for j in range(3)]
+    found = node_data('idc-found', 'Person 0 found', labels=['Entity', 'Person'], attributes={'email': 'p0@x.io'})
+    cases.append({'fn': 'resolve_extracted_nodes', 'cancel': True, 'clients': {'max_coroutines': None}, 'exact': [],
+                  'identity': {'Person': [found]}, 'identity_mode': 'returns', 'search': {},
+                  'llm': {'dedupe_nodes.nodes': [{'entity_resolutions': [{'id': 0, 'name': 'Person 0', 'duplicate_candidate_id': -1}]}]},
+                  'args': {'nodes': people, 'episode': episode_data(1), 'previous': [], 'identity_properties': {'Person': ['email']}}})
+    # The execute_query path of EntityNode.get_by_names, for each provider that the module reaches.
+    for provider in ('neo4j', 'neptune'):
+        nodes = [node_data(f'ni-{provider}-{j}', f'Name {j}', labels=['Entity']) for j in range(2)]
+        for fn in ('resolve_extracted_nodes', 'collect_candidate_nodes'):
+            cases.append({'fn': fn, 'clients': {'provider': provider}, 'exact': '$not_implemented', 'identity': {}, 'search': {},
+                          'llm': {'dedupe_nodes.nodes': [resolution_reply(2)]},
+                          'args': {'nodes': nodes, 'episode': episode_data(1), 'previous': []}})
+    return cases
+
+
 def sync_cases(m):
     no = m.no
     records = []
@@ -794,6 +922,8 @@ def main() -> int:
         raise SystemExit(f'Python 3.12 is needed, and this is {sys.version.split()[0]}')
     sys.path.insert(0, str(UPSTREAM))
     os.environ.pop('GRAPHITI_ATTRIBUTE_MAX_LENGTH', None)
+    from pydantic import ConfigDict
+
     from graphiti_core.driver.driver import GraphProvider
     from graphiti_core.driver.graph_operations.graph_operations import GraphOperationsInterface
     from graphiti_core.driver.search_interface.search_interface import SearchInterface
@@ -815,12 +945,17 @@ def main() -> int:
     attribute_utils.set = InsertionOrderSet
 
     class OrderedLabelsEntityNode(EntityNode):
+        model_config = ConfigDict(title='EntityNode')
+
         def __init__(self, **data):
             labels = data.get('labels')
             if labels is not None and 'Entity' in labels:
                 data['labels'] = ['Entity'] + [label for label in labels if label != 'Entity']
             super().__init__(**data)
 
+    # The title of a pydantic error is the title of the model config, and the class takes the name of upstream too.
+    OrderedLabelsEntityNode.__name__ = 'EntityNode'
+    OrderedLabelsEntityNode.__qualname__ = 'EntityNode'
     node_operations.EntityNode = OrderedLabelsEntityNode
     node_operations.utc_now = lambda: FIXED_NOW
 
@@ -856,11 +991,22 @@ def main() -> int:
 
     sync = sync_cases(m)
     async_inputs = extract_cases() + resolve_cases() + attribute_cases()
+    # The cases of the review round come last, so that the index of each earlier case stays.
+    async_inputs += limit_cases() + group_cases() + lower_cases() + concurrency_cases()
     async_cases = []
     for case in async_inputs:
         output = call_async(m, case)
         CURRENT['events'] = None
         async_cases.append({'input': case, 'output': normalize_uuids(output)})
+    for index in cancel_scenarios(async_cases):
+        case = async_cases[index]
+        runs = []
+        for k in range(-1, call_count(case['output']) - 1):
+            output = call_async(m, async_inputs[index], cancel_at=k)
+            CURRENT['events'] = None
+            runs.append(normalize_uuids({'k': k, 'error': output['error']['type'], 'attempts': output['attempts'],
+                                         'count': output['count'], 'after': output['after']}))
+        case['cancel'] = runs
     sync = [dict(r, r=normalize_uuids(r['r'])) for r in sync]
 
     def dumps(value):
