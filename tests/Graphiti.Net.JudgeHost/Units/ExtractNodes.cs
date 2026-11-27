@@ -1,6 +1,7 @@
 namespace Graphiti.JudgeHost.Units;
 
 using Graphiti.Core.Prompts;
+using Graphiti.Internal;
 using Graphiti.JudgeHost.Core;
 
 /// <summary>The bindings of <c>graphiti_core/prompts/extract_nodes.py</c>.</summary>
@@ -20,9 +21,22 @@ internal static class ExtractNodesBindings
         table.Pure.Add(Module + ":extract_summaries_batch", call => call.Signature("context").InvokeAsync(ExtractNodes.ExtractSummariesBatch));
         table.Pure.Add(Module + ":extract_entity_summaries_from_episodes", call => call.Signature("context").InvokeAsync(ExtractNodes.ExtractEntitySummariesFromEpisodes));
 
+        // The cases pass the class ExtractedEntity as a custom type, and they read only its __doc__ and its identity
+        // (R22). No case passes it as a response model. The class has no docstring.
+        // PORT: the C# model has no ModelFields, because upstream reads none, so the name and is_required() of each
+        // Python field are written here.
         table.Registry
             .AddRef(Module + ":extract_message", (PromptFunction)ExtractNodes.ExtractMessage)
-            .AddRef(Module + ":ExtractedEntity", ExtractedEntity.ResponseModel)
+            .AddRef(
+                Module + ":ExtractedEntity",
+                new GraphTypeDescriptor(
+                    "ExtractedEntity",
+                    null,
+                    [
+                        new GraphFieldDescriptor("name", GraphFieldKind.String, false, null, true, null),
+                        new GraphFieldDescriptor("entity_type_id", GraphFieldKind.Integer, false, null, true, null),
+                        new GraphFieldDescriptor("episode_indices", GraphFieldKind.Integer, true, null, false, null),
+                    ]))
             .AddRef(Module + ":ExtractedEntities", ExtractedEntities.ResponseModel)
             .AddModel(Module + ":ExtractedEntity", data => ExtractedEntity.ModelValidate(data));
 

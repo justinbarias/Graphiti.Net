@@ -2,7 +2,10 @@ namespace Graphiti.Internal;
 
 using Graphiti.PyCompat;
 
-/// <summary>The scalar kind of a field of a custom entity or edge type (decision D26).</summary>
+/// <summary>
+/// The scalar kind of a field of a custom entity or edge type (decision D26). Each member of the public
+/// <see cref="Graphiti.GraphFieldKind"/> is one of these kinds, with <see cref="GraphFieldDescriptor.IsList"/> for a list form.
+/// </summary>
 internal enum GraphFieldKind
 {
     String,
@@ -48,6 +51,8 @@ internal sealed class GraphTypeDescriptor : IResponseModel
         {
             ModelFields.Add(field.Name, field);
         }
+
+        ModelJsonSchema = BuildSchema();
     }
 
     /// <summary>Gets <c>type_model.__name__</c>.</summary>
@@ -59,19 +64,99 @@ internal sealed class GraphTypeDescriptor : IResponseModel
     /// <summary>Gets <c>type_model.model_fields</c>: the fields by Python name, in the order of the class.</summary>
     internal OrderedDictionary<string, GraphFieldDescriptor> ModelFields { get; } = new(StringComparer.Ordinal);
 
-    // TODO(port): the schema of a custom type. The lead builds it with the judge fixtures (debt T18).
-
-    /// <summary>Gets <c>type_model.model_json_schema()</c>.</summary>
-    public PydanticSchema ModelJsonSchema => throw new NotSupportedException("TODO(port): GraphTypeDescriptor.model_json_schema");
-
-    // TODO(port): the validation of a custom type. The lead builds it with the judge fixtures (debt T18).
+    // TODO(port): pydantic writes "maxLength" into the schema of a str field with max_length. PydanticType has no member
+    // for it, and only the lead changes PyCompat, so the schema of such a field has no maxLength key. ModelValidate
+    // checks the limit.
 
     /// <summary>
-    /// <c>type_model(**data)</c>: applies lax coercion by the kind of each field, and returns the validated dictionary
-    /// in field order.
+    /// Gets <c>type_model.model_json_schema()</c>: a required field is <c>x: T = Field(...)</c>, and a field that is
+    /// not required is <c>x: T | None = Field(default=None)</c>. The description of the schema is <see cref="Doc"/>
+    /// as it is: pydantic writes <c>inspect.cleandoc</c> of the docstring, which equals it for a docstring with no
+    /// indent and no tab (decision D26). An empty docstring gives no description, as in pydantic.
+    /// </summary>
+    public PydanticSchema ModelJsonSchema { get; }
+
+    /// <summary>
+    /// <c>type_model(**data)</c>, then <c>model_dump()</c>: applies lax coercion by the kind of each field, and returns
+    /// each field in field order. A field that is not required and not in <paramref name="data"/> is <c>None</c>. A
+    /// key that is not a field is ignored, which is pydantic's default.
     /// </summary>
     /// <param name="data">The open data.</param>
-    /// <exception cref="ValidationException">A value does not fit the kind of its field, or a required field is missing.</exception>
-    internal OrderedDictionary<string, object?> ModelValidate(OrderedDictionary<string, object?> data) =>
-        throw new NotSupportedException("TODO(port): GraphTypeDescriptor.__init__");
+    /// <exception cref="ValidationException">A value does not fit the kind of its field, a text is longer than the
+    /// <c>max_length</c> of its field, or a required field is missing.</exception>
+    internal OrderedDictionary<string, object?> ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields(PythonName, data);
+        var values = new List<(string Name, PydanticValue<object?> Value)>(ModelFields.Count);
+        foreach (var (name, field) in ModelFields)
+        {
+            var read = Reader(field);
+            values.Add((name, field.IsRequired ? f.Required(name, read) : f.Default(name, v => v is null ? null : read(v), () => null)));
+        }
+
+        f.ThrowIfAny();
+        var result = new OrderedDictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var (name, value) in values)
+        {
+            result[name] = value.Value;
+        }
+
+        return result;
+    }
+
+    // The reader of one field: the lax reader of its kind, of each item for a list, and the max_length check of a
+    // str field inside the read, so that its error stands in field order with the other errors, as in pydantic.
+    private static Func<object?, object?> Reader(GraphFieldDescriptor field)
+    {
+        Func<object?, object?> item = field.Kind switch
+        {
+            GraphFieldKind.String when field.MaxLength is { } limit && !field.IsList => v => MaxLength(Pydantic.Str(v), limit),
+            GraphFieldKind.String => v => Pydantic.Str(v),
+            GraphFieldKind.Integer => v => Pydantic.Int(v),
+            GraphFieldKind.Number => v => Pydantic.Float(v),
+            GraphFieldKind.Boolean => v => Pydantic.Bool(v),
+            _ => throw new InvalidOperationException($"GraphFieldKind {field.Kind}"),
+        };
+        return field.IsList ? v => Pydantic.List(v, item) : item;
+    }
+
+    // Field(max_length=limit): the check of PydanticFields, moved to the location of the value. The field read puts it
+    // under the field name. The title of the inner check is not shown.
+    private static string MaxLength(string value, long limit)
+    {
+        var check = new PydanticFields(string.Empty);
+        check.MaxLength(string.Empty, value, limit);
+        try
+        {
+            check.ThrowIfAny();
+        }
+        catch (ValidationException e)
+        {
+            throw new ValidationException(null, [.. e.Errors.Select(error => error with { Loc = [] })]);
+        }
+
+        return value;
+    }
+
+    private PydanticSchema BuildSchema()
+    {
+        var schema = new PydanticSchema(PythonName, string.IsNullOrEmpty(Doc) ? null : Doc);
+        foreach (var (name, field) in ModelFields)
+        {
+            var scalar = field.Kind switch
+            {
+                GraphFieldKind.String => PydanticType.Str,
+                GraphFieldKind.Integer => PydanticType.Int,
+                GraphFieldKind.Number => PydanticType.Float,
+                GraphFieldKind.Boolean => PydanticType.Bool,
+                _ => throw new InvalidOperationException($"GraphFieldKind {field.Kind}"),
+            };
+            var type = field.IsList ? PydanticType.List(scalar) : scalar;
+            schema = field.IsRequired
+                ? schema.Required(name, type, field.Description)
+                : schema.Default(name, PydanticType.Optional(type), null, field.Description);
+        }
+
+        return schema;
+    }
 }

@@ -707,10 +707,45 @@ public class TestNodeOperations
         Assert.Equal("Old2", results.First(n => n.Name == "Node2").Summary);
     }
 
-    // TODO(port): test_extract_attributes_from_nodes_keeps_initial_nulls_from_response waits for
-    // GraphTypeDescriptor.ModelValidate (lead, debt T18). extract_attributes_from_nodes validates the shape with
-    // `entity_type(**merged)`, and the descriptor throws NotSupportedException there. The recording covers the merge with
-    // validate_shape=False (NodeOperationsValuesTests).
+    [Fact(Timeout = 5000)]
+    public async Task test_extract_attributes_from_nodes_keeps_initial_nulls_from_response()
+    {
+        // class Patient(BaseModel): first_name, last_name, favorite_color: str | None = None
+        var patient = GraphTypeDefinition.Create("Patient")
+            .AddString("first_name")
+            .AddString("last_name")
+            .AddString("favorite_color")
+            .ToDescriptor();
+        var (clients, llm) = MakeClients();
+        llm.ReturnValue = new OrderedDictionary<string, object?>
+        {
+            ["first_name"] = "John",
+            ["last_name"] = null,
+            ["favorite_color"] = null,
+        };
+
+        var node = Node("John Smith", labels: ["Entity", "Patient"], summary: "Existing summary", attributes: new() { ["last_name"] = "Smith" });
+
+        static Task<bool> SkipSummary(EntityNode node) => Task.FromResult(false);
+
+        var results = await LoopGuard.RunAsync(() => NodeOperations.ExtractAttributesFromNodesAsync(
+            clients,
+            [node],
+            episode: new EpisodeOrEpisodes.One { Episode = MakeEpisode() },
+            previousEpisodes: [],
+            entityTypes: new OrderedDictionary<string, GraphTypeDescriptor> { ["Patient"] = patient },
+            shouldSummarizeNode: SkipSummary,
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        // Python compares two dicts, which does not read the key order.
+        var expected = new OrderedDictionary<string, object?>
+        {
+            ["first_name"] = "John",
+            ["last_name"] = "Smith",
+            ["favorite_color"] = null,
+        };
+        Assert.Equal(PyJson.Dumps(expected, sortKeys: true), PyJson.Dumps(results[0].Attributes, sortKeys: true));
+    }
 
     /// <summary>Test that LLM is called when summary exceeds character limit.</summary>
     [Fact(Timeout = 5000)]

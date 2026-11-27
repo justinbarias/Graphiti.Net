@@ -31,3 +31,6 @@ dotnet_diagnostic.CA1707.severity = none    # test names use underscores
 
 [*.g.cs]
 generated_code = true
+
+[src/Graphiti.Net/GraphFieldKind.cs]
+dotnet_diagnostic.CA1720.severity = none    # the member names String and Integer of decision D26 name the field kinds

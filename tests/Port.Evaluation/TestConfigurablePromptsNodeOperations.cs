@@ -2,15 +2,12 @@
 // under test is graphiti_core/utils/maintenance/node_operations.py. The edge tests wait for edge_operations.py (packet
 // P7c), the tests of combined extraction and communities for packet P7d, the bulk tests for packet P7e, and the tests of
 // add_episode_bulk and of sagas for graphiti.py (layer 9).
-//
-// TODO(port): test_extract_node_attributes_use_injected_prompt_library waits for GraphTypeDescriptor.ModelValidate (lead,
-// debt T18). extract_attributes_from_nodes validates the shape of the reply with `entity_type(**merged)`, and the
-// descriptor throws NotSupportedException there.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
 using Graphiti.Core.Prompts;
 using Graphiti.Core.Utils.Maintenance;
+using Graphiti.Internal;
 using static Graphiti.Port.Evaluation.NodeOperationsTestSupport;
 
 public class TestConfigurablePromptsNodeOperations
@@ -72,6 +69,37 @@ public class TestConfigurablePromptsNodeOperations
     {
         TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
         await test_extract_nodes_uses_clients_prompt_library();
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task test_extract_node_attributes_use_injected_prompt_library()
+    {
+        // class Person(BaseModel): city: str = Field(default='')
+        // PORT: a default other than None is outside the field forms of decision D26, so the test builds the descriptor
+        // of a field that is not required. The test reads no default: the reply gives the field.
+        var person = new GraphTypeDescriptor("Person", null, [new GraphFieldDescriptor("city", GraphFieldKind.String, false, null, false, null)]);
+        var marker = "CUSTOM_NODE_ATTRS";
+        var llm = Llm();
+        llm.ReturnValue = new OrderedDictionary<string, object?> { ["city"] = "Seattle" };
+
+        // PORT: monkeypatch replaces create_entity_node_embeddings with a mock that does nothing (O10). The real function
+        // runs with the fake embedder.
+        var clients = MakeClients(llm, promptLibrary: Library("extract_nodes", "extract_attributes", marker));
+
+        static Task<bool> ShouldNotSummarize(EntityNode node) => Task.FromResult(false);
+
+        await LoopGuard.RunAsync(() => NodeOperations.ExtractAttributesFromNodesAsync(
+            clients,
+            [Node("Alice", labels: ["Entity", "Person"])],
+            episode: new EpisodeOrEpisodes.One { Episode = MakeEpisode() },
+            entityTypes: new OrderedDictionary<string, GraphTypeDescriptor> { ["Person"] = person },
+            shouldSummarizeNode: ShouldNotSummarize,
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        var call = llm.Calls[^1];
+        Assert.StartsWith(marker, call.Messages[0].Content, StringComparison.Ordinal);
+        Assert.Equal("extract_nodes.extract_attributes", call.PromptName);
+        Assert.Same(person, call.ResponseModel);
     }
 
     [Fact(Timeout = 5000)]
