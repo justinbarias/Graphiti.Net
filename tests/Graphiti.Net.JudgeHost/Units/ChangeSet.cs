@@ -29,7 +29,9 @@ internal static class ChangeSetBindings
                 Attributes = Py.AsDict(data["attributes"]),
                 InvalidAt = data["invalid_at"] is null ? null : Py.AsDateTime(data["invalid_at"]),
                 ExpiredAt = data["expired_at"] is null ? null : Py.AsDateTime(data["expired_at"]),
-                EndedAsCandidate = data.TryGetValue("ended_as_candidate", out var ended) && Py.AsBool(ended),
+                EndedAsCandidate = Py.AsBool(data.TryGetValue("ended_as_candidate", out var ended)
+                    ? ended
+                    : throw new JudgeTypeRejectedException("missing a required argument: 'ended_as_candidate'")),
             })
             .AddType<AddEpisodesToEdge>("AddEpisodesToEdge", m =>
             [

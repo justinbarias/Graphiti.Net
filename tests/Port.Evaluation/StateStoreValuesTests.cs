@@ -1,8 +1,8 @@
 // Evaluation test for graphiti_core/ingestion/state_store.py and graphiti_core/ingestion/sqlite_state_store.py
 // (port/RULES.md, R23 and R25, gap J7). values/state_store.json holds what port/tools/record_state_store.py recorded
 // from Python: the constants, is_released and is_stale_heartbeat, sequences of store calls with a fake clock (the
-// result of each call, the state of the in-memory store, and the rows of the SQLite file at the end), and one SQLite
-// file that Python wrote. Each sequence runs on the in-memory store, and on the SQLite store with a temp file and with
+// result of each call, the state of the in-memory store, and the rows of the SQLite file at the end), one SQLite
+// file that Python wrote, and the busy timeout and the journal mode of the connection of a store. Each sequence runs on the in-memory store, and on the SQLite store with a temp file and with
 // ':memory:'. The schema of the SQLite store is a stored data shape, so the test reads the file of Python with the
 // port, and compares the rows and the sqlite_master text of a file that the port wrote with those of Python.
 namespace Graphiti.Port.Evaluation;
@@ -143,6 +143,37 @@ public sealed class StateStoreValuesTests : IDisposable
         await store.CloseAsync(TestContext.Current.CancellationToken);
         Same(result["results"], results, "the results");
         Same(rows, TableRows(portFile), "the rows of the file of the port");
+    }
+
+    [Theory(Timeout = 20000)]
+    [InlineData("file")]
+    [InlineData("memory")]
+    public async Task The_connection_of_the_store_has_the_busy_timeout_and_the_journal_mode_of_python(string kind)
+    {
+        var recorded = Cases.Single(c => (string?)c["f"] == "pragmas" && Py.AsString(Py.AsList(c["a"])[0]) == kind);
+        var store = new SQLiteIngestionStateStore(kind == "file" ? Path.Combine(folder, "pragmas.db") : ":memory:", new FakeClock().Now);
+        try
+        {
+            // The connection is private. The test reads it, because a pragma has no other way out.
+            var conn = (SqliteConnection)typeof(SQLiteIngestionStateStore)
+                .GetField("conn", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .GetValue(store)!;
+            object? Pragma(string name)
+            {
+                using var command = conn.CreateCommand();
+                command.CommandText = "PRAGMA " + name;
+                return Encode(command.ExecuteScalar());
+            }
+
+            Same(
+                recorded["r"],
+                new OrderedDictionary<string, object?> { ["busy_timeout"] = Pragma("busy_timeout"), ["journal_mode"] = Pragma("journal_mode") },
+                "the pragmas");
+        }
+        finally
+        {
+            await store.CloseAsync(TestContext.Current.CancellationToken);
+        }
     }
 
     // The calls of one recorded sequence, with the result or the exception of each call as Python encodes it.

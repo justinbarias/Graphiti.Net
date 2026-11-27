@@ -7,7 +7,11 @@ inputs from a fixed seed (port/RULES.md, R23 and R25):
 - ResolutionTrace: a list of steps on a pool of stored edges and nodes, with the state of the trace after each
   step. No step calls a function of utils/maintenance (layer 7),
 - ChangeSet: the text of model_dump_json(), the bytes of to_bytes() as hex, patches_by_node(), and
-  edge_operations(). The stored form of a change set is a stored data shape, so the test compares the bytes,
+  edge_operations(). The stored form of a change set is a stored data shape. The compressed bytes of .NET differ
+  from the bytes of CPython (GAPS F39), so the test compares the text inside the bytes, and it reads the bytes of Python,
+- ChangeSet.from_bytes on bytes that are cut or changed: the class of the error and, for three kinds of zlib.error, its
+  text,
+- model_copy(deep=True) of a change set: which objects the copy shares with the original,
 - ConcurrentIngestionConfig(**kwargs): the fields, or the class and the text of the error.
 
     .upstream/graphiti/.venv/bin/python -B port/tools/record_change_set.py
@@ -18,8 +22,8 @@ differs from what the run would write. The environment variable GRAPHITI_UPSTREA
 folder, for a worktree that has no .upstream. Nothing here uses the network.
 
 A pydantic message is recorded without ', input_value=..., input_type=...]' and without the link line
-(RULES.md R25). A config case has at most one field that is not valid, because the port reports a
-constraint error only after the type errors (PydanticFields.ThrowIfAny).
+(RULES.md R25). Each config case has one bad field at most, because the port reports a constraint error only after
+the type errors (PydanticFields.ThrowIfAny), where pydantic reports all of them together (GAPS F40).
 """
 from __future__ import annotations
 
@@ -165,8 +169,95 @@ def trace_state(trace) -> dict:
     })
 
 
+def apply_step(trace, edges, nodes, step):
+    """Runs one step on the trace. It returns the result of the step, or None."""
+    kind = step['m']
+    pick = step.get('nodes', step.get('edges'))
+    if kind == 'candidates':
+        return trace.record_node_candidates(step['uuid'], [nodes[i] for i in pick])
+    if kind == 'resolution':
+        return trace.record_node_resolution(nodes[step['node']], step['resolved'])
+    if kind == 'edge_candidates':
+        return trace.record_edge_candidates(
+            step['uuid'], [edges[i] for i in step['duplicates']], [edges[i] for i in step['invalidations']]
+        )
+    if kind == 'watch':
+        return trace.watch_stored_edges([edges[i] for i in pick])
+    if kind == 'mutate':
+        edge = edges[step['edge']]
+        if 'append' in step:
+            edge.episodes.append(step['append'])
+        if 'attributes' in step:
+            edge.attributes = dict(step['attributes'])
+        if 'set_key' in step:
+            edge.attributes[step['set_key'][0]] = step['set_key'][1]
+        if 'invalid_at' in step:
+            edge.invalid_at = None if step['invalid_at'] is None else datetime.fromisoformat(step['invalid_at'])
+        if 'expired_at' in step:
+            edge.expired_at = None if step['expired_at'] is None else datetime.fromisoformat(step['expired_at'])
+        return None
+    if kind == 'labels':
+        # A promotion of the labels of a candidate in memory, after its first read.
+        node = nodes[step['node']]
+        node.labels = [*node.labels, step['label']]
+        return None
+    if kind == 'mark':
+        return trace.mark_ended_as_candidate([edges[i] for i in pick])
+    if kind == 'collect':
+        return [op.model_dump(mode='json') for op in trace.collect_edge_operations([edges[i] for i in pick])]
+    return [op.model_dump(mode='json') for op in trace.collect_edge_operations()]
+
+
+def random_step():
+    kind = rng.choice(['candidates', 'resolution', 'edge_candidates', 'watch', 'mutate', 'mark', 'collect', 'collect_all', 'labels'])
+    pick = sorted(rng.sample(range(4), rng.randint(0, 4)))
+    if kind == 'candidates':
+        return {'m': kind, 'uuid': rng.choice(['x1', 'x2', 'n0']), 'nodes': pick}
+    if kind == 'resolution':
+        i = rng.randrange(4)
+        return {'m': kind, 'node': i, 'resolved': rng.choice([f'n{i}', 'stored-1', 'stored-2'])}
+    if kind == 'edge_candidates':
+        other = sorted(rng.sample(range(4), rng.randint(0, 4)))
+        return {'m': kind, 'uuid': rng.choice(['x1', 'x2']), 'duplicates': pick, 'invalidations': other}
+    if kind == 'watch':
+        return {'m': kind, 'edges': pick}
+    if kind == 'mutate':
+        step = {'m': kind, 'edge': rng.randrange(4)}
+        if rng.random() < 0.5:
+            step['append'] = rng.choice(EPISODES)
+        if rng.random() < 0.4:
+            step['attributes'] = rand_attrs()
+        if rng.random() < 0.3:
+            step['set_key'] = [rng.choice(KEYS), rng.choice(VALUES)]
+        if rng.random() < 0.4:
+            step['invalid_at'] = dt_json(maybe_dt())
+        if rng.random() < 0.4:
+            step['expired_at'] = dt_json(maybe_dt())
+        return step
+    if kind == 'labels':
+        return {'m': kind, 'node': rng.randrange(4), 'label': rng.choice(LABELS)}
+    if kind == 'mark':
+        return {'m': kind, 'edges': pick}
+    if kind == 'collect':
+        return {'m': kind, 'edges': pick}
+    return {'m': kind}
+
+
+def run_trace(m, edges, nodes, steps):
+    start = {
+        'edges': [e.model_dump(mode='json') for e in edges],
+        'nodes': [n.model_dump(mode='json') for n in nodes],
+    }
+    trace = m.ResolutionTrace()
+    recorded = []
+    for step in steps():
+        result = apply_step(trace, edges, nodes, step)
+        recorded.append({'step': step, 'result': result, 'state': trace_state(trace)})
+    records.append({'f': 'ResolutionTrace', 'a': [start], 'r': recorded})
+
+
 def record_traces(m, EntityEdge, EntityNode) -> None:
-    for _ in range(45):
+    def pool():
         edges = [make_edge(EntityEdge, f'e{i}') for i in range(4)]
         nodes = [
             EntityNode(
@@ -175,70 +266,36 @@ def record_traces(m, EntityEdge, EntityNode) -> None:
             )
             for i in range(4)
         ]
-        start = {
-            'edges': [e.model_dump(mode='json') for e in edges],
-            'nodes': [n.model_dump(mode='json') for n in nodes],
-        }
-        trace = m.ResolutionTrace()
-        steps = []
-        for _ in range(rng.randint(3, 14)):
-            kind = rng.choice(['candidates', 'resolution', 'edge_candidates', 'watch', 'mutate', 'mark', 'collect', 'collect_all', 'labels'])
-            pick = sorted(rng.sample(range(4), rng.randint(0, 4)))
-            if kind == 'candidates':
-                uuid = rng.choice(['x1', 'x2', 'n0'])
-                step = {'m': kind, 'uuid': uuid, 'nodes': pick}
-                result = trace.record_node_candidates(uuid, [nodes[i] for i in pick])
-            elif kind == 'resolution':
-                i = rng.randrange(4)
-                resolved = rng.choice([nodes[i].uuid, 'stored-1', 'stored-2'])
-                step = {'m': kind, 'node': i, 'resolved': resolved}
-                result = trace.record_node_resolution(nodes[i], resolved)
-            elif kind == 'edge_candidates':
-                other = sorted(rng.sample(range(4), rng.randint(0, 4)))
-                uuid = rng.choice(['x1', 'x2'])
-                step = {'m': kind, 'uuid': uuid, 'duplicates': pick, 'invalidations': other}
-                result = trace.record_edge_candidates(uuid, [edges[i] for i in pick], [edges[i] for i in other])
-            elif kind == 'watch':
-                step = {'m': kind, 'edges': pick}
-                result = trace.watch_stored_edges([edges[i] for i in pick])
-            elif kind == 'mutate':
-                i = rng.randrange(4)
-                edge = edges[i]
-                step = {'m': kind, 'edge': i}
-                if rng.random() < 0.5:
-                    step['append'] = rng.choice(EPISODES)
-                    edge.episodes.append(step['append'])
-                if rng.random() < 0.4:
-                    step['attributes'] = rand_attrs()
-                    edge.attributes = dict(step['attributes'])
-                if rng.random() < 0.3:
-                    step['set_key'] = [rng.choice(KEYS), rng.choice(VALUES)]
-                    edge.attributes[step['set_key'][0]] = step['set_key'][1]
-                if rng.random() < 0.4:
-                    step['invalid_at'] = dt_json(maybe_dt())
-                    edge.invalid_at = None if step['invalid_at'] is None else datetime.fromisoformat(step['invalid_at'])
-                if rng.random() < 0.4:
-                    step['expired_at'] = dt_json(maybe_dt())
-                    edge.expired_at = None if step['expired_at'] is None else datetime.fromisoformat(step['expired_at'])
-                result = None
-            elif kind == 'labels':
-                # A promotion of the labels of a candidate in memory, after its first read.
-                i = rng.randrange(4)
-                label = rng.choice(LABELS)
-                step = {'m': kind, 'node': i, 'label': label}
-                nodes[i].labels = [*nodes[i].labels, label]
-                result = None
-            elif kind == 'mark':
-                step = {'m': kind, 'edges': pick}
-                result = trace.mark_ended_as_candidate([edges[i] for i in pick])
-            elif kind == 'collect':
-                step = {'m': kind, 'edges': pick}
-                result = [op.model_dump(mode='json') for op in trace.collect_edge_operations([edges[i] for i in pick])]
-            else:
-                step = {'m': kind}
-                result = [op.model_dump(mode='json') for op in trace.collect_edge_operations()]
-            steps.append({'step': step, 'result': result, 'state': trace_state(trace)})
-        records.append({'f': 'ResolutionTrace', 'a': [start], 'r': steps})
+        return edges, nodes
+
+    for _ in range(45):
+        edges, nodes = pool()
+        run_trace(m, edges, nodes, lambda: (random_step() for _ in range(rng.randint(3, 14))))
+
+    # Two rules that the random traces rarely reach. Each trace is fixed. Its pool is random, and it does not change the
+    # random draws of the records that follow.
+    state = rng.getstate()
+    # The labels of a candidate are the labels of its first read. A later read, after a promotion of the labels in
+    # memory, keeps them (setdefault).
+    edges, nodes = pool()
+    nodes[0].labels = ['Entity']
+    run_trace(m, edges, nodes, lambda: iter([
+        {'m': 'candidates', 'uuid': 'x1', 'nodes': [0]},
+        {'m': 'labels', 'node': 0, 'label': 'Person'},
+        {'m': 'candidates', 'uuid': 'x2', 'nodes': [0]},
+    ]))
+    # A second watch of an edge that is watched keeps the first state: the episode that was added between the two
+    # watches is still a change when the watch stops.
+    edges, nodes = pool()
+    edges[0].episodes = []
+    edges[0].attributes = {}
+    run_trace(m, edges, nodes, lambda: iter([
+        {'m': 'watch', 'edges': [0]},
+        {'m': 'mutate', 'edge': 0, 'append': 'ep1'},
+        {'m': 'watch', 'edges': [0]},
+        {'m': 'collect_all'},
+    ]))
+    rng.setstate(state)
 
 
 def make_change_set(m, nodes_module, EntityEdge, EpisodicEdge):
@@ -373,6 +430,184 @@ def record_config(config_module) -> None:
         records.append({'f': 'ConcurrentIngestionConfig', 'a': [kwargs], 'r': result})
 
 
+def record_merge_nan(m) -> None:
+    # `current_value == base.get(key, missing)` is a plain ==, so a nan is not equal to itself, also when it is one
+    # object in both maps. In a list, the comparison of the items tests identity first. The test builds the same
+    # objects: one nan object where the name says "same object".
+    nan = float('nan')
+    other = float('nan')
+    for name, base, current in [
+        ('same object, top level', {'x': nan}, {'x': nan}),
+        ('two objects, top level', {'x': other}, {'x': nan}),
+        ('same object in a list', {'x': [nan]}, {'x': [nan]}),
+        ('two objects in a list', {'x': [other]}, {'x': [nan]}),
+    ]:
+        records.append({'f': 'merge_edge_attributes_nan', 'a': [name], 'r': m.merge_edge_attributes(base, {'x': 1}, current)})
+
+
+def mutate_bytes(payload: bytes, spec: list) -> bytes:
+    kind = spec[0]
+    if kind == 'keep':
+        return payload[:spec[1]]
+    if kind == 'cut_tail':
+        return payload[:len(payload) - spec[1]]
+    if kind == 'xor':
+        out = bytearray(payload)
+        out[spec[1]] ^= spec[2]
+        return bytes(out)
+    if kind == 'append':
+        return payload + bytes.fromhex(spec[1])
+    return payload
+
+
+def bytes_result(m, payload: bytes) -> list:
+    # The text of a zlib.error is recorded for the three kinds that an input of this recording gives with every zlib: a
+    # cut stream, a wrong header, and a wrong check value. Another kind has a text that depends on the build of zlib.
+    try:
+        restored = m.ChangeSet.from_bytes(payload)
+    except zlib.error as error:
+        text = str(error)
+        known = ('incomplete or truncated stream', 'incorrect header check', 'incorrect data check')
+        return ['zlib.error', text if text.endswith(known) else None]
+    except Exception as error:
+        return [type(error).__name__, None]
+    return ['ok', restored.model_dump_json()]
+
+
+def record_corrupt_bytes(m, nodes_module, EntityEdge, EpisodicEdge) -> None:
+    minimal = m.ChangeSet(group_id='g', unit_id='u', seq=1, snapshot_seq=0, analysis_started_at=1.0)
+    sets = [minimal, make_change_set(m, nodes_module, EntityEdge, EpisodicEdge), make_change_set(m, nodes_module, EntityEdge, EpisodicEdge)]
+    for change_set in sets:
+        payload = change_set.to_bytes()
+        n = len(payload)
+        specs = [
+            ['none'],
+            ['keep', 0],
+            ['keep', 1],
+            ['keep', n // 2],
+            ['cut_tail', 1],
+            ['cut_tail', 3],
+            ['cut_tail', 4],
+            ['xor', 0, 0xFF],
+            ['xor', 1, 0x01],
+            ['xor', n // 2, 0x55],
+            ['xor', n - 4, 0x10],
+            ['xor', n - 1, 0x01],
+            ['append', 'deadbeef'],
+            ['append', '00'],
+        ]
+        if change_set is minimal:
+            # Each cut and each changed byte of a short stream.
+            specs += [['keep', k] for k in range(n + 1)] + [['xor', i, 0x55] for i in range(n)]
+        records.append({
+            'f': 'ChangeSetBytes',
+            'a': [payload.hex()],
+            'r': [[spec, bytes_result(m, mutate_bytes(payload, spec))] for spec in specs],
+        })
+
+
+def record_deep_copy(m, nodes_module, EntityEdge, EpisodicEdge) -> None:
+    # model_copy(deep=True) is copy.deepcopy: each list, dict, and model is new, a str or a float is the same object, and
+    # an object that the change set holds two times is copied one time.
+    node = nodes_module.EntityNode(
+        uuid='n1', name='Ana', group_id='g', labels=['Entity', 'Person'], created_at=DATES[0], name_embedding=[0.5, 0.25],
+        summary='s', attributes={'tags': ['a', ['b']], 'meta': {'k': [1, 2]}},
+    )
+    edge = EntityEdge(
+        uuid='e1', group_id='g', source_node_uuid='a', target_node_uuid='b', name='WORKS_AT', fact='f', created_at=DATES[0],
+        episodes=['ep0'], attributes={'tags': ['x', {'y': [1]}]}, fact_embedding=[1.0, 2.0],
+    )
+    episode = nodes_module.EpisodicNode(
+        uuid='ep0', name='episode', group_id='g', labels=['Episodic'], created_at=DATES[0], source=nodes_module.EpisodeType.text,
+        source_description='t', content='c', valid_at=DATES[0], entity_edges=['e1'], episode_metadata={'m': [1]},
+    )
+    episodic_edge = EpisodicEdge(uuid='ee0', source_node_uuid='ep0', target_node_uuid='n1', group_id='g', created_at=DATES[0])
+    add = m.AddEpisodesToEdge(edge_uuid='e1', episode_uuids=['ep1'])
+    end = m.EndEdge(edge_uuid='e1', invalid_at=DATES[1], expired_at=DATES[2], only_if_open=False)
+    set_op = m.SetEdgeAttributes(edge_uuid='e1', base_attributes={'t': [1]}, attributes={'t': [1, 2], 'u': {'v': [3]}})
+    patch = m.PatchNode(node_uuid='n1', labels=['A'], attributes={'t': [1]})
+    saga = nodes_module.SagaNode(uuid='s1', name='saga', group_id='g', created_at=DATES[0], summary='s', labels=['Saga'])
+    link = m.SagaLink(
+        saga_uuid='s1', episode_uuid='ep0', previous_episode_uuid=None, has_episode_edge_uuid='h0', next_episode_edge_uuid=None,
+        created_at=DATES[0],
+    )
+    change_set = m.ChangeSet(
+        group_id='g', unit_id='u', seq=1, snapshot_seq=0, analysis_started_at=1.0, episodes=[episode],
+        create_nodes=[node, node], create_edges=[edge, edge], episodic_edges=[episodic_edge],
+        operations=[add, end, set_op, patch, set_op], node_uuids=['n1', 'n2'], node_first_episode={'n1': 'ep0'},
+        seen_node_candidates={'n1': ['s1']}, seen_node_labels={'s1': ['Entity']}, seen_duplicate_candidates={'e1': ['e9']},
+        seen_invalidation_candidates={'e1': ['e8']}, edges_ended_by_candidate=['e1'], uuid_map={'x': 'n9'},
+        saga_links=[link], saga_node=saga,
+    )
+    copy_ = change_set.model_copy(deep=True)
+    probes = {
+        'node_uuids': lambda a, b: b.node_uuids is a.node_uuids,
+        'node_uuids_item': lambda a, b: b.node_uuids[0] is a.node_uuids[0],
+        'episodes': lambda a, b: b.episodes is a.episodes,
+        'episode0': lambda a, b: b.episodes[0] is a.episodes[0],
+        'episode0_labels': lambda a, b: b.episodes[0].labels is a.episodes[0].labels,
+        'episode0_entity_edges': lambda a, b: b.episodes[0].entity_edges is a.episodes[0].entity_edges,
+        'episode0_metadata': lambda a, b: b.episodes[0].episode_metadata is a.episodes[0].episode_metadata,
+        'episode0_metadata_list': lambda a, b: b.episodes[0].episode_metadata['m'] is a.episodes[0].episode_metadata['m'],
+        'create_nodes': lambda a, b: b.create_nodes is a.create_nodes,
+        'node0': lambda a, b: b.create_nodes[0] is a.create_nodes[0],
+        'node0_labels': lambda a, b: b.create_nodes[0].labels is a.create_nodes[0].labels,
+        'node0_embedding': lambda a, b: b.create_nodes[0].name_embedding is a.create_nodes[0].name_embedding,
+        'node0_attributes': lambda a, b: b.create_nodes[0].attributes is a.create_nodes[0].attributes,
+        'node0_tags': lambda a, b: b.create_nodes[0].attributes['tags'] is a.create_nodes[0].attributes['tags'],
+        'node0_tags_inner': lambda a, b: b.create_nodes[0].attributes['tags'][1] is a.create_nodes[0].attributes['tags'][1],
+        'node0_meta_list': lambda a, b: b.create_nodes[0].attributes['meta']['k'] is a.create_nodes[0].attributes['meta']['k'],
+        'dup_nodes': lambda a, b: b.create_nodes[0] is b.create_nodes[1],
+        'create_edges': lambda a, b: b.create_edges is a.create_edges,
+        'edge0': lambda a, b: b.create_edges[0] is a.create_edges[0],
+        'edge0_episodes': lambda a, b: b.create_edges[0].episodes is a.create_edges[0].episodes,
+        'edge0_embedding': lambda a, b: b.create_edges[0].fact_embedding is a.create_edges[0].fact_embedding,
+        'edge0_attributes': lambda a, b: b.create_edges[0].attributes is a.create_edges[0].attributes,
+        'edge0_tags': lambda a, b: b.create_edges[0].attributes['tags'] is a.create_edges[0].attributes['tags'],
+        'edge0_tags_dict': lambda a, b: b.create_edges[0].attributes['tags'][1] is a.create_edges[0].attributes['tags'][1],
+        'edge0_tags_list': lambda a, b: b.create_edges[0].attributes['tags'][1]['y'] is a.create_edges[0].attributes['tags'][1]['y'],
+        'dup_edges': lambda a, b: b.create_edges[0] is b.create_edges[1],
+        'episodic_edges': lambda a, b: b.episodic_edges is a.episodic_edges,
+        'episodic_edge0': lambda a, b: b.episodic_edges[0] is a.episodic_edges[0],
+        'operations': lambda a, b: b.operations is a.operations,
+        'op_add': lambda a, b: b.operations[0] is a.operations[0],
+        'op_add_episode_uuids': lambda a, b: b.operations[0].episode_uuids is a.operations[0].episode_uuids,
+        'op_end': lambda a, b: b.operations[1] is a.operations[1],
+        'op_set': lambda a, b: b.operations[2] is a.operations[2],
+        'op_set_base': lambda a, b: b.operations[2].base_attributes is a.operations[2].base_attributes,
+        'op_set_base_list': lambda a, b: b.operations[2].base_attributes['t'] is a.operations[2].base_attributes['t'],
+        'op_set_attributes': lambda a, b: b.operations[2].attributes is a.operations[2].attributes,
+        'op_set_nested': lambda a, b: b.operations[2].attributes['u']['v'] is a.operations[2].attributes['u']['v'],
+        'op_patch': lambda a, b: b.operations[3] is a.operations[3],
+        'op_patch_labels': lambda a, b: b.operations[3].labels is a.operations[3].labels,
+        'op_patch_attributes': lambda a, b: b.operations[3].attributes is a.operations[3].attributes,
+        'dup_ops': lambda a, b: b.operations[2] is b.operations[4],
+        'node_first_episode': lambda a, b: b.node_first_episode is a.node_first_episode,
+        'seen_node_candidates': lambda a, b: b.seen_node_candidates is a.seen_node_candidates,
+        'seen_node_candidates_list': lambda a, b: b.seen_node_candidates['n1'] is a.seen_node_candidates['n1'],
+        'seen_node_labels': lambda a, b: b.seen_node_labels is a.seen_node_labels,
+        'seen_node_labels_list': lambda a, b: b.seen_node_labels['s1'] is a.seen_node_labels['s1'],
+        'seen_duplicate_candidates': lambda a, b: b.seen_duplicate_candidates is a.seen_duplicate_candidates,
+        'seen_duplicate_candidates_list': lambda a, b: b.seen_duplicate_candidates['e1'] is a.seen_duplicate_candidates['e1'],
+        'seen_invalidation_candidates': lambda a, b: b.seen_invalidation_candidates is a.seen_invalidation_candidates,
+        'seen_invalidation_candidates_list': lambda a, b: b.seen_invalidation_candidates['e1'] is a.seen_invalidation_candidates['e1'],
+        'edges_ended_by_candidate': lambda a, b: b.edges_ended_by_candidate is a.edges_ended_by_candidate,
+        'uuid_map': lambda a, b: b.uuid_map is a.uuid_map,
+        'saga_links': lambda a, b: b.saga_links is a.saga_links,
+        'saga_link0': lambda a, b: b.saga_links[0] is a.saga_links[0],
+        'saga_node': lambda a, b: b.saga_node is a.saga_node,
+        'saga_node_labels': lambda a, b: b.saga_node.labels is a.saga_node.labels,
+    }
+    records.append({
+        'f': 'ChangeSetDeepCopy',
+        'a': [change_set.model_dump_json()],
+        'r': {
+            'shared': {name: probe(change_set, copy_) for name, probe in probes.items()},
+            'copy_equal': copy_.model_dump_json() == change_set.model_dump_json(),
+        },
+    })
+
+
 def main() -> int:
     if sys.version_info[:2] != (3, 12):
         raise SystemExit(f'Python 3.12 is needed, and this is {sys.version.split()[0]}')
@@ -388,6 +623,9 @@ def main() -> int:
     record_traces(m, EntityEdge, nodes_module.EntityNode)
     record_change_sets(m, nodes_module, EntityEdge, EpisodicEdge)
     record_config(config_module)
+    record_merge_nan(m)
+    record_corrupt_bytes(m, nodes_module, EntityEdge, EpisodicEdge)
+    record_deep_copy(m, nodes_module, EntityEdge, EpisodicEdge)
     lines = [json.dumps(r, ensure_ascii=True, allow_nan=True, separators=(',', ':')) for r in records]
     text = (
         '{"python":"' + '.'.join(str(p) for p in sys.version_info[:3])

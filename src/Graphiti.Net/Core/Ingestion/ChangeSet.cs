@@ -17,7 +17,6 @@ limitations under the License.
 
 namespace Graphiti.Core.Ingestion;
 
-using System.IO.Compression;
 using Graphiti.Core.Utils;
 using Graphiti.PyCompat;
 
@@ -466,33 +465,16 @@ internal sealed record ChangeSet : IPydanticModel
     }
 
     /// <summary>Return the compressed JSON of the change set.</summary>
-    // PORT: zlib.compress is ZLibStream (R18), with the default level 6 of Python.
-    // TODO(port): the stored bytes differ from the bytes of Python. .NET compresses with zlib-ng, and CPython 3.12 with
-    // zlib 1.2.12. No level of ZLibStream gives the bytes of Python (measured on 2026-11-27 for levels 0 to 9). The
-    // compressed text is the same, and each side reads the bytes of the other. The lead decides (R18, a stored shape).
-    internal byte[] ToBytes()
-    {
-        var text = PyText.EncodeUtf8(Pydantic.DumpJson(ModelDump(json: true)));
-        using var output = new MemoryStream();
-        using (var zlib = new ZLibStream(output, new ZLibCompressionOptions { CompressionLevel = 6 }, leaveOpen: true))
-        {
-            zlib.Write(text);
-        }
-
-        return output.ToArray();
-    }
+    // PORT: zlib.compress is PyZlib.Compress, with the default level 6 of Python (R18). The compressed bytes differ from the
+    // bytes of CPython: .NET compresses with zlib-ng, and CPython 3.12 with zlib 1.2.12. No level of ZLibStream gives the
+    // bytes of Python (measured on 2026-11-27 for levels 0 to 9). The compressed text is the same, and each side reads the
+    // bytes of the other. GAPS F39 names the difference.
+    internal byte[] ToBytes() => PyZlib.Compress(PyText.EncodeUtf8(Pydantic.DumpJson(ModelDump(json: true))));
 
     /// <summary>Return the change set of a payload that `to_bytes` made.</summary>
-    // PORT: zlib.decompress is ZLibStream (R18). Bytes that are not zlib data throw InvalidDataException, where Python
-    // raises zlib.error. R4 has no row for zlib.error.
-    internal static ChangeSet FromBytes(byte[] payload)
-    {
-        using var input = new MemoryStream(payload);
-        using var zlib = new ZLibStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
-        zlib.CopyTo(output);
-        return ModelValidate(Pydantic.LoadJson(output.ToArray()));
-    }
+    // PORT: zlib.decompress is PyZlib.Decompress (R18). Bytes that are not a full zlib stream throw InvalidDataException with
+    // the text of zlib.error, where Python raises zlib.error. R4 has no row for zlib.error.
+    internal static ChangeSet FromBytes(byte[] payload) => ModelValidate(Pydantic.LoadJson(PyZlib.Decompress(payload)));
 
     /// <summary>Return the `PatchNode` operations for each node UUID, in list order.</summary>
     internal OrderedDictionary<string, List<PatchNode>> PatchesByNode()
@@ -725,7 +707,8 @@ internal static class ChangeSetModule
         foreach (var key in (List<string>)[.. current.Keys, .. @new.Keys.Where(k => !current.ContainsKey(k))])
         {
             var currentValue = current.GetValueOrDefault(key, missing);
-            var unchanged = PyEqualityComparer<object?>.Instance.Equals(currentValue, @base.GetValueOrDefault(key, missing));
+            // PORT: `current_value == base.get(key, missing)` is a plain `==` of two open values, with no identity test (R6).
+            var unchanged = PyValueEquality.PlainEqual(currentValue, @base.GetValueOrDefault(key, missing));
             var value = unchanged ? @new.GetValueOrDefault(key, missing) : currentValue;
             if (!ReferenceEquals(value, missing))
             {
