@@ -19,6 +19,7 @@ Floats are the 64 bits of the value, as a signed integer. Nothing here uses the 
 """
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import random
@@ -415,6 +416,41 @@ def build_values() -> dict:
         add('code_point_props', {'c': c, 'upper': ch.isupper(), 'lower': ch.islower(), 'space': ch.isspace(),
                                  'decimal': ch.isdecimal(), 'digit': int(ch) if ch.isdecimal() else None,
                                  'a_upper': ('A' + ch).isupper(), 'printable': ch.isprintable(), 'lower_map': cps(ch.lower()), 'title_map': cps(ch.title())})
+
+    # str.title() and inspect.cleandoc, which pydantic uses for the field title and the description of a schema. Their
+    # own generator keeps the cases above the same.
+    rng2 = random.Random(SEED + 1)
+    cased = [c for c in range(MAX_CP) if is_cased(c)]
+    title_texts = list(strings)
+    title_texts += [chr(c) + ' a' + chr(c) + chr(c) for c in cased]
+    title_texts += [chr(c) + 'b' for c in range(MAX_CP) if not is_cased(c) and chr(c).title() != chr(c)]
+    title_texts += ['ß', 'ßtraße', 'straße', 'ǆx', 'ǅx', 'Ǆx', 'xǆ', 'ﬁx', 'ŉx', 'ǰx', 'ΐx', 'ᾳx', 'ΑΣ', 'ΑΣ_end',
+                    'σς', "they're", "it's", 'x1y2', '1abc', 'a1b', 'a_b_c', '__x__', 'type_', 'trailing_', 'école_x',
+                    'größe', 'naïve_date', 'ǈǈ', 'Ǉǉ', 'ǅungla', 'İx', 'ıx', 'áb', 'é', '東京_x', 'x\U00010428y',
+                    '\U00010400\U00010400', 'Aǅ', 'ǅA', 'hello world', 'HELLO WORLD', '']
+    pools = [list('abcxyzABCXYZ'), list('0123459'), ['_'], ["'"], list('éÉßǆǅǄﬁŉǰΣσΐİıÆæ東京'),
+             ['́', 'ͅ', '\U00010428', '\U00010400', 'ẞ', 'Ⅰ', 'Ⓐ', 'ʰ']]
+    for _ in range(500):
+        n = rng2.randint(1, 12)
+        title_texts.append(''.join(rng2.choice(rng2.choice(pools)) for _ in range(n)))
+    assert not any(has_joinable_surrogates(s) for s in title_texts)
+    for t in title_texts:
+        add('title', {'s': cps(t), 'r': cps(t.title())})
+
+    docs = ['', ' ', '   ', '\n', ' Lead space.', 'Line one.\n    Line two.', '\n    A person.\n\n    More text.\n    ',
+            'a\tb', '\tx', 'ab\tc\td', '12345678\tx', 'x\n\ty', 'x\r\ty', 'Line one.\r\nLine two.\r\n', 'One line.', 'a\r\nb',
+            '\r\n  x\r\n  y', '  \n  \n', '\n\n  First.\n\n', 'First.\n  Two.\n    Four.\n', 'x\n\ty\n        z',
+            '　Ideographic.', '\x85Next line.', '\x1c\x1d\x1e\x1fx\n \x1cy', 'Form\x0cfeed\x0b.\n\x1c sep.',
+            'Café.\n  é indented.', '\U0001F600\tx\n \U0001F600\ty', 'a\n\n\nb', 'a\n \n  b', '\n  a\n b\n   c',
+            '\ud800\n  \udc00x', 'x \n  y', 'tab\t\n\t\tz']
+    ws = [' ', ' ', '\t', '\n', '\n', '\r', '\r\n', '\x0b', '\x0c', '\x1c', '\x85', '\xa0', ' ', '　']
+    words = ['a', 'Word', 'é', '\U0001F600', 'x.y', '']
+    for _ in range(300):
+        n = rng2.randint(0, 14)
+        docs.append(''.join(rng2.choice(ws) if rng2.random() < 0.6 else rng2.choice(words) for _ in range(n)))
+    docs = [d for d in docs if not has_joinable_surrogates(d)]
+    for d in docs:
+        add('cleandoc', {'s': cps(d), 'r': cps(inspect.cleandoc(d))})
 
     return {
         'meta': {'python': sys.version.split()[0], 'unicode': unicodedata.unidata_version, 'seed': SEED,

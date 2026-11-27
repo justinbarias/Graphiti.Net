@@ -64,15 +64,11 @@ internal sealed class GraphTypeDescriptor : IResponseModel
     /// <summary>Gets <c>type_model.model_fields</c>: the fields by Python name, in the order of the class.</summary>
     internal OrderedDictionary<string, GraphFieldDescriptor> ModelFields { get; } = new(StringComparer.Ordinal);
 
-    // TODO(port): pydantic writes "maxLength" into the schema of a str field with max_length. PydanticType has no member
-    // for it, and only the lead changes PyCompat, so the schema of such a field has no maxLength key. ModelValidate
-    // checks the limit.
-
     /// <summary>
     /// Gets <c>type_model.model_json_schema()</c>: a required field is <c>x: T = Field(...)</c>, and a field that is
-    /// not required is <c>x: T | None = Field(default=None)</c>. The description of the schema is <see cref="Doc"/>
-    /// as it is: pydantic writes <c>inspect.cleandoc</c> of the docstring, which equals it for a docstring with no
-    /// indent and no tab (decision D26). An empty docstring gives no description, as in pydantic.
+    /// not required is <c>x: T | None = Field(default=None)</c>. A text field with <c>max_length</c> has the key
+    /// <c>maxLength</c>. The description of the schema is <c>inspect.cleandoc</c> of <see cref="Doc"/>. A null or
+    /// empty docstring gives no description, as in pydantic.
     /// </summary>
     public PydanticSchema ModelJsonSchema { get; }
 
@@ -140,11 +136,12 @@ internal sealed class GraphTypeDescriptor : IResponseModel
 
     private PydanticSchema BuildSchema()
     {
-        var schema = new PydanticSchema(PythonName, string.IsNullOrEmpty(Doc) ? null : Doc);
+        var schema = new PydanticSchema(PythonName, string.IsNullOrEmpty(Doc) ? null : PyText.Cleandoc(Doc));
         foreach (var (name, field) in ModelFields)
         {
             var scalar = field.Kind switch
             {
+                GraphFieldKind.String when field.MaxLength is { } limit && !field.IsList => PydanticType.StrMaxLength(limit),
                 GraphFieldKind.String => PydanticType.Str,
                 GraphFieldKind.Integer => PydanticType.Int,
                 GraphFieldKind.Number => PydanticType.Float,

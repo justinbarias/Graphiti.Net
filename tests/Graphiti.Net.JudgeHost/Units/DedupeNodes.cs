@@ -19,7 +19,11 @@ internal static class DedupeNodesBindings
         // The cases pass the classes as custom types, and they read only __doc__ and the identity of each class (R22).
         // Neither class has a docstring.
         // PORT: the C# models have no ModelFields, because upstream reads none, so the name and is_required() of each
-        // Python field are written here. The descriptor has no kind for list[NodeDuplicate], and no case reads it.
+        // Python field are written here. The descriptors differ from the Python classes: no field has a description,
+        // where Python has one for each field of NodeDuplicate and for entity_resolutions; and entity_resolutions is
+        // list[str], because the descriptor has no kind for list[NodeDuplicate], where Python has a list of models with
+        // $defs. So their ModelJsonSchema and ModelValidate are not Python's. No judge case reads the schema or the
+        // validation of these descriptors.
         table.Registry
             .AddRef(
                 "graphiti_core.prompts.dedupe_nodes:NodeDuplicate",

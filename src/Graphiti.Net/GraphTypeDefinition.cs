@@ -1,5 +1,6 @@
 namespace Graphiti;
 
+using System.Diagnostics.Contracts;
 using Graphiti.Internal;
 
 /// <summary>
@@ -16,12 +17,18 @@ using Graphiti.Internal;
 /// </example>
 /// <remarks>
 /// The definition gives what upstream reads from the class: the docstring, the field list, the JSON schema text, and the
-/// validation of a model reply. Pydantic writes <c>inspect.cleandoc</c> of the docstring into the schema, and
-/// <see cref="Description"/> serves as both, so the two equal Python only for a description of one paragraph with no
-/// indent. A field kind outside <see cref="GraphFieldKind"/> is not possible.
+/// validation of a model reply. <see cref="Description"/> is the raw docstring, as <c>__doc__</c> is. The JSON schema
+/// holds <c>inspect.cleandoc</c> of it, as pydantic writes it, so the schema text equals pydantic's. A field kind
+/// outside <see cref="GraphFieldKind"/> is not possible. Two definitions are equal if they have the same name, the
+/// same description, and equal fields in the same order.
 /// </remarks>
 public sealed record GraphTypeDefinition
 {
+    // The members of BaseModel in the protected namespaces "model_validate" and "model_dump" (pydantic raises ValueError
+    // for a field with such a name), and model_config (pydantic raises TypeError).
+    private static readonly string[] RefusedNames =
+        ["model_config", "model_dump", "model_dump_json", "model_validate", "model_validate_json", "model_validate_strings"];
+
     private readonly GraphTypeDescriptor descriptor;
 
     private GraphTypeDefinition(string name, string? description, IReadOnlyList<GraphFieldDefinition> fields)
@@ -61,6 +68,7 @@ public sealed record GraphTypeDefinition
     /// </param>
     /// <returns>The new definition.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    [Pure]
     public static GraphTypeDefinition Create(string name, string? description = null)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -74,9 +82,12 @@ public sealed record GraphTypeDefinition
     /// <param name="maxLength">The <c>max_length</c> of the field in code points, or null.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxLength"/> is negative.</exception>
-    public GraphTypeDefinition AddString(string name, string? description = null, bool required = false, long? maxLength = null)
+    [Pure]
+    public GraphTypeDefinition AddString(string name, string? description = null, bool required = false, int? maxLength = null)
     {
         if (maxLength is { } limit)
         {
@@ -92,7 +103,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddInteger(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.Integer, description, required, null);
 
@@ -102,7 +116,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddNumber(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.Number, description, required, null);
 
@@ -112,7 +129,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddBoolean(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.Boolean, description, required, null);
 
@@ -122,7 +142,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddStringList(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.StringList, description, required, null);
 
@@ -132,7 +155,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddIntegerList(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.IntegerList, description, required, null);
 
@@ -142,7 +168,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddNumberList(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.NumberList, description, required, null);
 
@@ -152,7 +181,10 @@ public sealed record GraphTypeDefinition
     /// <param name="required">True for a required field. A field that is not required has the default <c>None</c>.</param>
     /// <returns>A new definition with the field at the end.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
-    /// <exception cref="ArgumentException">The definition has a field with the name already.</exception>
+    /// <exception cref="ArgumentException">The definition has a field with the name already, or pydantic refuses the
+    /// name: it starts with <c>_</c>, or it is <c>model_config</c> or a member of <c>BaseModel</c> that starts with
+    /// <c>model_dump</c> or <c>model_validate</c>.</exception>
+    [Pure]
     public GraphTypeDefinition AddBooleanList(string name, string? description = null, bool required = false) =>
         Add(name, GraphFieldKind.BooleanList, description, required, null);
 
@@ -161,6 +193,32 @@ public sealed record GraphTypeDefinition
     /// descriptor, so that the class is one object, as in Python.
     /// </summary>
     internal GraphTypeDescriptor ToDescriptor() => descriptor;
+
+    /// <summary>
+    /// Compares the name, the description, and the fields in order (decision D25). The descriptor that the definition
+    /// builds is not part of the comparison.
+    /// </summary>
+    /// <param name="other">The definition to compare with.</param>
+    /// <returns>True if the two definitions are equal.</returns>
+    public bool Equals(GraphTypeDefinition? other) =>
+        other is not null
+        && string.Equals(Name, other.Name, StringComparison.Ordinal)
+        && string.Equals(Description, other.Description, StringComparison.Ordinal)
+        && Fields.SequenceEqual(other.Fields);
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+    {
+        var hash = default(HashCode);
+        hash.Add(Name, StringComparer.Ordinal);
+        hash.Add(Description, StringComparer.Ordinal);
+        foreach (var field in Fields)
+        {
+            hash.Add(field);
+        }
+
+        return hash.ToHashCode();
+    }
 
     private static Internal.GraphFieldKind ScalarKind(GraphFieldKind kind) => kind switch
     {
@@ -171,9 +229,19 @@ public sealed record GraphTypeDefinition
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
-    private GraphTypeDefinition Add(string name, GraphFieldKind kind, string? description, bool required, long? maxLength)
+    private GraphTypeDefinition Add(string name, GraphFieldKind kind, string? description, bool required, int? maxLength)
     {
         ArgumentNullException.ThrowIfNull(name);
+        if (name.StartsWith('_'))
+        {
+            throw new ArgumentException($"The field name {name} starts with '_'. Pydantic does not accept it as a field name.", nameof(name));
+        }
+
+        if (RefusedNames.Contains(name, StringComparer.Ordinal))
+        {
+            throw new ArgumentException($"The field name {name} is a member of the pydantic BaseModel. Pydantic does not accept it as a field name.", nameof(name));
+        }
+
         if (Fields.Any(field => field.Name == name))
         {
             throw new ArgumentException($"The type {Name} has a field {name} already.", nameof(name));

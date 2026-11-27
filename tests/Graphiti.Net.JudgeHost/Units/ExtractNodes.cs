@@ -24,7 +24,11 @@ internal static class ExtractNodesBindings
         // The cases pass the class ExtractedEntity as a custom type, and they read only its __doc__ and its identity
         // (R22). No case passes it as a response model. The class has no docstring.
         // PORT: the C# model has no ModelFields, because upstream reads none, so the name and is_required() of each
-        // Python field are written here.
+        // Python field are written here. The descriptor differs from the Python class in two ways: no field has a
+        // description, where Python has one for each field; and episode_indices is list[int] | None = None, where Python
+        // has list[int] with default_factory=lambda: [0], so no anyOf and no default in the schema, and [0] for a
+        // missing key. So its ModelJsonSchema and ModelValidate are not Python's. No judge case reads the schema or the
+        // validation of this descriptor.
         table.Registry
             .AddRef(Module + ":extract_message", (PromptFunction)ExtractNodes.ExtractMessage)
             .AddRef(

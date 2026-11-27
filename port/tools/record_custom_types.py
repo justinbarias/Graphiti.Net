@@ -27,29 +27,29 @@ a missing key, an extra key, and random mixes. The pool has a wrong type for eac
 numeric text, None, an empty list, a list with a wrong item, a text over max_length, non-ASCII text, and a lone
 surrogate. The values are the JSON values of a model reply.
 
-Pydantic writes `"maxLength"` into the schema of a text field with max_length, and the port cannot (PydanticType has no
-member for it). For such a class the tool also records the schema text without the key, and the test compares with
-that text. The tool leaves out a docstring that `inspect.cleandoc` changes, because the port writes one text for both
-(decision D26), a result that holds an int that a C# long cannot hold (the limit of RULES.md R4), a field name that is
-not ASCII (the title rule of PydanticSchema is for ASCII text), and a field name that ends in `_` (pydantic strips the
-space at the end of the title, and PydanticSchema does not).
+A result that holds an int that a C# long cannot hold has the mark `"gap": "F41"` (GAPS F41, the limit of RULES.md R4).
+The port throws OverflowException for such a case, and the test asserts that it still does.
 
 The error text is str(ValidationError) without the input value, the input type, and the URL line (R25).
 
-It writes tests/Port.Evaluation/values/custom_types.json. --check writes nothing and exits 1 if the file differs from
-what the run would write. The tool needs Python 3.12 and the pinned upstream. It reads the folder of the variable
+It writes tests/Port.Evaluation/values/custom_types.json, and custom_types_2.json with the input classes that the review
+of packet P7f found missing: more classes (docstrings that inspect.cleandoc changes, max_length schemas, titles of
+names that are not ASCII or end in `_`, field descriptions at the edges, names that differ only by case, names for
+which pydantic only warns), the inputs of POOL2 for each class of the first file (`more_cases`), and the field names
+that pydantic refuses at class creation with the Python error of each D26 form (`refused`). A value file stays under
+1.5 MB. --check writes nothing and exits 1 if a file differs from what the run would write. The tool needs Python 3.12 and the pinned upstream. It reads the folder of the variable
 GRAPHITI_UPSTREAM, or .upstream/graphiti. It changes nothing there. Nothing here uses the network.
 """
 from __future__ import annotations
 
 import importlib.util
-import inspect
 import json
 import os
 import random
 import re
 import sys
 import types
+import warnings
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -58,6 +58,7 @@ ROOT = Path(__file__).resolve().parents[2]
 UPSTREAM = Path(os.environ.get('GRAPHITI_UPSTREAM') or ROOT / '.upstream' / 'graphiti')
 FIXTURES = ROOT / 'port' / 'judge' / 'host-python' / 'fixtures.py'
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'custom_types.json'
+OUT2 = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'custom_types_2.json'
 
 if sys.version_info[:2] != (3, 12):
     sys.exit(f'record_custom_types: needs Python 3.12, found {sys.version.split()[0]}')
@@ -227,20 +228,20 @@ def text_of(e: ValidationError) -> str:
     return '\n'.join(lines)
 
 
-def validate(cls: type[BaseModel], data: dict) -> dict | None:
+def validate(cls: type[BaseModel], data: dict) -> dict:
     try:
         dumped = cls(**data).model_dump()
     except ValidationError as e:
         return {'err': {'errors': [[list(er['loc']), er['type'], er['msg']] for er in e.errors()], 'text': text_of(e)}}
     if contains_big(dumped):
-        return None
+        return {'ok': dumped, 'gap': 'F41'}
     return {'ok': dumped}
 
 
-def inputs(spec: dict) -> list[dict]:
+def inputs(spec: dict, pool: list = POOL, gen: random.Random = rng) -> list[dict]:
     out = [{}, base_data(spec)]
     for f in spec['fields']:
-        for value in POOL:
+        for value in pool:
             out.append({**base_data(spec), f['name']: value})
         if f['required']:
             data = base_data(spec)
@@ -251,75 +252,177 @@ def inputs(spec: dict) -> list[dict]:
     for _ in range(20):
         data = {}
         for f in spec['fields']:
-            r = rng.random()
+            r = gen.random()
             if r < 0.3:
                 continue
-            data[f['name']] = valid_value(f) if r < 0.6 else rng.choice(POOL)
-        if rng.random() < 0.3:
-            data['extra'] = rng.choice(POOL)
+            data[f['name']] = valid_value(f) if r < 0.6 else gen.choice(pool)
+        if gen.random() < 0.3:
+            data['extra'] = gen.choice(pool)
         out.append(data)
+    return out
+
+
+# --- The second value file -------------------------------------------------------------------------------------------
+#
+# The input classes that review B of packet P7f found missing, and the differences that the fix of the review closed:
+# the schema description (inspect.cleandoc), the maxLength key, the field titles, and the field names that pydantic
+# refuses. A case whose result holds an int that a C# long cannot hold has the mark "gap": "F41" (GAPS F41): the port
+# throws OverflowException there, and the test asserts that it still does.
+
+POOL2 = [
+    2**63 - 1, -(2**63), 16777217, 2**53 + 1, 10**20, -(10**20), -1, -1.0, 2.0,
+    '+5', '+1.5', '007', '-0', '\t12\n', ' 7 ', '1.000', '.5', '5.', '1E3', ' 1.5 ', 'Infinity', '-inf', 'iNf',
+    '9223372036854775807', '-9223372036854775808', '100000000000000000000',
+    'y', 'n', 'Y', 'N', 'yes', 'YES', 'Yes', 'no', 'NO', 'true', 'TRUE', 'false', 'FALSE', 'True', 'on', 'On', 'OFF',
+    't', 'T', 'F', ' true ',
+    ['+5', '007'], [2**63 - 1, -(2**63)], [10**20], [16777217, 2**53 + 1], ['y', 'N', 'true'], ['Infinity', '.5'],
+    ['\ud800'], [[]], [-1.0, 2.0],
+]
+
+rng2 = random.Random(20261128)
+
+
+def specs2() -> list[dict]:
+    docs = ['   ', '\n', ' Lead space.', 'Line one.\n    Line two.', '\n    A person.\n\n    More text.\n    ', 'a\tb',
+            'Line one.\r\nLine two.\r\n', 'One line.', '\t\tTabbed start.\n\tSecond line.', '\n\n  First.\n\n',
+            '  \n  \n', 'First.\n  Two spaces.\n    Four spaces.\n', 'x\n\ty\n        z', '　Ideographic space.',
+            'Café.\n  é indented.', 'Form\x0cfeed\x0b.\n\x1c sep.']
+    specs = [{'name': f'Doc{i}', 'doc': doc, 'fields': [field('value', 'String', 'A value')]} for i, doc in enumerate(docs)]
+    specs.append({'name': 'MaxLengths', 'doc': 'Text fields with max_length.', 'fields': [
+        field('zero_required', 'String', None, True, 0), field('zero_optional', 'String', 'Only empty', False, 0),
+        field('big_required', 'String', 'A large limit', True, 2147483647), field('big_optional', 'String', None, False, 2147483647),
+        field('ten', 'String', None, False, 10), field('plain', 'String', None, False, None),
+    ]})
+    specs.append({'name': 'Titles2', 'doc': None, 'fields': [
+        field('trailing_', 'String'), field('type_', 'Integer'), field('école_x', 'String'), field('größe', 'Number'),
+        field('naïve_date', 'String'), field('ßtraße', 'Boolean'), field('ǆx', 'String'), field("it's", 'String'),
+        field('ΑΣ_end', 'String'), field('a__b_', 'StringList'), field('x1y2', 'IntegerList'), field(' padded ', 'String'),
+        field('ǅungla', 'NumberList'), field('ﬁx', 'BooleanList'), field('ǰx', 'String'), field('東京_x', 'String'),
+    ]})
+    specs.append({'name': 'Descriptions', 'doc': 'Field descriptions at the edges.', 'fields': [
+        field('a', 'String', '', True), field('b', 'Integer', '  padded  ', True), field('c', 'Number', '', False),
+        field('d', 'BooleanList', ' lead', False), field('e', 'StringList', 'trail ', False),
+    ]})
+    specs.append({'name': 'CaseNames', 'doc': 'Two fields whose names differ only by case.', 'fields': [
+        field('a', 'Integer', None, False), field('A', 'Integer', None, False), field('age', 'Integer', None, True),
+    ]})
+    specs.append({'name': 'WarnedNames', 'doc': 'Names for which pydantic only warns.', 'fields': [
+        field('schema', 'String'), field('json', 'Integer', None, True), field('copy', 'Boolean'),
+        field('dict', 'StringList'), field('model_dump_x', 'String'), field('construct', 'Number'),
+    ]})
+    return specs
+
+
+def inputs2(spec: dict, seen: set | None = None) -> list[dict]:
+    """POOL2 in each field. With `seen`, only in the first field of each mix of kind, required flag, and max_length."""
+    out = []
+    for f in spec['fields']:
+        if seen is not None:
+            key = (f['kind'], f['required'], f['max_length'] is not None)
+            if key in seen:
+                continue
+            seen.add(key)
+        for value in POOL2:
+            out.append({**base_data(spec), f['name']: value})
+        if f['name'].upper() != f['name']:
+            out.append({**base_data(spec), f['name'].upper(): valid_value(f)})
+            out.append({**base_data(spec), f['name'].upper(): POOL2[0], f['name']: valid_value(f)})
+    return out
+
+
+# The field names that pydantic refuses at class creation, in the four forms of decision D26.
+REFUSED = ['_x', '__x', '_', '__x__', '__doc__', '_abc_impl', 'model_config', 'model_dump', 'model_dump_json',
+           'model_validate', 'model_validate_json', 'model_validate_strings']
+
+
+def refused() -> list[dict]:
+    out = []
+    for name in REFUSED:
+        forms = []
+        for required in (True, False):
+            for described in (True, False):
+                spec = {'name': 'Refused', 'doc': None,
+                        'fields': [field(name, 'String', 'd' if described else None, required)]}
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter('ignore')
+                        cls = build(spec)
+                    result = 'no field' if name not in cls.model_fields else 'field'
+                except Exception as e:  # noqa: BLE001 - the type of the error is what the file records
+                    result = type(e).__name__
+                forms.append([required, described, result])
+        out.append({'name': name, 'forms': forms})
     return out
 
 
 # --- Recording -------------------------------------------------------------------------------------------------------
 
 
-def without_max_length(value):
-    if isinstance(value, dict):
-        return {k: without_max_length(v) for k, v in value.items() if k != 'maxLength'}
-    if isinstance(value, list):
-        return [without_max_length(v) for v in value]
-    return value
+def cases_of(cls: type[BaseModel], datas: list[dict]) -> list[dict]:
+    return [{'data': data, **validate(cls, data)} for data in datas]
 
 
-def record(cls: type[BaseModel], spec: dict) -> dict:
-    assert spec['doc'] is None or inspect.cleandoc(spec['doc']) == spec['doc'] or spec['doc'] == '', spec['name']
-    assert all(f['name'].isascii() and not f['name'].endswith('_') for f in spec['fields']), spec['name']
-    schema = cls.model_json_schema()
-    entry = {
+def record(cls: type[BaseModel], spec: dict, datas: list[dict] | None = None) -> dict:
+    return {
         'spec': spec,
         'doc': cls.__doc__,
         'model_fields': [[name, _field_is_required(cls, name), _field_max_length(cls, name)] for name in cls.model_fields],
-        'schema': json.dumps(schema),
+        'schema': json.dumps(cls.model_json_schema()),
+        'cases': cases_of(cls, inputs(spec) if datas is None else datas),
     }
-    if without_max_length(schema) != schema:
-        entry['schema_without_max_length'] = json.dumps(without_max_length(schema))
-    cases = []
-    for data in inputs(spec):
-        result = validate(cls, data)
-        if result is not None:
-            cases.append({'data': data, **result})
-    entry['cases'] = cases
-    return entry
+
+
+def file_text(entries: list[dict], extra: dict) -> str:
+    import pydantic
+
+    lines = [json.dumps(e, ensure_ascii=True, separators=(',', ':')) for e in entries]
+    head = '{"python":"' + '.'.join(str(p) for p in sys.version_info[:3]) + '","pydantic":"' + pydantic.VERSION + '",'
+    tail = ''.join(f'"{key}":{json.dumps(value, ensure_ascii=True, separators=(",", ":"))},\n' for key, value in extra.items())
+    return head + tail + '"types":[\n' + ',\n'.join(lines) + '\n]}\n'
 
 
 def main() -> int:
     entries = []
+    classes = []
     for cls in load_fixtures():
         spec = spec_of(cls)
         assert build(spec).model_json_schema() == cls.model_json_schema(), cls.__name__
         entries.append(record(cls, spec))
+        classes.append((cls, spec))
     for spec in coverage_specs() + random_specs(8):
-        entries.append(record(build(spec), spec))
+        cls = build(spec)
+        entries.append(record(cls, spec))
+        classes.append((cls, spec))
 
-    lines = [json.dumps(e, ensure_ascii=True, separators=(',', ':')) for e in entries]
-    import pydantic
+    # The second file: the new classes with all inputs, and the inputs of POOL2 for each class of the first file.
+    entries2 = []
+    for spec in specs2():
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            cls = build(spec)
+        datas = [{}, {'value': 'x'}] if spec['name'].startswith('Doc') else inputs(spec, POOL, rng2) + inputs2(spec)
+        entries2.append(record(cls, spec, datas))
+    seen: set = set()
+    more = [{'name': spec['name'], 'cases': cases_of(cls, inputs2(spec, seen))} for cls, spec in classes]
+    more = [m for m in more if m['cases']]
 
-    text = (
-        '{"python":"' + '.'.join(str(p) for p in sys.version_info[:3]) + '","pydantic":"' + pydantic.VERSION
-        + '","types":[\n' + ',\n'.join(lines) + '\n]}\n'
-    )
-    count = sum(len(e['cases']) for e in entries)
-    if '--check' in sys.argv[1:]:
-        if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
-            print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
-            return 1
-        print(f'{OUT.relative_to(ROOT)}: current, {len(entries)} types and {count} cases')
-        return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding='utf-8')
-    print(f'{OUT.relative_to(ROOT)}: {len(entries)} types and {count} cases, {len(text.encode("utf-8"))} bytes')
-    return 0
+    outputs = [(OUT, file_text(entries, {}), entries, []), (OUT2, file_text(entries2, {'refused': refused(), 'more_cases': more}), entries2, more)]
+    stale = False
+    for path, text, written, extra in outputs:
+        count = sum(len(e['cases']) for e in written + extra)
+        size = len(text.encode('utf-8'))
+        assert size < 1_572_864, (path.name, size)
+        if '--check' in sys.argv[1:]:
+            if not path.exists() or path.read_text(encoding='utf-8') != text:
+                print(f'{path.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
+                stale = True
+            else:
+                print(f'{path.relative_to(ROOT)}: current, {len(written)} types and {count} cases')
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding='utf-8')
+        print(f'{path.relative_to(ROOT)}: {len(written)} types and {count} cases, {size} bytes')
+    return 1 if stale else 0
 
 
 if __name__ == '__main__':

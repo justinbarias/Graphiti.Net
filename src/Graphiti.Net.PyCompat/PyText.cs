@@ -210,6 +210,40 @@ internal static class PyText
         return sb.ToString();
     }
 
+    /// <summary>
+    /// <c>s.title()</c>: a code point after a cased code point goes to lowercase, with the final sigma rule, and each
+    /// other code point goes to its full titlecase mapping, as <c>do_title</c> of CPython does.
+    /// </summary>
+    internal static string Title(string s)
+    {
+        var cps = ToCodePoints(s);
+        var sb = new StringBuilder(s.Length);
+        var previousIsCased = false;
+        for (var i = 0; i < cps.Length; i++)
+        {
+            if (previousIsCased)
+            {
+                AppendLower(sb, cps, i);
+            }
+            else
+            {
+                var title = Lookup(PyUnicodeData.TitlecaseKeys, PyUnicodeData.TitlecaseValues, cps[i]);
+                if (title is null)
+                {
+                    AppendCodePoint(sb, cps[i]);
+                }
+                else
+                {
+                    sb.Append(title);
+                }
+            }
+
+            previousIsCased = InRanges(PyUnicodeData.Cased, cps[i]);
+        }
+
+        return sb.ToString();
+    }
+
     /// <summary><c>s.isupper()</c>: no lowercase or titlecase code point, and at least one uppercase one.</summary>
     internal static bool IsUpper(string s)
     {
@@ -374,6 +408,86 @@ internal static class PyText
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// <c>inspect.cleandoc(doc)</c> of Python 3.12: <c>doc.expandtabs()</c>, split at each <c>\n</c>, strip the start
+    /// of the first line, remove the smallest indent of the later lines that are not blank, then drop the empty lines
+    /// at the end and at the start. Pydantic writes it as the <c>description</c> of a schema.
+    /// </summary>
+    internal static string Cleandoc(string doc)
+    {
+        var lines = Split(ExpandTabs(doc), "\n").Select(ToCodePoints).ToList();
+        var margin = int.MaxValue;
+        for (var i = 1; i < lines.Count; i++)
+        {
+            var content = lines[i].Length - LeadingSpaces(lines[i]);
+            if (content > 0)
+            {
+                margin = Math.Min(margin, lines[i].Length - content);
+            }
+        }
+
+        if (lines.Count > 0)
+        {
+            lines[0] = lines[0][LeadingSpaces(lines[0])..];
+        }
+
+        if (margin < int.MaxValue)
+        {
+            for (var i = 1; i < lines.Count; i++)
+            {
+                lines[i] = lines[i][Math.Min(margin, lines[i].Length)..];
+            }
+        }
+
+        while (lines.Count > 0 && lines[^1].Length == 0)
+        {
+            lines.RemoveAt(lines.Count - 1);
+        }
+
+        while (lines.Count > 0 && lines[0].Length == 0)
+        {
+            lines.RemoveAt(0);
+        }
+
+        return string.Join("\n", lines.Select(line => FromCodePoints(line)));
+    }
+
+    // The number of code points at the start of a line that s.lstrip() removes.
+    private static int LeadingSpaces(int[] line)
+    {
+        var n = 0;
+        while (n < line.Length && IsSpaceCodePoint(line[n]))
+        {
+            n++;
+        }
+
+        return n;
+    }
+
+    // s.expandtabs(8): a tab goes to the next column that is a multiple of 8. The column counts code points and goes
+    // back to 0 after each \n and \r.
+    private static string ExpandTabs(string s)
+    {
+        var sb = new StringBuilder(s.Length);
+        var column = 0;
+        foreach (var cp in ToCodePoints(s))
+        {
+            if (cp == '\t')
+            {
+                var spaces = 8 - (column % 8);
+                sb.Append(' ', spaces);
+                column += spaces;
+            }
+            else
+            {
+                AppendCodePoint(sb, cp);
+                column = cp is '\n' or '\r' ? 0 : column + 1;
+            }
+        }
+
+        return sb.ToString();
     }
 
     private static (int Start, int End) AdjustIndices(int length, long? start, long? end)

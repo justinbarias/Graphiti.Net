@@ -1,11 +1,12 @@
 namespace Graphiti;
 
 /// <summary>
-/// One field of a <see cref="GraphTypeDefinition"/>. The <c>Add</c> members of the definition make it.
+/// One field of a <see cref="GraphTypeDefinition"/>. The <c>Add</c> members of the definition make it. Two fields are
+/// equal if each property is equal.
 /// </summary>
 public sealed record GraphFieldDefinition
 {
-    internal GraphFieldDefinition(string name, GraphFieldKind kind, string? description, bool required, long? maxLength)
+    internal GraphFieldDefinition(string name, GraphFieldKind kind, string? description, bool required, int? maxLength)
     {
         Name = name;
         Kind = kind;
@@ -36,5 +37,5 @@ public sealed record GraphFieldDefinition
     /// Gets the <c>max_length</c> of a text field in code points, or null. Validation rejects a longer text. The
     /// attribute cap of a model reply also reads it, in place of its default limit.
     /// </summary>
-    public long? MaxLength { get; }
+    public int? MaxLength { get; }
 }

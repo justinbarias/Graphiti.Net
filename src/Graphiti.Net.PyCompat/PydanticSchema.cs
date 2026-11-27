@@ -1,7 +1,5 @@
 namespace Graphiti.PyCompat;
 
-using System.Text;
-
 /// <summary>
 /// The JSON schema of one model, as <c>M.model_json_schema()</c> of pydantic 2.12.5 gives it (RULES.md R7, GAPS G3).
 /// A ported model builds it in field order with the Python field names, the Python class name as the title, and the
@@ -124,21 +122,10 @@ internal sealed class PydanticSchema
         return body;
     }
 
-    /// <summary>pydantic's field title: <c>name.replace('_', ' ')</c>, then Python <c>str.title()</c> for ASCII text.</summary>
-    private static string FieldTitle(string name)
-    {
-        var sb = new StringBuilder(name.Length);
-        var previousCased = false;
-        foreach (var raw in name)
-        {
-            var c = raw == '_' ? ' ' : raw;
-            var cased = char.IsAsciiLetter(c);
-            sb.Append(cased ? (previousCased ? char.ToLowerInvariant(c) : char.ToUpperInvariant(c)) : c);
-            previousCased = cased;
-        }
-
-        return sb.ToString();
-    }
+    /// <summary>
+    /// pydantic's field title, <c>GenerateJsonSchema.get_title_from_name</c>: <c>name.title().replace('_', ' ').strip()</c>.
+    /// </summary>
+    private static string FieldTitle(string name) => PyText.Strip(PyText.Title(name).Replace('_', ' '));
 
     /// <summary>pydantic's sort of a schema: the keys of each dict in code point order, except under <c>properties</c> and <c>default</c>.</summary>
     private static object? Sort(object? value, string? parentKey)
@@ -178,6 +165,10 @@ internal sealed class PydanticType
 
     /// <summary><c>str</c>.</summary>
     internal static PydanticType Str { get; } = Simple("string");
+
+    /// <summary><c>str</c> with <c>Field(max_length=n)</c>: a string with <c>maxLength</c>.</summary>
+    internal static PydanticType StrMaxLength(long maxLength) =>
+        new(_ => new() { ["maxLength"] = maxLength, ["type"] = "string" });
 
     /// <summary><c>int</c>.</summary>
     internal static PydanticType Int { get; } = Simple("integer");
