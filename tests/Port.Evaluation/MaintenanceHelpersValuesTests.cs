@@ -1,12 +1,14 @@
 // Evaluation test for four maintenance modules (port/RULES.md, R23 and R25): dedup_helpers.py, attribute_utils.py,
 // temporal_edge_utils.py, and dangling_endpoints.py of graphiti_core/utils/maintenance/.
 // values/maintenance_helpers.json holds about 4,000 calls that port/tools/record_maintenance_helpers.py recorded from
-// Python, each with its log lines. GraphDataOperationsValuesTests reads the async cases of the same file.
+// Python, each with its log lines, and values/maintenance_helpers_review.json holds the fixed calls that came with the
+// reviews. GraphDataOperationsValuesTests reads the async cases of the first file.
 namespace Graphiti.Port.Evaluation;
 
 using System.Collections;
 using System.Globalization;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Graphiti.Core;
@@ -16,7 +18,9 @@ using Graphiti.PyCompat;
 
 public class MaintenanceHelpersValuesTests
 {
-    internal static readonly OrderedDictionary<string, object?> Document = Load();
+    internal static readonly OrderedDictionary<string, object?> Document = Load("maintenance_helpers.json");
+
+    private static readonly OrderedDictionary<string, object?> ReviewDocument = Load("maintenance_helpers_review.json");
 
     [Fact]
     public void Each_module_constant_has_the_value_of_python()
@@ -37,7 +41,11 @@ public class MaintenanceHelpersValuesTests
         Assert.Equal(AttributeUtils.EnvVar, (string)attributes["_ENV_VAR"]!);
 
         Assert.Equal(GraphDataOperations.EpisodeWindowLen, (long)Dict(constants["graph_data_operations"])["EPISODE_WINDOW_LEN"]!);
-        Assert.Equal(512L, (long)constants["lru_cache_maxsize"]!);
+
+        // The recording holds the maxsize of the lru_cache of Python. The port keeps its cache in a private static field.
+        var cache = typeof(DedupHelpers).GetField("CachedShinglesCache", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(cache);
+        Assert.Equal((int)(long)constants["lru_cache_maxsize"]!, ((PyLruCache<string, HashSet<string>>)cache.GetValue(null)!).MaxSize);
     }
 
     [Fact]
@@ -55,74 +63,101 @@ public class MaintenanceHelpersValuesTests
                 List(fields).Select(f => List(f)).Select(f => new GraphFieldDescriptor((string)f[0]!, GraphFieldKind.String, false, null, (bool)f[1]!, (long?)f[2])));
         }
 
-        // The cases share the set of warned environment values, as the recorder does, so they run in the recorded order.
+        // The cases of one file share the set of warned environment values, as the recorder does, so they run in the
+        // recorded order. Each file starts with an empty set, and the set is private to this test.
         var clock = new MaintenanceFixedClock(PyDateTime.FromIsoFormat((string)Document["fixed_now"]!).ToDateTimeOffset());
         List<string> failures = [];
-        foreach (var item in cases)
+        foreach (var file in new[] { cases, List(ReviewDocument["cases"]) })
         {
-            var recorded = Dict(item);
-            var name = (string)recorded["f"]!;
-            if (name == "descriptors")
+            using (AttributeUtils.WarnedInvalidEnv.Use(new HashSet<string>(StringComparer.Ordinal)))
             {
-                continue;
-            }
-
-            var args = List(recorded["a"]);
-            var result = Dict(recorded["r"]);
-            var expectedLogs = List(recorded["logs"]).Select(Dict).Select(l => ((string)l["level"]!, (string)l["message"]!)).ToList();
-            var capture = new MaintenanceLogCapture();
-            var label = $"{name}({Short(PyJson.Dumps(args))})";
-            try
-            {
-                using (PortServices.Use(loggerFactory: capture, time: clock))
+                foreach (var item in file)
                 {
-                    if (result.TryGetValue("err", out var err))
-                    {
-                        var error = List(err);
-                        var thrown = Assert.ThrowsAny<Exception>(() => Invoke(name, args, models));
-                        switch ((string)error[0]!)
-                        {
-                            case "ValueError":
-                                Assert.IsType<ArgumentException>(thrown);
-                                Assert.Equal((string)error[1]!, thrown.Message);
-                                break;
-                            case "UnicodeEncodeError":
-                                Assert.IsType<EncoderFallbackException>(thrown);
-                                break;
-                            default:
-                                throw new InvalidOperationException($"No exception type for {error[0]}");
-                        }
-                    }
-                    else
-                    {
-                        var want = PyJson.Dumps(result["ok"]);
-                        var got = PyJson.Dumps(Invoke(name, args, models));
-                        if (want != got)
-                        {
-                            var at = 0;
-                            while (at < want.Length && at < got.Length && want[at] == got[at])
-                            {
-                                at++;
-                            }
-
-                            failures.Add($"{label}: the results differ at character {at}: expected ...{Window(want, at)} but got ...{Window(got, at)}");
-                            continue;
-                        }
-                    }
+                    Check(Dict(item), models, clock, failures);
                 }
-
-                if (!expectedLogs.SequenceEqual(capture.Lines))
-                {
-                    failures.Add($"{label}: the log lines differ: expected [{string.Join(" | ", expectedLogs)}] but got [{string.Join(" | ", capture.Lines)}]");
-                }
-            }
-            catch (Exception error)
-            {
-                failures.Add($"{label}: {error.GetType().Name}: {error.Message}");
             }
         }
 
         Assert.True(failures.Count == 0, $"{failures.Count} recorded results differ. The first ones:\n{string.Join("\n", failures.Take(8))}");
+    }
+
+    // The order of a Python set of text changes with the hash seed. R14 gives the port the insertion order, and the
+    // recorder binds `set` to a class with that order. A case with "set_order": true has another result for another
+    // order, so real Python can give another result for it. The recording must keep such cases for both places.
+    [Fact]
+    public void The_recording_holds_cases_that_depend_on_the_order_of_a_set()
+    {
+        var ordered = List(Document["cases"]).Concat(List(ReviewDocument["cases"]))
+            .Select(Dict)
+            .Where(c => c.TryGetValue("set_order", out var flag) && (bool)flag!)
+            .Select(c => (string)c["f"]!)
+            .ToList();
+        Assert.Contains("resolve", ordered);
+        Assert.Contains("apply_capped_attributes", ordered);
+        Assert.All(ordered, name => Assert.True(name is "resolve" or "apply_capped_attributes", name));
+    }
+
+    private static void Check(OrderedDictionary<string, object?> recorded, Dictionary<string, GraphTypeDescriptor> models, MaintenanceFixedClock clock, List<string> failures)
+    {
+        var name = (string)recorded["f"]!;
+        if (name == "descriptors")
+        {
+            return;
+        }
+
+        var args = List(recorded["a"]);
+        var result = Dict(recorded["r"]);
+        var expectedLogs = List(recorded["logs"]).Select(Dict).Select(l => ((string)l["level"]!, (string)l["message"]!)).ToList();
+        var capture = new MaintenanceLogCapture();
+        var label = $"{name}({Short(PyJson.Dumps(args))})";
+        try
+        {
+            using (PortServices.Use(loggerFactory: capture, time: clock))
+            {
+                if (result.TryGetValue("err", out var err))
+                {
+                    var error = List(err);
+                    var thrown = Assert.ThrowsAny<Exception>(() => Invoke(name, args, models));
+                    switch ((string)error[0]!)
+                    {
+                        case "ValueError":
+                            Assert.IsType<ArgumentException>(thrown);
+                            Assert.Equal((string)error[1]!, thrown.Message);
+                            break;
+                        case "UnicodeEncodeError":
+                            Assert.IsType<EncoderFallbackException>(thrown);
+                            break;
+                        default:
+                            throw new InvalidOperationException($"No exception type for {error[0]}");
+                    }
+                }
+                else
+                {
+                    var want = PyJson.Dumps(result["ok"]);
+                    var got = PyJson.Dumps(Invoke(name, args, models));
+                    if (want != got)
+                    {
+                        var at = 0;
+                        while (at < want.Length && at < got.Length && want[at] == got[at])
+                        {
+                            at++;
+                        }
+
+                        failures.Add($"{label}: the results differ at character {at}: expected ...{Window(want, at)} but got ...{Window(got, at)}");
+                        return;
+                    }
+                }
+            }
+
+            if (!expectedLogs.SequenceEqual(capture.Lines))
+            {
+                failures.Add($"{label}: the log lines differ: expected [{string.Join(" | ", expectedLogs)}] but got [{string.Join(" | ", capture.Lines)}]");
+            }
+        }
+        catch (Exception error)
+        {
+            failures.Add($"{label}: {error.GetType().Name}: {error.Message}");
+        }
     }
 
     private static object? Invoke(string name, List<object?> a, Dictionary<string, GraphTypeDescriptor> models) => name switch
@@ -423,9 +458,9 @@ public class MaintenanceHelpersValuesTests
 
     internal static OrderedDictionary<string, object?> Dict(object? value) => (OrderedDictionary<string, object?>)value!;
 
-    private static OrderedDictionary<string, object?> Load()
+    private static OrderedDictionary<string, object?> Load(string file)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "values", "maintenance_helpers.json");
+        var path = Path.Combine(AppContext.BaseDirectory, "values", file);
         return (OrderedDictionary<string, object?>)PyJson.Loads(File.ReadAllText(path))!;
     }
 }

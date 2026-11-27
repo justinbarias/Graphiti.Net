@@ -44,8 +44,9 @@ internal static partial class AttributeUtils
 
     // Track invalid env values we've already warned about so a misconfigured deploy
     // emits one warning per unique bad value rather than one per cap invocation.
-    // PORT: a module-level "warned once" set is a static readonly field (R17). It is only tested with `in` (R14).
-    internal static readonly HashSet<string> WarnedInvalidEnv = new(StringComparer.Ordinal);
+    // PORT: a module-level value that an upstream test replaces (monkeypatch.setattr) is a PyPatch<T> (R17). The set is
+    // only tested with `in` (R14). The code reads it with .Value at each site.
+    internal static readonly PyPatch<HashSet<string>> WarnedInvalidEnv = new(new HashSet<string>(StringComparer.Ordinal));
 
     // Merge semantics shared by node and edge call sites:
     //
@@ -83,7 +84,7 @@ internal static partial class AttributeUtils
         catch (ArgumentException)
         {
             // PORT: `if raw not in s: s.add(raw)` is one Add call, which returns false for a value in the set (CA1868).
-            if (WarnedInvalidEnv.Add(raw))
+            if (WarnedInvalidEnv.Value.Add(raw))
             {
                 if (Logger.IsEnabled(LogLevel.Warning))
                 {
@@ -160,10 +161,13 @@ internal static partial class AttributeUtils
             }
 
             var total = Py.Iter(value).OfType<string>().Sum(Py.Len);
-            var aggregateCap = maxLen * ListTotalLengthMultiplier;
+            // PORT: Python ints have no limit, so `max_len * LIST_TOTAL_LENGTH_MULTIPLIER` is exact for each cap that a long holds
+            // (R4). The product and the comparison are Int128. The breached cap is a long: `total` is a sum of lengths and
+            // cannot pass a cap above long.MaxValue, so a breach has a cap that a long holds.
+            var aggregateCap = (Int128)maxLen * ListTotalLengthMultiplier;
             if (total > aggregateCap)
             {
-                return (true, "aggregate", total, aggregateCap);
+                return (true, "aggregate", total, (long)aggregateCap);
             }
 
             return (false, "ok", 0, maxLen);

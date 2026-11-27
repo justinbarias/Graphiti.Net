@@ -275,8 +275,9 @@ public class TestAttributeUtils
     [Fact]
     public void test_invalid_env_warning_dedups_across_calls()
     {
-        // PORT: Python replaces _warned_invalid_env with an empty set (monkeypatch.setattr). The name has no PyPatch<T>
-        // (R17), so the test uses a value that no other test of the process passes: the set holds it after the first call.
+        // PORT: monkeypatch.setattr(attribute_utils, '_warned_invalid_env', set()) is PyPatch<T>.Use (R17). The set is empty
+        // for this test only, so that no other test class shares its state.
+        using (AttributeUtils.WarnedInvalidEnv.Use(new HashSet<string>(StringComparer.Ordinal)))
         using (SetEnv("garbage"))
         {
             var caplog = new MaintenanceLogCapture();

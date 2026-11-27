@@ -16,17 +16,30 @@ lines are one ordered list.
 Two values are fixed on both sides. dangling_endpoints.utc_now gives FIXED_NOW, and the C# test gives the port a
 clock with the same time. A new node gets a random uuid4, so the test compares its shape.
 
-The recording leaves out inputs that differ by a documented limit: an int above 64 bits in an environment value
-(RULES.md R4) and a high surrogate next to a low one (RULES.md, Part 3). Each invalid environment value starts with
-'p7a', so that the set of warned values (_warned_invalid_env) holds no value of another test.
+The recording leaves out inputs that differ by a documented limit: an int above 64 bits in an environment value or in a
+cap (RULES.md R4) and a high surrogate next to a low one (RULES.md, Part 3). It holds each cap that a long holds, up to
+9223372036854775807, because Python has no limit on the product `max_len * LIST_TOTAL_LENGTH_MULTIPLIER` and the port
+computes it in Int128. Each invalid environment value starts with 'p7a', so that the set of warned values
+(_warned_invalid_env) holds no value of another test. The C# test replaces that set, as the upstream test does.
 
-It writes tests/Port.Evaluation/values/maintenance_helpers.json. --check writes nothing and exits 1 if the file
+Real Python can give another result than this file for some inputs. A Python set of text iterates in an order that
+changes with the hash seed of the process. The port iterates such a set in insertion order (RULES.md R14, decision D43),
+so the tool binds the name `set` of dedup_helpers and attribute_utils to a class that iterates in insertion order
+(InsertionOrderSet). The order decides the result in two places: a tie between two fuzzy candidates in
+_resolve_with_similarity, and the order of the restored fields in apply_capped_attributes (merge_mode='replace'). The tool
+runs each such case a second time with the iteration order reversed, and it marks the case with "set_order": true if the
+result or a log line differs. For a marked case, real Python gives this recorded result for some hash seeds and the
+other result for the others. The port gives the recorded result, which is the choice of R14.
+
+It writes tests/Port.Evaluation/values/maintenance_helpers.json and maintenance_helpers_review.json (the fixed cases that
+came with the reviews, so that each file stays under the limit of R25). --check writes nothing and exits 1 if the file
 differs from what the run would write. The tool needs Python 3.12 and the pinned upstream. It reads the folder of the
 variable GRAPHITI_UPSTREAM, or .upstream/graphiti. It changes nothing there. Nothing here uses the network.
 """
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import math
@@ -40,6 +53,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 UPSTREAM = Path(os.environ.get('GRAPHITI_UPSTREAM') or ROOT / '.upstream' / 'graphiti')
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'maintenance_helpers.json'
+OUT_REVIEW = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'maintenance_helpers_review.json'
 
 SEED = 20261127
 FIXED_NOW = datetime(2026, 3, 4, 5, 6, 7, 891011, tzinfo=timezone.utc)
@@ -48,7 +62,7 @@ WORDS = ['Alice', 'alice', 'ALICE', 'Johnson', 'Acme', 'Corporation', 'Corp.', '
          'Bob', 'Area', '51', '(Nevada)', 'Hello___World', 'Café', 'Crème', 'École', 'İstanbul', 'İzmir', 'STRAßE',
          'ΣΑΣ', 'ǅungla', 'Ｆｕｌｌ', '東京', '大学', 'こんにちは', '한국어', 'école', 'It’s', "Ross'", 'x', 'a',
          'ab', 'aaaa', 'meaningful', 'name', 'version', '2.0', 'v1.2.3', 'ſmith', 'ıvan', 'KKelvin', 'IBM', 'ibm',
-         '\U0001F600', '\U0001F680', '\U0001D400bc', 'z\ud800z', 'a\udfff', '​', '﻿ab']
+         '\U0001F600', '\U0001F680', '\U0001D400bc', 'z\ud800z', 'a\udfff', '​', '﻿ab', '\x1c', ' \x1f ', '\x85']
 SEPS = [' ', ' ', ' ', '  ', '\t', '\n', ' ', '　', '\x1c', '\x1f', ' ', '\x85', '', '-', '_', '.', ',']
 
 LABELS = ['Person', 'Company', 'Party', 'Org', 'Place']
@@ -62,6 +76,8 @@ CREATED = [
 
 rng = random.Random(SEED)
 records: list[dict] = []
+review_records: list[dict] = []
+sink = [records]
 events: list[dict] = []
 UUID4 = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
 
@@ -73,7 +89,11 @@ class InsertionOrderSet(set):
     such a set in insertion order, which is one of the orders that Python can give (RULES.md R14). The tool binds the
     name `set` of dedup_helpers and attribute_utils to this class, so that both sides use the same order:
     candidate_ids in _resolve_with_similarity and dropped in cap_string_attributes.
+
+    `reverse` is a flag of the class. While it is true, the set iterates in the reverse of the insertion order.
     """
+
+    reverse = False
 
     def __init__(self, items=()):
         super().__init__()
@@ -91,7 +111,7 @@ class InsertionOrderSet(set):
                 self.add(item)
 
     def __iter__(self):
-        return iter(self._order)
+        return iter(reversed(self._order) if InsertionOrderSet.reverse else self._order)
 
 
 def rand_name(max_words: int = 4) -> str:
@@ -153,7 +173,8 @@ def node_data(uuid: str, name: str) -> dict:
 
 def rand_attr_value():
     return rng.choice([None, '', ' ', ' \t', 'C-1', ' C-1 ', 'c-1', 'x', ' ', 7, 0, -3, 7.0, 2.5, -0.0,
-                       float('nan'), float('inf'), True, False, [1], ['C-1'], {'a': 1}, 10 ** 30, 'é東'])
+                       float('nan'), float('inf'), True, False, [1], ['C-1'], {'a': 1}, 10 ** 30, 'é東',
+                       '\x1c', ' \x1f ', '\x85'])
 
 
 def node_view(node) -> dict:
@@ -189,13 +210,31 @@ def hashes(values) -> list[str]:
     return [str(v) for v in values]
 
 
-def call(name: str, fn, args: list, encoded: list, view=plain) -> None:
+def run_call(fn, args: list, view) -> tuple[dict, list]:
     events.clear()
     try:
         result = {'ok': view(fn(*args))}
     except Exception as error:  # noqa: BLE001 - the recording keeps each exception
         result = {'err': [type(error).__name__, str(error)]}
-    records.append({'f': name, 'a': encoded, 'r': result, 'logs': list(events)})
+    return result, list(events)
+
+
+def call(name: str, fn, args: list, encoded: list, view=plain, ordered: bool = False) -> None:
+    # An ordered case runs a second time with the iteration order of the sets reversed. The second run gets a copy of
+    # the arguments that the first run has not changed.
+    second_args = copy.deepcopy(args) if ordered else None
+    result, logs = run_call(fn, args, view)
+    record = {'f': name, 'a': encoded, 'r': result, 'logs': logs}
+    if ordered:
+        InsertionOrderSet.reverse = True
+        try:
+            other, other_logs = run_call(fn, second_args, view)
+        finally:
+            InsertionOrderSet.reverse = False
+        dump = lambda value: json.dumps(value, ensure_ascii=True, allow_nan=True, separators=(',', ':'))  # noqa: E731
+        if dump([other, other_logs]) != dump([result, logs]):
+            record['set_order'] = True
+    sink[0].append(record)
 
 
 def record_dedup(dh, EntityNode) -> None:
@@ -314,7 +353,84 @@ def record_dedup(dh, EntityNode) -> None:
             extracted.append(data)
         pre = [rng.randrange(len(existing)) if existing and rng.random() < 0.15 else None for _ in extracted]
         props = rand_identity_properties()
-        call('resolve', resolve, [existing, extracted, pre, props], [existing, extracted, pre, props])
+        call('resolve', resolve, [existing, extracted, pre, props], [existing, extracted, pre, props], ordered=True)
+
+    def call_resolve(*a):
+        call('resolve', resolve, list(a), list(a), ordered=True)
+
+    sink[0] = review_records
+    record_fixed_dedup(dh, call_resolve)
+    sink[0] = records
+
+
+def mk(uuid, name, created='2024-01-01T00:00:00+00:00', labels=('Entity', 'Person'), attributes=None, group_id='g'):
+    """A node with no random part, for the fixed cases."""
+    return {'uuid': uuid, 'name': name, 'group_id': group_id, 'labels': list(labels), 'created_at': created,
+            'summary': '', 'attributes': dict(attributes or {})}
+
+
+def record_fixed_dedup(dh, call_resolve) -> None:
+    """Fixed inputs for the identity match, the fuzzy threshold, and the strip of attribute values."""
+    email = {'Person': ['email']}
+    pid = {'Person': ['pid']}
+
+    def with_email(uuid, created, value='x@y', name=None):
+        return mk(uuid, name or f'Person {uuid}', created, attributes={'email': value})
+
+    # The identity matches are not in the order of (created_at, uuid), so the sort decides.
+    for existing in ([('a', '2024-01-01T00:00:00+00:00'), ('b', '2023-01-01T00:00:00+00:00')],
+                     [('b', '2023-01-01T00:00:00+00:00'), ('a', '2024-01-01T00:00:00+00:00')],
+                     [('c', '2025-02-03T00:00:00+00:00'), ('a', '2024-01-01T00:00:00+00:00'), ('b', '2023-01-01T00:00:00+00:00')],
+                     [('a', '2023-01-01T00:00:00+00:00'), ('c', '2025-02-03T00:00:00+00:00'), ('b', '2024-01-01T00:00:00+00:00')],
+                     [('z', '2023-06-01T12:30:00+00:00'), ('y', '2023-06-01T12:30:00.000001+00:00'), ('x', '2023-06-01T12:29:59+00:00')]):
+        nodes = [with_email(u, c) for u, c in existing]
+        call_resolve(nodes, [with_email('x', '2024-06-01T00:00:00+00:00')], [None], email)
+
+    # Two matches have one created_at, so the uuid decides. Some pairs have the same instant at two offsets.
+    for first, second in ((('u-b', '2024-01-01T00:00:00+00:00'), ('u-a', '2024-01-01T00:00:00+00:00')),
+                          (('u-a', '2024-01-01T00:00:00+00:00'), ('u-b', '2024-01-01T00:00:00+00:00')),
+                          (('u-b', '2024-01-01T05:00:00+05:00'), ('u-a', '2024-01-01T00:00:00+00:00')),
+                          (('u-a', '2024-01-01T00:00:00+00:00'), ('u-b', '2024-01-01T05:00:00+05:00')),
+                          (('u-b', '2024-01-01T00:00:00+00:00'), ('u-a', '2023-12-31T19:00:00-05:00'))):
+        nodes = [with_email(*first), with_email(*second)]
+        call_resolve(nodes, [with_email('x', '2024-06-01T00:00:00+00:00')], [None], email)
+    for value, other in ((True, 1), (1, 1.0), (1.0, True), (0, False), (7, 7.0)):
+        nodes = [mk('u-b', 'B', '2024-01-01T05:00:00+05:00', attributes={'pid': other}),
+                 mk('u-a', 'A', '2024-01-01T00:00:00+00:00', attributes={'pid': other})]
+        call_resolve(nodes, [mk('u-x', 'X', attributes={'pid': value})], [None], pid)
+
+    # An extracted node has the uuid of an existing node with the same identity key.
+    call_resolve([with_email('s', '2020-01-01T00:00:00+00:00', 'z'), with_email('t', '2024-01-01T00:00:00+00:00', 'z')],
+                 [with_email('s', '2025-01-01T00:00:00+00:00', 'z')], [None], email)
+    call_resolve([with_email('t', '2024-01-01T00:00:00+00:00', 'z'), with_email('s', '2020-01-01T00:00:00+00:00', 'z')],
+                 [with_email('t', '2025-01-01T00:00:00+00:00', 'z')], [None], email)
+    call_resolve([with_email('r', '2019-01-01T00:00:00+00:00', 'z'), with_email('s', '2020-01-01T00:00:00+00:00', 'z'),
+                  with_email('t', '2024-01-01T00:00:00+00:00', 'z')],
+                 [with_email('s', '2025-01-01T00:00:00+00:00', 'z')], [None], email)
+    call_resolve([with_email('s', '2020-01-01T00:00:00+00:00', 'z', name='Same Name'), with_email('t', '2024-01-01T00:00:00+00:00', 'q')],
+                 [with_email('s', '2025-01-01T00:00:00+00:00', 'z', name='Same Name')], [None], email)
+    call_resolve([with_email('s', '2020-01-01T00:00:00+00:00', 'z'), with_email('t', '2024-01-01T00:00:00+00:00', 'z')],
+                 [with_email('s', '2025-01-01T00:00:00+00:00', 'z'), with_email('t', '2025-01-01T00:00:00+00:00', 'z')],
+                 [None, None], email)
+
+    # The fuzzy score of 0.9 resolves, and the score of 8/9 does not.
+    letters = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    for long_length, short_length in ((12, 11), (11, 10), (10, 9), (13, 12), (14, 13)):
+        longer, shorter = letters[:long_length], letters[:short_length]
+        call_resolve([mk('e', longer, labels=('Entity',))], [mk('n', shorter, labels=('Entity',))], [None], None)
+        call_resolve([mk('e', shorter, labels=('Entity',))], [mk('n', longer, labels=('Entity',))], [None], None)
+
+    # A prior match with empty text after a strip does not replace an attribute (_merge_non_empty_attributes).
+    for text in ('\x1c', ' \x1f ', '\x85', '\x1c\x1d\x1e\x1f', ' \u00a0 ', '\u200b', '\x1c7\x1f'):
+        call_resolve([mk('e', 'Alice Johnson', attributes={'a': 'old', 'b': 'old'})],
+                     [mk('n', 'Alice Johnson', attributes={'a': text, 'b': 'new'})], [None], None)
+        call_resolve([mk('e', 'Alice Johnson', attributes={'email': 'old'})],
+                     [mk('n', 'Alice Johnson', attributes={'email': text})], [None], email)
+        call_resolve([mk('e', 'Alice Johnson', attributes={'email': text})],
+                     [mk('n', 'Bob Other', attributes={'email': text})], [None], email)
+
+    for text in ('\x1c', '\x1f', ' \x1f ', '\x85', '\x1c\x1f', '\x1c7\x1f', '\u00a0', '\u200b', '\ufeff', ' x '):
+        call('_normalize_identity_value', dh._normalize_identity_value, [text], [text])
 
 
 def record_attributes(au) -> None:
@@ -367,7 +483,8 @@ def record_attributes(au) -> None:
         call('_check_value_against_cap', au._check_value_against_cap, [decode(value), cap], [value, cap])
 
     envs = [None, '', '   ', '50', ' 7 ', '1_000', '١٢', '+12', 'p7a-bad', 'p7a-bad', 'p7a-0x10', '-7', '-00',
-            '+0', 'p7a-1.5', 'p7a-bad']
+            '+0', 'p7a-1.5', 'p7a-bad', '2000000000000000000', '9223372036854775807', '1152921504606846975',
+            '1152921504606846976', '\x1c', ' \x1f ', '\x85', '\x1c7\x1f']
 
     def run_with_env(env, fn):
         if env is None:
@@ -425,8 +542,57 @@ def record_attributes(au) -> None:
         kwargs['merge_mode'] = rng.choice(['overlay', 'overlay', 'replace', 'replace', 'merge'])
         call('apply_capped_attributes',
              lambda m, r, p, k: au.apply_capped_attributes({x: decode(y) for x, y in r.items()}, models[m], p, **k),
-             [model_name, response, prior, kwargs], [model_name, response, prior, kwargs], dropped_order_view)
+             [model_name, response, prior, kwargs], [model_name, response, prior, kwargs], dropped_order_view, ordered=True)
 
+    sink[0] = review_records
+    # Fixed inputs: a cap above long.MaxValue / 8, an aggregate breach, and a replace that restores two fields or more.
+    # They use no random value, so that they do not move the cases above.
+    big_caps = [2000000000000000000, 9223372036854775807, 1152921504606846975, 1152921504606846976, 1152921504606846977]
+    for cap in big_caps:
+        for value in (['a', 'b'], ['x' * 300, 'y'], 'abc', [], ['a', 5, None]):
+            call('_check_value_against_cap', au._check_value_against_cap, [value, cap], [value, cap])
+    for value, cap in ((['x' * 40] * 9, 40), (['x' * 40] * 8, 40), (['x' * 40] * 8 + ['y'], 40), (['a'] * 9, 1), (['a'] * 8, 1),
+                       (['\U0001F600' * 5] * 9, 5), (['x' * 5, 7, None] * 20, 5), ([['a'] * 100] * 3 + ['aa'] * 9, 2),
+                       (['x' * 249] * 10, 250), (['x' * 250] * 8, 250), (['x' * 250] * 9, 250), (['x'] * 9, 0), (['x'] * 9, -1)):
+        call('_check_value_against_cap', au._check_value_against_cap, [value, cap], [value, cap])
+
+    for env in ('2000000000000000000', '9223372036854775807', '1152921504606846976', None, '50'):
+        for model_name in ('Person', 'Strict'):
+            for response in ({'aliases': ['x' * 300, 'y'], 'tags': ['a', 'b'], 'phones': 'z' * 400},
+                             {'aliases': ['ok', 'fine'], 'tags': ['a'] * 3, 'phones': 'ok', 'short': 'abc'},
+                             {'aliases': ['x' * 49] * 9, 'tags': ['ab'] * 9, 'phones': 'z' * 51, 'full_name': 'n' * 300},
+                             {'aliases': ['x' * 249] * 10, 'tags': [], 'industry': 'i' * 300}):
+                kwargs = {'prompt_name': 'extract_nodes.extract_attributes', 'entity_uuid': 'abc-123', 'group_id': 'tenant-x'}
+                call('cap_string_attributes',
+                     lambda e, m, r, k: run_with_env(e, lambda: au.cap_string_attributes(dict(r), models[m], **k)),
+                     [env, model_name, response, kwargs], [env, model_name, response, kwargs], view)
+    for default in (2000000000000000000, 9223372036854775807):
+        response = {'aliases': ['x' * 300, 'y'], 'phones': 'z' * 400}
+        kwargs = {'default_max_length': default}
+        call('cap_string_attributes', lambda e, m, r, k: run_with_env(e, lambda: au.cap_string_attributes(dict(r), models[m], **k)),
+             [None, 'Person', response, kwargs], [None, 'Person', response, kwargs], view)
+
+    long_text = 'x' * 300
+    replace_cases = [
+        ('Person', {'phones': long_text, 'industry': 'y' * 300, 'aliases': ['ok']}, {'phones': 'a', 'industry': 'b'}),
+        ('Person', {'aliases': ['ok'], 'industry': 'y' * 300, 'phones': long_text}, {'phones': 'a', 'industry': 'b'}),
+        ('Person', {'industry': 'y' * 300, 'phones': long_text, 'aliases': ['x' * 249] * 10}, {'phones': 'a', 'industry': 'b', 'aliases': ['p']}),
+        ('Person', {'phones': long_text, 'industry': 'y' * 300, 'aliases': ['x' * 249] * 10}, {'aliases': ['p'], 'industry': 'b'}),
+        ('Person', {'phones': long_text, 'industry': 'y' * 300, 'aliases': ['x' * 249] * 10, 'description': 'd' * 2500},
+         {'description': 'd0', 'phones': 'a', 'industry': 'b', 'aliases': ['p'], 'other': 1}),
+        ('Person', {'phones': None, 'industry': long_text, 'aliases': ['x' * 249] * 10}, {'phones': 'a', 'aliases': None, 'industry': 'b'}),
+        ('Strict', {'tags': ['ab'] * 9, 'zero': 'z', 'note': 'n', 'full_name': 'f', 'short': 'abc'}, {'zero': 'old', 'tags': ['t'], 'note': 'o'}),
+        ('Strict', {'zero': 'z', 'tags': ['ab'] * 9, 'short': 'abc', 'full_name': 'f', 'note': 'n'}, {'tags': ['t'], 'zero': 'old', 'note': 'o'}),
+        ('Mixed', {'notes': long_text, 'amount': 2.5, 'count': 3}, {'notes': 'n', 'amount': 1.0}),
+    ]
+    for model_name, response, prior in replace_cases:
+        for mode in ('replace', 'overlay'):
+            kwargs = {'merge_mode': mode, 'entity_uuid': 'abc-123', 'group_id': 'tenant-x'}
+            call('apply_capped_attributes',
+                 lambda m, r, p, k: au.apply_capped_attributes(dict(r), models[m], p, **k),
+                 [model_name, response, prior, kwargs], [model_name, response, prior, kwargs], dropped_order_view, ordered=True)
+
+    sink[0] = records
     records.append({'f': 'descriptors', 'a': [], 'r': {'ok': descriptors}, 'logs': []})
 
 
@@ -482,6 +648,63 @@ def record_temporal(te, EntityEdge) -> None:
         f = fact()
         args = [f, rng.choice(texts), rng.choice(texts), rng.choice(reference), rng.choice(dates), rng.choice(dates)]
         call('apply_extracted_timestamps', apply, args, [args[0], args[1], args[2], dt(args[3]), dt(args[4]), dt(args[5])], lambda x: x)
+
+    sink[0] = review_records
+    # Fixed inputs that use no random value. A letter that R13 adds to a pattern, a mark next to a keyword, a date text
+    # whose only form is `Z`, and a word that contains a keyword.
+    utc = timezone.utc
+    ref = datetime(2020, 1, 1, tzinfo=utc)
+    later = datetime(2021, 6, 1, tzinfo=utc)
+
+    def fixed_bounds(f, valid=None, invalid=None):
+        call('normalize_future_temporal_bounds', te.normalize_future_temporal_bounds, [f, ref, valid, invalid],
+             [f, dt(ref), dt(valid), dt(invalid)], lambda pair: [dt(pair[0]), dt(pair[1])])
+
+    # The contraction has no boundary before it, so each of these needs the letters that R13 adds to [a-z].
+    for letter in ('ſ', 'İ', 'ı', 'ſı', 'K', 'ıſ', 'a', 'Z', '1', 'é', ''):
+        fixed_bounds(f"{letter}'ll go", later)
+        fixed_bounds(f"Bob said {letter}'ll go", later)
+        fixed_bounds(f"{letter}'ll go by Friday", None, later)
+
+    marks = ['́', '‿', 'ͅ', '̀́']
+    # A mark is not a word character in Python, so a keyword with a mark next to it still has its boundaries.
+    for keyword in ('will', 'shall', 'is going to', 'plans to', 'set to', 'committed to', "she'll"):
+        for mark in marks:
+            for text in (f'Bob {keyword}{mark} stay', f'Bob {mark}{keyword} stay', f'Bob {keyword}{mark}{mark} stay',
+                         f'Bob{mark} {keyword} stay', f'Bob {keyword} {mark}stay'):
+                fixed_bounds(text, later)
+    for keyword in ('by', 'before', 'no later than', 'deadline', 'due by', 'due on'):
+        for mark in marks:
+            for text in (f'Bob will stay {keyword}{mark} Friday', f'Bob will stay {mark}{keyword} Friday',
+                         f'Bob will stay {keyword} {mark}Friday'):
+                fixed_bounds(text, None, later)
+    for keyword in ('until', 'through', 'thru', 'expires', 'expired', 'ended', 'ending', 'stopped', 'ceases', 'no longer'):
+        for mark in marks:
+            for text in (f'Bob will stay by Friday {keyword}{mark} 2025', f'Bob will stay by Friday {mark}{keyword} 2025',
+                         f'Bob will stay by Friday {keyword} {mark}2025'):
+                fixed_bounds(text, None, later)
+
+    # A word that contains a keyword does not end a state or give a deadline, and a bare keyword does.
+    for text in ('Bob will stay endless by Friday', 'Bob will stay by Friday endless', 'Bob will stay by Friday untill 2025',
+                 'Bob will stay by Friday bypass', 'Bob will stay nearby', 'Bob will stay bypass', 'Bob will stay standby',
+                 'Bob will stay thruway by Friday', 'Bob will stay by Friday through', 'Bob will stay by Friday ends',
+                 'Bob will stay by Friday ending', 'Bob will stay by Friday expiresx', 'Bob will stay by Friday xexpires',
+                 'Bob will stay by Friday no longer', 'Bob will stay by Friday nolonger', 'Bob will stay by Friday no  longer',
+                 'Bob will stay by Friday stops', 'Bob will stay by Friday _stops', 'Bob will stay by Friday 9stops',
+                 'Bob will stay by Friday éstops', 'Bob will stay by Friday ſtops', 'Bob will stay by Friday UNTİL',
+                 'Bob will stay bye', 'Bob will stay by_Friday', 'Bob will stay by9', 'Bob will stay Standby by Friday'):
+        fixed_bounds(text, None, later)
+
+    # `Z` alone is a date text only after the replacement, and a text with `Z` inside is not.
+    for text in ('2024-05-06Z', '2024-05-06z', '2024-05-06T07:08Z', '2024-05-06T07Z', 'Z2024-05-06', '2024Z', '2024-05-06 Z',
+                 '2024-05-06TZ', '2024-W19-1Z', '2024-126Z', '20240506Z', '2024-05-06T07:08:09.5Z', '2024-05-06T07:08:09+00:00Z'):
+        for fact, valid0, invalid0 in (('Bob will go', None, None), ('Bob will go by Friday', None, None),
+                                       ('Bob went', datetime(2019, 1, 1), later)):
+            args = [fact, text, text, ref, valid0, invalid0]
+            call('apply_extracted_timestamps', apply, args, [args[0], args[1], args[2], dt(args[3]), dt(args[4]), dt(args[5])], lambda x: x)
+        args = ['Bob will go by Friday', None, text, ref, None, None]
+        call('apply_extracted_timestamps', apply, args, [args[0], args[1], args[2], dt(args[3]), dt(args[4]), dt(args[5])], lambda x: x)
+    sink[0] = records
 
 
 def record_dangling(de, EntityNode) -> None:
@@ -751,8 +974,6 @@ def main() -> int:
             '_MINHASH_PERMUTATIONS', '_MINHASH_BAND_SIZE', 'ENTITY_BASE_LABEL']},
         'attribute_utils': {name: getattr(attribute_utils, name) for name in [
             'DEFAULT_ATTRIBUTE_MAX_LENGTH', 'LIST_TOTAL_LENGTH_MULTIPLIER', '_ENV_VAR']},
-        'temporal_edge_utils': {name: getattr(temporal_edge_utils, name).pattern for name in [
-            '_FUTURE_ASSERTION_RE', '_DEADLINE_RE', '_ONGOING_STATE_END_RE']},
         'graph_data_operations': {'EPISODE_WINDOW_LEN': graph_data_operations.EPISODE_WINDOW_LEN},
         'lru_cache_maxsize': dedup_helpers._cached_shingles.cache_info().maxsize,
     }
@@ -766,25 +987,34 @@ def main() -> int:
     record_dangling(dangling_endpoints, EntityNode)
     async_cases = record_graph_data(graph_data_operations, GraphProvider, EpisodeType, GraphOperationsInterface)
 
-    lines = [json.dumps(r, ensure_ascii=True, allow_nan=True, separators=(',', ':')) for r in records]
-    async_lines = [json.dumps(r, ensure_ascii=True, allow_nan=True, separators=(',', ':')) for r in async_cases]
+    def dump(items):
+        return [json.dumps(r, ensure_ascii=True, allow_nan=True, separators=(',', ':')) for r in items]
+
+    top = '{"python":"' + '.'.join(str(p) for p in sys.version_info[:3]) + '","fixed_now":"' + FIXED_NOW.isoformat() + '",'
     text = (
-        '{"python":"' + '.'.join(str(p) for p in sys.version_info[:3]) + '","fixed_now":"' + FIXED_NOW.isoformat() + '",'
-        + '"constants":' + json.dumps(constants, ensure_ascii=True, separators=(',', ':')) + ',"cases":[\n'
-        + ',\n'.join(lines) + '\n],"async_cases":[\n' + ',\n'.join(async_lines) + '\n]}\n'
+        top + '"constants":' + json.dumps(constants, ensure_ascii=True, separators=(',', ':')) + ',"cases":[\n'
+        + ',\n'.join(dump(records)) + '\n],"async_cases":[\n' + ',\n'.join(dump(async_cases)) + '\n]}\n'
     )
-    size = len(text.encode('utf-8'))
-    if size > 1_572_864:
-        raise SystemExit(f'The values file would have {size} bytes, above the limit of 1,572,864 (R25).')
+    # The second file holds the fixed cases that came with the reviews. It has no constants and no async case.
+    review_text = top + '"cases":[\n' + ',\n'.join(dump(review_records)) + '\n]}\n'
+    outputs = [(OUT, text), (OUT_REVIEW, review_text)]
+    for path, body in outputs:
+        size = len(body.encode('utf-8'))
+        if size > 1_572_864:
+            raise SystemExit(f'{path.name} would have {size} bytes, above the limit of 1,572,864 (R25).')
+    counts = f'{len(records)} and {len(review_records)} cases and {len(async_cases)} async cases'
     if '--check' in sys.argv[1:]:
-        if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
-            print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
+        stale = [path for path, body in outputs if not path.exists() or path.read_text(encoding='utf-8') != body]
+        if stale:
+            print(f'{", ".join(p.name for p in stale)} not current. Run this tool with no flag.', file=sys.stderr)
             return 1
-        print(f'{OUT.relative_to(ROOT)}: current, {len(records)} cases and {len(async_cases)} async cases')
+        print(f'{OUT.name} and {OUT_REVIEW.name}: current, {counts}')
         return 0
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding='utf-8')
-    print(f'{OUT.relative_to(ROOT)}: {len(records)} cases and {len(async_cases)} async cases, {size} bytes')
+    for path, body in outputs:
+        path.write_text(body, encoding='utf-8')
+    sizes = [len(body.encode('utf-8')) for _, body in outputs]
+    print(f'{OUT.name} and {OUT_REVIEW.name}: {counts}, {sizes} bytes')
     return 0
 
 
