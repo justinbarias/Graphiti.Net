@@ -77,9 +77,9 @@
       "external": [
         "abc"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/CrossEncoder/Client.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/CrossEncoderClientTests.cs covers it."
     },
     {
       "order": 2,
@@ -127,9 +127,9 @@
         "os",
         "pydantic"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Embedder/Client.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/EmbedderClientTests.cs covers it."
     },
     {
       "order": 5,
@@ -162,8 +162,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 7,
@@ -607,9 +607,9 @@
         "sqlite3",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/Cache.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. The cache sets a busy timeout of 5 seconds on its connection. tests/Port.Evaluation/LlmClientCacheTests.cs ports the upstream tests and compares the rows that port/tools/record_cache_reranker.py recorded."
     },
     {
       "order": 29,
@@ -622,9 +622,9 @@
       "external": [
         "enum"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/Config.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientBaseValuesTests.cs compares the recorded values of port/tools/record_llm_client_base.py."
     },
     {
       "order": 30,
@@ -635,9 +635,9 @@
       "lines": 40,
       "imports": [],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/LlmClientErrors.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. The exception classes are public and stay at the root of the package (rule R4). tests/Port.Evaluation/LlmClientErrorsTests.cs ports the upstream tests."
     },
     {
       "order": 31,
@@ -651,9 +651,9 @@
         "dataclasses",
         "threading"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/TokenTracker.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientTokenTrackerTests.cs ports the upstream tests, and LlmClientBaseValuesTests.cs compares the recorded values."
     },
     {
       "order": 32,
@@ -734,9 +734,9 @@
         "tenacity",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/Client.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientClientValuesTests.cs compares the recorded calls of port/tools/record_llm_client.py, with the cache path of generate_response. Rule R5: decision D48 keeps the provider text in the span status of the model call."
     },
     {
       "order": 36,
@@ -985,9 +985,9 @@
         "types",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/PromptConfig.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. One covering case stays listed: pure.prompts.prompt_config.LLMModel.blank_id_raises (open item O4, accepted by name). tests/Port.Evaluation/LlmClientPromptConfigValuesTests.cs compares the 1,193 recorded cases of port/tools/record_prompt_config.py."
     },
     {
       "order": 48,
@@ -1007,9 +1007,9 @@
         "re",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/DecisionPrompts.cs",
+      "status": "reviewed",
+      "notes": "Layer 3. Two reviews and one fix round. Each pure judge case of the module passes. tests/Port.Evaluation/LlmClientDecisionValuesTests.cs compares the recorded values, with jev_prompt_overrides and openai_decisions_prompt_overrides."
     },
     {
       "order": 49,
@@ -1073,9 +1073,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/LlmRuntime.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientRuntimeValuesTests.cs compares the 553 recorded cases of port/tools/record_llm_runtime.py, and LlmClientRuntimeTests.cs ports the upstream tests. Two tests wait for jev_client, and tests/test_graphiti_configurable_prompts.py waits for layer 9."
     },
     {
       "order": 52,
@@ -1147,9 +1147,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/OpenaiDecisionsClient.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientDecisionValuesTests.cs compares the recorded calls of port/tools/record_decisions_client.py, and LlmClientDecisionClientTests.cs ports the upstream tests. Two tests wait for jev_client. GAPS F34, F35, and F36 name what stays different."
     },
     {
       "order": 55,
@@ -1171,8 +1171,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 56,
@@ -1210,9 +1210,9 @@
         "openai",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/CrossEncoder/OpenaiRerankerClient.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/CrossEncoderRerankerTests.cs compares the recorded calls of port/tools/record_cache_reranker.py. Rule R5: decision D48 keeps the provider text in the error log line."
     },
     {
       "order": 58,
@@ -1682,8 +1682,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 78,
@@ -4039,9 +4039,9 @@
         "logging",
         "time"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/LlmClient/Utils.cs",
+      "status": "tests_pass",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientBaseValuesTests.cs compares the recorded values. No test compares the time text of the debug line, because Py.TimeSeconds reads the system clock."
     },
     {
       "order": 174,

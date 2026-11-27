@@ -72,6 +72,7 @@ If a rule in Part 1 and a rule in Part 3 disagree, Part 1 applies.
 | A wire name: a JSON key, a node property, a Cypher parameter, a prompt name, a span attribute | Keep the Python text exactly. Never derive it from a C# name. |
 | A private name that a ported test, a recording test, or a judge case reads (`_SYSTEM_PROMPT`, `_clean_input`, `_get_cache_key`, `_map_answers`) | `internal`, not `private`. A test project cannot name a private member. |
 | Two names of one class that give the same C# name after this table (`generate_response` and `_generate_response`) | The private one gets the prefix `Private`: `PrivateGenerateResponseAsync`, `PrivateEnsureChatPrompt`. |
+| A private attribute and a method of one class whose C# names differ only in the case of the first letter (`_flat_overrides` and `flat_overrides()` of `LLMModel`) | The private one gets the prefix `Private`: `PrivateFlatOverrides`. The field keeps its place in the field order of Python (R7). |
 | A member with the name of its enclosing type (error CS0542) | A field or a property gets the suffix `Value`, and a method gets the suffix `Function`: `SummaryValue`, `EvalPromptFunction`. A property whose type is a delegate, for example a `PromptFunction` member of a prompt interface, counts as a method and gets `Function`. |
 | A nested class with the name of a member of the outer class (error CS0102) | The nested type gets the suffix `Group`, and a constant `PythonName` holds the Python name (R15). |
 | `__call__`, `__repr__` | `Call(...)` and `Repr()` |
@@ -863,6 +864,7 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 - A test that calls a constructor with only the named arguments of a recorded case uses one reflection helper with `Type.Missing` for each other parameter (`LlmClientClientSupport.MakeConfig`). The C# defaults then run.
 - A test of code that makes a file or a folder in the working directory removes it only if the test made it.
 - A recording keeps the calls and the log lines in one ordered list, so that a log line that moves across a call fails the test. It calls each method with its defaults one time, and it records `a == b` and `hash(a)` for the pairs of GAPS J2.
+- A values file stays under 1.5 MB. A recording stores a long rendered text as its SHA-256 and its length, and the test hashes the text of the port (`record_decisions_client.py`).
 - Do not drop a test because it is hard to port. Mark it `// TODO(port)` and set the unit to `blocked`.
 - Write no new unit test that restates the implementation. A gap in coverage gets a judge case, a property test, or an end-to-end test.
 - The table in Part 3 maps pytest constructs to xUnit.
@@ -1152,6 +1154,9 @@ Each entry of [GAPS.md](GAPS.md) and the rule that answers it.
 | F21 | `search_ops.py` is not on the public search path | R22 |
 | F22 | `expired_at` for a fact with an end date | R21 |
 | F23 | The schema text at the end of the prompt | R21, decision D17 |
+| F34 | The charset of a reply of the decisions client | R19 |
+| F35 | Two wrong questions in one call of the decisions client | R6 |
+| F36 | The timeout of an `HttpClient` that the host gives | R19 |
 
 ## Part 5. Open items
 
@@ -1209,7 +1214,7 @@ The reviews of skeleton packets S3 and S5 found 11 more cases. Each one stays in
 | `pure.prompts.lib.create_prompt_library.unknown_group_raises`, `.unknown_function_raises`, `.non_callable_raises` | The override value is a `PromptFunction` or a value that is not callable, where the dict takes a `ChatPromptFunction`. Python raises `ValueError` for the name before it reads the value. | Accept by name. |
 | `pure.prompts.lib.validate_prompt_library.empty_dict_raises`, `.empty_namespace_missing_group_raises`, `.groups_without_functions_raises`, `.non_callable_function_raises` | A dict or a `types:SimpleNamespace` as the library. | The three namespace cases are closed with layer 4: the judge host decodes the namespace as a library (`Units/Types.cs`), and the cases pass. Accept the dict case by name. |
 | `pure.prompts.prompt_config.LLMModel.blank_id_raises` | A blank id with a wrong-type field beside it. | Accept by name. |
-| `pure.prompts.decision_prompts.parse_list.json_non_list` | JSON text that is not a list, where the result type is a list of dicts (R20). | Accept by name. |
+| `pure.prompts.decision_prompts.parse_list.json_non_list` | JSON text that is not a list, where the result type is a list of dicts (R20). | Closed with layer 3: `parse_list` returns `object?`, because its result is open data (R20). The case passes. |
 | `pure.ranking.rrf.rank_const_fraction` | A fraction for `rank_const`, which is a `long`. Each caller passes an int. | Accept by name. |
 | `pure.ranking.SearchConfig.model_copy.recipe_update_unvalidated_bad_type` | `model_copy(update=...)` stores a value of the wrong type with no validation, and a typed property cannot hold it. | Accept by name. |
 
@@ -1238,3 +1243,4 @@ The reviews of skeleton packets S3 and S5 found 11 more cases. Each one stays in
 | 2026-11-27 | After two reviews of the prompt packets of layer 4. R2: the suffix `Function` for a delegate property. R6: the text of a `join` error, and a comprehension over an open value. R7: what a built-in response model is, and the value of a reader needs no second copy. R22: the defining unit registers each path of its module, no encoder without a case, and the lead file `Units/Types.cs` for `types:SimpleNamespace`. Part 3: `object?` parameters for a private function that only open data reaches. | The seven prompt units: yes. Their fix round applied each change. |
 | 2026-11-27 | After two reviews of `prompts.lib` (layer 4). R15: a group property that returns null, the `isinstance` test of a null entry in a typed mapping, and `callable` for a delegate of another type. R17: one delegate for an instance with `__call__`. R14: `AsReadOnly<K, V>` for a `MappingProxyType`. R15: `isinstance(x, list)` is `Py.TypeName(x) == "list"`, and an attribute of a prompt library that is not a group. | `prompts.lib`, in its fix round. No other unit has these constructs. |
 | 2026-11-27 | After two reviews of each layer 3 packet. R1: a `<param>` tag that the compiler forces. R2: the case of a private field. R4: `Py.Int`, an unhashable value, and a base URL with no scheme. R7: a frozen dataclass with `compare=False`. R15: the `PythonNames` table. R16: the retry log, a cancel between attempts, and `sqlite3.connect`. R19: the default `HttpClient`, and the bytes of a reply. R24: `.GetAwaiter().GetResult()`. R25: constructor defaults, and files in the working directory. | The layer 3 units, in their fix rounds: `llm_client.cache`, `llm_client.client`, `llm_client.token_tracker`, `cross_encoder.openai_reranker_client`, and `llm_client.openai_decisions_client`. |
+| 2026-11-27 | After packet P3g of layer 3. R2: the prefix `Private` for a private attribute beside a method of the same name. R25: the size limit of a values file and the hash form of a long text. | None. `llm_client.llm_runtime` has the field, and the recorder has the hash form. |
