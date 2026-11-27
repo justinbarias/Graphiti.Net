@@ -194,6 +194,8 @@ Typed data stays typed: `dict[str, list[str]]` is `OrderedDictionary<string, Lis
 `x in c`, `c[k]`, `c.get(k)`, and `a + b` on two values of open data have no `Py` helper yet. `DecisionPrompts.cs` is the one site, and it has four private members for them (`Has`, `At`, `Get`, `Concat`), each with a `// PORT:` comment. They throw what Python throws. If a second unit needs one, the lead moves them into `PyCompat` first.
 The truth test of a typed parameter has a typed form: `if not uuids` on `list[str]` is `uuids.Count == 0`, and `if uuid_cursor` on `str | None` is `!string.IsNullOrEmpty(uuidCursor)`.
 A typed parameter that Python binds again to a value from a record (`group_ids` in `get_community_clusters`) gets a local of open data for that value: read it with `Py.Iter`, and pass each item on as it is.
+A call with named arguments and a spread, `f(a=1, **d)`, builds the dictionary with the named keys first and then calls `Add` for each key of `d`. `Add` throws for a key that is there, where Python raises `TypeError`. No filter key of `search_utils.py` is also a named key.
+A result row of FalkorDB is an ordered dictionary in the driver contract, where the Python driver gives a list. `dict(zip(header, row, strict=True))` is `Py.ZipStrict(Py.Iter(header), Py.Iter(row))`, which takes the keys of a dictionary row as Python does. The FalkorDB driver is out of the MVP, and its unit decides the row type.
 
 | Python value | C# runtime type |
 | --- | --- |
@@ -343,6 +345,8 @@ Other shapes:
 | `__post_init__` of a dataclass | A method `Validate()`. The code that builds the value calls it, as for a model. |
 | A `TypedDict` with `total=False` | A class with a nullable property for each key. Null stands for a missing key. |
 
+A record with a list member or a dict member does not give the `==` of Python, because C# compares that member by reference. `EdgeSearchConfig(search_methods=[]) == EdgeSearchConfig(search_methods=[])` is `True` in Python and `False` in the port. No upstream site compares a search config or a `SearchResults` value. A unit that ports such a comparison stops and asks the lead.
+
 ### R8. Async, concurrency, and cancellation
 
 Decision D22. asyncio runs all code on one thread, so upstream shares lists and dicts between concurrent calls with no lock.
@@ -391,6 +395,8 @@ The port runs all ported code on one process-wide exclusive `TaskScheduler`. Cod
 - It throws the first failure in time. It does not cancel the other calls.
 
 The order of side effects between concurrent calls is not a contract (GAPS G19).
+
+A cancel that arrives late differs (GAPS F33). Python delivers `task.cancel()` at the next step of the task, also while its last call returns. A C# call that returned reads the token only at its next check. So a search that the caller cancels while its last driver call returns can give the full result, where Python raises `CancelledError`. Add no token check to hide this.
 
 ### R9. Cypher strings
 
@@ -850,6 +856,7 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 - A module whose Python bodies are only `...` or a docstring, for example an abstract base class, is ported in full. It has no `TODO(port)` marker, and its unit is not a skeleton.
 - Each other name from a module that is not ported is a skeleton member, and so is each other name that `entity_node_ops` uses. That unit has no pure case. The lead adds the files to the unit's file list. Layer 0 and the later layers complete them.
 - A skeleton member never throws `NotImplementedException`. Ported code catches that type to fall back from a driver operation (71 sites), and such a `catch` must not hide a member that is not ported yet.
+- A call of a member that only the Neptune driver has (`save_to_aoss`, `run_aoss_query`) keeps a `// TODO(port)` marker and throws `NotSupportedException` at the call (decision D10). The code of the branch after the call is not ported, because the compiler rejects code after a throw. The marker does not block the unit. [STATE.md](STATE.md) lists each site, and the maintainer accepts or rejects each one at gate 4.
 - Not allowed in product code: `dynamic`, the null-forgiving `!` operator, `#pragma warning disable`, `[SuppressMessage]`, an empty `catch` block that Python does not have, `async void`, `.Result`, `.Wait()`, and `.GetAwaiter().GetResult()` on a task that can still run.
 - A Python `except X: pass` is a `catch` block with the comment `// PORT: Python passes`.
 - If the same mistake shows up in two units, the lead changes this file and the affected units are ported again. Nobody patches output by hand.
@@ -872,6 +879,10 @@ The unit that ports the surface delivers both. The lead writes or approves the r
 - A test of code that makes a file or a folder in the working directory removes it only if the test made it.
 - That theory asserts that the fake recorded no call. A method with more than one awaited call adds a case for each later call: the fake cancels the token source at call k, and the test expects `OperationCanceledException` and no call after k.
 - A test that calls a function that does not end for some inputs (upstream defect U11) first runs that function on a background thread and calls `Join(5000)`. If the thread does not end, the test fails the case and does not start the product call. `Neo4jGraphOperationsTests` shows the form.
+- The canceled-token theory proves only that some call reads the token. So the test of a recording gives the product call the token of a live `CancellationTokenSource`. Each fake records the token that it gets, and the test asserts that each one equals the given token.
+- A Python fake of a recording yields at the same place as the C# fake: `await asyncio.sleep(0)` first, and then the record. Without it, Python runs gathered calls one after the other, and a port that runs them in series gives the same list.
+- For each function with a concurrency limit, the fakes count the calls in flight on both sides, and the recording has a case with more calls than the limit.
+- Each async test has a time limit (`Timeout` on the test attribute), so that a call that blocks fails one test and does not stop the run.
 - A recording keeps the calls and the log lines in one ordered list, so that a log line that moves across a call fails the test. It calls each method with its defaults one time, and it records `a == b` and `hash(a)` for the pairs of GAPS J2.
 - A values file stays under 1.5 MiB (1,572,864 bytes). A recording stores a long rendered text as its SHA-256 and its length, and the test hashes the text of the port (`record_decisions_client.py`).
 - Do not drop a test because it is hard to port. Mark it `// TODO(port)` and set the unit to `blocked`.
@@ -1056,7 +1067,7 @@ R4 holds the exception rules. R16 holds decorators and generators.
 | A fixture | Constructor setup, `IAsyncLifetime`, or a class or collection fixture |
 | `tmp_path` | A temp folder created in the constructor and removed in `Dispose` |
 | `monkeypatch.setattr(module, 'NAME', value)` on a module-level value | `using (Module.Name.Use(value))` on the `PyPatch<T>` field of R17 |
-| `monkeypatch.setattr` or `mock.patch` on a module-level function or on a method of a class | No form yet (Part 5, O10). Mark the test `// TODO(port): O10`, and name it in the `notes` of the unit. This does not block the unit. |
+| `monkeypatch.setattr` or `mock.patch` on a module-level function or on a method of a class | No form yet (Part 5, O10). Mark the test `// TODO(port): O10`, and name it in the `notes` of the unit. This does not block the unit. One case has a form and needs no marker: the real function reads an object of the fake before its own work, as `edge_similarity_search` reads `driver.search_interface`. The test then puts the replacement on that object and runs the real function. |
 | `monkeypatch`, `mock.patch` on an object that the code receives | An injected interface with a fake. Use `PortServices.Use(time: ...)` for clocks and a stub `HttpMessageHandler` for HTTP. Never assign `PortServices.Time` in a test: tests run at the same time. |
 | `pytest.raises(X, match=...)` | `Assert.Throws<X>`, then an assertion on the message |
 | `caplog` | A fake `ILoggerFactory` in `PortServices.Use(loggerFactory: ...)` that collects entries |
@@ -1170,6 +1181,9 @@ Each entry of [GAPS.md](GAPS.md) and the rule that answers it.
 | F28 | `session.run` with a statement that fails at once | R8, R9 |
 | F29 | An error at commit | R9 |
 | F30 | A datetime offset that `DateTimeOffset` cannot hold | R9, R11 |
+| F31 | `model_dump(mode='json')` keeps `nan` and `inf` | R7 |
+| F32 | The embedding lookups of Neptune return text lists | R6, decision D10 |
+| F33 | A cancel that arrives while the last call returns | R8 |
 | F34 | The charset of a reply of the decisions client | R19 |
 | F35 | Two wrong questions in one call of the decisions client | R6 |
 | F36 | The timeout of an `HttpClient` that the host gives | R19 |
@@ -1264,3 +1278,4 @@ The reviews of skeleton packets S3 and S5 found 11 more cases. Each one stays in
 | 2026-11-27 | After two reviews of each layer 3 packet. R1: a `<param>` tag that the compiler forces. R2: the case of a private field. R4: `Py.Int`, an unhashable value, and a base URL with no scheme. R7: a frozen dataclass with `compare=False`. R15: the `PythonNames` table. R16: the retry log, a cancel between attempts, and `sqlite3.connect`. R19: the default `HttpClient`, and the bytes of a reply. R24: `.GetAwaiter().GetResult()`. R25: constructor defaults, and files in the working directory. | The layer 3 units, in their fix rounds: `llm_client.cache`, `llm_client.client`, `llm_client.token_tracker`, `cross_encoder.openai_reranker_client`, and `llm_client.openai_decisions_client`. |
 | 2026-11-27 | After packet P3g of layer 3. R2: the prefix `Private` for a private attribute beside a method of the same name. R25: the size limit of a values file and the hash form of a long text. | None. `llm_client.llm_runtime` has the field, and the recorder has the hash form. |
 | 2026-11-27 | After two reviews of each layer 5 packet. R2: the other option keys of the driver. R4: the text of a driver error in a log line. R6: the truth test of a typed parameter, and a typed parameter that Python binds again to open data. R21: the marker of an upstream defect at each site. R8: the token checks of the Neo4j driver, and the close of a session. R9: a lone surrogate and an odd offset in a parameter. R25: a slow fake, and the check for a function that does not end. R25: the token theory for a later call. | The layer 5 units, in their fix rounds: `driver.neo4j_driver` and the operations of `driver.neo4j.operations`. The pilot unit `entity_node_ops` gets its U1 markers in the same round. |
+| 2026-11-27 | After two reviews of each layer 6 packet. R6: named arguments with a spread, and a result row of FalkorDB. R7: `==` of a record with a list member. R8: a cancel that arrives late. R24: a member that only the Neptune driver has. R25: each fake records its token, a Python fake yields, the fakes count the calls in flight, each async test has a time limit, and a replacement on an object that the real function reads first (Part 3). | None. The fix rounds of the layer 6 packets applied each change. |
