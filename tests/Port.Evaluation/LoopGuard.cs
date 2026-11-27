@@ -10,12 +10,14 @@ using Graphiti.PyCompat;
 // with a message if the scheduler does not answer after the limit, so that the run fails and does not hang.
 internal static class LoopGuard
 {
-    internal static async Task<T> RunAsync<T>(Func<Task<T>> body)
+    // A test with a fake at each boundary ends in a few milliseconds, so its limit is 4 seconds. A test on a real
+    // database gives a larger limit, because a slow server is not a blocked scheduler.
+    internal static async Task<T> RunAsync<T>(Func<Task<T>> body, double seconds = 4)
     {
         var task = Asyncio.Run(body);
         try
         {
-            return await task.WaitAsync(TimeSpan.FromSeconds(4));
+            return await task.WaitAsync(TimeSpan.FromSeconds(seconds));
         }
         catch (TimeoutException)
         {
@@ -32,10 +34,12 @@ internal static class LoopGuard
         }
     }
 
-    internal static async Task RunAsync(Func<Task> body) =>
-        await RunAsync<object?>(async () =>
-        {
-            await body();
-            return null;
-        });
+    internal static async Task RunAsync(Func<Task> body, double seconds = 4) =>
+        await RunAsync<object?>(
+            async () =>
+            {
+                await body();
+                return null;
+            },
+            seconds);
 }

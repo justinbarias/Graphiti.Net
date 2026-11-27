@@ -30,6 +30,9 @@ using Graphiti.PyCompat;
 public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph graph) : IClassFixture<SearchRecipesOnNeo4jTests.Graph>
 {
     private const int TimeLimit = 180_000;
+
+    // The limit of the loop guard for a body that calls Neo4j. It is under the time limit of the test.
+    private const double GuardSeconds = 150;
     private const double Tolerance = 1e-6;
 
     private static readonly string[] Words = ["quorbix7k", "zandeltu9q", "vexmorin4w"];
@@ -133,7 +136,7 @@ public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph gr
                 var recorded = expected.Single(r => (int)r!["query"]! == index)!;
                 Compare(recorded, actual, $"{recipe} query {index} ({Queries[index].Text})", failures);
             }
-        });
+        }, GuardSeconds);
 
         Assert.True(failures.Count == 0, string.Join('\n', failures));
     }
@@ -619,7 +622,7 @@ public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph gr
                         await Driver.ExecuteQueryAsync("CALL db.awaitIndexes(120)", new(), ct);
                         await SeedAsync(Group, FixtureSpec(), ct);
                         await SeedAsync(NoiseGroup, NoiseSpec(), ct);
-                    });
+                    }, GuardSeconds);
                     seeded = true;
                 }
             }
@@ -679,7 +682,7 @@ public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph gr
                 }
 
                 await Driver.CloseAsync(CancellationToken.None);
-            });
+            }, GuardSeconds);
             gate.Dispose();
         }
 

@@ -1273,7 +1273,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Search/SearchUtils.cs",
       "status": "tests_pass",
-      "notes": "Layer 6. Two reviews and one fix round. Two covering cases stay listed: pure.ranking.rrf.inner_not_list_string and pure.ranking.rrf.rank_const_fraction (open item O4). tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune."
+      "notes": "Layer 6. Two reviews and one fix round. Two covering cases stay listed: pure.ranking.rrf.inner_not_list_string and pure.ranking.rrf.rank_const_fraction (open item O4). tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune. Two tests of tests/test_neptune_search_isolation.py call those Neptune branches, so they have no port (rule R24)."
     },
     {
       "order": 61,
@@ -1910,7 +1910,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Search/Search.cs",
       "status": "tests_pass",
-      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/SearchValuesTests.cs compares the 204 recorded cases of port/tools/record_search.py, with 44 cancel points. tests/Graphiti.Net.E2E.Tests/SearchRecipesOnNeo4jTests.cs runs each of the 16 recipes on Neo4j and compares the ranked results with Python. GAPS F33 names what stays different for a late cancel."
+      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/SearchValuesTests.cs compares the 172 recorded cases of port/tools/record_search.py and its grid of 153 cancel points. tests/Port.Evaluation/TestEdgeCrossEncoderRrfShortlist.cs ports the two upstream tests of the cross-encoder shortlist. tests/Graphiti.Net.E2E.Tests/SearchRecipesOnNeo4jTests.cs runs each of the 16 recipes on Neo4j and compares the ranked results with Python. GAPS F33 names what stays different for a late cancel."
     },
     {
       "order": 87,
