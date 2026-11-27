@@ -9,13 +9,13 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 
 | Layer | Branch | Upstream packages | Units | Lines | Implementer |
 | --- | --- | --- | --- | --- | --- |
-| 0 | `port/skeleton` | Types and signatures for all 114 units, with no bodies | 114 | | Opus 5.5, medium |
-| 1 | `port/foundations` | `errors`, `helpers`, `graphiti_types`, `tracer`, `decorators`, `graph_queries`, `utils` (6 modules), `models`, `namespaces` | 20 | 4,277 | Sonnet 5.5, medium |
-| 2 | `port/graph-types` | `nodes`, `edges`, and the driver contract: `driver.driver`, `driver.operations`, `driver.graph_operations`, `driver.search_interface`, `driver.query_executor`, `driver.record_parsers`, the `driver` package root | 21 | 5,147 | Opus 5.5, medium. One cycle group holds most of this layer. |
-| 3 | `port/models-boundary` | `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
-| 4 | `port/prompts` | `prompts` | 14 | 3,052 | Sonnet 5.5, medium |
-| 5 | `port/neo4j` | `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
-| 6 | `port/search` | `search` | 7 | 3,456 | Opus 5.5, medium |
+| 0 | `port/skeleton` | In progress. Types and signatures for all 114 units, with no bodies | 114 | | Opus 5.5, medium |
+| 1 | `port/foundations` | Done 2026-11-27. `errors`, `helpers`, `graphiti_types`, `tracer`, `decorators`, `graph_queries`, `utils` (6 modules), `models`, `namespaces` | 20 | 4,277 | Sonnet 5.5, medium |
+| 2 | `port/graph-types` | Done 2026-11-27. `nodes`, `edges`, and the driver contract: `driver.driver`, `driver.operations`, `driver.graph_operations`, `driver.search_interface`, `driver.query_executor`, `driver.record_parsers`, the `driver` package root | 21 | 5,147 | Opus 5.5, medium. One cycle group holds most of this layer. |
+| 3 | `port/models-boundary` | In progress. `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
+| 4 | `port/prompts` | Done 2026-11-27. `prompts` | 14 | 3,052 | Sonnet 5.5, medium |
+| 5 | `port/neo4j` | In progress. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
+| 6 | `port/search` | In progress. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
 | 8 | `port/ingestion` | `ingestion` | 9 | 4,159 | Opus 5.5, medium |
 | 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
@@ -53,8 +53,8 @@ Each subagent start needs the maintainer's approval first.
 
 | After layer | Flow |
 | --- | --- |
-| 5 | Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
-| 6 | Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
+| 5 | In progress. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
+| 6 | In progress. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
 | 8 | Ingest episodes in parallel into one group, and find no lost update. |
 | 9 | `AddEpisodeAsync`, then `SearchAsync`. A contradicting episode closes the old fact's validity window and deletes nothing. |
 
