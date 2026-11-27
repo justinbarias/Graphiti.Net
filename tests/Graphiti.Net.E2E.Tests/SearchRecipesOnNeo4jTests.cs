@@ -24,6 +24,7 @@ using Graphiti.Core.CrossEncoder;
 using Graphiti.Core.Embedder;
 using Graphiti.Core.Search;
 using Graphiti.Neo4j;
+using Graphiti.Port.Evaluation;
 using Graphiti.PyCompat;
 
 public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph graph) : IClassFixture<SearchRecipesOnNeo4jTests.Graph>
@@ -124,7 +125,7 @@ public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph gr
         Assert.Equal(Queries.Length, expected.Count);
 
         var failures = new List<string>();
-        await Asyncio.Run(async () =>
+        await LoopGuard.RunAsync(async () =>
         {
             for (var index = 0; index < Queries.Length; index++)
             {
@@ -612,7 +613,7 @@ public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph gr
             {
                 if (!seeded)
                 {
-                    await Asyncio.Run(async () =>
+                    await LoopGuard.RunAsync(async () =>
                     {
                         await Driver.BuildIndicesAndConstraintsAsync(cancellationToken: ct);
                         await Driver.ExecuteQueryAsync("CALL db.awaitIndexes(120)", new(), ct);
@@ -667,7 +668,7 @@ public sealed class SearchRecipesOnNeo4jTests(SearchRecipesOnNeo4jTests.Graph gr
 
         public async ValueTask DisposeAsync()
         {
-            await Asyncio.Run(async () =>
+            await LoopGuard.RunAsync(async () =>
             {
                 foreach (var label in GroupLabels)
                 {

@@ -28,11 +28,18 @@ max_coroutines of 1, and direct calls of the four scope functions with no config
 Other cases give the cross-encoder of the community and episode scope a reranker_min_score at and above a score, give
 the edge and node scopes a sim_min_score and a bfs_max_depth that differ from the defaults, give an MMR reranker with no
 cosine method, an empty list of breadth-first origins, and a max_coroutines of 1 and 2 for a hybrid config of each scope.
-The cancel cases cancel the task of the search while the k-th query returns. The search then ends with CancelledError,
-which is a BaseException, so the spans keep no status.
+Two more groups of cases give each of the three reranker_min_score filters of rrf (the edge cross-encoder, the edge node
+distance, and the node node distance) a candidate below the minimum and a candidate at the minimum, with no limit that
+removes it first.
 
-The tool writes tests/Port.Evaluation/values/search.json. --check writes nothing and exits 1 if the file differs from
-what the run would write. The tool needs Python 3.12 and the pinned upstream in .upstream/graphiti, or the path in
+The cancel cases are in a second file. The grid has 8 recipes, a max_coroutines of None, 1, and 2, and each k from 1 to
+the count of calls of one kind that the search makes with no cancel. The kinds are a query of the driver, a call of the
+embedder, and a call of the cross-encoder. The caller cancels the task of the search while the k-th call of the kind
+returns. The search then ends with CancelledError, which is a BaseException, so the spans keep no status. The loop
+builds the grid, and no list holds a point.
+
+The tool writes tests/Port.Evaluation/values/search.json and tests/Port.Evaluation/values/search_cancel.json. --check
+writes nothing and exits 1 if a file differs from what the run would write. The tool needs Python 3.12 and the pinned upstream in .upstream/graphiti, or the path in
 GRAPHITI_UPSTREAM. It changes nothing there. Nothing here uses the network.
 """
 from __future__ import annotations
@@ -53,6 +60,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # GRAPHITI_UPSTREAM names the pinned upstream checkout when the working tree has no .upstream (a git worktree).
 UPSTREAM = Path(os.environ.get('GRAPHITI_UPSTREAM', str(ROOT / '.upstream' / 'graphiti')))
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'search.json'
+OUT_CANCEL = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'search_cancel.json'
 
 RECIPES = [
     'COMBINED_HYBRID_SEARCH_RRF',
@@ -246,61 +254,47 @@ CUSTOM = {
     # B3: an MMR reranker with no cosine method. Python embeds the query for it.
     'edge_mmr_bm25': {'edge_config': {'search_methods': ['bm25'], 'reranker': 'mmr'}},
     'node_mmr_bm25': {'node_config': {'search_methods': ['bm25'], 'reranker': 'mmr'}},
+    # The three rrf filters that read reranker_min_score: the edge cross-encoder, the edge node distance, and the node node
+    # distance. The methods are bm25 and cosine_similarity, so that rrf gives the score 1 / (i + 1) for each list. An
+    # item that only one list holds at position 2 has the score 0.5: e-2 and e-4 for the edges, and n-2 and n-4 for the
+    # nodes. All four are next to the center node n-1 or sit in the cross-encoder passages, so a minimum of 0.6 that the
+    # rrf filter does not apply would let them through. The minimum 0.5 holds them at the boundary. The limit is the
+    # default 10, so the slice of 2 * limit removes no candidate.
+    'edge_cross_min_06': {'edge_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.6},
+    'edge_cross_min_05': {'edge_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'cross_encoder'}, 'reranker_min_score': 0.5},
+    'edge_distance_min_06': {'edge_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'node_distance'}, 'reranker_min_score': 0.6},
+    'edge_distance_min_05': {'edge_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'node_distance'}, 'reranker_min_score': 0.5},
+    'node_distance_min_06': {'node_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'node_distance'}, 'reranker_min_score': 0.6},
+    'node_distance_min_05': {'node_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'node_distance'}, 'reranker_min_score': 0.5},
     # B5: a hybrid config for each scope, to see the limit of the inner gather.
     'community_rrf_hybrid': {'community_config': {'search_methods': ['bm25', 'cosine_similarity'], 'reranker': 'reciprocal_rank_fusion'}},
 }
 
 
-# (recipe, max_coroutines, k): the caller cancels the search while the k-th query returns. The port sees a cancel only
+# The cancel grid. The caller cancels the search while the k-th call of one kind returns. The port sees a cancel only
 # where code passes its token, and Python delivers it at the next await of each task. So a cancel that arrives while a
-# task waits to resume after a finished call can end the search later in the port, with more spans or a full result.
-# These points are left out: late cancel, see GAPS. Each point below is one where the port and Python agree.
-CANCEL_POINTS = [
-    ('COMBINED_HYBRID_SEARCH_RRF', None, 1),
-    ('COMBINED_HYBRID_SEARCH_RRF', 1, 1),
-    ('COMBINED_HYBRID_SEARCH_RRF', 1, 3),
-    ('COMBINED_HYBRID_SEARCH_RRF', 1, 6),
-    ('COMBINED_HYBRID_SEARCH_RRF', 2, 1),
-    ('COMBINED_HYBRID_SEARCH_MMR', None, 1),
-    ('COMBINED_HYBRID_SEARCH_MMR', None, 8),
-    ('COMBINED_HYBRID_SEARCH_MMR', None, 9),
-    ('COMBINED_HYBRID_SEARCH_MMR', 1, 1),
-    ('COMBINED_HYBRID_SEARCH_MMR', 1, 3),
-    ('COMBINED_HYBRID_SEARCH_MMR', 1, 4),
-    ('COMBINED_HYBRID_SEARCH_MMR', 1, 6),
-    ('COMBINED_HYBRID_SEARCH_MMR', 1, 8),
-    ('COMBINED_HYBRID_SEARCH_MMR', 2, 1),
-    ('COMBINED_HYBRID_SEARCH_MMR', 2, 5),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', None, 1),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', None, 8),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', None, 9),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 1),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 2),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 3),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 4),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 5),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 6),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 1, 8),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 2, 1),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 2, 5),
-    ('COMBINED_HYBRID_SEARCH_CROSS_ENCODER', 2, 6),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', None, 1),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', None, 3),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 1, 1),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 1, 2),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 1, 3),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 2, 1),
-    ('NODE_HYBRID_SEARCH_CROSS_ENCODER', 2, 3),
-    ('COMMUNITY_HYBRID_SEARCH_MMR', None, 1),
-    ('COMMUNITY_HYBRID_SEARCH_MMR', 1, 1),
-    ('COMMUNITY_HYBRID_SEARCH_MMR', 2, 1),
-    ('EDGE_HYBRID_SEARCH_RRF', None, 1),
-    ('EDGE_HYBRID_SEARCH_RRF', 1, 1),
-    ('EDGE_HYBRID_SEARCH_RRF', 2, 1),
-    ('NODE_HYBRID_SEARCH_RRF', None, 1),
-    ('NODE_HYBRID_SEARCH_RRF', 1, 1),
-    ('NODE_HYBRID_SEARCH_RRF', 2, 1),
+# task waits to resume after a finished call can end the search later in the port, with more spans or a full result:
+# late cancel, see GAPS. The recorder keeps each point of the grid, and the test names the points where the port differs.
+CANCEL_RECIPES = [
+    'COMBINED_HYBRID_SEARCH_RRF',
+    'COMBINED_HYBRID_SEARCH_MMR',
+    'COMBINED_HYBRID_SEARCH_CROSS_ENCODER',
+    'NODE_HYBRID_SEARCH_CROSS_ENCODER',
+    'COMMUNITY_HYBRID_SEARCH_MMR',
+    'EDGE_HYBRID_SEARCH_RRF',
+    'NODE_HYBRID_SEARCH_RRF',
+    'EDGE_HYBRID_SEARCH_NODE_DISTANCE',
 ]
+CANCEL_COROUTINES = [None, 1, 2]
+# The key of the input for each kind of call, and the key of the count in `state`.
+CANCEL_KINDS = [('query', 'queries'), ('embed', 'embeds'), ('rank', 'ranks')]
+
+
+def cancel_base(recipe, max_coroutines):
+    case = {'fn': 'search', 'recipe': recipe}
+    if max_coroutines is not None:
+        case['max_coroutines'] = max_coroutines
+    return case
 
 
 def cases():
@@ -330,13 +324,6 @@ def cases():
     for name in ('edge_rrf_all', 'node_rrf_all', 'community_rrf_hybrid'):
         for limit in (1, 2):
             out.append({'fn': 'search', 'config': name, 'max_coroutines': limit})
-    # B6: the caller cancels the search while the k-th query returns (see CANCEL_POINTS).
-    for recipe, max_coroutines, k in CANCEL_POINTS:
-        case = {'fn': 'search', 'recipe': recipe}
-        if max_coroutines is not None:
-            case['max_coroutines'] = max_coroutines
-        case['cancel_at_query'] = k
-        out.append(case)
     for fn in ('edge_search', 'node_search', 'episode_search', 'community_search'):
         out.append({'fn': fn, 'config': None})
         out.append({'fn': fn, 'config': 'all_scopes_min_score', 'no_tracer': True})
@@ -441,7 +428,17 @@ def main() -> int:
 
     # The count of calls that run at the same time, over the driver, the embedder, and the cross-encoder. A call runs
     # from its entry to its return. `main` is the task that runs the case, which a cancel at a query ends.
-    state = {'in_flight': 0, 'max_in_flight': 0, 'queries': 0, 'cancel_at_query': None, 'main': None}
+    state = {
+        'in_flight': 0,
+        'max_in_flight': 0,
+        'queries': 0,
+        'embeds': 0,
+        'ranks': 0,
+        'cancel_at_query': None,
+        'cancel_at_embed': None,
+        'cancel_at_rank': None,
+        'main': None,
+    }
 
     class FakeDriver:
         provider = GraphProvider.NEO4J
@@ -471,6 +468,9 @@ def main() -> int:
             try:
                 await asyncio.sleep(0)
                 events.append({'kind': 'embed', 'input': encode(input_data)})
+                state['embeds'] += 1
+                if state['embeds'] == state['cancel_at_embed']:
+                    state['main'].cancel()
                 return [1.0, 0.0]
             finally:
                 state['in_flight'] -= 1
@@ -482,6 +482,9 @@ def main() -> int:
             try:
                 await asyncio.sleep(0)
                 events.append({'kind': 'rank', 'query': query, 'passages': list(passages)})
+                state['ranks'] += 1
+                if state['ranks'] == state['cancel_at_rank']:
+                    state['main'].cancel()
                 return [(passage, 1.0 - 0.25 * i) for i, passage in enumerate(reversed(passages))]
             finally:
                 state['in_flight'] -= 1
@@ -582,10 +585,19 @@ def main() -> int:
             items, scores = await func(*common, 3, 0.5, tracer_arg, max_coroutines=2)
         return {'items': [item.uuid for item in items], 'scores': encode(scores)}
 
-    results = []
-    for case in cases():
+    def execute(case):
         events.clear()
-        state.update(in_flight=0, max_in_flight=0, queries=0, cancel_at_query=case.get('cancel_at_query'), main=None)
+        state.update(
+            in_flight=0,
+            max_in_flight=0,
+            queries=0,
+            embeds=0,
+            ranks=0,
+            cancel_at_query=case.get('cancel_at_query'),
+            cancel_at_embed=case.get('cancel_at_embed'),
+            cancel_at_rank=case.get('cancel_at_rank'),
+            main=None,
+        )
         outcome = {}
         try:
             outcome['result'] = asyncio.run(run(case))
@@ -599,10 +611,28 @@ def main() -> int:
             outcome['error'] = {'type': type(error).__name__, 'text': str(error)}
         outcome['events'] = list(events)
         outcome['max_in_flight'] = state['max_in_flight']
+        return outcome, {kind: state[key] for kind, key in CANCEL_KINDS}
+
+    results = []
+    for case in cases():
+        outcome, _ = execute(case)
         results.append({'input': case, 'output': outcome})
 
+    # The cancel grid: each k from 1 to the count of calls that the search makes with no cancel.
+    cancel_results = []
+    for recipe in CANCEL_RECIPES:
+        for max_coroutines in CANCEL_COROUTINES:
+            base = cancel_base(recipe, max_coroutines)
+            _, counts = execute(base)
+            for kind, _key in CANCEL_KINDS:
+                for k in range(1, counts[kind] + 1):
+                    case = {**base, f'cancel_at_{kind}': k}
+                    outcome, _ = execute(case)
+                    cancel_results.append({'input': case, 'output': outcome})
+
+    python = '.'.join(str(part) for part in sys.version_info[:3])
     document = {
-        'python': '.'.join(str(part) for part in sys.version_info[:3]),
+        'python': python,
         'source': 'graphiti_core/search/search.py',
         'tables': TABLES,
         'embeddings': EMBEDDINGS,
@@ -612,16 +642,31 @@ def main() -> int:
         'recipes': {name: getattr(search_config_recipes, name).model_dump(mode='json') for name in RECIPES},
         'cases': results,
     }
-    text = json.dumps(document, ensure_ascii=True, separators=(',', ':'), allow_nan=False) + '\n'
+    # The cancel file holds the fixture of the first file, so that the test can see that the two files agree.
+    cancel_document = {
+        'python': python,
+        'source': 'graphiti_core/search/search.py',
+        'tables': TABLES,
+        'embeddings': EMBEDDINGS,
+        'connected': CONNECTED,
+        'mentions': MENTIONS,
+        'cases': cancel_results,
+    }
+    files = [
+        (OUT, json.dumps(document, ensure_ascii=True, separators=(',', ':'), allow_nan=False) + '\n', len(results)),
+        (OUT_CANCEL, json.dumps(cancel_document, ensure_ascii=True, separators=(',', ':'), allow_nan=False) + '\n', len(cancel_results)),
+    ]
     if '--check' in sys.argv[1:]:
-        if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
-            print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
-            return 1
-        print(f'{OUT.relative_to(ROOT)}: current, {len(results)} cases')
+        for path, text, count in files:
+            if not path.exists() or path.read_text(encoding='utf-8') != text:
+                print(f'{path.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
+                return 1
+            print(f'{path.relative_to(ROOT)}: current, {count} cases')
         return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding='utf-8')
-    print(f'{OUT.relative_to(ROOT)}: {len(results)} cases, {len(text) // 1024} KB')
+    for path, text, count in files:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding='utf-8')
+        print(f'{path.relative_to(ROOT)}: {count} cases, {len(text) // 1024} KB')
     return 0
 
 

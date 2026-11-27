@@ -2,8 +2,9 @@
 // The recording is values/search.json, which port/tools/record_search.py wrote from Python. Fakes replace the graph
 // driver, the embedder, the cross-encoder, and the tracer on both sides. The test asserts on the ranked uuids and the
 // scores, and on one ordered list of the queries, the embedder and cross-encoder calls, the spans with their
-// attributes and status, and the log lines. It also compares the largest count of calls that ran at the same time,
-// and the cases that cancel the search while a query returns. Python has no token, so the test also asserts that each
+// attributes and status, and the log lines. It also compares the largest count of calls that ran at the same time.
+// The cancel grid is the second recording, values/search_cancel.json: it cancels the search while the k-th query, the
+// k-th embedder call, or the k-th cross-encoder call returns. Python has no token, so the test also asserts that each
 // call of a fake got the token that the test gave to the search.
 namespace Graphiti.Port.Evaluation;
 
@@ -23,12 +24,27 @@ public class SearchValuesTests
 {
     private static readonly JsonElement Document = Load();
 
+    private static readonly JsonElement CancelDocument = Load("search_cancel.json");
+
     private static readonly List<JsonElement> Cases = Document.GetProperty("cases").EnumerateArray().ToList();
+
+    private static readonly List<JsonElement> CancelCases = CancelDocument.GetProperty("cases").EnumerateArray().ToList();
 
     public static TheoryData<int> CaseIndexes()
     {
         var data = new TheoryData<int>();
         for (var i = 0; i < Cases.Count; i++)
+        {
+            data.Add(i);
+        }
+
+        return data;
+    }
+
+    public static TheoryData<int> CancelIndexes()
+    {
+        var data = new TheoryData<int>();
+        for (var i = 0; i < CancelCases.Count; i++)
         {
             data.Add(i);
         }
@@ -45,7 +61,7 @@ public class SearchValuesTests
             ["community_search", "edge_search", "episode_search", "node_search", "search"],
             inputs.Select(i => i.GetProperty("fn").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
         Assert.Equal(
-            ["CancelledError", "GroupIdValidationError", "SearchRerankerError"],
+            ["GroupIdValidationError", "SearchRerankerError"],
             Cases.Select(c => c.GetProperty("output").GetProperty("error")).Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => e.GetProperty("type").GetString()).Distinct().Order(StringComparer.Ordinal).ToList());
 
@@ -68,87 +84,109 @@ public class SearchValuesTests
         }
     }
 
-    // The cases with `cancel_at_query` cancel the search while the k-th query returns. Python cancels the task of the
-    // search, and the port cancels the token source. The test compares the exception type and the span list, so a span of
-    // a canceled search that ends with an error status fails it. A cancel can arrive while a task waits to resume after a
-    // call that finished. Python then raises where the task resumes, and the port reads the token at the next call, so
-    // the port can run more spans or return a full result. The recording leaves out each such point: late cancel, see
-    // GAPS.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(CaseIndexes))]
     public async Task Each_result_call_span_and_log_line_matches_Python(int index)
     {
         var input = Cases[index].GetProperty("input");
         var output = Cases[index].GetProperty("output");
-        var events = new List<JsonNode>();
 
-        using var factory = new CaptureFactory(events);
-        using var scope = PortServices.Use(loggerFactory: factory);
-
-        // PORT: a live token source. Python has no token, so the test checks that each fake got this token (R8, R25).
-        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var probe = new Probe(source, input.TryGetProperty("cancel_at_query", out var cancelAt) ? cancelAt.GetInt32() : null);
-
-        JsonNode? result = null;
-        Exception? error = null;
-        try
-        {
-            result = await Asyncio.Run(() => RunAsync(input, events, probe, source.Token));
-        }
-        catch (Exception e) when (e is GraphitiException or OperationCanceledException)
-        {
-            error = e;
-        }
-
-        // asyncio.run ends the tasks that a failed search leaves, and a span of such a task ends in this time. The
-        // port runs the same tasks on its scheduler, so the test lets the scheduler run before it reads the events.
-        await Asyncio.Run(async () =>
-        {
-            for (var i = 0; i < 50; i++)
-            {
-                await Task.Yield();
-            }
-        });
+        var run = await ExecuteAsync(input, TestContext.Current.CancellationToken);
 
         var expectedError = output.GetProperty("error");
         if (expectedError.ValueKind == JsonValueKind.Null)
         {
-            Assert.Null(error);
-            AssertSame(JsonNode.Parse(output.GetProperty("result").GetRawText()), result);
+            Assert.Null(run.Error);
+            AssertSame(JsonNode.Parse(output.GetProperty("result").GetRawText()), run.Result);
         }
         else
         {
-            Assert.NotNull(error);
-            Assert.Equal(expectedError.GetProperty("type").GetString(), PythonName(error));
+            Assert.NotNull(run.Error);
+            Assert.Equal(expectedError.GetProperty("type").GetString(), PythonName(run.Error));
 
             // The text of a CancelledError is empty in Python, and the text of an OperationCanceledException is not.
-            if (error is not OperationCanceledException)
+            if (run.Error is not OperationCanceledException)
             {
-                Assert.Equal(expectedError.GetProperty("text").GetString(), error.Message);
+                Assert.Equal(expectedError.GetProperty("text").GetString(), run.Error.Message);
             }
         }
 
         var expectedEvents = output.GetProperty("events").EnumerateArray().ToList();
         Assert.True(
-            expectedEvents.Count == events.Count,
-            $"expected {expectedEvents.Count} events but got {events.Count}: {string.Join(" | ", events.Select(Short))}");
-        for (var i = 0; i < events.Count; i++)
+            expectedEvents.Count == run.Events.Count,
+            $"expected {expectedEvents.Count} events but got {run.Events.Count}: {string.Join(" | ", run.Events.Select(Short))}");
+        for (var i = 0; i < run.Events.Count; i++)
         {
-            AssertSame(Untimed(JsonNode.Parse(expectedEvents[i].GetRawText())!), Untimed(events[i]));
+            AssertSame(Untimed(JsonNode.Parse(expectedEvents[i].GetRawText())!), Untimed(run.Events[i]));
         }
 
-        Assert.Equal(output.GetProperty("max_in_flight").GetInt32(), probe.MaxInFlight);
+        Assert.Equal(output.GetProperty("max_in_flight").GetInt32(), run.MaxInFlight);
+    }
 
-        // Each call of a fake got the token of the test. A call that a cancel ended before its record has a token too.
-        Assert.All(probe.Tokens, token => Assert.Equal(source.Token, token));
-        var recordedCalls = events.Count(e => e["kind"]!.GetValue<string>() is "query" or "embed" or "rank");
-        if (error is null)
+    [Fact]
+    public void The_cancel_grid_holds_each_recipe_each_limit_and_each_kind_of_call()
+    {
+        // The two files share the fixture of the fakes.
+        foreach (var key in new[] { "tables", "embeddings", "connected", "mentions" })
         {
-            Assert.Equal(recordedCalls, probe.Tokens.Count);
+            Assert.True(
+                JsonNode.DeepEquals(JsonNode.Parse(Document.GetProperty(key).GetRawText()), JsonNode.Parse(CancelDocument.GetProperty(key).GetRawText())),
+                $"{key} differs between search.json and search_cancel.json");
+        }
+
+        var points = CancelCases.Select(c => c.GetProperty("input")).ToList();
+        var recipes = points.Select(p => p.GetProperty("recipe").GetString()).Distinct().ToList();
+        Assert.Equal(8, recipes.Count);
+        foreach (var recipe in recipes)
+        {
+            Assert.Equal(
+                [null, 1L, 2L],
+                points.Where(p => p.GetProperty("recipe").GetString() == recipe).Select(MaxCoroutines).Distinct().OrderBy(m => m ?? 0).ToList());
+        }
+
+        foreach (var call in CallKinds)
+        {
+            Assert.Contains(points, p => p.TryGetProperty($"cancel_at_{call}", out _));
+        }
+
+        // Python ends each canceled search with CancelledError, whatever the point.
+        Assert.All(CancelCases, c => Assert.Equal("CancelledError", c.GetProperty("output").GetProperty("error").GetProperty("type").GetString()));
+        Assert.Equal(CancelCases.Count, points.Select(CancelKey).Distinct().Count());
+    }
+
+    // Each entry of LateCancel names one point of the grid.
+    [Fact]
+    public void Each_late_cancel_entry_names_one_point_of_the_grid()
+    {
+        var keys = CancelCases.Select(c => CancelKey(c.GetProperty("input"))).ToHashSet();
+        Assert.Equal(LateCancel.Length, LateCancel.Select(e => CancelKey(e.Recipe, e.MaxCoroutines, e.Call, e.K)).Distinct().Count());
+        Assert.All(LateCancel, e => Assert.Contains(CancelKey(e.Recipe, e.MaxCoroutines, e.Call, e.K), keys));
+    }
+
+    // The grid of search_cancel.json cancels the search while the k-th call of one kind returns. Python cancels the task of
+    // the search, and the port cancels the token source. A point that is not in LateCancel must give the exception type,
+    // the ordered spans, queries, calls, and log lines, and the count of calls in flight that Python gave. A point in
+    // LateCancel must differ in the way that its kind says, so a listed point that agrees fails the test, and the list
+    // cannot go stale. The cause of each listed point is GAPS F33 (late cancel, R8): the cancel arrives while a task waits
+    // to resume after a call that already returned. Python raises CancelledError where that task resumes. The port reads
+    // the token at its next call, so it can run more spans, return a full result, or end the spans in another order.
+    [Theory(Timeout = 5000)]
+    [MemberData(nameof(CancelIndexes))]
+    public async Task Each_cancel_point_matches_Python_or_is_a_listed_late_cancel(int index)
+    {
+        var input = CancelCases[index].GetProperty("input");
+        var run = await ExecuteAsync(input, TestContext.Current.CancellationToken);
+
+        var kind = Compare(CancelCases[index].GetProperty("output"), run);
+        var key = CancelKey(input);
+        var listed = LateCancel.Where(e => CancelKey(e.Recipe, e.MaxCoroutines, e.Call, e.K) == key).Select(e => e.Kind).ToList();
+        if (listed.Count == 0)
+        {
+            Assert.True(kind == "same", $"{key}: the port differs from Python in kind {kind}: {string.Join(" | ", run.Events.Select(Short))}");
         }
         else
         {
-            Assert.True(probe.Tokens.Count >= recordedCalls);
+            Assert.True(kind == listed.Single(), $"{key}: listed as {listed.Single()}, but the port is {kind}");
         }
     }
 
@@ -169,8 +207,208 @@ public class SearchValuesTests
             i.GetProperty("fn").GetString() == fn
             && (fn == "search" || (i.GetProperty("config").ValueKind == JsonValueKind.String && !i.TryGetProperty("defaults", out _))));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Asyncio.Run(() => RunAsync(input, [], new Probe(canceled, null), canceled.Token)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => RunAsync(input, [], new Probe(canceled, null, 0), canceled.Token)));
     }
+
+    // The points of the grid where the port differs from Python by the late cancel of GAPS F33. The grid of
+    // search_cancel.json holds 153 points: 114 cancel while a query returns, 24 while the embedder returns, and 15 while
+    // the cross-encoder returns. 73 differ, and 80 agree. A point has the kind of its difference (see Compare):
+    //   event_order    51   the same exception, and the events differ by more than extra events (extra spans, and an
+    //                       end event that comes earlier or later)
+    //   full_result    18   the port returns a result, and Python ends with CancelledError
+    //   extra_events    2   the same exception, and only extra events
+    //   other_error     2   the port ends with another exception (the reranker error, which it reaches before it reads
+    //                       the token)
+    // Each point that is not in this list must agree with Python. A listed point that agrees fails the test.
+    private static readonly (string Recipe, long? MaxCoroutines, string Call, int K, string Kind)[] LateCancel =
+    [
+        ("COMBINED_HYBRID_SEARCH_RRF", null, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", null, "query", 3, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", null, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", null, "query", 5, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", null, "query", 6, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", null, "query", 7, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 1L, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 1L, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 1L, "query", 5, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 1L, "query", 7, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 2L, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 2L, "query", 3, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 2L, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 2L, "query", 5, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 2L, "query", 6, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_RRF", 2L, "query", 7, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 3, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 5, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 6, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 7, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", null, "query", 10, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 1L, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 1L, "query", 5, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 1L, "query", 7, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 1L, "query", 9, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 1L, "query", 10, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 3, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 6, "extra_events"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 7, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 8, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 9, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 10, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 3, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 5, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 6, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 7, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", null, "rank", 4, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 1L, "query", 7, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 1L, "query", 9, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 1L, "rank", 4, "full_result"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 2, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 3, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 4, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 7, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 8, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 9, "event_order"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "rank", 2, "extra_events"),
+        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "rank", 4, "full_result"),
+        ("NODE_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 2, "event_order"),
+        ("NODE_HYBRID_SEARCH_CROSS_ENCODER", null, "rank", 1, "full_result"),
+        ("NODE_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 2, "event_order"),
+        ("NODE_HYBRID_SEARCH_CROSS_ENCODER", 2L, "rank", 1, "full_result"),
+        ("COMMUNITY_HYBRID_SEARCH_MMR", null, "query", 2, "event_order"),
+        ("COMMUNITY_HYBRID_SEARCH_MMR", null, "query", 3, "full_result"),
+        ("COMMUNITY_HYBRID_SEARCH_MMR", 1L, "query", 2, "event_order"),
+        ("COMMUNITY_HYBRID_SEARCH_MMR", 1L, "query", 3, "full_result"),
+        ("COMMUNITY_HYBRID_SEARCH_MMR", 2L, "query", 2, "event_order"),
+        ("COMMUNITY_HYBRID_SEARCH_MMR", 2L, "query", 3, "full_result"),
+        ("EDGE_HYBRID_SEARCH_RRF", null, "query", 2, "full_result"),
+        ("EDGE_HYBRID_SEARCH_RRF", 1L, "query", 2, "event_order"),
+        ("EDGE_HYBRID_SEARCH_RRF", 2L, "query", 2, "full_result"),
+        ("NODE_HYBRID_SEARCH_RRF", null, "query", 2, "full_result"),
+        ("NODE_HYBRID_SEARCH_RRF", 1L, "query", 2, "event_order"),
+        ("NODE_HYBRID_SEARCH_RRF", 2L, "query", 2, "full_result"),
+        ("EDGE_HYBRID_SEARCH_NODE_DISTANCE", null, "query", 2, "other_error"),
+        ("EDGE_HYBRID_SEARCH_NODE_DISTANCE", 1L, "query", 2, "event_order"),
+        ("EDGE_HYBRID_SEARCH_NODE_DISTANCE", 2L, "query", 2, "other_error"),
+    ];
+
+    private static readonly string[] CallKinds = ["query", "embed", "rank"];
+
+    // What one run of a case gave: the result or the error, the ordered events, and the largest count of calls in flight.
+    private sealed record Run(JsonNode? Result, Exception? Error, List<JsonNode> Events, int MaxInFlight);
+
+    private static async Task<Run> ExecuteAsync(JsonElement input, CancellationToken testToken)
+    {
+        var events = new List<JsonNode>();
+
+        using var factory = new CaptureFactory(events);
+        using var scope = PortServices.Use(loggerFactory: factory);
+
+        // PORT: a live token source. Python has no token, so the test checks that each fake got this token (R8, R25).
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(testToken);
+        string? cancelCall = null;
+        var cancelAt = 0;
+        foreach (var call in CallKinds)
+        {
+            if (input.TryGetProperty($"cancel_at_{call}", out var k))
+            {
+                cancelCall = call;
+                cancelAt = k.GetInt32();
+            }
+        }
+
+        var probe = new Probe(source, cancelCall, cancelAt);
+
+        JsonNode? result = null;
+        Exception? error = null;
+        try
+        {
+            result = await LoopGuard.RunAsync(() => RunAsync(input, events, probe, source.Token));
+        }
+        catch (Exception e) when (e is GraphitiException or OperationCanceledException)
+        {
+            error = e;
+        }
+
+        // asyncio.run ends the tasks that a failed search leaves, and a span of such a task ends in this time. The
+        // port runs the same tasks on its scheduler, so the test lets the scheduler run before it reads the events.
+        await LoopGuard.RunAsync(async () =>
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                await Task.Yield();
+            }
+        });
+
+        // Each call of a fake got the token of the test. A call that a cancel ended before its record has a token too.
+        Assert.All(probe.Tokens, token => Assert.Equal(source.Token, token));
+        var recordedCalls = events.Count(e => e["kind"]!.GetValue<string>() is "query" or "embed" or "rank");
+        if (error is null)
+        {
+            Assert.Equal(recordedCalls, probe.Tokens.Count);
+        }
+        else
+        {
+            Assert.True(probe.Tokens.Count >= recordedCalls);
+        }
+
+        return new Run(result, error, events, probe.MaxInFlight);
+    }
+
+    // "same" when the port gave what Python gave. Else the kind of the difference, in this order:
+    //   full_result    the port returns a result, and Python ends with an exception.
+    //   other_error    the port ends with an exception of another type.
+    //   extra_events   the exception is the same, and the events of Python are in the events of the port in order, with
+    //                  more events between them.
+    //   event_order    the exception is the same, and the events differ in another way.
+    //   in_flight      the events are the same, and the largest count of calls in flight is not.
+    private static string Compare(JsonElement output, Run run)
+    {
+        var expectedError = output.GetProperty("error");
+        if (expectedError.ValueKind == JsonValueKind.Null || run.Error is null)
+        {
+            return expectedError.ValueKind == JsonValueKind.Null && run.Error is null ? "same" : run.Error is null ? "full_result" : "other_error";
+        }
+
+        if (expectedError.GetProperty("type").GetString() != PythonName(run.Error))
+        {
+            return "other_error";
+        }
+
+        var expected = output.GetProperty("events").EnumerateArray().Select(e => Untimed(JsonNode.Parse(e.GetRawText())!)).ToList();
+        var actual = run.Events.Select(Untimed).ToList();
+        if (expected.Count == actual.Count && expected.Zip(actual).All(p => Same(p.First, p.Second)))
+        {
+            return output.GetProperty("max_in_flight").GetInt32() == run.MaxInFlight ? "same" : "in_flight";
+        }
+
+        var next = 0;
+        foreach (var node in actual)
+        {
+            if (next < expected.Count && Same(expected[next], node))
+            {
+                next++;
+            }
+        }
+
+        return next == expected.Count ? "extra_events" : "event_order";
+    }
+
+    private static long? MaxCoroutines(JsonElement input) => input.TryGetProperty("max_coroutines", out var m) ? m.GetInt64() : null;
+
+    private static string CancelKey(JsonElement input)
+    {
+        var call = CallKinds.Single(c => input.TryGetProperty($"cancel_at_{c}", out _));
+        return CancelKey(input.GetProperty("recipe").GetString()!, MaxCoroutines(input), call, input.GetProperty($"cancel_at_{call}").GetInt32());
+    }
+
+    private static string CancelKey(string recipe, long? maxCoroutines, string call, int k) =>
+        $"{recipe} max_coroutines={(maxCoroutines is { } m ? m.ToString(System.Globalization.CultureInfo.InvariantCulture) : "None")} {call} {k}";
 
     private static async Task<JsonNode?> RunAsync(JsonElement input, List<JsonNode> events, Probe probe, CancellationToken token)
     {
@@ -489,16 +727,16 @@ public class SearchValuesTests
         return dict;
     }
 
-    private static JsonElement Load()
+    private static JsonElement Load(string file = "search.json")
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "values", "search.json");
+        var path = Path.Combine(AppContext.BaseDirectory, "values", file);
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         return document.RootElement.Clone();
     }
 
-    // The calls in flight, the token of each call, and the cancel at the k-th query. A call is in flight from its entry
-    // to its return. Python counts the same way in port/tools/record_search.py.
-    private sealed class Probe(CancellationTokenSource source, int? cancelAtQuery)
+    // The calls in flight, the token of each call, and the cancel at the k-th call of one kind. A call is in flight from
+    // its entry to its return. Python counts the same way in port/tools/record_search.py.
+    private sealed class Probe(CancellationTokenSource source, string? cancelCall, int cancelAt)
     {
         internal List<CancellationToken> Tokens { get; } = [];
 
@@ -506,6 +744,8 @@ public class SearchValuesTests
 
         private int inFlight;
         private int queries;
+        private int embeds;
+        private int ranks;
 
         internal void Enter(CancellationToken token)
         {
@@ -516,11 +756,28 @@ public class SearchValuesTests
 
         internal void Exit() => inFlight--;
 
-        // Python: `main_task.cancel()` after the query is recorded.
+        // Python: `main_task.cancel()` after the call is recorded.
         internal void AfterQuery()
         {
             queries++;
-            if (queries == cancelAtQuery)
+            CancelAt("query", queries);
+        }
+
+        internal void AfterEmbed()
+        {
+            embeds++;
+            CancelAt("embed", embeds);
+        }
+
+        internal void AfterRank()
+        {
+            ranks++;
+            CancelAt("rank", ranks);
+        }
+
+        private void CancelAt(string call, int count)
+        {
+            if (call == cancelCall && count == cancelAt)
             {
                 source.Cancel();
             }
@@ -576,6 +833,7 @@ public class SearchValuesTests
                 await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
                 events.Add(new JsonObject { ["kind"] = "embed", ["input"] = Encode(inputData) });
+                probe.AfterEmbed();
                 return [1.0, 0.0];
             }
             finally
@@ -601,6 +859,7 @@ public class SearchValuesTests
                     ["query"] = query,
                     ["passages"] = new JsonArray([.. passages.Select(p => (JsonNode)p)]),
                 });
+                probe.AfterRank();
                 return [.. Enumerable.Reverse(passages).Select((passage, i) => (passage, 1.0 - (0.25 * i)))];
             }
             finally

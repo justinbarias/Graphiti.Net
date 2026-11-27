@@ -6,7 +6,6 @@ using Graphiti.Core.Driver;
 using Graphiti.Core.Embedder;
 using Graphiti.Core.Search;
 using Graphiti.Internal;
-using Graphiti.PyCompat;
 
 public class TestSearchTracing
 {
@@ -23,7 +22,7 @@ public class TestSearchTracing
             Tracer = tracer,
         };
 
-        var results = await Asyncio.Run(() => SearchModule.SearchAsync(
+        var results = await LoopGuard.RunAsync(() => SearchModule.SearchAsync(
             clients,
             query: "where is the edge",
             groupIds: null,
@@ -69,7 +68,7 @@ public class TestSearchTracing
             Tracer = null!,
         };
 
-        var results = await Asyncio.Run(() => SearchModule.SearchAsync(
+        var results = await LoopGuard.RunAsync(() => SearchModule.SearchAsync(
             clients,
             query: "where is the edge",
             groupIds: null,
@@ -86,7 +85,7 @@ public class TestSearchTracing
     [Fact(Timeout = 5000)]
     public async Task test_edge_search_uses_noop_tracer_when_none_is_passed()
     {
-        var (edges, scores) = await Asyncio.Run(() => SearchModule.EdgeSearchAsync(
+        var (edges, scores) = await LoopGuard.RunAsync(() => SearchModule.EdgeSearchAsync(
             driver: new FakeDriver(),
             crossEncoder: null!,
             query: "where is the edge",
@@ -118,7 +117,7 @@ public class TestSearchTracing
             Tracer = new RecordingTracer(),
         };
 
-        await Asyncio.Run(() => SearchModule.SearchAsync(
+        await LoopGuard.RunAsync(() => SearchModule.SearchAsync(
             clients,
             query: "where is the edge",
             groupIds: null,

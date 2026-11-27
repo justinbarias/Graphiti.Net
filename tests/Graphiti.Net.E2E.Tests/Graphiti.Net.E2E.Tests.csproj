@@ -14,5 +14,7 @@
     <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
     <!-- Values that the recorders in port/tools recorded from Python at the pinned commit (port/RULES.md, R23). -->
     <Content Include="values/**/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The loop guard of the evaluation tests (port/RULES.md, R25). -->
+    <Compile Include="..\Port.Evaluation\LoopGuard.cs" Link="LoopGuard.cs" />
   </ItemGroup>
 </Project>
