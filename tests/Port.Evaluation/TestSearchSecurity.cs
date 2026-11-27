@@ -1,7 +1,9 @@
 // Ported from tests/utils/search/test_search_security.py (port/RULES.md, R25). Only the tests whose code under test
-// is in graphiti_core/search/search_filters.py, helpers.validate_node_labels, or driver/neo4j/operations/search_ops.py.
+// is in graphiti_core/search/search_filters.py, helpers.validate_node_labels,
+// driver/neo4j/operations/search_ops.py, graphiti_core/search/search_utils.py, or graphiti_core/search/search.py.
 namespace Graphiti.Port.Evaluation;
 
+using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Search;
 using Graphiti.Neo4j.Operations;
@@ -55,5 +57,58 @@ public class TestSearchSecurity
     {
         var error = Assert.Throws<GroupIdValidationException>(() => SearchOps.BuildNeo4jFulltextQuery("test", ["bad\"group"]));
         Assert.Contains("must contain only alphanumeric", error.Message, StringComparison.Ordinal);
+    }
+
+    // Ported with graphiti_core/search/search_utils.py. SimpleNamespace(provider=..., fulltext_syntax='') is a driver
+    // that answers no query.
+    [Fact]
+    public void test_fulltext_query_rejects_invalid_group_ids()
+    {
+        var driver = new NamespaceDriver { Provider = GraphProvider.Neo4j, FulltextSyntax = string.Empty };
+
+        var error = Assert.Throws<GroupIdValidationException>(() => SearchUtils.FulltextQuery("test", ["bad\"group"], driver));
+        Assert.Contains("must contain only alphanumeric", error.Message, StringComparison.Ordinal);
+    }
+
+    // Ported with graphiti_core/search/search.py. `search` validates the group ids before it reads any client, so the
+    // SimpleNamespace clients are null here. The embedder, the cross-encoder, and the tracer are never read.
+    [Fact(Timeout = 5000)]
+    public async Task test_shared_search_rejects_invalid_group_ids()
+    {
+        var clients = new GraphitiClients
+        {
+            Driver = new NamespaceDriver(),
+            LlmClient = null!,
+            Embedder = null!,
+            CrossEncoder = null!,
+            Tracer = null!,
+        };
+
+        var error = await Assert.ThrowsAsync<GroupIdValidationException>(() => LoopGuard.RunAsync(() => SearchModule.SearchAsync(
+            clients,
+            query: "test",
+            groupIds: ["bad\"group"],
+            config: new SearchConfig(),
+            searchFilter: new SearchFilters(),
+            cancellationToken: TestContext.Current.CancellationToken)));
+        Assert.Contains("must contain only alphanumeric", error.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class NamespaceDriver : GraphDriver
+    {
+        internal override string PythonName => "SimpleNamespace";
+
+        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+            string cypherQuery,
+            OrderedDictionary<string, object?> parameters,
+            CancellationToken cancellationToken = default) => throw new InvalidOperationException("not used");
+
+        internal override GraphDriverSession Session(string? database = null) => throw new InvalidOperationException("not used");
+
+        internal override Task CloseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        internal override Task DeleteAllIndexesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        internal override Task BuildIndicesAndConstraintsAsync(bool deleteExisting = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

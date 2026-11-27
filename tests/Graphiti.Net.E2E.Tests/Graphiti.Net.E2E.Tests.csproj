@@ -12,7 +12,9 @@
     <ProjectReference Include="../../src/Graphiti.Net/Graphiti.Net.csproj" />
     <ProjectReference Include="../../src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
     <ProjectReference Include="../../src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
-    <!-- Values that port/tools/record_graph_types_e2e.py recorded from Python at the pinned commit (port/RULES.md, R23). -->
+    <!-- Values that the recorders in port/tools recorded from Python at the pinned commit (port/RULES.md, R23). -->
     <Content Include="values/**/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The loop guard of the evaluation tests (port/RULES.md, R25). -->
+    <Compile Include="..\Port.Evaluation\LoopGuard.cs" Link="LoopGuard.cs" />
   </ItemGroup>
 </Project>

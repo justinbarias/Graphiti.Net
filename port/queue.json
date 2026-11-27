@@ -1271,9 +1271,9 @@
         "typing",
         "typing_extensions"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Search/SearchUtils.cs",
+      "status": "tests_pass",
+      "notes": "Layer 6. Two reviews and one fix round. Two covering cases stay listed: pure.ranking.rrf.inner_not_list_string and pure.ranking.rrf.rank_const_fraction (open item O4). tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune. Two tests of tests/test_neptune_search_isolation.py call those Neptune branches, so they have no port (rule R24)."
     },
     {
       "order": 61,
@@ -1291,9 +1291,9 @@
         "enum",
         "pydantic"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Search/SearchConfig.cs",
+      "status": "tests_pass",
+      "notes": "Layer 6. Two reviews and one fix round. One covering case stays listed: pure.ranking.SearchConfig.model_copy.recipe_update_unvalidated_bad_type (open item O4, accepted by name). tests/Port.Evaluation/SearchConfigValuesTests.cs compares the 510 recorded cases of port/tools/record_search_config_values.py. GAPS F31 names what stays different."
     },
     {
       "order": 62,
@@ -1314,8 +1314,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Decorators.cs",
-      "status": "todo",
-      "notes": "Moved from layer 1 to layer 6: it imports search.search_config, and four of its tests need SearchResults.merge."
+      "status": "tests_pass",
+      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/DecoratorsValuesTests.cs compares the 432 recorded cases of port/tools/record_handle_multiple_group_ids.py."
     },
     {
       "order": 63,
@@ -1908,9 +1908,9 @@
         "time",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Search/Search.cs",
+      "status": "tests_pass",
+      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/SearchValuesTests.cs compares the 172 recorded cases of port/tools/record_search.py and its grid of 153 cancel points. tests/Port.Evaluation/TestEdgeCrossEncoderRrfShortlist.cs ports the two upstream tests of the cross-encoder shortlist. tests/Graphiti.Net.E2E.Tests/SearchRecipesOnNeo4jTests.cs runs each of the 16 recipes on Neo4j and compares the ranked results with Python. GAPS F33 names what stays different for a late cancel."
     },
     {
       "order": 87,
@@ -1923,9 +1923,9 @@
         "graphiti_core.search.search_config"
       ],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Search/SearchConfigRecipes.cs",
+      "status": "reviewed",
+      "notes": "Layer 6. Two reviews and one fix round. Each judge case that reads a recipe passes, except the one that search_config lists. The recording of search_config holds each recipe."
     },
     {
       "order": 88,
@@ -4105,8 +4105,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. The file is empty, so it needs no file (rule R1)."
     },
     {
       "order": 179,
@@ -4121,9 +4121,9 @@
         "graphiti_core.search.search_config"
       ],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Search/SearchHelpers.cs",
+      "status": "reviewed",
+      "notes": "Layer 6. Two reviews and one fix round. Each pure judge case of the module passes. The recording of search_config holds its cases."
     },
     {
       "order": 180,

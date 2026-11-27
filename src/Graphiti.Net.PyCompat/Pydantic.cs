@@ -427,9 +427,11 @@ internal static partial class Pydantic
     }
 
     /// <summary>
-    /// What <c>model_dump(mode='json')</c> gives for a value: an enum member becomes its value, a datetime the text of
-    /// <see cref="JsonDateTime(PyDateTime)"/>, a date <c>YYYY-MM-DD</c>, <c>bytes</c> UTF-8 text, a float
-    /// <c>nan</c> or <c>inf</c> <c>None</c>, a tuple or a set a list, and a dict key a text. A model gives its
+    /// What <c>model_dump_json()</c> gives for a value before it writes the text: an enum member becomes its value, a
+    /// datetime the text of <see cref="JsonDateTime(PyDateTime)"/>, a date <c>YYYY-MM-DD</c>, <c>bytes</c> UTF-8 text,
+    /// a float <c>nan</c> or <c>inf</c> <c>None</c>, a tuple or a set a list, and a dict key a text. Only
+    /// <c>model_dump_json()</c> writes <c>null</c> for <c>nan</c> and <c>inf</c>: <c>model_dump(mode='json')</c> keeps
+    /// them as floats, so a caller of <c>ModelDump(json: true)</c> differs from Python there. A model gives its
     /// <c>ModelDump(json: true)</c>. <c>bytes</c> that are not UTF-8 throw <see cref="DecoderFallbackException"/>
     /// (<c>UnicodeDecodeError</c>). A value outside the value model, such as a delegate, throws
     /// <see cref="ArgumentException"/> (pydantic's <c>PydanticSerializationError</c>, a <c>ValueError</c>).
