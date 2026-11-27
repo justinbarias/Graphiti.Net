@@ -17,14 +17,18 @@
 //   second.
 // The Python oracle ran each scenario with these fakes and no patch, and each assertion of the upstream test held.
 //
-// TODO(port): O10. test_semantic_search_reuses_name_embeddings_only_when_requested reads the arguments of the patched
-// `node_ops.node_similarity_search` (`await_args_list[0].args[1]`), so it has no form. The recorded cases of
-// collect_candidate_nodes with reuse_name_embeddings in values/node_operations.json cover the same behavior: each one
-// records each embedder batch and the query text of each similarity search.
+// test_semantic_search_reuses_name_embeddings_only_when_requested reads the arguments of the patched
+// `node_ops.node_similarity_search`. That function passes its arguments unchanged to
+// `driver.search_interface.node_similarity_search(driver, search_vector, ...)` (search_utils.py), an object of the
+// fake, so the test has the form of the second clause of the reading of O10: the replacement is a search interface
+// that records each search vector and returns [], and the test runs the real function.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
+using Graphiti.Core.Driver;
+using Graphiti.Core.Embedder;
 using Graphiti.Core.Ingestion;
+using Graphiti.Core.Search;
 using Graphiti.Core.Utils.Maintenance;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
@@ -236,6 +240,84 @@ public class TestResolutionTrace
             new PatchNode { NodeUuid = "stored", Labels = ["Entity", "Person"], Attributes = new() { ["email"] = "ana@example.com" } },
         ];
         Assert.Equal(Dump(expected), Dump(trace.Operations));
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task test_semantic_search_reuses_name_embeddings_only_when_requested()
+    {
+        var withEmbedding = new EntityNode { Uuid = "n1", Name = "Ana", GroupId = "g", NameEmbedding = [1.0, 0.0] }.Validate();
+        var withoutEmbedding = new EntityNode { Uuid = "n2", Name = "Acme", GroupId = "g" }.Validate();
+
+        (GraphitiClients Clients, BatchEmbedder Embedder, VectorSearch Search) MakeClients()
+        {
+            var embedder = new BatchEmbedder();
+            var search = new VectorSearch();
+            var clients = new GraphitiClients
+            {
+                Driver = new MockGraphDriver(search: search),
+                LlmClient = new MockLlm(),
+                Embedder = embedder,
+                CrossEncoder = new EdgeOperationsRun.FakeCrossEncoder(),
+                Tracer = new NoOpTracer(),
+            };
+            return (clients, embedder, search);
+        }
+
+        // Default: the embedder gets each name, as before the change.
+        var (clients, embedder, search) = MakeClients();
+        await LoopGuard.RunAsync(() => NodeOperations.SemanticCandidateSearchAsync(
+            clients, [withEmbedding, withoutEmbedding], cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("[[\"Ana\", \"Acme\"]]", PyJson.Dumps(embedder.Batches));
+        Assert.Equal([0.5, 0.5], search.Vectors[0]);
+
+        (clients, embedder, search) = MakeClients();
+        await LoopGuard.RunAsync(() => NodeOperations.SemanticCandidateSearchAsync(
+            clients, [withEmbedding, withoutEmbedding], reuseNameEmbeddings: true, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("[[\"Acme\"]]", PyJson.Dumps(embedder.Batches));
+        Assert.Equal("[[1.0, 0.0], [0.5, 0.5]]", PyJson.Dumps(search.Vectors));
+
+        // No embedder call when each node has an embedding.
+        (clients, embedder, _) = MakeClients();
+        await LoopGuard.RunAsync(() => NodeOperations.SemanticCandidateSearchAsync(
+            clients, [withEmbedding], reuseNameEmbeddings: true, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(embedder.Batches);
+    }
+
+    // The embedder of the test: create_batch gives [0.5, 0.5] for each query and records each batch that it awaits.
+    private sealed class BatchEmbedder : EmbedderClient
+    {
+        internal List<List<string>> Batches { get; } = [];
+
+        internal override Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("not used");
+
+        internal override async Task<List<List<double>>> CreateBatchAsync(List<string> inputDataList, CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            Batches.Add([.. inputDataList]);
+            return [.. inputDataList.Select(_ => new List<double> { 0.5, 0.5 })];
+        }
+    }
+
+    // The replacement of `node_ops.node_similarity_search`, AsyncMock(return_value=[]), on the object that the real
+    // function reads. It records the search vector at the call, as AsyncMock records its arguments, then yields.
+    private sealed record VectorSearch : SearchInterface
+    {
+        internal List<List<double>> Vectors { get; } = [];
+
+        internal override async Task<List<EntityNode>> NodeSimilaritySearchAsync(
+            GraphDriver driver,
+            List<double> searchVector,
+            SearchFilters searchFilter,
+            List<string>? groupIds = null,
+            long limit = 100,
+            double minScore = 0.7,
+            CancellationToken cancellationToken = default)
+        {
+            Vectors.Add(searchVector);
+            await Task.Yield();
+            return [];
+        }
     }
 
     private static string DumpNodes(List<EntityNode> nodes) => PyJson.Dumps(nodes.Select(node =>

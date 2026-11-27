@@ -16,10 +16,15 @@ generated inputs from a fixed seed, and records the result or the type and the t
 - load_delta_digests with the final change sets of units in any order, and each method of Delta on the result.
 
 A float32 value is recorded exactly. The C# test compares each matrix value exactly and each list of UUIDs exactly.
-numpy sorts more than 16 equal scores in an order that is not stable, so no case has more than 16 candidates.
+np.argsort sorts 17 or more scores in an order that is not stable (PyNumpy.ArgSort ports it). The cases of the reviews
+of packet P8b have 17, 20, and 22 candidates with equal scores, a row of nan with a limit below the count, a row of
+width 255 that the pairwise split rounds in another way than a plain loop, a fuzzy score of exactly 0.9, two equal
+best fuzzy scores, two patches of one node, and more similar edges and cosine node matches than the limits.
 
 The digest cache: a load of the same units gives the same digest objects, and the load of DIGEST_CACHE_SIZE + 1 other
-units drops the first one. The case records `is` of each digest against the digest of the first load.
+units drops the first one. The case records `is` of each digest against the digest of the first load. Three sequences
+test the limits: A and then DIGEST_CACHE_SIZE - 1 other units keep A; A, B, A again, and DIGEST_CACHE_SIZE - 1 other
+units keep A and drop B; two payloads with the same group, seq, status, and length give two digests.
 
 Python iterates a set in hash order. delta.py iterates one set, `candidate_ids` in _fuzzy_match (RULES.md R14). The
 tool binds the name `set` of delta and dedup_helpers to the insertion-order set of record_maintenance_helpers.py.
@@ -135,6 +140,12 @@ def unit_matrix_cases(d) -> None:
     for rows in ([], [[]], [[], []], [[3.0, 4.0], [0.0, 0.0], [1.0, 1.0]], [[1.0, 2.0], [3.0]], [[], [1.0]],
                  [[1e39, 1.0]], [[1e-46, 0.0]], [[-0.0, 0.0]], [[1e20, 1e20, 1e20]], [[3e-23, 4e-23]]):
         call('_unit_matrix', [rows], lambda rows=rows: d._unit_matrix(rows), matrix_view)
+    # A row of width 255 whose float32 norm differs if the pairwise split does not round half down to a multiple of 8
+    # (review B, seed D03): the 27th draw of random.Random(7).
+    rv = random.Random(7)
+    for _ in range(27):
+        row = [rv.uniform(-1, 1) for _ in range(rv.choice([255, 300, 1536]))]
+    call('_unit_matrix', [[row]], lambda: d._unit_matrix([row]), matrix_view)
 
 
 def fuzzy_cases(d, dh) -> None:
@@ -145,6 +156,14 @@ def fuzzy_cases(d, dh) -> None:
     for _ in range(40):
         nodes = [node_data(f'c{j}') for j in range(rng.randint(0, 6))]
         name = rng.choice(NAMES)
+        call('_fuzzy_match', [name, nodes],
+             lambda name=name, nodes=nodes: d._fuzzy_match(
+                 d._fuzzy_query(name), dh._build_candidate_indexes([EntityNode(**n) for n in nodes])))
+    # A Jaccard score of exactly 0.9 (review B, seed D23), and two candidates with one best score (seed D24).
+    for name, nodes in (('Quantum Biola', [node_data('c0', name='Quantum Biol')]),
+                        ('Acme Corporation', [node_data('c0', name='Acme Corporation'), node_data('c1', name='Acme Corporation')]),
+                        ('Quantum Biola', [node_data('c0', name='Bob'), node_data('c1', name='Quantum Biol'),
+                                           node_data('c2', name='Quantum Biol')])):
         call('_fuzzy_match', [name, nodes],
              lambda name=name, nodes=nodes: d._fuzzy_match(
                  d._fuzzy_query(name), dh._build_candidate_indexes([EntityNode(**n) for n in nodes])))
@@ -175,10 +194,12 @@ def top_matches_cases(d) -> None:
                 matrix = np.zeros((0, 0), dtype=np.float32)
             return d._top_matches(vectors, uuids, matrix, min_score, limit), top_loop(vectors, uuids, matrix, min_score, limit)
         try:
-            result, loop = run()
+            result, (loop, check) = run()
             record = {'f': '_top_matches', 'a': [vectors, uuids, rows, min_score, limit, raw], 'r': {'ok': result}}
             if loop != result:
-                # GAPS G17: BLAS sums the scores in another order than the plain loop of the port.
+                # GAPS G17: BLAS sums the scores in another order than the plain loop of the port. The ranks may differ
+                # only where the loop scores are equal.
+                check()
                 record['r_loop'] = {'ok': loop}
             records.append(record)
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -186,14 +207,16 @@ def top_matches_cases(d) -> None:
 
     def top_loop(vectors, uuids, matrix, min_score, limit):
         # _top_matches with the scores of a plain loop in index order with a float32 sum (RULES.md R18). It checks that
-        # each score differs from the BLAS score by less than 1e-6, and gives the ranks of the port.
+        # each score differs from the BLAS score by less than 1e-6, and gives the ranks of the port. The check that it
+        # returns stops the tool if the BLAS ranks and the loop ranks differ in more than the order of equal loop scores,
+        # or if a score of the first `limit` ranks is on the other side of `min_score`.
         results = [[] for _ in vectors]
         rows = [index for index, vector in enumerate(vectors) if vector]
         if not rows or not uuids:
-            return results
+            return results, lambda: None
         queries = d._unit_matrix([vectors[index] or [] for index in rows])
         if queries.shape[1] != matrix.shape[1]:
-            return results
+            return results, lambda: None
         blas = queries @ matrix.T
         scores = np.zeros(blas.shape, dtype=np.float32)
         for r in range(queries.shape[0]):
@@ -205,9 +228,21 @@ def top_matches_cases(d) -> None:
                 if np.isfinite(blas[r, c]) and abs(float(total) - float(blas[r, c])) >= 1e-6:
                     raise SystemExit(f'A BLAS score differs from the loop by 1e-6 or more: {total} {blas[r, c]}')
         for row, index in enumerate(rows):
-            order = np.argsort(-scores[row], kind='stable')
+            order = np.argsort(-scores[row])
             results[index] = [uuids[column] for column in order[:limit] if scores[row, column] >= min_score]
-        return results
+
+        def check():
+            for row in range(len(rows)):
+                blas_order = np.argsort(-blas[row])
+                loop_order = np.argsort(-scores[row])
+                for a, b in zip(blas_order, loop_order, strict=True):
+                    x, y = scores[row, a], scores[row, b]
+                    if not (x == y or (np.isnan(x) and np.isnan(y))):
+                        raise SystemExit(f'BLAS and the loop rank other scores at one place: {x} {y} (GAPS G17)')
+                for column in list(blas_order[:limit]) + list(loop_order[:limit]):
+                    if (blas[row, column] >= min_score) != (scores[row, column] >= min_score):
+                        raise SystemExit(f'BLAS and the loop put a score on two sides of {min_score} (GAPS G17)')
+        return results, check
 
     # A score exactly on the limit (0.6 in float32), a limit above the score that float32 rounds to the score (NumPy 2
     # compares in float32, NEP 50), equal scores, and 0, 1, and more matches than the limit.
@@ -236,6 +271,34 @@ def top_matches_cases(d) -> None:
         vectors = [rng.choice([None, vector(dim), vector(dim), list(rows[0]) if rows else vector(dim)]) for _ in range(rng.randint(1, 4))]
         top(vectors, [f'c{i}' for i in range(count)], rows, rng.choice([0.6, 0.0, 0.3, 0.9, -0.5]),
             rng.choice([1, 3, 10, 15, 0]), raw=rng.random() < 0.5)
+
+    # The reviews of packet P8b. numpy's quicksort orders equal scores of 17 or more candidates in another order than
+    # their columns (review A, finding 1, and review B, finding 1).
+    rv = random.Random(SEED + 1)
+    top([[1.0, 0.0]], [f'c{i}' for i in range(20)], [[1.0, 0.0]] * 20, 0.6, 10)
+    top([[1.0, 0.0]], [f'c{i}' for i in range(17)], [[1.0, 0.0]] * 17, 0.6, 10)
+    top([[1.0, 0.0]], [f'c{i}' for i in range(20)], [[1.0, 0.0]] * 20, 0.6, 30)
+    v = [round(rv.gauss(0, 0.03), 5) for _ in range(1536)]
+    q = [round(x + rv.gauss(0, 0.01), 5) for x in v]
+    others = [[round(x + rv.gauss(0, 0.02), 5) for x in v] for _ in range(4)]
+    top([q], [f'c{i}' for i in range(20)], [v] * 20, 0.6, 10, raw=False)
+    top([q], [f'c{i}' for i in range(22)], [v] * 9 + others + [v] * 9, 0.6, 10, raw=False)
+    # Two or more equal rows among 17 to 40 rows.
+    for _ in range(40):
+        dim = rv.choice([2, 3, 9, 64])
+        count = rv.randint(17, 40)
+        rows = [[round(rv.uniform(-1, 1), 6) for _ in range(dim)] for _ in range(count)]
+        for i in range(count):
+            if rv.random() < 0.3 and i:
+                rows[i] = list(rows[rv.randrange(i)])
+        query = [round(rv.uniform(-1, 1), 6) for _ in range(dim)]
+        top([rv.choice([query, list(rows[0])]), rv.choice([None, list(reversed(query))])], [f'c{i}' for i in range(count)], rows,
+            rv.choice([0.6, 0.0, -1.0]), rv.choice([1, 10, 15, 40]), raw=rv.random() < 0.5)
+    # A candidate row with nan and a limit below the count: the nan column sorts last (review A, finding 3, and review B,
+    # seed D16).
+    # float32 makes 1e39 inf, and the unit row of [inf, 0] is [nan, 0].
+    top([[1.0, 1.0]], ['c1', 'c2', 'c3'], [[1e39, 0.0], [0.0, 1.0], [1.0, 0.0]], -1.0, 2, raw=False)
+    top([[1.0, 0.0]], ['c1', 'c2'], [[1e39, 1.0], [1.0, 0.0]], 0.6, 1, raw=False)
 
 
 def patch_cases(d) -> None:
@@ -346,6 +409,21 @@ def delta_cases(d) -> None:
     run('bad', [{'seq': 1, 'status': 'committed', 'payload': ChangeSet(group_id='bad', unit_id='u', seq=1, snapshot_seq=0,
                                                                          analysis_started_at=0.0).to_bytes().hex()[:-4]}],
         [], [], {})
+    # Two patches of one node with other identity values, applied in order (review B, seed D31).
+    patches = [{'node_uuid': 's1', 'labels': ['Entity', 'Person'], 'attributes': {'email': 'a@x.io'}},
+               {'node_uuid': 's1', 'labels': ['Entity', 'Person'], 'attributes': {'email': 'c@x.io'}}]
+    run('patches', [unit(1, 'committed', change_set('patches', 1, [], [], patches))],
+        [node_data('qa', name='Qa', labels=['Person'], attributes={'email': 'a@x.io'}),
+         node_data('qc', name='Qc', labels=['Person'], attributes={'email': 'c@x.io'})], [], {'Person': ['email']})
+    # More delta edges with the same fact embedding than DEFAULT_SEARCH_LIMIT (seed D39), and more delta nodes with
+    # the same name embedding and no rule match than NODE_DEDUP_CANDIDATE_LIMIT (seed D40). The scores are equal.
+    words = ['Harbor', 'Kestrel', 'Juniper', 'Zephyr', 'Northwind', 'Silverline', 'Blue', 'Quantum', 'Fieldwork', 'Delta']
+    cosine = [node_data(f'k{j}', name=f'{words[j % 10]} {words[(j * 3 + 1) % 10]} {j}', labels=[], embedding=[1.0, 0.0])
+              for j in range(20)]
+    similar = [edge_data(f'se{j}', 'k1', 'k2', [1.0, 0.0]) for j in range(12)]
+    run('limits', [unit(1, 'committed', change_set('limits', 1, cosine, similar, []))],
+        [node_data('q1', name='Q', labels=[], embedding=[1.0, 0.0])],
+        [edge_data('xs', 'k3', 'k4', [1.0, 0.0])], {})
 
 
 def cache_case(d) -> dict:
@@ -364,9 +442,30 @@ def cache_case(d) -> dict:
     filler = [DeltaUnit(1000 + i, 'committed', payload(1000 + i, 'Filler')) for i in range(d.DIGEST_CACHE_SIZE + 1)]
     d.load_delta_digests('cache', filler)
     three = d.load_delta_digests('cache', first).digests
+    # Review B of packet P8b. Each sequence uses its own group, so the result does not depend on the entries of the
+    # cache before it. Seed D32: A, then DIGEST_CACHE_SIZE - 1 other units, then A.
+    others = [DeltaUnit(5000 + i, 'committed', payload(5000 + i, 'Other')) for i in range(d.DIGEST_CACHE_SIZE - 1)]
+    a = d.load_delta_digests('limit', first[:1]).digests[0]
+    d.load_delta_digests('limit', others)
+    limit_kept = d.load_delta_digests('limit', first[:1]).digests[0] is a
+    # Seed D33: A, B, A again (a hit moves A to the end), DIGEST_CACHE_SIZE - 1 other units, then A and B.
+    a = d.load_delta_digests('move', first[:1]).digests[0]
+    b = d.load_delta_digests('move', first[1:]).digests[0]
+    d.load_delta_digests('move', first[:1])
+    d.load_delta_digests('move', others)
+    move = [d.load_delta_digests('move', first[:1]).digests[0] is a, d.load_delta_digests('move', first[1:]).digests[0] is b]
+    # Seed D34: two payloads with the same group, seq, status, and length.
+    # The payload is compressed, so the tool takes the first name of a fixed list that gives the length of 'Alice'.
+    twins = [payload(7, 'Alice')]
+    twins.append(next(p for p in (payload(7, name) for name in ('Alicg', 'Alicf', 'Alicd', 'Alica', 'Aline', 'Alize', 'Elice'))
+                      if len(p) == len(twins[0])))
+    x = d.load_delta_digests('twins', [DeltaUnit(7, 'committed', twins[0])]).digests[0]
+    y = d.load_delta_digests('twins', [DeltaUnit(7, 'committed', twins[1])]).digests[0]
     return {'again': [a is b for a, b in zip(one, two, strict=True)], 'other_status': other_status[0] is one[0],
             'other_group': other_group[0] is one[0], 'after_eviction': [a is b for a, b in zip(one, three, strict=True)],
-            'payloads': [u.payload.hex() for u in first], 'filler_count': len(filler)}
+            'payloads': [u.payload.hex() for u in first], 'filler_count': len(filler),
+            'other_count': len(others), 'limit_kept': limit_kept, 'move': move,
+            'twins': [t.hex() for t in twins], 'twins_same': x is y, 'twins_names': [x.nodes[0].name, y.nodes[0].name]}
 
 
 class Names:

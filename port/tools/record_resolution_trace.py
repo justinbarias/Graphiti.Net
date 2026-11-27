@@ -22,7 +22,9 @@ calls the real function. Nothing else of those recorders changes.
 
 The cases: nodes that resolve by the exact name, by a fuzzy name, by an identity property, and by the answer of the
 model, and a node with no match; edges that are an exact duplicate, a duplicate by the answer of the model, a
-contradiction that ends a stored edge, a fact that a later stored edge ends, and a new edge.
+contradiction that ends a stored edge, a fact that a later stored edge ends, and a new edge. The cases of review B of
+packet P8b: an extracted edge that arrives with an end date, an override list with a copy of an extracted edge, and a
+stored edge that one extracted edge resolves to and another lists as a contradiction.
 
 The fixed values of the three recorders hold here too: each utc_now of graphiti_core gives FIXED_NOW, the sets that
 the code iterates iterate in insertion order, a uuid4 of the output is a placeholder, and a time of a log line is
@@ -207,6 +209,37 @@ def edge_cases() -> list[dict]:
                reply('dedupe_edges.resolve_edge', '<NEW FACT>\nAna works at Acme\n</NEW FACT>',
                      {'duplicate_facts': [], 'contradicted_facts': []})]
     edges = [x_dup, x_llm, x_contra, x_old, x_new]
+
+    # Review B of packet P8b (seeds T15, T17, and T21). An extracted edge that arrives with an end date and contradicts
+    # a stored edge: it ends no candidate.
+    hist = e('x-hist', 'n-bob', 'n-acme', 'Bob ran Acme', valid_at=PAST, invalid_at=REF, episodes=['ep1'])
+    c15 = {**base, 'edges': [hist], 'search': search('Bob ran Acme', all_cos=[bob_work]),
+           'replies': [reply('dedupe_edges.resolve_edge', '<NEW FACT>\nBob ran Acme\n</NEW FACT>',
+                             {'duplicate_facts': [], 'contradicted_facts': [0]})]}
+    # An override list that holds a copy of an extracted edge with other episodes: the watch leaves out extracted uuids.
+    x_dup_ep0 = e('x-dup', 'n-ana', 'n-acme', 'Ana works at Acme', episodes=['ep0'])
+    x_dup2 = e('x-dup2', 'n-ana', 'n-acme', 'Ana is employed by Acme', episodes=['ep1'])
+    c17 = {**base, 'edges': [x_dup, x_dup2], 'override': [x_dup_ep0], 'search': {},
+           'replies': [reply('dedupe_edges.resolve_edge', '<NEW FACT>\nAna is employed by Acme\n</NEW FACT>',
+                             {'duplicate_facts': [0], 'contradicted_facts': []})]}
+    # A resolves to the stored edge R, which a later candidate C ends. B lists R as a contradiction that it does not end.
+    r = e('s-r', 'n-ana', 'n-acme', 'Ana works at Acme', valid_at=PAST, episodes=['ep0'])
+    c = e('s-c', 'n-ana', 'n-acme', 'Ana quit Acme', valid_at=FUTURE, episodes=['ep0'])
+    a = e('x-a', 'n-ana', 'n-acme', 'Ana is employed by Acme', episodes=['ep1'], valid_at=PAST)
+    b = e('x-b', 'n-bob', 'n-acme', 'Bob runs Acme', episodes=['ep1'], valid_at=PAST)
+    c21 = {**base, 'edges': [a, b],
+           'search': {**search('Ana is employed by Acme', pair_bm25=[r], all_bm25=[c]), **search('Bob runs Acme', all_cos=[r])},
+           'replies': [reply('dedupe_edges.resolve_edge', '<NEW FACT>\nAna is employed by Acme\n</NEW FACT>',
+                             {'duplicate_facts': [0], 'contradicted_facts': [1]}),
+                       reply('dedupe_edges.resolve_edge', '<NEW FACT>\nBob runs Acme\n</NEW FACT>',
+                             {'duplicate_facts': [], 'contradicted_facts': [0]})]}
+    # The same with an override list [R, C] that both extracted edges see.
+    b2 = e('x-b2', 'n-ana', 'n-acme', 'Ana runs Acme', episodes=['ep1'], valid_at=PAST)
+    c21b = {**base, 'edges': [a, b2], 'override': [r, c], 'search': {},
+            'replies': [reply('dedupe_edges.resolve_edge', '<NEW FACT>\nAna is employed by Acme\n</NEW FACT>',
+                              {'duplicate_facts': [0], 'contradicted_facts': [1]}),
+                        reply('dedupe_edges.resolve_edge', '<NEW FACT>\nAna runs Acme\n</NEW FACT>',
+                              {'duplicate_facts': [], 'contradicted_facts': [0]})]}
     return [
         {**base, 'edges': edges, 'search': tables, 'replies': replies},
         {**base, 'edges': edges, 'search': tables, 'replies': replies, 'max_coroutines': 1, 'invalidated_by': False},
@@ -214,6 +247,10 @@ def edge_cases() -> list[dict]:
         {**base, 'edges': [x_dup, e('x-dup2', 'n-acme', 'n-ana', ' ana works at ACME', episodes=['ep1']), x_new],
          'override': [work], 'search': tables, 'replies': replies},
         {**base, 'edges': []},
+        c15,
+        c17,
+        c21,
+        c21b,
     ]
 
 

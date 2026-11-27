@@ -62,52 +62,7 @@ internal static partial class DeltaModule
         }
 
         // PORT: `np.linalg.norm(matrix, axis=1, keepdims=True)` is `sqrt(add.reduce(x * x, axis=1))` in float32.
-        // numpy sums each row in pairs (`FLOAT_pairwise_sum`), from the identity 0. PyNumpy.AddReduce has only the
-        // float64 form, so the float32 form is a local function here (R18: the lead adds the float32 form).
-        static float PairwiseSum(float[] a, int start, int n)
-        {
-            if (n < 8)
-            {
-                var sum = 0.0f;
-                for (var i = 0; i < n; i++)
-                {
-                    sum += a[start + i];
-                }
-
-                return sum;
-            }
-
-            if (n <= 128)
-            {
-                var r = new float[8];
-                for (var j = 0; j < 8; j++)
-                {
-                    r[j] = a[start + j];
-                }
-
-                int k;
-                for (k = 8; k < n - (n % 8); k += 8)
-                {
-                    for (var j = 0; j < 8; j++)
-                    {
-                        r[j] += a[start + k + j];
-                    }
-                }
-
-                var res = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]));
-                for (; k < n; k++)
-                {
-                    res += a[start + k];
-                }
-
-                return res;
-            }
-
-            var half = n / 2;
-            half -= half % 8;
-            return PairwiseSum(a, start, half) + PairwiseSum(a, start + half, n - half);
-        }
-
+        // numpy sums each row in pairs (`FLOAT_pairwise_sum`), from the identity 0 (R18).
         var norms = new float[vectors.Count];
         var squares = new float[width];
         for (var row = 0; row < vectors.Count; row++)
@@ -117,7 +72,7 @@ internal static partial class DeltaModule
                 squares[column] = matrix[row, column] * matrix[row, column];
             }
 
-            norms[row] = MathF.Sqrt(0.0f + PairwiseSum(squares, 0, width));
+            norms[row] = MathF.Sqrt(PyNumpy.AddReduce(squares));
         }
 
         for (var row = 0; row < norms.Length; row++)
@@ -399,14 +354,14 @@ internal static partial class DeltaModule
         var threshold = (float)minScore;
         foreach (var (row, index) in rows.Index())
         {
-            // PORT: `np.argsort(-scores[row])`. numpy puts nan last. A stable sort keeps equal scores in column order,
-            // as the insertion sort of numpy does for 16 candidates or fewer. Above 16, numpy's quicksort can give
-            // equal scores in another order.
-            var order = Enumerable.Range(0, candidates)
-                .OrderBy(
-                    column => -scores[row, column],
-                    Comparer<float>.Create((a, b) => float.IsNaN(a) ? (float.IsNaN(b) ? 0 : 1) : float.IsNaN(b) ? -1 : a.CompareTo(b)))
-                .ToList();
+            // PORT: `np.argsort(-scores[row])`, the quicksort of numpy, which is not stable for 17 candidates or more.
+            var negated = new float[candidates];
+            for (var column = 0; column < candidates; column++)
+            {
+                negated[column] = -scores[row, column];
+            }
+
+            var order = PyNumpy.ArgSort(negated);
             results[index] = [.. Py.Slice(order, null, limit)
                 .Where(column => scores[row, column] >= threshold)
                 .Select(column => candidateUuids[column])];

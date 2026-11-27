@@ -14,9 +14,15 @@ value, with fakes at the network boundary:
   of a vector from it, and a stored fact embedding [k, 0.25] names the fact `vec<k>`.
 - an LLM client and a cross-encoder that the reader never calls.
 
-Each fake yields once (asyncio.sleep(0)) and then records its call, so the calls are one ordered list. Each case keeps
-the largest count of fake calls in flight, and a case with more searches than its limit of max_coroutines.
-graph_reader writes no log line, and the reads below it write none on these paths.
+Each fake counts an attempt, yields once (asyncio.sleep(0)), and then records its call, so the calls are one ordered
+list. Each case keeps the largest count of fake calls in flight, and a case with more searches than its limit of
+max_coroutines. graph_reader writes no log line, and the reads below it write none on these paths.
+
+Each case that ends with no error and makes a call runs again with a cancel, in the form of record_node_operations.py:
+once for k = -1, where the task is canceled before its first await, and once for each call k except the last, where
+the fake that makes call k records it and then cancels the task of the call (the port cancels a token source). The
+case keeps under `cancel` the count of the attempts of the run, the count of the recorded calls, and the events after
+call k. A cancel of a gather leaves coroutines that never started, and Python warns about each one. That is no result.
 
 It writes tests/Port.Evaluation/values/graph_reader.json. --check writes nothing and exits 1 if the file differs from
 what the run would write. The tool needs Python 3.12 and the pinned upstream in the folder of the variable
@@ -28,6 +34,7 @@ import asyncio
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +42,8 @@ UPSTREAM = Path(os.environ.get('GRAPHITI_UPSTREAM') or ROOT / '.upstream' / 'gra
 OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'graph_reader.json'
 
 DT = '2025-01-01T00:00:00+00:00'
+
+warnings.filterwarnings('ignore', message='coroutine .* was never awaited', category=RuntimeWarning)
 
 
 def node(uuid, name, labels=None, group_id='g', attributes=None, embedding=None):
@@ -137,19 +146,25 @@ def cases() -> list[dict]:
     return out
 
 
-async def run_case(case: dict, mods) -> dict:
+async def run_case(case: dict, mods, cancel_at=None) -> dict:
     (GraphReader, EntityNode, EntityEdge, EpisodicNode, GraphitiClients, GraphProvider, GraphOperationsInterface,
      SearchInterface, NoOpTracer, errors) = mods
     events: list[dict] = []
-    state = {'in_flight': 0, 'max_in_flight': 0}
+    state = {'in_flight': 0, 'max_in_flight': 0, 'attempts': 0, 'count': 0, 'events_at_cancel': None}
     texts: list[str] = []
+    main = asyncio.current_task()
 
     async def enter(kind, record):
+        state['attempts'] += 1
         state['in_flight'] += 1
         state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
         try:
             await asyncio.sleep(0)
             events.append({'kind': kind, **record})
+            state['count'] += 1
+            if cancel_at is not None and state['count'] - 1 == cancel_at:
+                state['events_at_cancel'] = len(events)
+                main.cancel()
         finally:
             state['in_flight'] -= 1
 
@@ -258,6 +273,10 @@ async def run_case(case: dict, mods) -> dict:
     reader = GraphReader(clients)
     fn = case['fn']
     output: dict = {}
+    if cancel_at == -1:
+        # A task that is canceled before its first await: the first suspension raises CancelledError.
+        state['events_at_cancel'] = 0
+        main.cancel()
     try:
         if fn == 'node_candidates':
             nodes = [EntityNode(**n) for n in case['nodes']]
@@ -277,8 +296,19 @@ async def run_case(case: dict, mods) -> dict:
             output['ok'] = [edge_view(e) for e in await reader.edges_by_uuids(case['uuids'])]
         else:
             raise AssertionError(fn)
+    except asyncio.CancelledError:
+        if cancel_at is None:
+            raise
+        output['error'] = {'type': 'CancelledError', 'text': ''}
+        # The calls that the failed gather leaves run on (R25): give them turns before the count.
+        for _ in range(50):
+            await asyncio.shield(asyncio.sleep(0))
     except Exception as error:  # noqa: BLE001 - the recording keeps each exception
         output['error'] = {'type': type(error).__name__, 'text': str(error)}
+    if cancel_at is not None:
+        return {'k': cancel_at, 'error': output.get('error', {}).get('type'), 'attempts': state['attempts'],
+                'count': state['count'],
+                'after': events[state['events_at_cancel']:] if state['events_at_cancel'] is not None else None}
     output['events'] = events
     output['max_in_flight'] = state['max_in_flight']
     return output
@@ -301,6 +331,10 @@ def main() -> int:
     mods = (GraphReader, EntityNode, EntityEdge, EpisodicNode, GraphitiClients, GraphProvider, GraphOperationsInterface,
             SearchInterface, NoOpTracer, errors)
     records = [{'in': case, 'out': asyncio.run(run_case(case, mods))} for case in cases()]
+    for record in records:
+        calls = len(record['out']['events'])
+        if calls and 'error' not in record['out']:
+            record['cancel'] = [asyncio.run(run_case(record['in'], mods, cancel_at=k)) for k in range(-1, calls - 1)]
 
     def dumps(value):
         return json.dumps(value, ensure_ascii=True, allow_nan=False, separators=(',', ':'))

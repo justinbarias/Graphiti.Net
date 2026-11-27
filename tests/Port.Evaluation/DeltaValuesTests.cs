@@ -13,9 +13,15 @@ using Graphiti.Core.Utils.Maintenance;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.MaintenanceHelpersValuesTests;
 
+// The digest cache of delta.py is module state with no lock, as in Python: each ported call runs on one scheduler
+// thread. Two test classes that call LoadDeltaDigests at the same time would change the cache under each other, so each
+// class that calls it is in this collection, and xunit runs the classes of one collection one after the other.
+[Collection(DigestCacheGroup)]
 public class DeltaValuesTests
 {
-    private static readonly OrderedDictionary<string, object?> Values =
+    internal const string DigestCacheGroup = "DeltaDigestCache";
+
+    internal static readonly OrderedDictionary<string, object?> Values =
         (OrderedDictionary<string, object?>)PyJson.Loads(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "values", "delta.json")))!;
 
     private static readonly List<OrderedDictionary<string, object?>> Cases = [.. List(Values["cases"]).Select(Dict)];
@@ -55,6 +61,10 @@ public class DeltaValuesTests
         Assert.Contains(top, c => List(Dict(c["r"])["ok"]).Any(r => List(r).Count == 0));
         Assert.Contains(top, c => List(Dict(c["r"])["ok"]).Any(r => List(r).Count == 1));
         Assert.Contains(top, c => List(Dict(c["r"])["ok"]).Any(r => List(r).Count == 15));
+
+        // numpy's quicksort orders equal scores of 17 or more candidates in another order than their columns.
+        Assert.Contains(top, c => List(List(c["a"])[1]).Count == 17 && Str(List(List(Dict(c["r"])["ok"])[0])[1]) == "c14");
+        Assert.Contains(top, c => List(List(c["a"])[1]).Count == 22);
 
         // The fuzzy rule finds a match, and a load of the delta raises.
         Assert.Contains(Cases, c => Str(c["f"]) == "_fuzzy_match" && Dict(c["r"])["ok"] is string);
@@ -119,7 +129,7 @@ public class DeltaValuesTests
         Assert.Equal(PyJson.Dumps(cache["after_eviction"]), PyJson.Dumps(one.Zip(three).Select(p => (object?)ReferenceEquals(p.First, p.Second)).ToList()));
     }
 
-    private static DeltaUnit Unit(long seq, string status, byte[] payload) => new() { Seq = seq, Status = status, Payload = payload };
+    internal static DeltaUnit Unit(long seq, string status, byte[] payload) => new() { Seq = seq, Status = status, Payload = payload };
 
     private static object? Invoke(string name, List<object?> a)
     {
@@ -325,4 +335,64 @@ public class DeltaValuesTests
     private static EntityNode Node(object? value) => EntityNode.ModelValidate(Dict(Py.DeepCopy(value)));
 
     private static string Short(string text) => text.Length > 600 ? text[..600] + "..." : text;
+}
+
+// The sequences of review B of packet P8b on the digest cache. Each one uses its own group, so its result does not
+// depend on what the cache held before it. The class is in the collection of DeltaValuesTests (see there).
+[Collection(DeltaValuesTests.DigestCacheGroup)]
+public class DeltaDigestCacheTests
+{
+    private static readonly OrderedDictionary<string, object?> Cache = Dict(DeltaValuesTests.Values["cache"]);
+
+    private static readonly List<byte[]> Payloads = [.. List(Cache["payloads"]).Select(p => Convert.FromHexString(Str(p)))];
+
+    // A, then DIGEST_CACHE_SIZE - 1 other units, then A: A is the oldest entry of a full cache, and it stays.
+    [Fact]
+    public void The_digest_cache_keeps_an_entry_on_the_size_limit()
+    {
+        var a = Load("limit", 1, Payloads[0]);
+        DeltaModule.LoadDeltaDigests("limit", Others());
+        Assert.Equal((bool)Cache["limit_kept"]!, ReferenceEquals(a, Load("limit", 1, Payloads[0])));
+    }
+
+    // A, B, A again, then DIGEST_CACHE_SIZE - 1 other units: the hit moved A to the end, so B leaves and A stays.
+    [Fact]
+    public void A_hit_moves_the_entry_to_the_end_of_the_digest_cache()
+    {
+        var a = Load("move", 1, Payloads[0]);
+        var b = Load("move", 2, Payloads[1]);
+        Load("move", 1, Payloads[0]);
+        DeltaModule.LoadDeltaDigests("move", Others());
+        List<object?> move = [ReferenceEquals(a, Load("move", 1, Payloads[0])), ReferenceEquals(b, Load("move", 2, Payloads[1]))];
+        Assert.Equal(PyJson.Dumps(Cache["move"]), PyJson.Dumps(move));
+    }
+
+    // Two payloads with the same group, seq, status, and length: the hash of the payload keeps their keys apart.
+    [Fact]
+    public void Two_payloads_of_one_length_give_two_digests()
+    {
+        var twins = List(Cache["twins"]).Select(p => Convert.FromHexString(Str(p))).ToList();
+        Assert.Equal(twins[0].Length, twins[1].Length);
+        var x = Load("twins", 7, twins[0]);
+        var y = Load("twins", 7, twins[1]);
+        Assert.Equal((bool)Cache["twins_same"]!, ReferenceEquals(x, y));
+        Assert.Equal(PyJson.Dumps(Cache["twins_names"]), PyJson.Dumps(new List<object?> { x.Nodes[0].Name, y.Nodes[0].Name }));
+    }
+
+    private static UnitDigest Load(string groupId, long seq, byte[] payload) =>
+        DeltaModule.LoadDeltaDigests(groupId, [DeltaValuesTests.Unit(seq, "committed", payload)]).Digests[0];
+
+    // DIGEST_CACHE_SIZE - 1 other units with the seqs 5000 and up. Only their keys matter, so the port writes them.
+    private static List<DeltaUnit> Others()
+    {
+        var changeSet = ChangeSet.FromBytes(Payloads[0]);
+        List<DeltaUnit> units = [];
+        for (var i = 0L; i < (long)Cache["other_count"]!; i++)
+        {
+            changeSet.Seq = 5000 + i;
+            units.Add(DeltaValuesTests.Unit(5000 + i, "committed", changeSet.ToBytes()));
+        }
+
+        return units;
+    }
 }

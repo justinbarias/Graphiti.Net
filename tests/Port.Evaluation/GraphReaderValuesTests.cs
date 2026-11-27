@@ -2,7 +2,8 @@
 // values/graph_reader.json holds the calls that port/tools/record_graph_reader.py recorded from Python: each method of
 // GraphReader with each argument at its default and with a value, with fakes at the network boundary on both sides (a
 // driver with a graph operations interface and a search interface, and an embedder). Each fake yields once and then
-// records its call. The recorder docstring gives the answers of the fakes.
+// records its call. The recorder docstring gives the answers of the fakes. For each case with a call and no error, the
+// recorder also ran the Python original with a cancel at each point (`cancel`), and the cancel theories compare with it.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
@@ -26,19 +27,17 @@ public class GraphReaderValuesTests
 
     public static TheoryData<int> CaseIndexes() => [.. Enumerable.Range(0, Cases.Count)];
 
-    // The cases that make at least one call that takes the token, for the cancellation tests.
-    public static TheoryData<int> CallingCases() =>
-        [.. Enumerable.Range(0, Cases.Count).Where(i => List(Dict(Cases[i]["out"])["events"]).Count > 0 && !Dict(Cases[i]["out"]).ContainsKey("error"))];
+    // The cases that the recorder ran with a cancel: each one makes at least one call and ends with no error.
+    public static TheoryData<int> CallingCases() => [.. Enumerable.Range(0, Cases.Count).Where(i => Cases[i].ContainsKey("cancel"))];
 
     public static TheoryData<int, int> LaterCalls()
     {
         var data = new TheoryData<int, int>();
-        foreach (var index in Enumerable.Range(0, Cases.Count).Where(i => !Dict(Cases[i]["out"]).ContainsKey("error")))
+        foreach (var index in Enumerable.Range(0, Cases.Count).Where(i => Cases[i].ContainsKey("cancel")))
         {
-            var calls = List(Dict(Cases[index]["out"])["events"]).Count;
-            for (var k = 0; k < calls - 1; k++)
+            foreach (var recorded in List(Cases[index]["cancel"]).Select(Dict).Where(r => (long)r["k"]! >= 0))
             {
-                data.Add(index, k);
+                data.Add(index, (int)(long)recorded["k"]!);
             }
         }
 
@@ -63,6 +62,12 @@ public class GraphReaderValuesTests
 
         Assert.Contains(Cases, c => Dict(c["in"])["max_coroutines"] is 1L && (long)Dict(c["out"])["max_in_flight"]! == 1 && List(Dict(c["out"])["events"]).Count > 2);
         Assert.Contains(Cases, c => Dict(c["in"])["max_coroutines"] is 2L && (long)Dict(c["out"])["max_in_flight"]! == 4);
+
+        // Each case with a call and no error has a cancel at each point.
+        foreach (var c in Cases.Where(c => List(Dict(c["out"])["events"]).Count > 0 && !Dict(c["out"]).ContainsKey("error")))
+        {
+            Assert.Equal(List(Dict(c["out"])["events"]).Count, List(c["cancel"]).Count);
+        }
     }
 
     [Theory(Timeout = 5000)]
@@ -95,8 +100,9 @@ public class GraphReaderValuesTests
         Assert.All(run.Tokens, token => Assert.Equal(source.Token, token));
     }
 
-    // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8)
-    // and makes no fake call.
+    // Each async method with a canceled token throws OperationCanceledException (R8). The recorder canceled the task of
+    // the call before its first await (k = -1), so the test compares the attempts and the recorded calls. A fake counts
+    // an attempt before it reads its token.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(CallingCases))]
     public async Task Each_async_method_with_a_canceled_token_throws_OperationCanceledException(int index)
@@ -107,11 +113,17 @@ public class GraphReaderValuesTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
         await LoopGuard.RunAsync(Turns);
-        Assert.Equal(0, run.Count);
+        AssertCancelPoint(index, -1, run, 0);
     }
 
-    // A test with no Python original: the token is canceled at fake call k. Call k is the last call that a fake
-    // records, and the method throws OperationCanceledException (R8).
+    // The token is canceled while call k runs. Call k is the last call that a fake records. Python lets a CancelledError
+    // through each `except Exception`. The recorder canceled the task of the call at the same point, so the test compares
+    // the count of the attempts, the count of the recorded calls, and the events after call k. The calls that a failed
+    // gather leaves run on, so the test gives the scheduler 50 turns before it counts (R25).
+    // A point in LateCancel is the late cancel of GAPS F33: the call that cancels is the last call of a gather, and Python
+    // raises CancelledError where the task of the caller resumes, so it makes no more attempt. The port reads the token
+    // at the next call of a fake, so it makes one more attempt, and that attempt throws. A point that agrees with Python
+    // must not be in the list, and a point in the list must differ in the way that its kind says.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(LaterCalls))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(int index, int k)
@@ -120,10 +132,46 @@ public class GraphReaderValuesTests
         var run = new Run(Dict(Cases[index]["in"]), source, cancelAt: k);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
-
-        // The calls that a failed gather leaves run on. Give them turns before the count (R25).
         await LoopGuard.RunAsync(Turns);
-        Assert.Equal(k + 1, run.Count);
+        AssertCancelPoint(index, k, run, run.EventsAtCancel);
+    }
+
+    [Fact]
+    public void Each_late_cancel_entry_names_one_point_of_the_recording()
+    {
+        Assert.Equal(LateCancel.Length, LateCancel.Select(e => (e.Case, e.K)).Distinct().Count());
+        Assert.All(LateCancel, e => Assert.Contains(e.K, List(Cases[e.Case]["cancel"]).Select(r => (int)(long)Dict(r)["k"]!)));
+    }
+
+    private static readonly string[] CancelFields = ["attempts", "count", "after"];
+
+    // The points where the port makes one more attempt than Python (GAPS F33).
+    private static readonly (int Case, int K, string Kind)[] LateCancel =
+    [
+        (2, 0, "attempts"),
+    ];
+
+    private static void AssertCancelPoint(int index, int k, Run run, int eventsAtCancel)
+    {
+        var recorded = List(Cases[index]["cancel"]).Select(Dict).Single(r => (long)r["k"]! == k);
+        var got = new OrderedDictionary<string, object?>
+        {
+            ["k"] = (long)k,
+            ["error"] = "CancelledError",
+            ["attempts"] = (long)run.Attempts,
+            ["count"] = (long)run.Count,
+            ["after"] = run.Events.Skip(eventsAtCancel).ToList(),
+        };
+        var differences = string.Join("+", CancelFields.Where(key => PyJson.Dumps(recorded[key]) != PyJson.Dumps(got[key])));
+        var listed = LateCancel.Where(e => e.Case == index && e.K == k).Select(e => e.Kind).ToList();
+        if (listed.Count == 0)
+        {
+            Assert.True(differences.Length == 0, $"case {index}, call {k}: the port differs from Python in {differences}: {PyJson.Dumps(recorded)} and {PyJson.Dumps(got)}");
+        }
+        else
+        {
+            Assert.Equal(listed.Single(), differences);
+        }
     }
 
     private static async Task Turns()
@@ -253,13 +301,19 @@ public class GraphReaderValuesTests
 
         internal int Count { get; private set; }
 
+        internal int Attempts { get; private set; }
+
+        internal int EventsAtCancel { get; private set; }
+
         internal int MaxInFlight { get; private set; }
 
         private int InFlight { get; set; }
 
-        // The common part of each fake call: a token check, a yield, a second token check, and the record (R25).
+        // The common part of each fake call: an attempt, a token check, a yield, a second token check, and the record
+        // (R25).
         internal async Task EnterAsync(string kind, OrderedDictionary<string, object?> record, CancellationToken cancellationToken)
         {
+            Attempts++;
             cancellationToken.ThrowIfCancellationRequested();
             InFlight++;
             MaxInFlight = Math.Max(MaxInFlight, InFlight);
@@ -277,7 +331,11 @@ public class GraphReaderValuesTests
                 Tokens.Add(cancellationToken);
                 if (Count++ == CancelAt)
                 {
-                    await Source.CancelAsync();
+                    // Cancel runs the callbacks of the token on the scheduler thread at this point, as task.cancel() of
+                    // Python acts at once. CancelAsync would run them on the thread pool, and the count of the attempts
+                    // would then depend on the timing of two threads.
+                    EventsAtCancel = Events.Count;
+                    Source.Cancel();
                 }
             }
             finally
