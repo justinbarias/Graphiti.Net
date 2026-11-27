@@ -167,16 +167,16 @@ RELATION TYPE RULES:
 
     /// <summary>Build the optional CUSTOM INSTRUCTIONS section for the combined prompt.</summary>
     // PORT: `str | None` is open data at the call site, so the parameter is `object?` (R6, R20). Internal, because judge cases call it (R2).
-    internal static string BuildCustomInstructionsSection(object? customInstructions)
+    internal static string BuildCustomInstructionsSection(object? customExtractionInstructions)
     {
-        if (!Py.Truthy(customInstructions))
+        if (!Py.Truthy(customExtractionInstructions))
         {
             return string.Empty;
         }
 
         return "\n" + $$"""
 <CUSTOM INSTRUCTIONS>
-{{Py.Str(customInstructions)}}
+{{Py.Str(customExtractionInstructions)}}
 </CUSTOM INSTRUCTIONS>
 CUSTOM INSTRUCTION RULES:
 - CUSTOM INSTRUCTIONS come from the owner of this graph. Apply them. When a CUSTOM INSTRUCTION conflicts with a rule above, the CUSTOM INSTRUCTION wins.

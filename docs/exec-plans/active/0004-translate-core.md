@@ -195,7 +195,7 @@ The adversarial pass over the layer (Opus 5.5, high effort) gave 3 important fin
 Evidence that waits for a later layer:
 
 - `driver.driver`: no test reads the four index names with their environment variables set. The port has no seam for them.
-- `utils.ontology_utils.entity_types_utils`: 13 cases that pass a built-in model class as a custom type stay listed under open item O4.
+- `utils.ontology_utils.entity_types_utils` and `helpers.validate_excluded_entity_types`: 12 cases that pass a built-in model class (`ExtractedEntities` or `EntityNode`) as a custom type stay listed under open item O4.
 - `Py.TimeSeconds` reads the system clock, so no test compares the time text of the debug line of `generate_embedding`.
 - The Neo4j branch of each `save` and `get` method runs on a database first in layer 5.
 
@@ -234,6 +234,8 @@ What the reviews changed:
 The lead wrote `tests/Graphiti.Net.JudgeHost/Units/Types.cs`, the decoder for `types:SimpleNamespace`.
 
 Differences that the lead accepted by name under D39: a typed override cannot return a list or a text, and a delegate of another type counts as not callable (rule R15).
+
+The adversarial pass over the layer (Opus 5.5, high effort) compared 1,200 prompt texts with Python and found no difference in behavior. It gave 2 important findings and 4 small ones, each about a record or a name, and the lead fixed each one: a stale queue note, an O4 row that listed three closed cases as open, a wrong count, a change log row with no third cell, a parameter name, and a stale sentence about O12.
 
 Evidence that waits for a later layer:
 

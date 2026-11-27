@@ -688,7 +688,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Prompts/Models.cs",
       "status": "reviewed",
-      "notes": "Ported with the pilot unit dedupe_nodes. 16 judge cases pass. The case pure.prompts.models.PromptSpec.with_model is not bound: its argument names the model ExtractedEntities of prompts.extract_nodes, which is not ported."
+      "notes": "Ported with the pilot unit dedupe_nodes. Each judge case of the module passes. The case pure.prompts.models.PromptSpec.with_model passes since layer 4, which registers the model ExtractedEntities."
     },
     {
       "order": 34,
@@ -871,7 +871,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Prompts/ExtractNodes.cs",
       "status": "reviewed",
-      "notes": "Layer 4. Two reviews and one fix round. The binding does not register the model ExtractedEntity as a custom type: the covering cases of entity_types_utils stay listed under open item O4."
+      "notes": "Layer 4. Two reviews and one fix round. The binding registers ExtractedEntities as a response model. It does not build a custom-type descriptor from it: the cases of entity_types_utils that pass the class as a custom type stay listed under open item O4."
     },
     {
       "order": 43,
@@ -2273,7 +2273,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/OntologyUtils/EntityTypesUtils.cs",
       "status": "reviewed",
-      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. 13 covering cases stay listed under open item O4: a built-in model as a custom type needs a field kind in the descriptor."
+      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. Its cases that pass a built-in model class (ExtractedEntities or EntityNode) as a custom type stay listed under open item O4: the descriptor of such a model needs a field kind. Two wrong-type cases of validate_identity_properties stay listed too."
     },
     {
       "order": 102,
