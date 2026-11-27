@@ -18,7 +18,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 6 | `port/search` | Done 2026-11-27. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | Done 2026-11-27. `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
 | 8 | `port/ingestion` | Done 2026-11-28. `ingestion` | 9 | 4,159 | Opus 5.5, medium |
-| 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
+| 9 | `port/facade` | In progress. `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
 
 Layer 0 is the skeleton that the porting skill requires, so every later layer compiles against fixed shapes.
 A skeleton member throws `NotSupportedException` with a `TODO(port)` marker, and the scanner counts the markers down to zero.
