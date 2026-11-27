@@ -1,6 +1,8 @@
 // Evaluation test for graphiti_core/driver/neo4j/operations/entity_node_ops.py (port/RULES.md, R23, R25).
-// The recording is values/neo4j_entity_node_ops.json, which port/tools/record_entity_node_ops.py wrote from Python.
-// save, save_bulk, get_by_uuid, get_by_uuids, and get_by_group_ids call a skeleton member, so they are not recorded.
+// The recording is values/neo4j_entity_node_ops.json, which port/tools/record_entity_node_ops.py wrote from Python. A recorded run holds the
+// calls and the log lines in one list in the order of their time. The last theory has no Python original: it tests the token rule of R8.
+// No method of the class awaits more than one call, so no case cancels the token after call k: the theory cancels the token before the call
+// and expects no call.
 namespace Graphiti.Port.Evaluation;
 
 using System.Text.Json;
@@ -27,63 +29,63 @@ public class Neo4jEntityNodeOperationsTests
         return data;
     }
 
-    [Fact]
-    public void The_recording_holds_each_recorded_method_with_and_without_a_transaction()
+    // One case for each method, and for each method that takes a transaction, one case with and one without it.
+    public static TheoryData<int> CancellationIndexes()
     {
-        var methods = Cases.Select(c => c.GetProperty("input").GetProperty("method").GetString()).Distinct().Order().ToList();
-        Assert.Equal(["delete", "delete_by_group_id", "delete_by_uuids", "load_embeddings", "load_embeddings_bulk"], methods);
-        Assert.Contains(Cases, c => c.GetProperty("output").GetProperty("calls").EnumerateArray().Any(x => x.GetProperty("via").GetString() == "transaction"));
-        Assert.Contains(Cases, c => c.GetProperty("output").GetProperty("calls").EnumerateArray().Any(x => x.GetProperty("via").GetString() == "executor"));
-        Assert.Contains(Cases, c => c.GetProperty("output").GetProperty("error").ValueKind == JsonValueKind.Object);
+        var data = new TheoryData<int>();
+        var seen = new HashSet<string>();
+        for (var i = 0; i < Cases.Count; i++)
+        {
+            var input = Cases[i].GetProperty("input");
+            var output = Cases[i].GetProperty("output");
+            var key = input.GetProperty("method").GetString() + "." + (input.TryGetProperty("use_tx", out var useTx) ? useTx.GetBoolean().ToString() : "none");
+            if (output.GetProperty("error").ValueKind == JsonValueKind.Null
+                && output.GetProperty("events").EnumerateArray().Any(e => e.GetProperty("kind").GetString() == "call")
+                && seen.Add(key))
+            {
+                data.Add(i);
+            }
+        }
+
+        return data;
     }
 
-    [Theory]
+    [Fact]
+    public void The_recording_holds_each_method_with_and_without_a_transaction()
+    {
+        var methods = Cases.Select(c => c.GetProperty("input").GetProperty("method").GetString()).Distinct().Order().ToList();
+        Assert.Equal(
+            ["delete", "delete_by_group_id", "delete_by_uuids", "get_by_group_ids", "get_by_uuid", "get_by_uuids", "load_embeddings", "load_embeddings_bulk", "save", "save_bulk"],
+            methods);
+        Assert.Contains(Cases, c => c.GetProperty("output").GetProperty("events").EnumerateArray().Any(x => x.TryGetProperty("via", out var via) && via.GetString() == "transaction"));
+        Assert.Contains(Cases, c => c.GetProperty("output").GetProperty("events").EnumerateArray().Any(x => x.TryGetProperty("via", out var via) && via.GetString() == "executor"));
+        Assert.Contains(Cases, c => c.GetProperty("output").GetProperty("error").ValueKind == JsonValueKind.Object);
+        Assert.Equal(
+            methods,
+            CancellationIndexes().Select(i => Cases[i.Data].GetProperty("input").GetProperty("method").GetString()).Distinct().Order().ToList());
+    }
+
+    [Theory(Timeout = 5000)]
     [MemberData(nameof(CaseIndexes))]
     public async Task Each_call_the_result_and_the_log_match_Python(int index)
     {
         var input = Cases[index].GetProperty("input");
         var output = Cases[index].GetProperty("output");
-        var method = input.GetProperty("method").GetString();
-        var records = input.TryGetProperty("records", out var recordsElement)
-            ? recordsElement.EnumerateArray().Select(r => (OrderedDictionary<string, object?>)Read(r)!).ToList()
-            : [];
-        var executor = new FakeExecutor(records);
-        var transaction = input.TryGetProperty("use_tx", out var useTx) && useTx.GetBoolean() ? new FakeTransaction() : null;
-        var uuids = input.TryGetProperty("uuids", out var uuidsElement) ? uuidsElement.EnumerateArray().Select(u => u.GetString()!).ToList() : [];
-        var nodes = uuids.Select(u => new EntityNode { Uuid = u, Name = "n", GroupId = "g" }).ToList();
-        var node = method is not "delete_by_uuids" && input.TryGetProperty("uuid", out var uuid)
-            ? new EntityNode { Uuid = uuid.GetString()!, Name = "n", GroupId = "g" }
-            : null;
-        long BatchSize() => input.GetProperty("batch_size").GetInt64();
+        var events = new List<object>();
+        var executor = new FakeExecutor(Records(input), events);
+        var transaction = input.TryGetProperty("use_tx", out var useTx) && useTx.GetBoolean() ? new FakeTransaction(events) : null;
 
-        var capture = new CaptureProvider();
+        var capture = new CaptureProvider(events);
         using var factory = new CaptureFactory(capture);
         using var scope = PortServices.Use(loggerFactory: factory);
-        var operations = new Neo4jEntityNodeOperations();
 
         Exception? error = null;
+        object? result = null;
         try
         {
-            switch (method)
-            {
-                case "delete":
-                    await operations.DeleteAsync(executor, node!, transaction, TestContext.Current.CancellationToken);
-                    break;
-                case "delete_by_group_id":
-                    await operations.DeleteByGroupIdAsync(executor, input.GetProperty("group_id").GetString()!, transaction, BatchSize(), TestContext.Current.CancellationToken);
-                    break;
-                case "delete_by_uuids":
-                    await operations.DeleteByUuidsAsync(executor, uuids, transaction, BatchSize(), TestContext.Current.CancellationToken);
-                    break;
-                case "load_embeddings":
-                    await operations.LoadEmbeddingsAsync(executor, node!, TestContext.Current.CancellationToken);
-                    break;
-                default:
-                    await operations.LoadEmbeddingsBulkAsync(executor, nodes, cancellationToken: TestContext.Current.CancellationToken);
-                    break;
-            }
+            result = await RunAsync(input, executor, transaction, TestContext.Current.CancellationToken);
         }
-        catch (Exception e) when (e is NodeNotFoundException or KeyNotFoundException or ValidationException)
+        catch (Exception e) when (e is not OperationCanceledException)
         {
             error = e;
         }
@@ -103,12 +105,18 @@ public class Neo4jEntityNodeOperationsTests
                     "NodeNotFoundError" => typeof(NodeNotFoundException),
                     "KeyError" => typeof(KeyNotFoundException),
                     "ValidationError" => typeof(ValidationException),
+                    "ValueError" => typeof(ArgumentException),
+                    "AttributeError" => typeof(MissingMemberException),
+                    "TypeError" => typeof(InvalidCastException),
                     _ => throw new InvalidOperationException(type),
                 },
                 error.GetType());
 
             // The text of a KeyError is the Python repr of the key, and a .NET message has other words.
-            if (type != "KeyError")
+            // PORT: the text of the TypeError of `dynamic_label in labels` for a labels value of None differs: Py.AsList in the record
+            // parser writes "expected list as List<object?>, got NoneType as nu...". The record parser is not a file of this unit, so
+            // the test checks the type of this error and not its text. The report names the difference.
+            if (type is not ("KeyError" or "TypeError"))
             {
                 // PORT: PyCompat writes the text of pydantic up to the type of each error. It leaves out the input value, the
                 // input type, and the link of each error, so the test removes them from the Python text.
@@ -121,34 +129,161 @@ public class Neo4jEntityNodeOperationsTests
             }
         }
 
-        var calls = executor.Calls.Concat(transaction?.Calls ?? []).ToList();
-        var expectedCalls = output.GetProperty("calls").EnumerateArray().ToList();
-        Assert.Equal(expectedCalls.Count, calls.Count);
-        for (var i = 0; i < calls.Count; i++)
+        var expectedEvents = output.GetProperty("events").EnumerateArray().ToList();
+        Assert.Equal(expectedEvents.Count, events.Count);
+        for (var i = 0; i < events.Count; i++)
         {
-            Assert.Equal(expectedCalls[i].GetProperty("via").GetString(), calls[i].Via);
-            Assert.Equal(expectedCalls[i].GetProperty("query").GetString(), calls[i].Query);
-            Assert.Equal(expectedCalls[i].GetProperty("keys").EnumerateArray().Select(k => k.GetString()), calls[i].Keys);
-            var expectedValues = expectedCalls[i].GetProperty("values").EnumerateArray().ToList();
-            Assert.Equal(expectedValues.Count, calls[i].Values.Count);
-            for (var j = 0; j < expectedValues.Count; j++)
+            switch (events[i])
             {
-                AssertSame(expectedValues[j], calls[i].Values[j]);
+                case Call call:
+                    Assert.Equal("call", expectedEvents[i].GetProperty("kind").GetString());
+                    Assert.Equal(expectedEvents[i].GetProperty("via").GetString(), call.Via);
+                    Assert.Equal(expectedEvents[i].GetProperty("query").GetString(), call.Query);
+                    Assert.Equal(expectedEvents[i].GetProperty("keys").EnumerateArray().Select(k => k.GetString()), call.Keys);
+                    var expectedValues = expectedEvents[i].GetProperty("values").EnumerateArray().ToList();
+                    Assert.Equal(expectedValues.Count, call.Values.Count);
+                    for (var j = 0; j < expectedValues.Count; j++)
+                    {
+                        AssertSame(expectedValues[j], call.Values[j]);
+                    }
+
+                    break;
+                case LogLine line:
+                    Assert.Equal("log", expectedEvents[i].GetProperty("kind").GetString());
+                    Assert.Equal(expectedEvents[i].GetProperty("level").GetString(), line.Level);
+                    Assert.Equal(expectedEvents[i].GetProperty("message").GetString(), line.Message);
+                    break;
+                default:
+                    throw new InvalidOperationException();
             }
         }
 
-        var expectedLogs = output.GetProperty("logs").EnumerateArray().Select(l => (l.GetProperty("level").GetString(), l.GetProperty("message").GetString())).ToList();
-        Assert.Equal(expectedLogs, capture.Lines);
-
-        if (output.TryGetProperty("embeddings", out var embeddings))
+        if (output.TryGetProperty("result", out var expectedResult))
         {
-            var actual = method == "load_embeddings" ? [node!] : nodes;
-            var expected = embeddings.EnumerateArray().ToList();
-            Assert.Equal(expected.Count, actual.Count);
-            for (var i = 0; i < actual.Count; i++)
-            {
-                AssertSame(expected[i], Encode(actual[i].NameEmbedding));
-            }
+            AssertSame(expectedResult, Encode(result));
+        }
+        else
+        {
+            Assert.Null(result);
+        }
+    }
+
+    // No Python original. The fake throws OperationCanceledException for a canceled token, as a driver does.
+    [Theory(Timeout = 5000)]
+    [MemberData(nameof(CancellationIndexes))]
+    public async Task A_canceled_token_stops_each_async_method(int index)
+    {
+        var input = Cases[index].GetProperty("input");
+        var events = new List<object>();
+        var executor = new FakeExecutor(Records(input), events);
+        var transaction = input.TryGetProperty("use_tx", out var useTx) && useTx.GetBoolean() ? new FakeTransaction(events) : null;
+
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await source.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RunAsync(input, executor, transaction, source.Token));
+        Assert.Empty(events);
+    }
+
+    private static List<OrderedDictionary<string, object?>> Records(JsonElement input) =>
+        input.TryGetProperty("records", out var records)
+            ? records.EnumerateArray().Select(r => (OrderedDictionary<string, object?>)Read(r)!).ToList()
+            : [];
+
+    private static async Task<object?> RunAsync(JsonElement input, FakeExecutor executor, FakeTransaction? tx, CancellationToken cancellationToken)
+    {
+        var method = input.GetProperty("method").GetString();
+        var defaults = input.TryGetProperty("defaults", out var d) && d.GetBoolean();
+        long BatchSize() => input.GetProperty("batch_size").GetInt64();
+        string Text(string name) => input.GetProperty(name).GetString()!;
+        List<string> Texts(string name) => input.GetProperty(name).EnumerateArray().Select(u => u.GetString()!).ToList();
+        string? NullableText(string name) => input.GetProperty(name).GetString();
+        long? Limit() => input.GetProperty("limit").ValueKind == JsonValueKind.Null ? null : input.GetProperty("limit").GetInt64();
+        List<EntityNode> NodeList() =>
+            input.GetProperty("nodes").EnumerateArray().Select(n => EntityNode.ModelValidate((OrderedDictionary<string, object?>)Read(n)!)).ToList();
+        EntityNode OneNode() => EntityNode.ModelValidate((OrderedDictionary<string, object?>)Read(input.GetProperty("node"))!);
+
+        var ops = new Neo4jEntityNodeOperations();
+        switch (method)
+        {
+            case "save":
+                if (defaults)
+                {
+                    await ops.SaveAsync(executor, OneNode(), cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await ops.SaveAsync(executor, OneNode(), tx, cancellationToken);
+                }
+
+                return null;
+            case "save_bulk":
+                if (defaults)
+                {
+                    await ops.SaveBulkAsync(executor, NodeList(), cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await ops.SaveBulkAsync(executor, NodeList(), tx, BatchSize(), cancellationToken);
+                }
+
+                return null;
+            case "delete":
+                if (defaults)
+                {
+                    await ops.DeleteAsync(executor, OneNode(), cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await ops.DeleteAsync(executor, OneNode(), tx, cancellationToken);
+                }
+
+                return null;
+            case "delete_by_group_id":
+                if (defaults)
+                {
+                    await ops.DeleteByGroupIdAsync(executor, Text("group_id"), cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await ops.DeleteByGroupIdAsync(executor, Text("group_id"), tx, BatchSize(), cancellationToken);
+                }
+
+                return null;
+            case "delete_by_uuids":
+                if (defaults)
+                {
+                    await ops.DeleteByUuidsAsync(executor, Texts("uuids"), cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await ops.DeleteByUuidsAsync(executor, Texts("uuids"), tx, BatchSize(), cancellationToken);
+                }
+
+                return null;
+            case "get_by_uuid":
+                return await ops.GetByUuidAsync(executor, Text("uuid"), cancellationToken);
+            case "get_by_uuids":
+                return await ops.GetByUuidsAsync(executor, Texts("uuids"), cancellationToken);
+            case "get_by_group_ids":
+                return defaults
+                    ? await ops.GetByGroupIdsAsync(executor, Texts("group_ids"), cancellationToken: cancellationToken)
+                    : await ops.GetByGroupIdsAsync(executor, Texts("group_ids"), Limit(), NullableText("uuid_cursor"), cancellationToken);
+            case "load_embeddings":
+                {
+                    var node = OneNode();
+                    await ops.LoadEmbeddingsAsync(executor, node, cancellationToken);
+                    return node.NameEmbedding;
+                }
+
+            case "load_embeddings_bulk":
+                {
+                    var nodes = NodeList();
+                    await ops.LoadEmbeddingsBulkAsync(executor, nodes, cancellationToken: cancellationToken);
+                    return nodes.Select(n => n.NameEmbedding).ToList();
+                }
+
+            default:
+                throw new InvalidOperationException(method);
         }
     }
 
@@ -166,6 +301,13 @@ public class Neo4jEntityNodeOperationsTests
         int or long => new JsonObject { ["type"] = "int", ["value"] = Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture) },
         double d => new JsonObject { ["type"] = "float", ["value"] = d },
         string s => new JsonObject { ["type"] = "str", ["value"] = s },
+        PyDateTime dt => new JsonObject { ["type"] = "datetime", ["value"] = dt.IsoFormat() },
+        EpisodeType e => new JsonObject { ["type"] = "enum", ["value"] = Py.Str(Py.EnumValue(e)) },
+        Node node => new JsonObject
+        {
+            ["type"] = node.PythonName,
+            ["items"] = new JsonArray(((IPydanticModel)node).ModelDump(false).Select(kv => (JsonNode?)new JsonArray(kv.Key, Encode(kv.Value))).ToArray()),
+        },
         OrderedDictionary<string, object?> dict => new JsonObject
         {
             ["type"] = "dict",
@@ -192,8 +334,14 @@ public class Neo4jEntityNodeOperationsTests
         _ => throw new InvalidOperationException(e.ValueKind.ToString()),
     };
 
-    private static OrderedDictionary<string, object?> ReadObject(JsonElement e)
+    private static object? ReadObject(JsonElement e)
     {
+        // A case writes a datetime as {"$dt": "<isoformat>"}.
+        if (e.TryGetProperty("$dt", out var text) && e.EnumerateObject().Count() == 1)
+        {
+            return PyDateTime.FromIsoFormat(text.GetString()!);
+        }
+
         var dict = new OrderedDictionary<string, object?>();
         foreach (var p in e.EnumerateObject())
         {
@@ -212,34 +360,35 @@ public class Neo4jEntityNodeOperationsTests
 
     private sealed record Call(string Via, string Query, List<string> Keys, List<JsonNode> Values);
 
+    private sealed record LogLine(string Level, string Message);
+
     private static Call Note(string via, string query, OrderedDictionary<string, object?> parameters) =>
         new(via, query, [.. parameters.Keys], [.. parameters.Values.Select(Encode)]);
 
-    private sealed class FakeExecutor(List<OrderedDictionary<string, object?>> records) : QueryExecutor
+    private sealed class FakeExecutor(List<OrderedDictionary<string, object?>> records, List<object> events) : QueryExecutor
     {
-        internal List<Call> Calls { get; } = [];
-
-        internal override Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
+        internal override async Task<(List<OrderedDictionary<string, object?>> Records, object? Summary, object? Keys)> ExecuteQueryAsync(
             string cypherQuery,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
-            Calls.Add(Note("executor", cypherQuery, parameters));
-            return Task.FromResult<(List<OrderedDictionary<string, object?>>, object?, object?)>((records, null, null));
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            events.Add(Note("executor", cypherQuery, parameters));
+            return (records, null, null);
         }
     }
 
-    private sealed class FakeTransaction : Transaction
+    private sealed class FakeTransaction(List<object> events) : Transaction
     {
-        internal List<Call> Calls { get; } = [];
-
-        internal override Task RunAsync(
+        internal override async Task RunAsync(
             string query,
             OrderedDictionary<string, object?> parameters,
             CancellationToken cancellationToken = default)
         {
-            Calls.Add(Note("transaction", query, parameters));
-            return Task.CompletedTask;
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            events.Add(Note("transaction", query, parameters));
         }
     }
 
@@ -256,17 +405,15 @@ public class Neo4jEntityNodeOperationsTests
         }
     }
 
-    private sealed class CaptureProvider : ILoggerProvider
+    private sealed class CaptureProvider(List<object> events) : ILoggerProvider
     {
-        internal List<(string?, string?)> Lines { get; } = [];
-
-        public ILogger CreateLogger(string categoryName) => new CaptureLogger(Lines);
+        public ILogger CreateLogger(string categoryName) => new CaptureLogger(events);
 
         public void Dispose()
         {
         }
 
-        private sealed class CaptureLogger(List<(string?, string?)> lines) : ILogger
+        private sealed class CaptureLogger(List<object> events) : ILogger
         {
             public IDisposable? BeginScope<TState>(TState state)
                 where TState : notnull => null;
@@ -274,7 +421,16 @@ public class Neo4jEntityNodeOperationsTests
             public bool IsEnabled(LogLevel logLevel) => true;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-                lines.Add((logLevel == LogLevel.Debug ? "DEBUG" : logLevel.ToString(), formatter(state, exception)));
+                events.Add(new LogLine(
+                    logLevel switch
+                    {
+                        LogLevel.Debug => "DEBUG",
+                        LogLevel.Information => "INFO",
+                        LogLevel.Warning => "WARNING",
+                        LogLevel.Error => "ERROR",
+                        _ => logLevel.ToString(),
+                    },
+                    formatter(state, exception)));
         }
     }
 }

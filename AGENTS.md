@@ -38,6 +38,7 @@ scripts/mutate.sh                 # mutation run in observe mode
 python3 scripts/mutation_survivors.py  # list the tests that the pruning rule deletes
 python3 port/judge/run.py --build dotnet   # the judge against the .NET build
 scripts/command_center.sh         # build the status board (docs/FRONTEND.md)
+python3 scripts/db_schema.py      # write docs/generated/db-schema.md from the ported queries
 ```
 
 ## Invariants

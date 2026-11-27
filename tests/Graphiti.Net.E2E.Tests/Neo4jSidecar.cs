@@ -45,3 +45,13 @@ public sealed class Neo4jFixtureGroup : ICollectionFixture<Neo4jSidecar>
 {
     public const string Name = "neo4j";
 }
+
+/// <summary>
+/// The tests that replace <see cref="Console.Out"/>, which is one object for the process. The classes of one
+/// collection do not run at the same time, so one test cannot read the line that another test prints.
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class ConsoleOutputGroup
+{
+    public const string Name = "Console output";
+}

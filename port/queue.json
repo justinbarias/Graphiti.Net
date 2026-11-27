@@ -1337,9 +1337,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/CommunityEdgeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 64,
@@ -1380,9 +1380,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/CommunityNodeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 66,
@@ -1404,9 +1404,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/EntityEdgeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_between_nodes and get_by_node_uuid, and compares the result with Python."
     },
     {
       "order": 67,
@@ -1430,7 +1430,7 @@
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EntityNodeOps.cs",
       "status": "tests_pass",
-      "notes": "Pilot unit (plan 0003, task 6), reviewed twice. It has no pure judge case, and its 3 flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEntityNodeOperationsTests.cs compares 94 recorded calls (port/tools/record_entity_node_ops.py) for delete, delete_by_group_id, delete_by_uuids, load_embeddings, and load_embeddings_bulk. save, save_bulk, get_by_uuid, get_by_uuids, and get_by_group_ids stop at skeleton members of node_db_queries and record_parsers. Layer 5 records them and sets the status reviewed."
+      "notes": "Pilot unit (plan 0003, task 6), reviewed twice. It has no pure judge case, and its 3 flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEntityNodeOperationsTests.cs compares 267 recorded cases (port/tools/record_entity_node_ops.py) for each of its 10 methods. Layer 5 added save, save_bulk, get_by_uuid, get_by_uuids, and get_by_group_ids. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 68,
@@ -1453,9 +1453,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/EpisodeNodeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_by_entity_node_uuid and retrieve_episodes, and compares the result with Python."
     },
     {
       "order": 69,
@@ -1477,9 +1477,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/EpisodicEdgeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 70,
@@ -1519,9 +1519,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/GraphOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jGraphOperationsTests.cs compares the recorded calls of port/tools/record_graph_ops.py, with the largest count of calls in flight. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs builds the indexes two times on Neo4j."
     },
     {
       "order": 72,
@@ -1542,9 +1542,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/HasEpisodeEdgeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 73,
@@ -1565,9 +1565,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/NextEpisodeEdgeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 74,
@@ -1589,9 +1589,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/SagaNodeOps.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 75,
@@ -1617,9 +1617,9 @@
         "logging",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Operations/SearchOps.cs",
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. Each pure judge case of the module passes (pure.queries.build_neo4j_fulltext_query). tests/Port.Evaluation/Neo4jSearchOperationsTests.cs compares the recorded calls of port/tools/record_search_ops.py. The queries run on Neo4j first in the end-to-end test of layer 6."
     },
     {
       "order": 76,
@@ -1665,9 +1665,9 @@
         "typing",
         "typing_extensions"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net.Neo4j/Neo4jDriver.cs",
+      "status": "tests_pass",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. The tests of tests/Graphiti.Net.E2E.Tests run the driver on Neo4j and against fakes of the Neo4j.Driver package (rule R25). port/tools/record_neo4j_driver.py records the index queries. GAPS F28 and F29 name what stays different."
     },
     {
       "order": 77,
@@ -2146,7 +2146,7 @@
       "external": [],
       "target": "src/Graphiti.Net/Core/Namespaces/Edges.cs",
       "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. Each path waits for the Neo4j operations of layer 5, and the recording grows then."
+      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. Layer 5 added each edge namespace to the recording of namespaces.nodes (port/tools/record_namespaces.py, 643 cases)."
     },
     {
       "order": 96,
@@ -2170,7 +2170,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Namespaces/Nodes.cs",
       "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. The recording reaches the entity node namespace. The other namespaces wait for the Neo4j operations of layer 5, and the recording grows then."
+      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. Layer 5 added each namespace to the recording: tests/Port.Evaluation/NamespacesTests.cs compares 643 recorded cases of port/tools/record_namespaces.py for the 75 public methods of the 9 namespace classes of namespaces.nodes and namespaces.edges, on the Neo4j operations classes."
     },
     {
       "order": 97,
@@ -2847,8 +2847,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. The file is empty, so it needs no file (rule R1)."
     },
     {
       "order": 124,
@@ -2872,8 +2872,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 125,

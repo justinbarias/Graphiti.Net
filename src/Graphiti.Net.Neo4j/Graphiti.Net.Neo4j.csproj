@@ -11,6 +11,8 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Only the lead changes this list (port/RULES.md, R3). -->
+    <InternalsVisibleTo Include="Graphiti.Net.JudgeHost" />
     <InternalsVisibleTo Include="Port.Evaluation" />
+    <InternalsVisibleTo Include="Graphiti.Net.E2E.Tests" />
   </ItemGroup>
 </Project>

@@ -20,102 +20,217 @@ namespace Graphiti.Neo4j.Operations;
 using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Driver.Operations;
+using Graphiti.Core.Models.Nodes;
 using Graphiti.Internal;
+using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
 
-// PORT: the module class of R2 and R5, with the logger and the record function. The unit adds the Log class with the log calls.
+// PORT: the module class of R2 and R5, with the logger and the record function.
 internal static partial class SagaNodeOps
 {
     internal static ILogger Logger => PortServices.Logger(typeof(SagaNodeOps));
 
-    // TODO(port): _saga_node_from_record
     internal static SagaNode SagaNodeFromRecord(OrderedDictionary<string, object?> record)
     {
-        throw new NotSupportedException("TODO(port): _saga_node_from_record");
+        // PORT: the keyword arguments hold open data, so the model reads them with ModelValidate (R7).
+        return SagaNode.ModelValidate(new OrderedDictionary<string, object?>
+        {
+            ["uuid"] = record["uuid"],
+            ["name"] = record["name"],
+            ["group_id"] = record["group_id"],
+            ["created_at"] = Helpers.ParseDbDate(record["created_at"]), // type: ignore[arg-type]
+        });
+    }
+
+    internal static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Saved Saga Node to Graph: {Uuid}")]
+        internal static partial void SavedSagaNodeToGraph(ILogger logger, string uuid);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Deleted Node: {Uuid}")]
+        internal static partial void DeletedNode(ILogger logger, string uuid);
     }
 }
 
 internal sealed class Neo4jSagaNodeOperations : SagaNodeOperations
 {
-    // TODO(port): Neo4jSagaNodeOperations.save
-    internal override Task SaveAsync(
+    // PORT: upstream defect U2 (R21, GAPS U2). The save query lacks five parameters.
+    internal override async Task SaveAsync(
         QueryExecutor executor,
         SagaNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.save");
+        var query = NodeDbQueries.GetSagaNodeSaveQuery(GraphProvider.Neo4j);
+        var parameters = new OrderedDictionary<string, object?>
+        {
+            ["uuid"] = node.Uuid,
+            ["name"] = node.Name,
+            ["group_id"] = node.GroupId,
+            ["created_at"] = node.CreatedAt,
+        };
+        if (tx is not null)
+        {
+            await tx.RunAsync(query, parameters, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(query, parameters, cancellationToken);
+        }
+
+        SagaNodeOps.Log.SavedSagaNodeToGraph(SagaNodeOps.Logger, node.Uuid);
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.save_bulk
-    internal override Task SaveBulkAsync(
+    // PORT: upstream defect U2 (R21, GAPS U2). The save query lacks five parameters.
+    internal override async Task SaveBulkAsync(
         QueryExecutor executor,
         List<SagaNode> nodes,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.save_bulk");
+        foreach (var node in nodes)
+        {
+            await SaveAsync(executor, node, tx: tx, cancellationToken: cancellationToken);
+        }
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.delete
-    internal override Task DeleteAsync(
+    internal override async Task DeleteAsync(
         QueryExecutor executor,
         SagaNode node,
         Transaction? tx = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.delete");
+        var query = "\n" + """
+            MATCH (n:Saga {uuid: $uuid})
+            DETACH DELETE n
+""" + "\n        ";
+        if (tx is not null)
+        {
+            await tx.RunAsync(query, new OrderedDictionary<string, object?> { ["uuid"] = node.Uuid }, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuid"] = node.Uuid }, cancellationToken);
+        }
+
+        SagaNodeOps.Log.DeletedNode(SagaNodeOps.Logger, node.Uuid);
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.delete_by_group_id
-    internal override Task DeleteByGroupIdAsync(
+    // PORT: upstream defect U1 (R21, GAPS U1). The batched delete fails in a transaction.
+    internal override async Task DeleteByGroupIdAsync(
         QueryExecutor executor,
         string groupId,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.delete_by_group_id");
+        var query = "\n" + """
+            MATCH (n:Saga {group_id: $group_id})
+            CALL (n) {
+                DETACH DELETE n
+            } IN TRANSACTIONS OF $batch_size ROWS
+""" + "\n        ";
+        if (tx is not null)
+        {
+            await tx.RunAsync(query, new OrderedDictionary<string, object?> { ["group_id"] = groupId, ["batch_size"] = batchSize }, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["group_id"] = groupId, ["batch_size"] = batchSize }, cancellationToken);
+        }
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.delete_by_uuids
-    internal override Task DeleteByUuidsAsync(
+    // PORT: upstream defect U1 (R21, GAPS U1). The batched delete fails in a transaction.
+    internal override async Task DeleteByUuidsAsync(
         QueryExecutor executor,
         List<string> uuids,
         Transaction? tx = null,
         long batchSize = 100,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.delete_by_uuids");
+        var query = "\n" + """
+            MATCH (n:Saga)
+            WHERE n.uuid IN $uuids
+            CALL (n) {
+                DETACH DELETE n
+            } IN TRANSACTIONS OF $batch_size ROWS
+""" + "\n        ";
+        if (tx is not null)
+        {
+            await tx.RunAsync(query, new OrderedDictionary<string, object?> { ["uuids"] = uuids, ["batch_size"] = batchSize }, cancellationToken);
+        }
+        else
+        {
+            await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuids"] = uuids, ["batch_size"] = batchSize }, cancellationToken);
+        }
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.get_by_uuid
-    internal override Task<SagaNode> GetByUuidAsync(
+    internal override async Task<SagaNode> GetByUuidAsync(
         QueryExecutor executor,
         string uuid,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.get_by_uuid");
+        var query = "\n" + """
+            MATCH (s:Saga {uuid: $uuid})
+            RETURN
+""" + "\n            " + NodeDbQueries.SagaNodeReturn;
+        var (records, _, _) = await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuid"] = uuid, ["routing_"] = "r" }, cancellationToken);
+        var nodes = records.Select(SagaNodeOps.SagaNodeFromRecord).ToList();
+        if (nodes.Count == 0)
+        {
+            throw new NodeNotFoundException(uuid);
+        }
+
+        return nodes[0];
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.get_by_uuids
-    internal override Task<List<SagaNode>> GetByUuidsAsync(
+    internal override async Task<List<SagaNode>> GetByUuidsAsync(
         QueryExecutor executor,
         List<string> uuids,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.get_by_uuids");
+        var query = "\n" + """
+            MATCH (s:Saga)
+            WHERE s.uuid IN $uuids
+            RETURN
+""" + "\n            " + NodeDbQueries.SagaNodeReturn;
+        var (records, _, _) = await executor.ExecuteQueryAsync(query, new OrderedDictionary<string, object?> { ["uuids"] = uuids, ["routing_"] = "r" }, cancellationToken);
+        return records.Select(SagaNodeOps.SagaNodeFromRecord).ToList();
     }
 
-    // TODO(port): Neo4jSagaNodeOperations.get_by_group_ids
-    internal override Task<List<SagaNode>> GetByGroupIdsAsync(
+    internal override async Task<List<SagaNode>> GetByGroupIdsAsync(
         QueryExecutor executor,
         List<string> groupIds,
         long? limit = null,
         string? uuidCursor = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("TODO(port): Neo4jSagaNodeOperations.get_by_group_ids");
+        var cursorClause = !string.IsNullOrEmpty(uuidCursor) ? "AND s.uuid < $uuid" : string.Empty;
+        var limitClause = limit is not null ? "LIMIT $limit" : string.Empty;
+        var query = "\n" + """
+            MATCH (s:Saga)
+            WHERE s.group_id IN $group_ids
+""" + "\n            "
+            + cursorClause
+            + "\n" + """
+            RETURN
+""" + "\n            "
+            + NodeDbQueries.SagaNodeReturn
+            + "\n" + """
+            ORDER BY s.uuid DESC
+""" + "\n            "
+            + limitClause;
+        var (records, _, _) = await executor.ExecuteQueryAsync(
+            query,
+            new OrderedDictionary<string, object?>
+            {
+                ["group_ids"] = groupIds,
+                ["uuid"] = uuidCursor,
+                ["limit"] = limit,
+                ["routing_"] = "r",
+            },
+            cancellationToken);
+        return records.Select(SagaNodeOps.SagaNodeFromRecord).ToList();
     }
 }

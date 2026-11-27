@@ -14,7 +14,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 2 | `port/graph-types` | Done 2026-11-27. `nodes`, `edges`, and the driver contract: `driver.driver`, `driver.operations`, `driver.graph_operations`, `driver.search_interface`, `driver.query_executor`, `driver.record_parsers`, the `driver` package root | 21 | 5,147 | Opus 5.5, medium. One cycle group holds most of this layer. |
 | 3 | `port/models-boundary` | Done 2026-11-27. `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
 | 4 | `port/prompts` | Done 2026-11-27. `prompts` | 14 | 3,052 | Sonnet 5.5, medium |
-| 5 | `port/neo4j` | In progress. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
+| 5 | `port/neo4j` | Done 2026-11-27. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
 | 6 | `port/search` | In progress. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
 | 8 | `port/ingestion` | `ingestion` | 9 | 4,159 | Opus 5.5, medium |
@@ -53,7 +53,7 @@ Each subagent start needs the maintainer's approval first.
 
 | After layer | Flow |
 | --- | --- |
-| 5 | In progress. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
+| 5 | Done 2026-11-27. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
 | 6 | In progress. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
 | 8 | Ingest episodes in parallel into one group, and find no lost update. |
 | 9 | `AddEpisodeAsync`, then `SearchAsync`. A contradicting episode closes the old fact's validity window and deletes nothing. |
@@ -310,3 +310,74 @@ Commands at the tip:
 - `dotnet test --project tests/Port.Evaluation`: 10,462 tests, 0 failed, 0 skipped.
 - The seven recorders of the layer with `--check`: 189, 931, 159, 1,193, 553, and 1,213 cases, and the 2 fixture texts. Each one is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,206 passed, 0 unexpected, 0 bound and wrong. 56 ids left `expected-failures.txt`, and 793 stay. The pull request lists the ids.
+
+### Layer 5, the Neo4j driver and its operations, 2026-11-27
+
+Five packets ported 11 modules, packet P5f wrote the end-to-end test, and two small packets added evidence for earlier units. Two Opus 5.5 high reviewers read each packet group. One Sonnet 5.5 implementer did each fix round.
+
+| Packet | Modules | Review |
+| --- | --- | --- |
+| P5a | `driver.neo4j_driver` | One review pair for P5a and P5e: 12 and 14 findings. 20 of 29 seeded defects in the driver passed each test before the fix round. |
+| P5e | `driver.neo4j.operations.search_ops` | The same pair. 8 of 26 seeded defects passed each test before the fix round. |
+| P5b | `episode_node_ops`, `community_node_ops`, `saga_node_ops` | One review pair for P5b, P5c, and P5d: 3 and 7 findings. 9 of 60 seeded defects passed each test before the fix round. |
+| P5c | `entity_edge_ops`, `episodic_edge_ops`, `community_edge_ops`, `has_episode_edge_ops`, `next_episode_edge_ops` | The same pair. |
+| P5d | `driver.neo4j.operations.graph_ops` | The same pair. |
+| P5f | The end-to-end test of the graph types, and `scripts/db_schema.py` | No review pair. The adversarial pass reads it. |
+| Evidence | More recorded calls for two earlier units. `entity_node_ops`: 267 cases for each of its 10 methods, where the pilot had 5 methods. `namespaces.nodes` and `namespaces.edges`: 643 cases for each of the 75 public methods of the 9 namespace classes. | No review pair. Each of 11 seeded defects fails a test, and no case showed a difference. |
+
+Each seeded defect that passed fails a test now.
+
+What the reviews changed:
+
+| Finding | Result |
+| --- | --- |
+| A text parameter with a lone surrogate was stored as U+FFFD. Python raises `UnicodeEncodeError`. | The conversion at the driver boundary runs the strict UTF-8 check on each text, at each depth (rule R9). |
+| The close of a session threw the error of a result that nobody read. The Python close drops it. | `CloseAsync` and `DisposeAsync` drop it. GAPS F28 names what stays different. |
+| A canceled token did not stop a write through a session or a transaction. | Each driver call checks the token first (rule R8), and a theory passes a canceled token to each method. |
+| The index test passed with no index build, because the shared database had the indexes. | A fake of the `Neo4j.Driver` package records each query, and the test compares the list with Python. |
+| The driver tests compared the port with itself. | Each expected text is a Python literal, and the life cycle of a transaction is compared call by call. |
+| The text of a driver error in a log line was not the `str(e)` of Python. | One private member builds the Python text (rule R4). |
+| `get_community_clusters(None)` read group ids from the database into a typed list. | The value stays open data (rule R6). |
+| No test saw the concurrency limit of `build_indices_and_constraints`. | The fake counts the calls in flight, and the test compares the largest count, which is 20. |
+| A cancel at a later awaited call had no case. | One case for each later call: the fake cancels at call k, and no call follows. |
+| The recordings left out a default `saga`, records with two defects, seven inputs of the rerankers, and 20 items with equal scores. | Each recorder has them. |
+
+The end-to-end test of the plan row, `GraphTypesOnNeo4jTests`:
+
+- It saves and loads each node type and each edge type on Neo4j, through the model classes and through the 9 operations classes. Python recorded the expected values on the same database.
+- It found no difference between the port and Python in a stored form, a loaded value, a type, an offset, an embedding, or an error code.
+- It builds the indexes two times and reads `SHOW INDEXES` after each build. The two lists are equal, and each of the 31 indexes of Python is in the list.
+- It does not call four methods of the operations classes: `get_between_nodes`, `get_by_node_uuid`, `get_by_entity_node_uuid`, and `retrieve_episodes`. The recorded calls with a fake cover them.
+- It holds upstream defects U1, U2, and U7 as they are: the batched deletes fail, the saga save through the driver fails, and a save with no embedding fails.
+
+`scripts/db_schema.py` writes [db-schema.md](../../generated/db-schema.md) from the ported query definitions.
+
+Differences that the lead accepted by name under D39: GAPS F26, F27, F28, F29, F30, F37, and F38. The maintainer reads F28 at gate 4: a bare `session.run` with a statement that fails at once raises in Python and is silent in the port. Three upstream sites call `session.run`, each with a fixed statement.
+
+Open item O7 is closed. The driver has the first library callback, and a test fails without `Asyncio.OnLoopAsync`.
+
+The adversarial pass over the layer (Opus 5.5, high effort) ran each command of this section and got the same counts. It gave 1 important finding and 8 small ones. The lead resolved each one:
+
+- Inside a transaction or `execute_write`, a statement that fails at once raises at `tx.run` in Python. In the port the rest of the body runs, and the error arrives at the commit. `Neo4j.Driver` has no call that waits for the answer to the statement alone, so the lead accepted the difference as GAPS F37. The stored data is the same. The maintainer reads it at gate 4.
+- A cancel at the end of a transaction body: GAPS F38.
+- A port that sorts the keys of a map from Neo4j passed each test. One test on Neo4j now compares the key order with Python.
+- The schema document left out three stored forms of the save methods of the operations classes. It has a section for them now.
+- On a database that already has the indexes, the two index tests on Neo4j pass with no index build. The test with a fake holds the build, and so does a run on an empty database, as in CI.
+- Four records were wrong or stale: two queue notes, the count of `session.run` sites, a line of `port/STATE.md`, and a count in rule R3.
+
+After the rebase onto layer 3, the full gate failed two health check tests in each run. The cause: two test classes replaced `Console.Out`, which is one object for the process, and they ran at the same time. Both classes are in one test collection now, so they run one after the other.
+
+Evidence that waits for a later layer:
+
+- No flow case of the judge runs against the .NET build. The 10 units with no pure case keep the status `tests_pass` until layer 9.
+- The queries of `search_ops` run on Neo4j first in the end-to-end test of layer 6.
+- No test holds the hang of upstream defect U11. A check on a background thread stops a recorded case that does not end.
+- No mutation run gave a result. The fix of the two `PyAst` tests is on the branch `test/pyast-large-stack`, and it waits for the maintainer.
+
+Commands at the tip:
+
+- `scripts/check.sh --test`: `check: passed`, 13,492 tests.
+- `dotnet test --project tests/Port.Evaluation`: 13,054 tests, 0 failed, 0 skipped.
+- `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 46 tests, 0 failed, 0 skipped.
+- The eight recorders of the layer with `--check`, each one current: 267 cases (`entity_node_ops`), 587 (the other node operations), 617 (the edge operations), 126 (`graph_ops`), 305 (`search_ops`), 643 (the namespaces), the index queries of the driver, and the end-to-end values of the graph types on Neo4j. `python3 scripts/db_schema.py --check` says that the schema document is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,229 passed, 0 unexpected, 0 bound and wrong. 23 ids left `expected-failures.txt`, and 770 stay. The pull request lists the ids.
