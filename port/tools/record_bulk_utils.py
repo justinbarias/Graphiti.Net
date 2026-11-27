@@ -40,8 +40,13 @@ P7c do.
 
 Paths that the recording does not reach, because the port throws there at the start commit:
 - extract_nodes_and_edges_bulk with combined extraction and at least one episode (combined_extraction is packet P7d).
-- execute_write_with_timeout on Neo4j (open item O6).
 - a Cypher bulk query of an entity node on FalkorDB or Neptune, which is a list of queries.
+
+Packet P7g (decision D52, open item O6) adds the cases of timeout_cases at the end, so that the index of each earlier
+case stays: add_nodes_and_edges_bulk with write_timeout on Neo4j, and execute_write_with_timeout on Neo4j and on another
+provider, with a work function that returns and one that raises. The session records `func.timeout`, the attribute
+that unit_of_work(timeout=...) of the neo4j package puts on the work function, and None for a plain work function. The
+limits are floats (7.5, 2.5, 0.0, -1.0), because the port takes a double: an int limit reaches the fake as an int.
 
 It writes tests/Port.Evaluation/values/bulk_utils.json. --check writes nothing and exits 1 if the file differs from
 what the run would write. The tool needs Python 3.12 and the pinned upstream in the folder of the variable
@@ -473,6 +478,25 @@ def dedupe_edge_cases() -> list[dict]:
     ]
 
 
+def timeout_cases() -> list[dict]:
+    episodes = [ep('ep1')]
+    nodes = [node('n-plain', 'Plain Node', ['Entity'])]
+    base = {'fn': 'add_nodes_and_edges_bulk', 'episodes': episodes, 'episodic_edges': [], 'nodes': nodes, 'edges': []}
+    cases = [
+        {**base, 'ops': False, 'provider': 'neo4j', 'write_timeout': 7.5},
+        {**base, 'ops': True, 'provider': 'neo4j', 'write_timeout': 2.5},
+        {**base, 'ops': False, 'provider': 'neo4j', 'write_timeout': 0.0},
+        {**base, 'ops': False, 'provider': 'neo4j', 'write_timeout': -1.0},
+    ]
+    for provider, timeout, raises, timeout_session in (
+        ('neo4j', 7.5, False, False), ('neo4j', 2.5, True, False), ('neo4j', 0.0, False, False),
+        ('neo4j', -1.0, True, False), ('relate', 2.5, True, True), ('relate', 7.5, False, False),
+    ):
+        cases.append({'fn': 'execute_write_with_timeout', 'ops': False, 'provider': provider, 'timeout': timeout,
+                      'raises': raises, 'timeout_session': timeout_session, 'value': 'x'})
+    return cases
+
+
 async def run_case(case: dict, mods) -> dict:
     (bu, EntityEdge, EntityNode, EpisodicNode, EpisodicEdge, GraphitiClients, GraphProvider, default_library, models,
      GraphOperationsInterface, SearchInterface) = mods
@@ -595,7 +619,9 @@ async def run_case(case: dict, mods) -> dict:
 
     class FakeSession:
         async def execute_write(self, func, *args, **kwargs):
-            await enter('execute_write', {'query_timeout_ms': getattr(self, 'query_timeout_ms', None)})
+            # `timeout` is the attribute that unit_of_work(timeout=...) puts on the work function (Neo4j branch).
+            await enter('execute_write', {'query_timeout_ms': getattr(self, 'query_timeout_ms', None),
+                                          'timeout': getattr(func, 'timeout', None)})
             return await func(FakeTx(), *args, **kwargs)
 
         async def close(self):
@@ -665,6 +691,16 @@ async def run_case(case: dict, mods) -> dict:
             await bu.add_nodes_and_edges_bulk(driver, episodes, episodic_edges, nodes, edges, embedder,
                                               write_timeout=case['write_timeout'])
         return {'nodes': [node_view(n) for n in nodes], 'edges': [edge_view(e) for e in edges]}
+    if fn == 'execute_write_with_timeout':
+        async def work(tx, value):
+            await tx.run('RETURN $value', value=value)
+            if case['raises']:
+                raise RuntimeError('work failed')
+            return value
+
+        # The port has no result here: the work function returns no value (R9).
+        await bu.execute_write_with_timeout(driver, case['timeout'], work, case['value'])
+        return None
     if fn == 'retrieve_previous_episodes_bulk':
         episodes = [EpisodicNode(**decode(e)) for e in case['episodes']]
         result = await bu.retrieve_previous_episodes_bulk(driver, episodes, max_coroutines=case['max_coroutines'])
@@ -698,7 +734,8 @@ async def run_case(case: dict, mods) -> dict:
 
 def record_async(mods) -> list[dict]:
     out = []
-    for case in write_cases() + retrieve_cases() + extract_cases() + dedupe_node_cases() + dedupe_edge_cases():
+    for case in (write_cases() + retrieve_cases() + extract_cases() + dedupe_node_cases() + dedupe_edge_cases()
+                 + timeout_cases()):
         events.clear()
         state.update(in_flight=0, max_in_flight=0, count=0)
         try:

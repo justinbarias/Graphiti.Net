@@ -166,4 +166,27 @@ public class TestBulkUtils
         Assert.Equal("alice", remappedSelfEdge.SourceNodeUuid);
         Assert.Equal("alice", remappedSelfEdge.TargetNodeUuid);
     }
+
+    // Ported from tests/ingestion/test_update_queries.py:100. The code under test is execute_write_with_timeout.
+    // PORT: the FakeSession of upstream is the session of BulkUtilsRun, which records the timeout parameter of the
+    // session write in place of `wrapped.timeout` (decision D52). The work function closes over `'x'` (R9), so the
+    // test reads the argument from the query that the work function runs.
+    // PORT: `== 'result'` has no C# form. The work function returns no value, so the call returns no value (R9).
+    [Fact(Timeout = 5000)]
+    public async Task test_neo4j_write_gets_the_limit_as_transaction_timeout()
+    {
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var run = new BulkUtilsRun(new() { ["provider"] = "neo4j", ["ops"] = false }, source, cancelAt: -1);
+
+        Task Work(Graphiti.Core.Driver.Transaction tx, string value) =>
+            tx.RunAsync("RETURN $value", new() { ["value"] = value }, source.Token);
+
+        await LoopGuard.RunAsync(() => BulkUtils.ExecuteWriteWithTimeoutAsync(run.Driver, 7.5, tx => Work(tx, "x"), source.Token));
+
+        var write = Assert.Single(run.Events, e => (string?)((OrderedDictionary<string, object?>)e!)["kind"] == "execute_write");
+        Assert.Equal(7.5, ((OrderedDictionary<string, object?>)write!)["timeout"]);
+        var query = Assert.Single(run.Events, e => (string?)((OrderedDictionary<string, object?>)e!)["kind"] == "tx_run");
+        Assert.Equal("[\"x\"]", PyJson.Dumps(((OrderedDictionary<string, object?>)query!)["values"]));
+        Assert.Single(run.Events, e => (string?)((OrderedDictionary<string, object?>)e!)["kind"] == "close");
+    }
 }

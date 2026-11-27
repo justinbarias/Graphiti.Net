@@ -418,9 +418,19 @@ internal sealed class BulkUtilsRun
         internal override Task CloseAsync(CancellationToken cancellationToken = default) =>
             run.EnterAsync("close", new(), cancellationToken, counted: false);
 
-        internal override async Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default)
+        internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
+            ExecuteWriteAsync(func, null, cancellationToken);
+
+        // The Python fake records `func.timeout`, which `unit_of_work(timeout=...)` sets (decision D52).
+        internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
+            ExecuteWriteAsync(func, (double?)timeout, cancellationToken);
+
+        private async Task ExecuteWriteAsync(Func<Transaction, Task> func, double? timeout, CancellationToken cancellationToken)
         {
-            await run.EnterAsync("execute_write", new() { ["query_timeout_ms"] = (this as IQueryTimeoutSession)?.QueryTimeoutMs }, cancellationToken);
+            await run.EnterAsync(
+                "execute_write",
+                new() { ["query_timeout_ms"] = (this as IQueryTimeoutSession)?.QueryTimeoutMs, ["timeout"] = timeout },
+                cancellationToken);
             await func(new FakeTx(run));
         }
     }

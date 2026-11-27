@@ -72,6 +72,14 @@ internal abstract class GraphDriverSession : IAsyncDisposable
     internal abstract Task ExecuteWriteAsync(
         Func<Transaction, Task> func,
         CancellationToken cancellationToken = default);
+
+    // PORT: a C# delegate carries no attribute, so the `timeout` attribute that `unit_of_work(timeout=...)` puts on the
+    // work function is a parameter, in seconds (decision D52, open item O6). The only caller is the Neo4j branch of
+    // utils/bulk_utils.py:194.
+    internal abstract Task ExecuteWriteAsync(
+        Func<Transaction, Task> func,
+        double timeout,
+        CancellationToken cancellationToken = default);
 }
 
 // PORT: R15. `hasattr(session, 'query_timeout_ms')` in utils/bulk_utils.py:195 is a test for this interface. It has no

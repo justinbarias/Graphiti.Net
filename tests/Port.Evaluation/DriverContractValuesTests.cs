@@ -565,6 +565,9 @@ public partial class DriverContractValuesTests
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("not used");
+
+        internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("not used");
     }
 
     private sealed class FakeExecutor(List<JsonObject> calls) : QueryExecutor

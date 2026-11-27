@@ -226,8 +226,9 @@ internal static partial class BulkUtils
 
     // PORT: `func, /, *args, **kwargs` is one work function that closes over its arguments (R9), and the result is the
     // result of execute_write, a Task with no result (R9). The Neo4j branch calls `neo4j.unit_of_work` from core code.
-    // Open item O6 (R19): the driver session contract has no write with a timeout yet. Open item O9 (R8): the budget
-    // of asyncio.wait_for does not hold for a session call that takes no token.
+    // Decision D52 closes open item O6: `unit_of_work(timeout=timeout)(func)` is the session write that takes the
+    // timeout in seconds as a parameter. Open item O9 (R8) still holds for the asyncio.wait_for branch: its budget does
+    // not hold for a session call that takes no token.
 
     /// <summary>
     /// Run a write function in a new session with a time limit in seconds.
@@ -249,10 +250,8 @@ internal static partial class BulkUtils
         {
             if (graphDriver.Provider == GraphProvider.Neo4j)
             {
-                // TODO(port): O6. `session.execute_write(unit_of_work(timeout=timeout)(func), ...)` needs a write with a
-                // transaction timeout on the driver session contract, which is an interface change for the maintainer
-                // (R19). No rule gives its form yet.
-                throw new NotSupportedException("TODO(port): execute_write_with_timeout on Neo4j (open item O6)");
+                await session.ExecuteWriteAsync(func, timeout, cancellationToken);
+                return;
             }
 
             if (session is IQueryTimeoutSession timeoutSession)

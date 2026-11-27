@@ -335,6 +335,9 @@ public class GraphDataOperationsValuesTests
             await run.EnterAsync(new OrderedDictionary<string, object?> { ["kind"] = "execute_write" }, cancellationToken);
             await func(new FakeTransaction(run));
         }
+
+        internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("not used");
     }
 
     private sealed class FakeTransaction(Run run) : Transaction

@@ -35,6 +35,9 @@ public class BulkUtilsValuesTests
         ["dedupe_nodes_bulk"] = 32,
         ["dedupe_nodes_bulk_llm"] = 36,
         ["dedupe_edges_bulk"] = 39,
+        ["add_nodes_and_edges_bulk_neo4j_timeout"] = 44,
+        ["execute_write_with_timeout_neo4j"] = 48,
+        ["execute_write_with_timeout_relate"] = 53,
     };
 
     public static TheoryData<int> AsyncCaseIndexes()
@@ -95,7 +98,7 @@ public class BulkUtilsValuesTests
         {
             "_entity_node_record", "_entity_edge_record", "update_entity_edges_tx", "update_entity_nodes_tx",
             "add_nodes_and_edges_bulk_tx", "add_nodes_and_edges_bulk", "retrieve_previous_episodes_bulk",
-            "extract_nodes_and_edges_bulk", "dedupe_nodes_bulk", "dedupe_edges_bulk",
+            "extract_nodes_and_edges_bulk", "dedupe_nodes_bulk", "dedupe_edges_bulk", "execute_write_with_timeout",
         })
         {
             Assert.Contains(fn, fns);
@@ -108,6 +111,15 @@ public class BulkUtilsValuesTests
         // The timeout of a write: a session with query_timeout_ms, and a limit that ends the write.
         Assert.Contains(AsyncCases, c => Dict(c["in"]).GetValueOrDefault("timeout_session") is true && Dict(c["out"]).ContainsKey("ok"));
         Assert.Contains(AsyncCases, c => Dict(c["out"]).GetValueOrDefault("error") is OrderedDictionary<string, object?> e && (string)e["type"]! == "TimeoutError");
+
+        // Neo4j: the limit reaches the session as the transaction timeout (decision D52), for 7.5, 2.5, 0, and a
+        // negative limit, and the session closes after a work function that raises.
+        foreach (var limit in new[] { 7.5, 2.5, 0.0, -1.0 })
+        {
+            Assert.Contains(AsyncCases, c => (string?)Dict(c["in"]).GetValueOrDefault("provider") == "neo4j" && List(Dict(c["out"])["events"]).Any(e => Dict(e).GetValueOrDefault("timeout") is double t && t == limit));
+        }
+
+        Assert.Contains(AsyncCases, c => (string?)Dict(c["in"]).GetValueOrDefault("provider") == "neo4j" && Dict(c["out"]).GetValueOrDefault("error") is OrderedDictionary<string, object?> e && (string)e["type"]! == "RuntimeError" && (string?)Dict(List(Dict(c["out"])["events"])[^1])["kind"] == "close");
     }
 
     [Fact]
@@ -164,6 +176,11 @@ public class BulkUtilsValuesTests
             {
                 output["error"] = new OrderedDictionary<string, object?> { ["type"] = "TimeoutError", ["text"] = e.Message };
             }
+            catch (InvalidOperationException e)
+            {
+                // R4: RuntimeError is InvalidOperationException. The work function of a case raises it.
+                output["error"] = new OrderedDictionary<string, object?> { ["type"] = "RuntimeError", ["text"] = e.Message };
+            }
         }
 
         output["events"] = run.Events;
@@ -184,11 +201,14 @@ public class BulkUtilsValuesTests
         Assert.Equal(PyJson.Dumps(expected["max_in_flight"]), PyJson.Dumps(actual["max_in_flight"]));
         Assert.Equal(PyJson.Dumps(expected["count"]), PyJson.Dumps(actual["count"]));
 
-        // Each fake got the token of the call (R25). With a write timeout, asyncio.wait_for gives execute_write a token
-        // that the limit or the call cancels (R8).
+        // Each fake got the token of the call (R25). With a write timeout on a provider other than Neo4j,
+        // asyncio.wait_for gives execute_write a token that the limit or the call cancels (R8). On Neo4j the session
+        // gets the token of the call with the timeout (decision D52).
+        var waitFor = (string?)input.GetValueOrDefault("provider") != "neo4j"
+            && (input.GetValueOrDefault("write_timeout") is not null || (string)input["fn"]! == "execute_write_with_timeout");
         foreach (var (kind, token) in run.Tokens)
         {
-            if (kind == "execute_write" && input.GetValueOrDefault("write_timeout") is not null)
+            if (kind == "execute_write" && waitFor)
             {
                 Assert.True(token.CanBeCanceled);
                 Assert.NotEqual(source.Token, token);
@@ -316,6 +336,13 @@ public class BulkUtilsValuesTests
         }
     }
 
+    private static double Number(object? value) => value switch
+    {
+        long l => l,
+        double d => d,
+        var other => throw new ArgumentException(Py.Repr(other)),
+    };
+
     private static OrderedDictionary<(string, string), List<string>> TypeMap(object? value)
     {
         var map = new OrderedDictionary<(string, string), List<string>>();
@@ -394,17 +421,31 @@ public class BulkUtilsValuesTests
                     }
                     else
                     {
-                        double? writeTimeout = input["write_timeout"] switch
-                        {
-                            null => null,
-                            long l => l,
-                            double d => d,
-                            var other => throw new InvalidOperationException(Py.Repr(other)),
-                        };
+                        double? writeTimeout = input["write_timeout"] is null ? null : Number(input["write_timeout"]);
                         await BulkUtils.AddNodesAndEdgesBulkAsync(driver, episodes, episodicEdges, nodes, edges, embedder, writeTimeout: writeTimeout, cancellationToken: cancellationToken);
                     }
 
                     return new OrderedDictionary<string, object?> { ["nodes"] = NodeViews(nodes), ["edges"] = EdgeViews(edges) };
+                }
+
+            case "execute_write_with_timeout":
+                {
+                    // PORT: the work function closes over its argument, and the call returns no value (R9).
+                    var value = (string?)input["value"];
+                    var raises = (bool)input["raises"]!;
+                    await BulkUtils.ExecuteWriteWithTimeoutAsync(
+                        driver,
+                        Number(input["timeout"]),
+                        async tx =>
+                        {
+                            await tx.RunAsync("RETURN $value", new() { ["value"] = value }, cancellationToken);
+                            if (raises)
+                            {
+                                throw new InvalidOperationException("work failed");
+                            }
+                        },
+                        cancellationToken);
+                    return null;
                 }
 
             case "retrieve_previous_episodes_bulk":
