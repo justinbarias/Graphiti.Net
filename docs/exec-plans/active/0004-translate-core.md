@@ -365,6 +365,8 @@ The adversarial pass over the layer (Opus 5.5, high effort) ran each command of 
 - On a database that already has the indexes, the two index tests on Neo4j pass with no index build. The test with a fake holds the build, and so does a run on an empty database, as in CI.
 - Four records were wrong or stale: two queue notes, the count of `session.run` sites, a line of `port/STATE.md`, and a count in rule R3.
 
+After the rebase onto layer 3, the full gate failed two health check tests in each run. The cause: two test classes replaced `Console.Out`, which is one object for the process, and they ran at the same time. Both classes are in one test collection now, so they run one after the other.
+
 Evidence that waits for a later layer:
 
 - No flow case of the judge runs against the .NET build. The 10 units with no pure case keep the status `tests_pass` until layer 9.
@@ -374,8 +376,8 @@ Evidence that waits for a later layer:
 
 Commands at the tip:
 
-- `scripts/check.sh`: `check: passed`.
-- `dotnet test --project tests/Port.Evaluation`: 12,825 tests, 0 failed, 0 skipped.
-- `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 45 tests, 0 failed, 0 skipped.
+- `scripts/check.sh --test`: `check: passed`, 13,492 tests.
+- `dotnet test --project tests/Port.Evaluation`: 13,054 tests, 0 failed, 0 skipped.
+- `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 46 tests, 0 failed, 0 skipped.
 - The eight recorders of the layer with `--check`, each one current: 267 cases (`entity_node_ops`), 587 (the other node operations), 617 (the edge operations), 126 (`graph_ops`), 305 (`search_ops`), 643 (the namespaces), the index queries of the driver, and the end-to-end values of the graph types on Neo4j. `python3 scripts/db_schema.py --check` says that the schema document is current.
-- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,173 passed, 0 unexpected, 0 bound and wrong. 23 ids left `expected-failures.txt`, and 826 stay. The pull request lists the ids.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,229 passed, 0 unexpected, 0 bound and wrong. 23 ids left `expected-failures.txt`, and 770 stay. The pull request lists the ids.

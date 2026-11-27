@@ -14,6 +14,7 @@ using Graphiti.Neo4j.Operations;
 using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
 
+[Collection(ConsoleOutputGroup.Name)]
 public sealed class Neo4jDriverTests : IAsyncLifetime
 {
     private static readonly string Uri = Neo4jSidecar.Uri;

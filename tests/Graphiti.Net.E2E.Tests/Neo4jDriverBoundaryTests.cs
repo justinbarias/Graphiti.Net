@@ -13,6 +13,7 @@ using Graphiti.Neo4j;
 using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
 
+[Collection(ConsoleOutputGroup.Name)]
 public sealed class Neo4jDriverBoundaryTests
 {
     private static readonly JsonElement Values = JsonDocument.Parse(
