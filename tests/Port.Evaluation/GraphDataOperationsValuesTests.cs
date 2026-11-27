@@ -270,7 +270,9 @@ public class GraphDataOperationsValuesTests
             Count++;
             if (Count - 1 == cancelAt)
             {
-                await source.CancelAsync();
+                // A fake cancels with Cancel(), which runs the callbacks of the token at once on the scheduler thread, as
+                // `task.cancel()` acts at one point of the loop in Python. CancelAsync runs them on the thread pool (RULES.md R25).
+                source.Cancel();
             }
 
             if (Count - 1 == failAt)

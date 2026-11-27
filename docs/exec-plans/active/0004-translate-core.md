@@ -508,16 +508,16 @@ What the reviews changed in the evidence:
 - The theory that cancels at call k now compares with Python: the recorder runs the same cancel on Python and records the attempts and the log events. A port that catches a cancel and writes a warning passed each test of four packets before this change.
 - A recorder subclass of a model takes the name of its base class. Before that, a recorded pydantic error had the title of the subclass, and the tests left the message out of the comparison.
 - `label_propagation` runs on a thread with a time limit in its test. A seeded tie rule made the test run hang.
-- 21 more upstream tests are ported: 5 of `remove_communities`, 6 of the configurable prompts of the community units, and 10 that the first version marked for open item O10.
+- 23 more upstream tests are ported: 5 of `remove_communities`, 6 of the configurable prompts of the community units, and 12 that the first version marked for open item O10.
 
 Decisions of the lead under D49, for the maintainer at gate 4:
 
 - D52 closes open item O6. `GraphDriverSession` has `ExecuteWriteAsync(func, double timeout, cancellationToken)`. The rulebook gave the item to the maintainer. The contract is internal, and each commit of an episode on Neo4j needs the member.
-- Open item O10 has a reading (Part 3 of the rulebook). A test that a fake at the network boundary can serve is ported. 14 tests of the layer keep a `TODO(port): O10` marker, each with the recorded case that covers the same behavior.
+- Open item O10 has a reading (Part 3 of the rulebook). A test that a fake at the network boundary can serve is ported. 12 tests of the layer keep a `TODO(port): O10` marker, each with the recorded case that covers the same behavior. `port/queue.json` names each one.
 - The public builder has six forms that the design does not give. [The public surface design](../../design-docs/public-surface-design.md) lists them at the end of the section "Custom entity types and edge types".
 - `.editorconfig` turns the analyzer rule CA1720 off for `GraphFieldKind.cs` only. The design names the members `String` and `Integer`.
 
-Differences that the lead accepted by name: GAPS F41 to F46, and 14 more cancel points of GAPS F33 (6 in `node_operations`, 1 in `combined_extraction`, and 7 in `community_operations`). The review of `community_operations` also found upstream defect U20: a `null` summary of the model becomes the text `None` in the next prompt.
+Differences that the lead accepted by name: GAPS F41 to F46, and 80 more cancel points of GAPS F33 (6 in `node_operations`, 1 in `combined_extraction`, 7 in `community_operations`, 55 in `edge_operations`, and 11 in `bulk_utils`). One point of `bulk_utils` makes two more attempts than Python. The review of `community_operations` also found upstream defect U20: a `null` summary of the model becomes the text `None` in the next prompt.
 
 The write with a timeout on the real Neo4j, `WriteTimeoutOnNeo4jTests` (23 tests):
 
@@ -534,3 +534,20 @@ Evidence that waits for a later layer:
 - Four covering cases stay listed under open item O4: two of `lsh_bands` and two wrong-type cases of `bulk_utils`.
 - The three built-in models that the judge host registers as custom types have descriptors that are written by hand. No case reads their schema or their validation.
 - Inputs of `ModelValidate` that are not JSON values, for example a `datetime` from a stored attribute, have no recorded case.
+
+The adversarial pass (Opus 5.5, high) read the layer diff and ran 2 seeds. It found four important gaps and five minor ones, and the lead resolved each one:
+
+- The cancel theory of `combined_extraction` failed in 8 of 30 runs on unchanged code. Its fake canceled with `CancelAsync`, which runs the callbacks of the token on the thread pool. Each fake now calls `Cancel()`, and the class passed 30 of 30 runs. Rule R25 has the form, and four test files of layers 2, 5, and 7 changed with it.
+- The cancel theories of `edge_operations` and `bulk_utils` did not compare with Python. Both recorders now run the same cancel on Python. A seeded port that logs a cancel now fails 13 tests. The comparison found 66 more points of GAPS F33.
+- Two upstream tests of `edge_operations` kept an O10 marker and have a form under the reading. They are ported.
+- The layer diff changed a file of `tests/Graphiti.Net.JudgeHost/Core/`. Pull request 44 merged that change alone, as `REVIEW.md` says.
+- The public documentation of `GraphTypeDefinition` gave the old equality, and one rule still named `Py.Round`. Both texts are corrected.
+- The queue did not name the tests that keep an O10 marker. It names each one now, with its recorded case.
+- Two sentences of the gate log row were wrong: the count of the builder forms, and the claim that each accepted difference had two reviews. Both are corrected.
+
+Commands at the tip, after the rebase on `main`:
+
+- `scripts/check.sh --test`: `check: passed`, 17,088 tests.
+- `dotnet test --project tests/Port.Evaluation`: 16,607 tests, 0 failed. `dotnet test --project tests/Graphiti.Net.E2E.Tests`: 86 tests, 0 failed.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,801 passed, 198 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong.
+- `scan_port.py src --allow-todo`: 384 `TODO(port)` markers in 147 files. The other 183 findings are `NotImplementedException` sites that rules R4 and R24 give.
