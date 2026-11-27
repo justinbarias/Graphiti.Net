@@ -20,7 +20,8 @@ using Graphiti.Internal;
 /// validation of a model reply. <see cref="Description"/> is the raw docstring, as <c>__doc__</c> is. The JSON schema
 /// holds <c>inspect.cleandoc</c> of it, as pydantic writes it, so the schema text equals pydantic's. A field kind
 /// outside <see cref="GraphFieldKind"/> is not possible. Two definitions are equal if they have the same name, the
-/// same description, and equal fields in the same order.
+/// same description, and the same field list object. A collection property of a record compares by reference, so two
+/// definitions that were built apart are not equal, and a copy with no change is.
 /// </remarks>
 public sealed record GraphTypeDefinition
 {

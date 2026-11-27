@@ -1012,7 +1012,7 @@ These are the risky ones. Wrong code still builds and still passes simple tests.
 | `int` has no size limit | `int` and `long` wrap on overflow | Use `long` inside a `checked` context. Use `BigInteger` where the code relies on large values. |
 | `-7 // 2` is `-4`, `-7 % 2` is `1` | `-7 / 2` is `-3`, `-7 % 2` is `-1` | Call `Py.FloorDiv` and `Py.Mod` (R18) |
 | `/` on two ints gives a float | `/` on two ints gives an int | Call `Py.TrueDiv` (R18) |
-| `round(2.5)` is `2` (rounds half to even) | `(int)2.5` cuts off and `2.5.ToString("F0")` gives `3` | Call `Py.Round`. Do not round by a cast or by formatting. |
+| `round(2.5)` is `2` (rounds half to even) | `(int)2.5` cuts off and `2.5.ToString("F0")` gives `3` | Write `Math.Round(x, MidpointRounding.ToEven)`. `PyCompat` has no `Py.Round` yet (R18). Do not round by a cast or by formatting. |
 | `len(s)`, `s[i]`, and slices count code points | `Length` and indexers count UTF-16 units | R12 |
 | `pos += 2` or `s[pos:pos + 2]` steps over two code points | The same code steps over two UTF-16 units and can stop inside an emoji | A scanner can keep UTF-16 positions while it steps over characters that it tested and knows are ASCII. A fixed-width step or slice over text that it did not look at must count code points. Convert positions to code points before they reach output. |
 | String formatting ignores locale | `ToString()` and `string.Format` use the current culture | Pass `CultureInfo.InvariantCulture`. Compare with `StringComparison.Ordinal`. |
