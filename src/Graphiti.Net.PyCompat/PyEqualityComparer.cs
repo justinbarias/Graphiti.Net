@@ -30,6 +30,12 @@ internal sealed class PyEqualityComparer<T> : IEqualityComparer<T>
 /// <summary>Python <c>==</c> and <c>hash()</c> over the value model.</summary>
 internal static class PyValueEquality
 {
+    /// <summary>
+    /// Python <c>a == b</c> as an expression on two open values. It has no identity test at the top, so a NaN does
+    /// not equal itself. An item of a list, a tuple, or a dict still gets the identity test first, as in Python.
+    /// </summary>
+    internal static bool PlainEqual(object? a, object? b) => a is not double.NaN and not float.NaN && Equal(a, b);
+
     /// <summary><c>PyObject_RichCompareBool(a, b, Py_EQ)</c>: the identity test, then <c>a == b</c>.</summary>
     internal static bool Equal(object? a, object? b)
     {
