@@ -3,6 +3,7 @@ namespace Graphiti.JudgeHost.Core;
 using System.Collections;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -218,9 +219,10 @@ internal sealed class JudgeParameters
                 continue;
             }
 
-            arguments[index] = value is null && !parameter.ParameterType.IsValueType && nullability.Create(parameter).WriteState == NullabilityState.Nullable
+            var annotation = nullability.Create(parameter);
+            arguments[index] = value is null && !parameter.ParameterType.IsValueType && annotation.WriteState == NullabilityState.Nullable
                 ? null
-                : JudgeTypes.Convert(parameter.ParameterType, value, $"argument '{name}'");
+                : JudgeTypes.Convert(parameter.ParameterType, value, $"argument '{name}'", annotation);
         }
 
         if (token)
@@ -283,19 +285,27 @@ internal sealed class JudgeParameters
 /// <list type="bullet">
 /// <item><c>None</c> only for <c>Nullable&lt;T&gt;</c>, for <c>object</c>, or through <see cref="JudgeParameters.GetOrNone{T}"/>.</item>
 /// <item>A <c>double</c> takes a <c>double</c>, a <c>long</c>, or a <c>BigInteger</c>, converted as <c>float(x)</c> does.</item>
-/// <item>A <c>long</c> or an <c>int</c> takes an int that fits. A <c>bool</c>, a <c>double</c>, or a larger int is rejected.</item>
+/// <item>A <c>long</c>, an <c>int</c>, or a <c>ulong</c> takes an int that fits. A <c>bool</c>, a <c>double</c>, or an
+/// int out of the range is rejected.</item>
 /// <item>A <c>bool</c> takes only a <c>bool</c>. An enum takes only its own member.</item>
-/// <item>A <c>List&lt;T&gt;</c>, an <c>IEnumerable&lt;T&gt;</c>, or an <c>IReadOnlyList&lt;T&gt;</c> takes a list, and an
-/// <c>OrderedDictionary&lt;string, T&gt;</c> a dict with string keys, with each item read by these rules. A tuple is
-/// not a list.</item>
-/// <item>A <c>PySet&lt;T&gt;</c> or a <c>HashSet&lt;T&gt;</c> takes a set, with each item read by these rules.</item>
+/// <item>A <c>List&lt;T&gt;</c>, an <c>IEnumerable&lt;T&gt;</c>, or an <c>IReadOnlyList&lt;T&gt;</c> takes a list, with
+/// each item read by these rules. A tuple is not a list.</item>
+/// <item>An <c>OrderedDictionary&lt;K, V&gt;</c> or a <c>Dictionary&lt;K, V&gt;</c> takes a dict, with each key and
+/// each value read by these rules.</item>
+/// <item>A value tuple takes a tuple of the same length, with each item read by these rules.</item>
+/// <item>A <c>PySet&lt;T&gt;</c> or a <c>HashSet&lt;T&gt;</c> takes a set, with each item read by these rules. An
+/// <c>IReadOnlyCollection&lt;T&gt;</c> takes a list or a set.</item>
 /// <item>Each other type takes a value of that runtime type.</item>
 /// </list>
 /// </summary>
 internal static class JudgeTypes
 {
     /// <summary>Reads <paramref name="value"/> as <paramref name="target"/>, or throws <see cref="JudgeTypeRejectedException"/>.</summary>
-    internal static object? Convert(Type target, object? value, string what)
+    /// <remarks>
+    /// <paramref name="nullability"/> is the annotation of the parameter. With it, a list item or a dict value that the
+    /// C# type marks as nullable takes <c>None</c>.
+    /// </remarks>
+    internal static object? Convert(Type target, object? value, string what, NullabilityInfo? nullability = null)
     {
         var underlying = Nullable.GetUnderlyingType(target);
         if (value is null)
@@ -330,8 +340,23 @@ internal static class JudgeTypes
             return value is long l && l is >= int.MinValue and <= int.MaxValue ? (int)l : throw Rejected(target, value, what);
         }
 
+        if (target == typeof(ulong))
+        {
+            return value switch
+            {
+                long l when l >= 0 => (ulong)l,
+                BigInteger big when big >= 0 && big <= ulong.MaxValue => (ulong)big,
+                _ => throw Rejected(target, value, what),
+            };
+        }
+
         var definition = target.IsGenericType ? target.GetGenericTypeDefinition() : null;
-        if (definition == typeof(List<>) || definition == typeof(IEnumerable<>) || definition == typeof(IReadOnlyList<>))
+        if (definition == typeof(IReadOnlyCollection<>) && value is PySet<object?>)
+        {
+            return Convert(typeof(PySet<>).MakeGenericType(target.GetGenericArguments()[0]), value, what);
+        }
+
+        if (definition == typeof(List<>) || definition == typeof(IEnumerable<>) || definition == typeof(IReadOnlyList<>) || definition == typeof(IReadOnlyCollection<>))
         {
             if (value is not List<object?> list)
             {
@@ -344,35 +369,67 @@ internal static class JudgeTypes
                 return list;
             }
 
+            var itemInfo = nullability is { GenericTypeArguments.Length: 1 } ? nullability.GenericTypeArguments[0] : null;
             var result = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(item), list.Count)!;
             for (var index = 0; index < list.Count; index++)
             {
-                result.Add(Convert(item, list[index], $"{what}[{index}]"));
+                result.Add(list[index] is null && !item.IsValueType && itemInfo?.WriteState == NullabilityState.Nullable
+                    ? null
+                    : Convert(item, list[index], $"{what}[{index}]", itemInfo));
             }
 
             return result;
         }
 
-        if (target.IsGenericType && target.GetGenericTypeDefinition() == typeof(OrderedDictionary<,>) && target.GetGenericArguments()[0] == typeof(string))
+        if (definition == typeof(OrderedDictionary<,>) || definition == typeof(Dictionary<,>))
         {
-            if (value is not OrderedDictionary<string, object?> dict)
+            var keyType = target.GetGenericArguments()[0];
+            var item = target.GetGenericArguments()[1];
+            if (value is OrderedDictionary<string, object?> dict)
+            {
+                if (target == typeof(OrderedDictionary<string, object?>))
+                {
+                    return dict;
+                }
+
+                var result = (IDictionary)Activator.CreateInstance(target)!;
+                foreach (var (key, entry) in dict)
+                {
+                    result.Add(Convert(keyType, key, $"{what} key '{key}'")!, Convert(item, entry, $"{what}['{key}']"));
+                }
+
+                return result;
+            }
+
+            if (value is PyDict open && keyType != typeof(string))
+            {
+                var result = (IDictionary)Activator.CreateInstance(target)!;
+                foreach (var (key, entry) in open)
+                {
+                    result.Add(Convert(keyType, key, $"{what} key {Py.Repr(key)}")!, Convert(item, entry, $"{what}[{Py.Repr(key)}]"));
+                }
+
+                return result;
+            }
+
+            throw Rejected(target, value, what);
+        }
+
+        if (typeof(ITuple).IsAssignableFrom(target) && target.IsValueType && target.IsGenericType)
+        {
+            var items = target.GetGenericArguments();
+            if (value is not PyTuple tuple || tuple.Count != items.Length || items.Length > 7)
             {
                 throw Rejected(target, value, what);
             }
 
-            var item = target.GetGenericArguments()[1];
-            if (item == typeof(object))
+            var converted = new object?[items.Length];
+            for (var index = 0; index < items.Length; index++)
             {
-                return dict;
+                converted[index] = Convert(items[index], tuple[index], $"{what}[{index}]");
             }
 
-            var result = (IDictionary)Activator.CreateInstance(target)!;
-            foreach (var (key, entry) in dict)
-            {
-                result.Add(key, Convert(item, entry, $"{what}['{key}']"));
-            }
-
-            return result;
+            return Activator.CreateInstance(target, converted);
         }
 
         if (definition == typeof(PySet<>) || definition == typeof(HashSet<>))

@@ -9,7 +9,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 
 | Layer | Branch | Upstream packages | Units | Lines | Implementer |
 | --- | --- | --- | --- | --- | --- |
-| 0 | `port/skeleton` | In progress. Types and signatures for all 114 units, with no bodies | 114 | | Opus 5.5, medium |
+| 0 | `port/skeleton`, `port/skeleton-upper` | Done 2026-11-27. Types and signatures for all 114 units, with no bodies | 114 | | Opus 5.5, medium |
 | 1 | `port/foundations` | Done 2026-11-27. `errors`, `helpers`, `graphiti_types`, `tracer`, `decorators`, `graph_queries`, `utils` (6 modules), `models`, `namespaces` | 20 | 4,277 | Sonnet 5.5, medium |
 | 2 | `port/graph-types` | Done 2026-11-27. `nodes`, `edges`, and the driver contract: `driver.driver`, `driver.operations`, `driver.graph_operations`, `driver.search_interface`, `driver.query_executor`, `driver.record_parsers`, the `driver` package root | 21 | 5,147 | Opus 5.5, medium. One cycle group holds most of this layer. |
 | 3 | `port/models-boundary` | Done 2026-11-27. `llm_client` (11 modules), `embedder`, `cross_encoder`, plus the new `Microsoft.Extensions.AI` adapter | 16 | 2,228 | Sonnet 5.5, high |
@@ -108,7 +108,7 @@ Commands at the tip, after the rebase on `main`:
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 403 passed, 1,596 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong.
 - `scan_port.py src --allow-todo`: 1,136 `TODO(port)` markers in 115 files. The other 105 findings are `NotImplementedException` sites that port a Python `raise NotImplementedError` (rule R4).
 
-Not in this pull request: the two skeleton packets for layers 7 to 9. They are outside the goal of decision D39, which ends at layer 6.
+Not in this pull request: the two skeleton packets for layers 7 to 9. They came after decision D49 (the section at the end of this file).
 
 ### Layer 1, the foundations, 2026-11-27
 
@@ -443,3 +443,33 @@ Commands at the tip:
 - `dotnet test --project tests/Graphiti.Net.E2E.Tests` on Neo4j 5.26.2: 63 tests, 0 failed, 0 skipped.
 - The five recorders of the layer with `--check`, each one current: 510 cases (the configuration, the recipes, and the helpers), 1,322 (`search_utils`), 432 (the decorator), 172 (`search`) with the 153 points of the cancel grid, and the end-to-end values of the recipes on Neo4j.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,375 passed, 0 unexpected, 0 bound and wrong. 146 ids left `expected-failures.txt`, and 624 stay. The pull request lists the ids.
+
+### Layer 0, the skeleton for layers 7 to 9, 2026-11-27
+
+Decision D49 extended the run through layer 9. Two packets declared the types and the signatures of the modules of layers 7 to 9. One Opus 5.5 high reviewer read each packet and tried to refute it.
+
+| Packet | Modules | Review findings |
+| --- | --- | --- |
+| S6 | `utils.maintenance` (9 modules) and `utils.bulk_utils` | 6 important, 2 minor |
+| S7 | `ingestion` (8 modules) and `graphiti` | 1 important, 8 minor |
+
+What the lead and the reviews changed:
+
+- The two packets typed the same Python unions in two ways. `str | SagaNode | None` is the record `SagaOrName`, and `EpisodicNode | list[EpisodicNode]` is the record `EpisodeOrEpisodes`, at each site. Part 3 of the rulebook now gives the name and the place of such a record.
+- Five of the six important findings of S6 had one cause: the typed read of the judge host had no form for five parameter types. About 70 judge cases did not reach their function. The host now reads a `ulong`, a value tuple, a dict with other keys, a read-only collection, and `None` for a nullable list item.
+- Two members of `delta` that judge cases call were private. They are internal, and so is `_get_or_create_saga`, which an upstream test calls.
+- The keyword dict `commit_kwargs` of the scheduler is three typed parameters.
+- `_get_provider_type` has no member. Its one caller is the telemetry that decision D9 leaves out.
+- The module class of `combined_extraction` has the suffix `Module`, because the module imports a model with its name.
+- Decision D50: where upstream keeps `type(error).__name__` as diagnostic text, the port keeps the .NET type name. The maintainer reads it at gate 4.
+- The rulebook has rows of R2, R14, R15, R16, R18, R22, and Part 3 for each construct that had a missing-rule marker. Open item O4 has 2 more cases.
+
+The lead left one finding for the units of layer 7: seven judge cases pass a built-in prompt model as a custom type, and the registry gives a response model for it.
+
+Three package modules of these layers only import names again, and `migrations` is empty. They need no file (rule R1), and the queue has them as `reviewed`. The queue has the target of each other module. 65 units are `reviewed`, 31 are `tests_pass`, and 86 are `todo`.
+
+Commands at the tip, after the rebase on `main`:
+
+- `scripts/check.sh --test`: `check: passed`, 15,776 tests.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,375 passed, 624 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong.
+- `scan_port.py src --allow-todo`: 606 `TODO(port)` markers in 144 files. The other 176 findings are `NotImplementedException` sites that rules R4 and R24 give.

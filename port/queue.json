@@ -1732,7 +1732,7 @@
         "typing",
         "zlib"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/ChangeSet.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1752,7 +1752,7 @@
         "dataclasses",
         "time"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/StateStore.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1771,7 +1771,7 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/Config.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1795,7 +1795,7 @@
         "re",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/DedupHelpers.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1814,7 +1814,7 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/AttributeUtils.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1850,7 +1850,7 @@
         "time",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1876,7 +1876,7 @@
         "dataclasses",
         "numpy"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/Delta.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1942,7 +1942,7 @@
       "external": [
         "logging"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/DanglingEndpoints.cs",
       "status": "todo",
       "notes": ""
     },
@@ -1962,7 +1962,7 @@
         "logging",
         "re"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/TemporalEdgeUtils.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2005,7 +2005,7 @@
         "typing",
         "typing_extensions"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/EdgeOperations.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2029,7 +2029,7 @@
         "graphiti_core.utils.maintenance.node_operations"
       ],
       "external": [],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/GraphReader.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2062,7 +2062,7 @@
         "pydantic",
         "time"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/CombinedExtraction.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2083,7 +2083,7 @@
         "logging",
         "typing_extensions"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2121,7 +2121,7 @@
         "typing",
         "typing_extensions"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/BulkUtils.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2253,7 +2253,7 @@
         "logging",
         "pydantic"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2330,7 +2330,7 @@
         "typing_extensions",
         "uuid"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Graphiti.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2371,7 +2371,7 @@
         "typing",
         "uuid"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/Phases.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2401,7 +2401,7 @@
         "typing",
         "uuid"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/Scheduler.cs",
       "status": "todo",
       "notes": ""
     },
@@ -2417,8 +2417,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 106,
@@ -3849,7 +3849,7 @@
         "time",
         "typing"
       ],
-      "target": "",
+      "target": "src/Graphiti.Net/Core/Ingestion/SqliteStateStore.cs",
       "status": "todo",
       "notes": ""
     },
@@ -3872,8 +3872,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 167,
@@ -4053,8 +4053,8 @@
       "imports": [],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. The file is empty, so it needs no file (rule R1)."
     },
     {
       "order": 175,
@@ -4176,8 +4176,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     }
   ]
 }
