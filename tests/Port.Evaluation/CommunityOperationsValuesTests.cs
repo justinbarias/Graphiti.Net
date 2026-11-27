@@ -5,6 +5,7 @@
 // summarize_pair calls of one round is sorted on both sides, because the calls of a round run at the same time.
 namespace Graphiti.Port.Evaluation;
 
+using System.Runtime.ExceptionServices;
 using Graphiti.Core;
 using Graphiti.Core.Utils.Maintenance;
 using Graphiti.Internal;
@@ -89,6 +90,9 @@ public class CommunityOperationsValuesTests
         Assert.Equal(4L, (long)eight["max_in_flight"]!);
     }
 
+    // PORT: upstream defect U11: label_propagation does not end for some inputs. A wrong tie order makes a recorded
+    // projection loop, so each case runs on a thread with a time limit (R25, RULES.md: a background thread and
+    // Join). A case that does not end fails the test, and the thread is a background thread, so the test host lives.
     [Fact]
     public void The_port_gives_each_recorded_sync_result()
     {
@@ -97,38 +101,27 @@ public class CommunityOperationsValuesTests
         List<string> failures = [];
         foreach (var (index, item) in cases.Index())
         {
-            var input = Dict(item["in"]);
-            object? actual;
-            try
+            object? actual = null;
+            Exception? unexpected = null;
+            var worker = new Thread(() =>
             {
-                if ((string)item["f"]! == "label_propagation")
+                try
                 {
-                    var projection = new OrderedDictionary<string, List<Neighbor>>();
-                    foreach (var (key, neighbors) in Dict(input["projection"]))
-                    {
-                        projection[key] = [.. List(neighbors).Select(n => Neighbor.ModelValidate(Dict(n)))];
-                    }
-
-                    actual = new OrderedDictionary<string, object?>
-                    {
-                        ["ok"] = CommunityOperations.LabelPropagation(projection).Select(c => (object?)c.Select(x => (object?)x).ToList()).ToList(),
-                    };
+                    actual = SyncResult(item);
                 }
-                else
+                catch (Exception e)
                 {
-                    actual = new OrderedDictionary<string, object?> { ["ok"] = Neighbor.ModelValidate(Dict(input["data"])).ModelDump() };
+                    unexpected = e;
                 }
-            }
-            catch (KeyNotFoundException)
+            })
             {
-                actual = new OrderedDictionary<string, object?> { ["error"] = "KeyError" };
-            }
-            catch (ValidationException e)
+                IsBackground = true,
+            };
+            worker.Start();
+            Assert.True(worker.Join(TimeSpan.FromSeconds(5)), $"case {index} ({item["f"]}) did not end within 5 seconds (defect U11)");
+            if (unexpected is not null)
             {
-                actual = new OrderedDictionary<string, object?>
-                {
-                    ["error"] = new OrderedDictionary<string, object?> { ["type"] = "ValidationError", ["text"] = e.Message.Split('\n')[0] },
-                };
+                ExceptionDispatchInfo.Capture(unexpected).Throw();
             }
 
             var expected = Dict(item["out"]);
@@ -144,6 +137,40 @@ public class CommunityOperationsValuesTests
         }
 
         Assert.True(failures.Count == 0, string.Join("\n", failures.Take(5)) + $"\n{failures.Count} failures");
+    }
+
+    private static OrderedDictionary<string, object?> SyncResult(OrderedDictionary<string, object?> item)
+    {
+        var input = Dict(item["in"]);
+        try
+        {
+            if ((string)item["f"]! == "label_propagation")
+            {
+                var projection = new OrderedDictionary<string, List<Neighbor>>();
+                foreach (var (key, neighbors) in Dict(input["projection"]))
+                {
+                    projection[key] = [.. List(neighbors).Select(n => Neighbor.ModelValidate(Dict(n)))];
+                }
+
+                return new OrderedDictionary<string, object?>
+                {
+                    ["ok"] = CommunityOperations.LabelPropagation(projection).Select(c => (object?)c.Select(x => (object?)x).ToList()).ToList(),
+                };
+            }
+
+            return new OrderedDictionary<string, object?> { ["ok"] = Neighbor.ModelValidate(Dict(input["data"])).ModelDump() };
+        }
+        catch (KeyNotFoundException)
+        {
+            return new OrderedDictionary<string, object?> { ["error"] = "KeyError" };
+        }
+        catch (ValidationException e)
+        {
+            return new OrderedDictionary<string, object?>
+            {
+                ["error"] = new OrderedDictionary<string, object?> { ["type"] = "ValidationError", ["text"] = e.Message.Split('\n')[0] },
+            };
+        }
     }
 
     [Theory(Timeout = 5000)]
@@ -205,42 +232,86 @@ public class CommunityOperationsValuesTests
         Assert.Equal(Scenarios[name].Calls, run.Count);
     }
 
-    // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8)
-    // and makes no fake call.
+    // The cases that the recorder ran again with a cancel are the cases of Scenarios (CANCEL_CASES in
+    // port/tools/record_community_operations.py).
+    [Fact]
+    public void Each_scenario_has_a_recorded_cancel_run_for_each_point()
+    {
+        var recorded = AsyncCases.Index().Where(c => c.Item.ContainsKey("cancel")).Select(c => c.Index).Order().ToList();
+        Assert.Equal(Scenarios.Values.Select(v => v.Case).Order().ToList(), recorded);
+        foreach (var (_, (index, calls)) in Scenarios)
+        {
+            Assert.Equal(
+                Enumerable.Range(-1, calls).Select(k => (long)k).ToList(),
+                List(AsyncCases[index]["cancel"]).Select(r => (long)Dict(r)["k"]!).ToList());
+        }
+    }
+
+    // Each async method with a canceled token throws OperationCanceledException (R8). The recorder canceled the task of
+    // the call before its first await (k = -1), so the test compares the attempts, the recorded calls, and the events
+    // that the method writes before it reads the token. A fake that is canceled throws after a yield, so a dropped token
+    // or a caught cancel gives other counts.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(ScenarioNames))]
     public async Task Each_async_method_with_a_canceled_token_throws_OperationCanceledException(string name)
     {
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await source.CancelAsync();
-        var run = new CommunityCombinedRun(Dict(AsyncCases[Scenarios[name].Case]["in"]), source, cancelAt: -1);
+        var index = Scenarios[name].Case;
+        var run = new CommunityCombinedRun(Dict(AsyncCases[index]["in"]), source, cancelAt: -1);
         using (PortServices.Use(loggerFactory: new CommunityCombinedLogCapture(run.Events), time: new MaintenanceFixedClock(Now.ToDateTimeOffset())))
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
             await LoopGuard.RunAsync(Turns);
         }
 
-        Assert.Equal(0, run.Count);
+        CommunityCombinedValues.AssertCancelPoint(AsyncCases[index], index, -1, run, 0, LateCancel);
     }
 
-    // A test with no Python original: the token is canceled at fake call k. Call k is the last call that a fake records,
-    // and the method throws OperationCanceledException (R8).
+    // The token is canceled while call k runs. Call k is the last call that a fake records. Python lets a CancelledError
+    // through each `except Exception` (it is a BaseException). The recorder canceled the task of the call at the same
+    // point, so the test compares the count of the attempts (each fake counts an attempt before it reads its token), the
+    // count of the calls that a fake recorded, and the events after call k (the log lines and the later calls, with each
+    // run of summarize_pair calls sorted). The calls that a failed gather leaves run on, so the test gives the scheduler
+    // 50 turns before it counts (R25).
     [Theory(Timeout = 5000)]
     [MemberData(nameof(LaterCalls))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(string name, int k)
     {
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var run = new CommunityCombinedRun(Dict(AsyncCases[Scenarios[name].Case]["in"]), source, cancelAt: k);
+        var index = Scenarios[name].Case;
+        var run = new CommunityCombinedRun(Dict(AsyncCases[index]["in"]), source, cancelAt: k);
         using (PortServices.Use(loggerFactory: new CommunityCombinedLogCapture(run.Events), time: new MaintenanceFixedClock(Now.ToDateTimeOffset())))
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
-
-            // The calls that a failed gather leaves run on. Give them turns before the count (R25).
             await LoopGuard.RunAsync(Turns);
         }
 
-        Assert.Equal(k + 1, run.Count);
+        CommunityCombinedValues.AssertCancelPoint(AsyncCases[index], index, k, run, run.EventsAtCancel, LateCancel);
     }
+
+    [Fact]
+    public void Each_late_cancel_entry_names_one_point_of_the_recording()
+    {
+        Assert.Equal(LateCancel.Length, LateCancel.Select(e => (e.Case, e.K)).Distinct().Count());
+        Assert.All(LateCancel, e => Assert.Contains(e.K, List(AsyncCases[e.Case]["cancel"]).Select(r => (int)(long)Dict(r)["k"]!)));
+    }
+
+    // The points where the port makes more attempts than Python (the late cancel of GAPS F33). At each point the call that
+    // cancels is the last call of a gather (or of a build that runs next to the others). Python raises CancelledError where
+    // the task of the caller resumes, so the next step makes no attempt. The port does not read the token again when the
+    // call returns, so each caller that resumes makes its next call, and that call throws. Case 25 at calls 16 and 17 has
+    // two and three more attempts, because that many builds of a community resume in the same turn.
+    private static readonly (int Case, int K, string Kind)[] LateCancel =
+    [
+        (0, 9, "attempts"),
+        (19, 6, "attempts"),
+        (20, 4, "attempts"),
+        (25, 9, "attempts"),
+        (25, 15, "attempts"),
+        (25, 16, "attempts"),
+        (25, 17, "attempts"),
+    ];
 
     private static async Task Turns()
     {
@@ -252,16 +323,20 @@ public class CommunityOperationsValuesTests
 
     private static List<string>? Strings(object? value) => value is List<object?> list ? [.. list.Select(x => (string)x!)] : null;
 
+    // A case with "defaults" leaves each optional argument out (R25).
     private static async Task<object?> CallAsync(CommunityCombinedRun run, CancellationToken cancellationToken)
     {
         var input = run.Input;
+        var defaults = input.GetValueOrDefault("defaults") is true;
         var route = input.GetValueOrDefault("routing") is true ? run.Clients : null;
         var maxCoroutines = (long?)input.GetValueOrDefault("max_coroutines");
         switch ((string)input["fn"]!)
         {
             case "get_community_clusters":
                 {
-                    var clusters = await CommunityOperations.GetCommunityClustersAsync(run.Driver, Strings(input["group_ids"]), maxCoroutines, cancellationToken);
+                    var clusters = defaults
+                        ? await CommunityOperations.GetCommunityClustersAsync(run.Driver, Strings(input["group_ids"]), cancellationToken: cancellationToken)
+                        : await CommunityOperations.GetCommunityClustersAsync(run.Driver, Strings(input["group_ids"]), maxCoroutines, cancellationToken);
                     return new OrderedDictionary<string, object?>
                     {
                         ["clusters"] = clusters.Select(c => (object?)c.Select(n => (object?)n.Uuid).ToList()).ToList(),
@@ -271,20 +346,26 @@ public class CommunityOperationsValuesTests
             case "summarize_pair":
                 {
                     var pair = List(input["pair"]);
-                    var summary = await CommunityOperations.SummarizePairAsync(run.Llm, ((string)pair[0]!, (string)pair[1]!), clients: route, cancellationToken: cancellationToken);
+                    var summary = defaults
+                        ? await CommunityOperations.SummarizePairAsync(run.Llm, ((string)pair[0]!, (string)pair[1]!), cancellationToken: cancellationToken)
+                        : await CommunityOperations.SummarizePairAsync(run.Llm, ((string)pair[0]!, (string)pair[1]!), clients: route, cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?> { ["summary"] = summary };
                 }
 
             case "generate_summary_description":
                 {
-                    var description = await CommunityOperations.GenerateSummaryDescriptionAsync(run.Llm, (string)input["summary"]!, clients: route, cancellationToken: cancellationToken);
+                    var description = defaults
+                        ? await CommunityOperations.GenerateSummaryDescriptionAsync(run.Llm, (string)input["summary"]!, cancellationToken: cancellationToken)
+                        : await CommunityOperations.GenerateSummaryDescriptionAsync(run.Llm, (string)input["summary"]!, clients: route, cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?> { ["description"] = description };
                 }
 
             case "build_community":
                 {
-                    var (community, edges) = await CommunityOperations.BuildCommunityAsync(
-                        run.Llm, [.. List(input["cluster"]).Select(n => Node(n))], clients: route, maxCoroutines: maxCoroutines, cancellationToken: cancellationToken);
+                    List<EntityNode> cluster = [.. List(input["cluster"]).Select(n => Node(n))];
+                    var (community, edges) = defaults
+                        ? await CommunityOperations.BuildCommunityAsync(run.Llm, cluster, cancellationToken: cancellationToken)
+                        : await CommunityOperations.BuildCommunityAsync(run.Llm, cluster, clients: route, maxCoroutines: maxCoroutines, cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?>
                     {
                         ["community"] = CommunityCombinedValues.CommunityView(community),
@@ -294,8 +375,9 @@ public class CommunityOperationsValuesTests
 
             case "build_communities":
                 {
-                    var (nodes, edges) = await CommunityOperations.BuildCommunitiesAsync(
-                        run.Driver, run.Llm, Strings(input["group_ids"]), clients: route, maxCoroutines: maxCoroutines, cancellationToken: cancellationToken);
+                    var (nodes, edges) = defaults
+                        ? await CommunityOperations.BuildCommunitiesAsync(run.Driver, run.Llm, Strings(input["group_ids"]), cancellationToken: cancellationToken)
+                        : await CommunityOperations.BuildCommunitiesAsync(run.Driver, run.Llm, Strings(input["group_ids"]), clients: route, maxCoroutines: maxCoroutines, cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?>
                     {
                         ["communities"] = nodes.Select(n => (object?)CommunityCombinedValues.CommunityView(n)).ToList(),
@@ -304,7 +386,15 @@ public class CommunityOperationsValuesTests
                 }
 
             case "remove_communities":
-                await CommunityOperations.RemoveCommunitiesAsync(run.Driver, Strings(input["group_ids"]), cancellationToken);
+                if (defaults)
+                {
+                    await CommunityOperations.RemoveCommunitiesAsync(run.Driver, cancellationToken: cancellationToken);
+                }
+                else
+                {
+                    await CommunityOperations.RemoveCommunitiesAsync(run.Driver, Strings(input["group_ids"]), cancellationToken);
+                }
+
                 return new OrderedDictionary<string, object?> { ["result"] = null };
             case "determine_entity_community":
                 {
@@ -318,8 +408,9 @@ public class CommunityOperationsValuesTests
 
             case "update_community":
                 {
-                    var (nodes, edges) = await CommunityOperations.UpdateCommunityAsync(
-                        run.Driver, run.Llm, run.Embedder, Node(input["entity"]), clients: route, cancellationToken: cancellationToken);
+                    var (nodes, edges) = defaults
+                        ? await CommunityOperations.UpdateCommunityAsync(run.Driver, run.Llm, run.Embedder, Node(input["entity"]), cancellationToken: cancellationToken)
+                        : await CommunityOperations.UpdateCommunityAsync(run.Driver, run.Llm, run.Embedder, Node(input["entity"]), clients: route, cancellationToken: cancellationToken);
                     return new OrderedDictionary<string, object?>
                     {
                         ["communities"] = nodes.Select(n => (object?)CommunityCombinedValues.CommunityView(n)).ToList(),

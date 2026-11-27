@@ -161,42 +161,79 @@ public class CombinedExtractionValuesTests
         Assert.Equal(Scenarios[name].Calls, run.Count);
     }
 
-    // A test with no Python original: the method with a canceled token throws OperationCanceledException (R8) and makes
-    // no fake call.
+    // The cases that the recorder ran again with a cancel are the cases of Scenarios (CANCEL_CASES in
+    // port/tools/record_combined_extraction.py).
+    [Fact]
+    public void Each_scenario_has_a_recorded_cancel_run_for_each_point()
+    {
+        var recorded = AsyncCases.Index().Where(c => c.Item.ContainsKey("cancel")).Select(c => c.Index).Order().ToList();
+        Assert.Equal(Scenarios.Values.Select(v => v.Case).Order().ToList(), recorded);
+        foreach (var (_, (index, calls)) in Scenarios)
+        {
+            Assert.Equal(
+                Enumerable.Range(-1, calls).Select(k => (long)k).ToList(),
+                List(AsyncCases[index]["cancel"]).Select(r => (long)Dict(r)["k"]!).ToList());
+        }
+    }
+
+    // Each async method with a canceled token throws OperationCanceledException (R8). The recorder canceled the task of
+    // the call before its first await (k = -1), so the test compares the attempts, the recorded calls, and the events
+    // that the method writes before it reads the token. A fake that is canceled throws after a yield, so a dropped token
+    // or a caught cancel gives other counts.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(ScenarioNames))]
     public async Task Each_async_method_with_a_canceled_token_throws_OperationCanceledException(string name)
     {
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await source.CancelAsync();
-        var run = new CommunityCombinedRun(Dict(AsyncCases[Scenarios[name].Case]["in"]), source, cancelAt: -1);
+        var index = Scenarios[name].Case;
+        var run = new CommunityCombinedRun(Dict(AsyncCases[index]["in"]), source, cancelAt: -1);
         using (PortServices.Use(loggerFactory: new CommunityCombinedLogCapture(run.Events), time: new MaintenanceFixedClock(Now.ToDateTimeOffset())))
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
             await LoopGuard.RunAsync(Turns);
         }
 
-        Assert.Equal(0, run.Count);
+        CommunityCombinedValues.AssertCancelPoint(AsyncCases[index], index, -1, run, 0, LateCancel);
     }
 
-    // A test with no Python original: the token is canceled at fake call k. Call k is the last call that a fake records,
-    // and the method throws OperationCanceledException (R8). The retry of a failed batch does not catch the cancel.
+    // The token is canceled while call k runs. Call k is the last call that a fake records. Python lets a CancelledError
+    // through each `except Exception` (it is a BaseException), so it writes no `Failed to extract batch timestamps` line
+    // and makes no retry. The recorder canceled the task of the call at the same point, so the test compares the count of
+    // the attempts (each fake counts an attempt before it reads its token), the count of the calls that a fake recorded,
+    // and the events after call k (the log lines and the later calls). The calls that a failed gather leaves run on, so the
+    // test gives the scheduler 50 turns before it counts (R25).
     [Theory(Timeout = 5000)]
     [MemberData(nameof(LaterCalls))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(string name, int k)
     {
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var run = new CommunityCombinedRun(Dict(AsyncCases[Scenarios[name].Case]["in"]), source, cancelAt: k);
+        var index = Scenarios[name].Case;
+        var run = new CommunityCombinedRun(Dict(AsyncCases[index]["in"]), source, cancelAt: k);
         using (PortServices.Use(loggerFactory: new CommunityCombinedLogCapture(run.Events), time: new MaintenanceFixedClock(Now.ToDateTimeOffset())))
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LoopGuard.RunAsync(() => CallAsync(run, source.Token)));
-
-            // The calls that a failed gather leaves run on. Give them turns before the count (R25).
             await LoopGuard.RunAsync(Turns);
         }
 
-        Assert.Equal(k + 1, run.Count);
+        CommunityCombinedValues.AssertCancelPoint(AsyncCases[index], index, k, run, run.EventsAtCancel, LateCancel);
     }
+
+    [Fact]
+    public void Each_late_cancel_entry_names_one_point_of_the_recording()
+    {
+        Assert.Equal(LateCancel.Length, LateCancel.Select(e => (e.Case, e.K)).Distinct().Count());
+        Assert.All(LateCancel, e => Assert.Contains(e.K, List(AsyncCases[e.Case]["cancel"]).Select(r => (int)(long)Dict(r)["k"]!)));
+    }
+
+    // The points where the port makes one more attempt than Python (the late cancel of GAPS F33). Case 14 runs three
+    // groups of facts with a limit of 2 and a retry. At call 4 the last running call raises, and the semaphore gives its
+    // place to the third group in the same turn. Python cancels the waiting coroutine of the third group before it runs.
+    // The port reads the token at the next call of a fake, so its third group makes one more attempt, and that attempt throws.
+    private static readonly (int Case, int K, string Kind)[] LateCancel =
+    [
+        (14, 4, "attempts"),
+    ];
 
     private static async Task Turns()
     {
@@ -251,18 +288,31 @@ public class CombinedExtractionValuesTests
         EpisodeOrEpisodes episode = input["episode"] is List<object?> many
             ? new EpisodeOrEpisodes.Many { Episodes = [.. many.Select(Episode)] }
             : new EpisodeOrEpisodes.One { Episode = Episode(input["episode"]) };
-        var (nodes, edges, map) = await CombinedExtractionModule.ExtractNodesAndEdgesAsync(
-            run.Clients,
-            episode,
-            [.. List(input["previous"]).Select(Episode)],
-            entityTypes: TypesOf(input["entity_types"]),
-            excludedEntityTypes: input["excluded"] is List<object?> excluded ? [.. excluded.Select(x => (string)x!)] : null,
-            edgeTypeMap: TypeMap(input["type_map"]),
-            edgeTypes: TypesOf(input["edge_types"]),
-            strictEdgeTypes: (bool)input["strict"]!,
-            customExtractionInstructions: (string?)input["instructions"],
-            timeline: input["timeline"] is List<object?> timeline ? [.. timeline.Select(Episode)] : null,
-            cancellationToken: cancellationToken);
+        List<EpisodicNode> previous = [.. List(input["previous"]).Select(Episode)];
+
+        // The case with "defaults" leaves each optional argument out (R25).
+        (List<EntityNode> Nodes, List<EntityEdge> Edges, OrderedDictionary<string, List<long>> Map) result;
+        if (input.GetValueOrDefault("defaults") is true)
+        {
+            result = await CombinedExtractionModule.ExtractNodesAndEdgesAsync(run.Clients, episode, previous, cancellationToken: cancellationToken);
+        }
+        else
+        {
+            result = await CombinedExtractionModule.ExtractNodesAndEdgesAsync(
+                run.Clients,
+                episode,
+                previous,
+                entityTypes: TypesOf(input["entity_types"]),
+                excludedEntityTypes: input["excluded"] is List<object?> excluded ? [.. excluded.Select(x => (string)x!)] : null,
+                edgeTypeMap: TypeMap(input["type_map"]),
+                edgeTypes: TypesOf(input["edge_types"]),
+                strictEdgeTypes: (bool)input["strict"]!,
+                customExtractionInstructions: (string?)input["instructions"],
+                timeline: input["timeline"] is List<object?> timeline ? [.. timeline.Select(Episode)] : null,
+                cancellationToken: cancellationToken);
+        }
+
+        var (nodes, edges, map) = result;
         // The map is a list of pairs, so that the placeholders reach its keys.
         var mapView = map.Select(e => (object?)new List<object?> { e.Key, e.Value.Select(x => (object?)x).ToList() }).ToList();
         return new OrderedDictionary<string, object?>

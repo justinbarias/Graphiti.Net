@@ -24,8 +24,17 @@ build_communities, remove_communities, determine_entity_community, and update_co
   answers node_get_by_group_ids and node_get_by_uuids from the stored nodes of the case, in their order. It implements
   get_community_clusters, remove_communities, and determine_entity_community only for a case that names them in "ops".
   A case with "graph_ops" has a GraphMaintenanceOperations with the default remove_communities.
-- Each fake yields once (asyncio.sleep(0)) and then records its call. The calls and the log lines are one list. Each
-  case keeps the largest count of fake calls in flight.
+- Each fake counts an attempt, yields once (asyncio.sleep(0)), and then records its call. The calls and the log lines
+  are one list. Each case keeps the largest count of fake calls in flight.
+- A case with "defaults" calls the function with each optional argument left out (R25).
+
+For the cases of CANCEL_CASES the tool also runs the case again with a cancel (the form of record_node_operations.py): once
+for k = -1, where the task is canceled before its first await, and once for each call k except the last, where the fake
+that makes call k records it and then cancels the task of the call (the port cancels a token source). The case keeps the
+count of the attempts of the run, the count of the recorded calls, and the events after call k, sorted as the text above
+says. Python lets a CancelledError through each `except Exception`, so the port must make the same attempts and write
+the same log lines (R25). A point where the port makes one more attempt is the late cancel of GAPS F33, and the test
+names it.
 
 A community summary comes from pairs of summaries in rounds, and the calls of one round run at the same time. Their
 order is not a contract (GAPS G19). So both sides sort each run of consecutive summarize_pair calls in the event list by
@@ -49,6 +58,7 @@ import os
 import random
 import re
 import sys
+import warnings
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,6 +77,12 @@ DESCRIPTION = 'summarize_nodes.summary_description'
 rng = random.Random(SEED)
 events: list[dict] = []
 state: dict = {}
+
+# A cancel leaves the coroutines of a gather that never started. Python warns about each one, and that is no result.
+warnings.filterwarnings('ignore', message='coroutine .* was never awaited', category=RuntimeWarning)
+
+# The cases that the tool runs again with a cancel. The C# test names the same cases.
+CANCEL_CASES = [0, 1, 7, 12, 19, 20, 25, 28, 32, 35, 42]
 
 
 def dt(value):
@@ -321,22 +337,56 @@ def cases() -> list[dict]:
     add('update_community', entity=entity, routing=True, answers=[answer(NEIGHBOR, [community('k2')], 'n1')])
     add('update_community', entity=entity, answers=[answer(NEIGHBOR, [community('k2')], 'n1')],
         replies=[reply(PAIR, '', {'summary': 'Merged.'}), reply(DESCRIPTION, 'Merged.', {'description': 'Merged\nname'})])
+    # The cases of the review round come last, so that the index of each earlier case stays (CANCEL_CASES).
+    # A tie in determine_entity_community: the first community that reaches the highest count wins
+    add('determine_entity_community', entity=entity, answers=[answer(NEIGHBOR, [community('k1'), community('k2')], 'n1')])
+    add('determine_entity_community', entity=entity, answers=[
+        answer(NEIGHBOR, [community('k2'), community('k1'), community('k2', 'Again.'), community('k1', 'Once more.')], 'n1')])
+    # A cluster of one node with a summary of 2000 characters, and a cluster of nodes of two groups
+    add('build_community', cluster=[node('c0', 'x' * 2000)])
+    add('build_community', cluster=[node('c0', 'Summary 0.', 'g'), node('c1', 'Summary 1.', 'h')])
+    # The limit of build_communities: 12 clusters with max_coroutines None and 0, and one cluster of 6 with a limit of 2
+    twelve = [node(f'b{i}', f'Summary b{i}.') for i in range(24)]
+    add('build_communities', group_ids=['g'], stored_nodes=twelve, ops=['get_community_clusters'],
+        clusters=[[f'b{2 * i}', f'b{2 * i + 1}'] for i in range(12)], max_coroutines=None)
+    add('build_communities', group_ids=['g'], stored_nodes=twelve, ops=['get_community_clusters'],
+        clusters=[[f'b{2 * i}', f'b{2 * i + 1}'] for i in range(12)], max_coroutines=0)
+    add('build_communities', group_ids=['g'], stored_nodes=twelve, ops=['get_community_clusters'],
+        clusters=[[f'b{i}' for i in range(6)]], max_coroutines=2)
+    # Each optional argument left out: the cluster of 8 pairs in a round of 4, and two clusters of one group
+    add('get_community_clusters', defaults=True, group_ids=['g'], answers=PROJECTION)
+    add('summarize_pair', defaults=True, pair=['Ana is an engineer.', 'Bob runs a bakery.'])
+    add('generate_summary_description', defaults=True, summary='A summary of Ana.')
+    add('build_community', defaults=True, cluster=[node(f'c{i}', f'Summary {i}.') for i in range(8)])
+    add('build_communities', defaults=True, group_ids=['g'], answers=PROJECTION)
+    add('remove_communities', defaults=True)
+    add('update_community', defaults=True, entity=entity, answers=[answer(NEIGHBOR, [community('k2')], 'n1')])
     return out
 
 
-async def run_case(case: dict, mods) -> dict:
+async def run_case(case: dict, mods, cancel_at=None) -> dict:
     co, EntityNode, CommunityNode, GraphitiClients, GraphProvider, GraphOperationsInterface, GraphMaintenanceOperations, \
         default_library = mods
     from graphiti_core.llm_client.config import ModelSize
     replies = [dict(r) for r in case.get('replies', [])]
     texts: list[str] = []
+    state['main'] = asyncio.current_task()
+    if cancel_at == -1:
+        # A task that is canceled before its first await: the first suspension raises CancelledError.
+        state['events_at_cancel'] = 0
+        state['main'].cancel()
 
     async def enter(kind, record):
+        state['attempts'] += 1
         state['in_flight'] += 1
         state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
         try:
             await asyncio.sleep(0)
             events.append({'kind': kind, **record})
+            state['count'] += 1
+            if cancel_at is not None and state['count'] - 1 == cancel_at:
+                state['events_at_cancel'] = len(events)
+                state['main'].cancel()
         finally:
             state['in_flight'] -= 1
 
@@ -452,38 +502,82 @@ async def run_case(case: dict, mods) -> dict:
         max_coroutines=case['max_coroutines'], prompt_library=default_library if case['routing'] else None)
     route = clients if case['routing'] else None
     fn = case['fn']
+    defaults = case.get('defaults')
     if fn == 'get_community_clusters':
-        clusters = await co.get_community_clusters(driver, case['group_ids'], max_coroutines=case['max_coroutines'])
+        if defaults:
+            clusters = await co.get_community_clusters(driver, case['group_ids'])
+        else:
+            clusters = await co.get_community_clusters(driver, case['group_ids'], max_coroutines=case['max_coroutines'])
         return {'clusters': [[n.uuid for n in cluster] for cluster in clusters]}
     if fn == 'summarize_pair':
+        if defaults:
+            return {'summary': await co.summarize_pair(llm, tuple(case['pair']))}
         return {'summary': await co.summarize_pair(llm, tuple(case['pair']), clients=route)}
     if fn == 'generate_summary_description':
+        if defaults:
+            return {'description': await co.generate_summary_description(llm, case['summary'])}
         return {'description': await co.generate_summary_description(llm, case['summary'], clients=route)}
     if fn == 'build_community':
         cluster = [EntityNode(**decode(n)) for n in case['cluster']]
-        result = await co.build_community(llm, cluster, clients=route, max_coroutines=case['max_coroutines'])
+        if defaults:
+            result = await co.build_community(llm, cluster)
+        else:
+            result = await co.build_community(llm, cluster, clients=route, max_coroutines=case['max_coroutines'])
         return {'community': community_view(result[0]), 'edges': [edge_view(e) for e in result[1]]}
     if fn == 'build_communities':
-        nodes, edges = await co.build_communities(driver, llm, case['group_ids'], clients=route,
-                                                  max_coroutines=case['max_coroutines'])
+        if defaults:
+            nodes, edges = await co.build_communities(driver, llm, case['group_ids'])
+        else:
+            nodes, edges = await co.build_communities(driver, llm, case['group_ids'], clients=route,
+                                                      max_coroutines=case['max_coroutines'])
         return {'communities': [community_view(n) for n in nodes], 'edges': [edge_view(e) for e in edges]}
     if fn == 'remove_communities':
+        if defaults:
+            return {'result': await co.remove_communities(driver)}
         return {'result': await co.remove_communities(driver, case['group_ids'])}
     if fn == 'determine_entity_community':
         found, is_new = await co.determine_entity_community(driver, EntityNode(**decode(case['entity'])))
         return {'community': None if found is None else community_view(found), 'is_new': is_new}
     if fn == 'update_community':
-        nodes, edges = await co.update_community(driver, llm, embedder, EntityNode(**decode(case['entity'])),
-                                                 clients=route)
+        entity = EntityNode(**decode(case['entity']))
+        if defaults:
+            nodes, edges = await co.update_community(driver, llm, embedder, entity)
+        else:
+            nodes, edges = await co.update_community(driver, llm, embedder, entity, clients=route)
         return {'communities': [community_view(n) for n in nodes], 'edges': [edge_view(e) for e in edges]}
     raise AssertionError(fn)
 
 
+def reset() -> None:
+    events.clear()
+    state.update(in_flight=0, max_in_flight=0, attempts=0, count=0, main=None, events_at_cancel=None)
+
+
+def call_count(output: dict) -> int:
+    return sum(1 for e in output['events'] if e['kind'] != 'log')
+
+
+def record_cancel(case: dict, mods, k: int) -> dict:
+    """The case again with a cancel at call k (k = -1: before the first await)."""
+    reset()
+    try:
+        asyncio.run(run_case(case, mods, k))
+        error = None
+    except asyncio.CancelledError:
+        error = 'CancelledError'
+    except Exception as exc:  # noqa: BLE001 - the recording keeps each exception
+        error = type(exc).__name__
+    if error != 'CancelledError':
+        raise SystemExit(f'The cancel at call {k} gave {error} and not CancelledError')
+    after = sort_pair_runs(list(events[state['events_at_cancel']:]))
+    return placeholders({'k': k, 'error': error, 'attempts': state['attempts'], 'count': state['count'],
+                         'after': after}, {})
+
+
 def record_async(mods) -> list[dict]:
     out = []
-    for case in cases():
-        events.clear()
-        state.update(in_flight=0, max_in_flight=0)
+    for index, case in enumerate(cases()):
+        reset()
         try:
             output = {'ok': asyncio.run(run_case(case, mods))}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -493,7 +587,10 @@ def record_async(mods) -> list[dict]:
             output = {'error': {'type': type(error).__name__, 'text': text}}
         output['events'] = sort_pair_runs(list(events))
         output['max_in_flight'] = state['max_in_flight']
-        out.append({'in': case, 'out': placeholders(output, {})})
+        item = {'in': case, 'out': placeholders(output, {})}
+        if index in CANCEL_CASES:
+            item['cancel'] = [record_cancel(case, mods, k) for k in range(-1, call_count(output) - 1)]
+        out.append(item)
     return out
 
 

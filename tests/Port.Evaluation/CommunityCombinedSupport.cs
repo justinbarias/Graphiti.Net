@@ -76,6 +76,45 @@ internal static class CommunityCombinedValues
         return output;
     }
 
+    internal static readonly string[] CancelFields = ["attempts", "count", "after"];
+
+    // The point k of a recorded cancel scenario (k = -1: the task is canceled before its first await). The recorder ran the
+    // case with a cancel at call k on Python, and kept the attempts, the recorded calls, and the events after call k. A
+    // point in `lateCancel` is a late cancel of GAPS F33: the port differs from Python in the fields of its kind. A point
+    // that agrees with Python must not be in the list, and a point in the list must differ in the way that its kind says.
+    internal static void AssertCancelPoint(
+        OrderedDictionary<string, object?> recordedCase,
+        int index,
+        int k,
+        CommunityCombinedRun run,
+        int eventsAtCancel,
+        (int Case, int K, string Kind)[] lateCancel)
+    {
+        var recorded = List(recordedCase["cancel"]).Select(Dict).Single(r => (long)r["k"]! == k);
+        var got = Dict(Placeholders(
+            new OrderedDictionary<string, object?>
+            {
+                ["k"] = (long)k,
+                ["error"] = "CancelledError",
+                ["attempts"] = run.Attempts,
+                ["count"] = (long)run.Count,
+                ["after"] = SortPairRuns([.. run.Events.Skip(eventsAtCancel)]),
+            },
+            []));
+        var differences = string.Join(
+            "+",
+            CancelFields.Where(key => PyJson.Dumps(recorded[key]) != PyJson.Dumps(got[key])));
+        var listed = lateCancel.Where(e => e.Case == index && e.K == k).Select(e => e.Kind).ToList();
+        if (listed.Count == 0)
+        {
+            Assert.True(differences.Length == 0, $"case {index}, call {k}: the port differs from Python in {differences}: {PyJson.Dumps(recorded)} and {PyJson.Dumps(got)}");
+        }
+        else
+        {
+            Assert.Equal(listed.Single(), differences);
+        }
+    }
+
     // The Python name of an exception that the recording keeps.
     internal static string PythonErrorName(Exception e) => e switch
     {
@@ -170,7 +209,16 @@ internal sealed class CommunityCombinedRun
 
     internal List<string> Texts { get; } = [];
 
+    // The count of the calls that take the token and record themselves.
     internal int Count { get; private set; }
+
+    // The count of the calls that start, before a fake reads its token (R25).
+    internal long Attempts { get; private set; }
+
+    // The count of the attempts and the length of the event list at the moment that a fake cancels the token source.
+    internal long AttemptsAtCancel { get; private set; } = -1;
+
+    internal int EventsAtCancel { get; private set; } = -1;
 
     internal int InFlight { get; private set; }
 
@@ -184,10 +232,11 @@ internal sealed class CommunityCombinedRun
 
     internal GraphitiClients Clients { get; }
 
-    // The common part of each fake call: the token check, a yield, a second token check, and the record (R25).
+    // The common part of each fake call: it counts an attempt and itself in flight, yields, reads the token, and records
+    // itself (R25). A call that is canceled still counts as an attempt, as in the fakes of the recorders.
     internal async Task EnterAsync(string kind, OrderedDictionary<string, object?> record, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        Attempts++;
         InFlight++;
         MaxInFlight = Math.Max(MaxInFlight, InFlight);
         try
@@ -204,6 +253,8 @@ internal sealed class CommunityCombinedRun
             Tokens.Add(cancellationToken);
             if (Count++ == CancelAt)
             {
+                AttemptsAtCancel = Attempts;
+                EventsAtCancel = Events.Count;
                 await Source.CancelAsync();
             }
         }

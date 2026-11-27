@@ -15,8 +15,15 @@ calls them, because the function calls only the LLM client:
   a fixed rule: the first reply of the case for the prompt name whose needle is in the last message and whose count of
   uses is not spent. A reply {"$raise": text} raises RuntimeError. With no such reply, a batch timestamp prompt gets one
   empty row for each `"reference_time"` text of the last message, and another prompt raises LookupError.
-- Each fake yields once (asyncio.sleep(0)) and then records its call. The calls and the log lines are one list. Each
-  case keeps the largest count of fake calls in flight.
+- Each fake counts an attempt, yields once (asyncio.sleep(0)), and then records its call. The calls and the log lines
+  are one list. Each case keeps the largest count of fake calls in flight.
+
+For the cases of CANCEL_CASES the tool also runs the case again with a cancel (the form of record_node_operations.py): once
+for k = -1, where the task is canceled before its first await, and once for each call k except the last, where the fake
+that makes call k records it and then cancels the task of the call (the port cancels a token source). The case keeps the
+count of the attempts of the run, the count of the recorded calls, and the events after call k. Python lets a
+CancelledError through each `except Exception`, so the port must make the same attempts and write the same log lines
+(R25). A point where the port makes one more attempt is the late cancel of GAPS F33, and the test names it.
 
 Fixed values on both sides: combined_extraction.utc_now and dangling_endpoints.utc_now give FIXED_NOW, and the C# test
 gives the port a clock with the same time. A uuid4 that the code makes is random: the test replaces each one, in the
@@ -41,6 +48,7 @@ import os
 import random
 import re
 import sys
+import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -56,6 +64,12 @@ MS = re.compile(r'in [0-9.e+-]+ ms')
 rng = random.Random(SEED)
 events: list[dict] = []
 state: dict = {}
+
+# A cancel leaves the coroutines of a gather that never started. Python warns about each one, and that is no result.
+warnings.filterwarnings('ignore', message='coroutine .* was never awaited', category=RuntimeWarning)
+
+# The cases that the tool runs again with a cancel. The C# test names the same cases.
+CANCEL_CASES = [0, 14, 15]
 
 
 def dt(value):
@@ -156,6 +170,7 @@ TYPE_DEFS = {
     'Person': 'A human being.',
     'Company': 'A named business or organization.',
     'Place': None,
+    'Bad Type': 'A type with a name that is not a Cypher identifier.',
     'WORKS_AT': 'Employment relation.',
     'LIVES_IN': None,
     'KNOWS': 'Two people know each other.',
@@ -285,20 +300,62 @@ def cases() -> list[dict]:
     add(replies=[main_reply([{'name': 'Ana', 'entity_type_id': 'x'}], [])])
     # The main call fails
     add(replies=[reply('extract_nodes_and_edges.extract_message', '', {'$raise': 'llm down'})])
+    # The cases of the review round come last, so that the index of each earlier case stays (CANCEL_CASES).
+    # An excluded source alone. The exclusion of the default type renumbers the types, so Person is id 0, and id 1 is out of
+    # range: Acme has the default type and is excluded, and Alice is a Person.
+    add(entity_types=['Person'], excluded=['Entity'], replies=[
+        main_reply([ent('Acme', 1), ent('Alice', 0)], [fact('Acme', 'Alice', 'KNOWS', 'Acme knows Alice')]),
+    ])
+    # The indices [1, 2] and [2, 1]: the reference time is the time of the first index in range
+    add(episode=three, replies=[main_reply([ent('Ana'), ent('Paris'), ent('Bob')], [
+        fact('Ana', 'Paris', 'LIVES_IN', 'Ana lives in Paris', [1, 2]),
+        fact('Bob', 'Paris', 'VISITED', 'Bob visited Paris', [2, 1]),
+    ])])
+    # An empty edge type map with edge types, strict on and off
+    add(entity_types=['Person'], edge_types=['WORKS_AT'], type_map=[], strict=True, replies=[])
+    add(entity_types=['Person'], edge_types=['WORKS_AT'], type_map=[], strict=False, replies=[
+        main_reply([ent('Ana', 1), ent('Acme')], [fact('Ana', 'Acme', 'WORKS_AT', 'Ana works at Acme')]),
+    ])
+    # A name and a fact of Python whitespace only: str.strip removes U+001C, and the .NET Trim does not
+    add(replies=[main_reply([ent('\x1c'), ent('Ana'), ent('Bob')], [
+        fact('Ana', 'Bob', 'KNOWS', '\x1c'),
+        fact('\x1c', 'Bob', 'KNOWS', 'a fact with an empty source'),
+        fact('Ana', 'Bob', 'KNOWS', 'Ana knows Bob'),
+    ])])
+    # Episodes of the groups g and h: the group of the first episode is the group of the call and of each result
+    add(episode=[ep('ga', REF, group_id='g'), ep('hb', REF, group_id='h', content='Bob knows Ana.')], previous=[], replies=[
+        main_reply([ent('Ana'), ent('Bob')], [fact('Ana', 'Bob', 'KNOWS', 'Ana knows Bob', [1])]),
+    ])
+    # The entity type id -1 is out of range, so the type is Entity
+    add(entity_types=['Person'], replies=[main_reply([ent('Ana', -1), ent('Bob', 1)], [fact('Ana', 'Bob', 'KNOWS', 'Ana knows Bob')])])
+    # Each optional argument left out
+    add(defaults=True, replies=[main_reply([ent('Ana'), ent('Acme')], [fact('Ana', 'Acme', 'WORKS_AT', 'Ana works at Acme')])])
+    # An entity type name that is not a Cypher identifier: the error of the node validator names EntityNode
+    add(entity_types=['Bad Type'], replies=[main_reply([ent('Ana', 1)], [fact('Ana', 'Ana', 'SELF', 'Ana is Ana')])])
     return out
 
 
-async def run_case(case: dict, mods) -> dict:
+async def run_case(case: dict, mods, cancel_at=None) -> dict:
     ce, EntityNode, EpisodicNode, GraphitiClients, default_library, models = mods
     from graphiti_core.llm_client.config import ModelSize
     replies = [dict(r) for r in case.get('replies', [])]
+    state['main'] = asyncio.current_task()
+    if cancel_at == -1:
+        # A task that is canceled before its first await: the first suspension raises CancelledError.
+        state['events_at_cancel'] = 0
+        state['main'].cancel()
 
     async def enter(kind, record):
+        state['attempts'] += 1
         state['in_flight'] += 1
         state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
         try:
             await asyncio.sleep(0)
             events.append({'kind': kind, **record})
+            state['count'] += 1
+            if cancel_at is not None and state['count'] - 1 == cancel_at:
+                state['events_at_cancel'] = len(events)
+                state['main'].cancel()
         finally:
             state['in_flight'] -= 1
 
@@ -345,19 +402,48 @@ async def run_case(case: dict, mods) -> dict:
     episode_arg = [EpisodicNode(**decode(e)) for e in episode] if isinstance(episode, list) else EpisodicNode(**decode(episode))
     timeline = None if case['timeline'] is None else [EpisodicNode(**decode(e)) for e in case['timeline']]
     type_map = None if case['type_map'] is None else {tuple(k): list(v) for k, v in case['type_map']}
-    nodes, edges, index_map = await ce.extract_nodes_and_edges(
-        clients, episode_arg, [EpisodicNode(**decode(e)) for e in case['previous']],
-        entity_types=types_of(case['entity_types']), excluded_entity_types=case['excluded'], edge_type_map=type_map,
-        edge_types=types_of(case['edge_types']), strict_edge_types=case['strict'],
-        custom_extraction_instructions=case['instructions'], timeline=timeline)
+    previous = [EpisodicNode(**decode(e)) for e in case['previous']]
+    if case.get('defaults'):
+        nodes, edges, index_map = await ce.extract_nodes_and_edges(clients, episode_arg, previous)
+    else:
+        nodes, edges, index_map = await ce.extract_nodes_and_edges(
+            clients, episode_arg, previous,
+            entity_types=types_of(case['entity_types']), excluded_entity_types=case['excluded'], edge_type_map=type_map,
+            edge_types=types_of(case['edge_types']), strict_edge_types=case['strict'],
+            custom_extraction_instructions=case['instructions'], timeline=timeline)
     return {'nodes': [node_view(n) for n in nodes], 'edges': [edge_view(e) for e in edges], 'map': [[k, v] for k, v in index_map.items()]}
+
+
+def reset() -> None:
+    events.clear()
+    state.update(in_flight=0, max_in_flight=0, attempts=0, count=0, main=None, events_at_cancel=None)
+
+
+def call_count(output: dict) -> int:
+    return sum(1 for e in output['events'] if e['kind'] != 'log')
+
+
+def record_cancel(case: dict, mods, k: int) -> dict:
+    """The case again with a cancel at call k (k = -1: before the first await)."""
+    reset()
+    try:
+        asyncio.run(run_case(case, mods, k))
+        error = None
+    except asyncio.CancelledError:
+        error = 'CancelledError'
+    except Exception as exc:  # noqa: BLE001 - the recording keeps each exception
+        error = type(exc).__name__
+    if error != 'CancelledError':
+        raise SystemExit(f'The cancel at call {k} gave {error} and not CancelledError')
+    after = events[state['events_at_cancel']:]
+    return placeholders({'k': k, 'error': error, 'attempts': state['attempts'], 'count': state['count'],
+                         'after': list(after)}, {})
 
 
 def record_async(mods) -> list[dict]:
     out = []
-    for case in cases():
-        events.clear()
-        state.update(in_flight=0, max_in_flight=0)
+    for index, case in enumerate(cases()):
+        reset()
         try:
             output = {'ok': asyncio.run(run_case(case, mods))}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -367,7 +453,10 @@ def record_async(mods) -> list[dict]:
             output = {'error': {'type': type(error).__name__, 'text': text}}
         output['events'] = list(events)
         output['max_in_flight'] = state['max_in_flight']
-        out.append({'in': case, 'out': placeholders(output, {})})
+        item = {'in': case, 'out': placeholders(output, {})}
+        if index in CANCEL_CASES:
+            item['cancel'] = [record_cancel(case, mods, k) for k in range(-1, call_count(output) - 1)]
+        out.append(item)
     return out
 
 
@@ -375,7 +464,7 @@ def main() -> int:
     if sys.version_info[:2] != (3, 12):
         raise SystemExit(f'Python 3.12 is needed, and this is {sys.version.split()[0]}')
     sys.path.insert(0, str(UPSTREAM))
-    from pydantic import BaseModel, create_model
+    from pydantic import BaseModel, ConfigDict, create_model
 
     from graphiti_core.graphiti_types import GraphitiClients
     from graphiti_core.nodes import EntityNode, EpisodicNode
@@ -397,12 +486,17 @@ def main() -> int:
     root.addHandler(Capture(logging.DEBUG))
 
     class OrderedLabelsEntityNode(EntityNode):
+        model_config = ConfigDict(title='EntityNode')
+
         def __init__(self, **data):
             labels = data.get('labels')
             if labels is not None and 'Entity' in labels:
                 data['labels'] = ['Entity'] + [label for label in labels if label != 'Entity']
             super().__init__(**data)
 
+    # The title of a pydantic error is the title of the model config, and the class takes the name of upstream too.
+    OrderedLabelsEntityNode.__name__ = 'EntityNode'
+    OrderedLabelsEntityNode.__qualname__ = 'EntityNode'
     ce.EntityNode = OrderedLabelsEntityNode
     ce.utc_now = lambda: FIXED_NOW
     dangling_endpoints.utc_now = lambda: FIXED_NOW

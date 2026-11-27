@@ -412,12 +412,14 @@ internal static partial class CombinedExtractionModule
                     if (timestamps is not null)
                     {
                         // PORT: batch_rows is a slice of at most len(group) items, so zip_longest gives an edge for
-                        // each row.
+                        // each row and no input gives a row with no edge. Python reads edge.reference_time with no
+                        // test, so the form of R4 is Py.NotNone.
+                        var rowEdge = Py.NotNone(edge, "reference_time");
                         TemporalEdgeUtils.ApplyExtractedTimestamps(
-                            edge!,
+                            rowEdge,
                             timestamps.ValidAt,
                             timestamps.InvalidAt,
-                            edge!.ReferenceTime);
+                            rowEdge.ReferenceTime);
                     }
                 }
             }
