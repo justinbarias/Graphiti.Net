@@ -8,7 +8,6 @@ namespace Graphiti.Port.Evaluation;
 using System.Collections;
 using System.Globalization;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Graphiti.Core;
@@ -42,10 +41,8 @@ public class MaintenanceHelpersValuesTests
 
         Assert.Equal(GraphDataOperations.EpisodeWindowLen, (long)Dict(constants["graph_data_operations"])["EPISODE_WINDOW_LEN"]!);
 
-        // The recording holds the maxsize of the lru_cache of Python. The port keeps its cache in a private static field.
-        var cache = typeof(DedupHelpers).GetField("CachedShinglesCache", BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(cache);
-        Assert.Equal((int)(long)constants["lru_cache_maxsize"]!, ((PyLruCache<string, HashSet<string>>)cache.GetValue(null)!).MaxSize);
+        // The recording holds the maxsize of the lru_cache of Python.
+        Assert.Equal((int)(long)constants["lru_cache_maxsize"]!, DedupHelpers.CachedShinglesCache.MaxSize);
     }
 
     [Fact]

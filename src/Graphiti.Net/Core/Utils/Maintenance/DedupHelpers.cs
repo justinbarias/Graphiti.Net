@@ -211,8 +211,9 @@ internal static partial class DedupHelpers
         return union != 0 ? Py.TrueDiv(intersection, union) : 0.0;
     }
 
-    // PORT: @lru_cache(maxsize=512) is a PyLruCache in a static field (R16).
-    private static readonly PyLruCache<string, HashSet<string>> CachedShinglesCache = new(512);
+    // PORT: @lru_cache(maxsize=512) is a PyLruCache in a static field (R16). It is internal, because the recording test
+    // reads its size (R2).
+    internal static readonly PyLruCache<string, HashSet<string>> CachedShinglesCache = new(512);
 
     /// <summary>Cache shingle sets per normalized name to avoid recomputation within a worker.</summary>
     internal static HashSet<string> CachedShingles(string name)
