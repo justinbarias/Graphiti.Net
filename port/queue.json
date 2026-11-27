@@ -688,7 +688,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Prompts/Models.cs",
       "status": "reviewed",
-      "notes": "Ported with the pilot unit dedupe_nodes. 16 judge cases pass. The case pure.prompts.models.PromptSpec.with_model is not bound: its argument names the model ExtractedEntities of prompts.extract_nodes, which is not ported."
+      "notes": "Ported with the pilot unit dedupe_nodes. Each judge case of the module passes. The case pure.prompts.models.PromptSpec.with_model passes since layer 4, which registers the model ExtractedEntities."
     },
     {
       "order": 34,
@@ -753,9 +753,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/DedupeEdges.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round."
     },
     {
       "order": 37,
@@ -793,9 +793,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/Eval.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round."
     },
     {
       "order": 39,
@@ -813,9 +813,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/ExtractEdges.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round."
     },
     {
       "order": 40,
@@ -847,9 +847,9 @@
         "graphiti_core.utils.text_utils"
       ],
       "external": [],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/Snippets.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Constants only. Ported with the skeleton, and the recording of extract_nodes compares each text that uses them."
     },
     {
       "order": 42,
@@ -869,9 +869,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/ExtractNodes.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round. The binding registers ExtractedEntities as a response model. It does not build a custom-type descriptor from it: the cases of entity_types_utils that pass the class as a custom type stay listed under open item O4."
     },
     {
       "order": 43,
@@ -889,9 +889,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/ExtractNodesAndEdges.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round. The two section builders take object?, because the context gives them open data (rule R20)."
     },
     {
       "order": 44,
@@ -911,9 +911,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/SummarizeNodes.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round."
     },
     {
       "order": 45,
@@ -931,9 +931,9 @@
         "pydantic",
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/SummarizeSagas.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round."
     },
     {
       "order": 46,
@@ -963,8 +963,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Prompts/Lib.cs",
-      "status": "todo",
-      "notes": "The pilot declared the interfaces IPromptGroup and IPromptLibrary for real (rule R24). The other members are not ported. The upstream tests test_chat_prompt_defaults_match_legacy_prompt_text and test_as_messages_appends_unicode_note_for_overrides wait for this unit."
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round. A typed override cannot return a list or a text, so those inputs are not recorded. jev_prompt_overrides and openai_decisions_prompt_overrides of the decisions clients read this library first in layer 3."
     },
     {
       "order": 47,
@@ -1048,9 +1048,9 @@
       "external": [
         "typing"
       ],
-      "target": "",
-      "status": "todo",
-      "notes": ""
+      "target": "src/Graphiti.Net/Core/Prompts/Names.cs",
+      "status": "reviewed",
+      "notes": "Layer 4. Two reviews and one fix round."
     },
     {
       "order": 51,
@@ -1188,8 +1188,8 @@
       ],
       "external": [],
       "target": "",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Package module. It only imports names again, so it needs no file (rule R1)."
     },
     {
       "order": 57,
@@ -2273,7 +2273,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/OntologyUtils/EntityTypesUtils.cs",
       "status": "reviewed",
-      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. The cases that pass the ExtractedEntities class stay listed until the extract_nodes unit of layer 4 registers it."
+      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. Its cases that pass a built-in model class (ExtractedEntities or EntityNode) as a custom type stay listed under open item O4: the descriptor of such a model needs a field kind. Two wrong-type cases of validate_identity_properties stay listed too."
     },
     {
       "order": 102,

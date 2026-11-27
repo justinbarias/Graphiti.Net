@@ -17,30 +17,115 @@ limitations under the License.
 
 namespace Graphiti.Core.Prompts;
 
-// PORT: each response model has its fields as properties. The unit adds the members of R7.
-internal sealed record QueryExpansion
+using Graphiti.Internal;
+using Graphiti.PyCompat;
+
+internal sealed record QueryExpansion : IPydanticModel
 {
     internal required string Query { get; set; }
+
+    internal QueryExpansion Validate() => this;
+
+    internal static QueryExpansion ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("QueryExpansion", data);
+        var query = f.Required("query", Pydantic.Str);
+        f.ThrowIfAny();
+        return new QueryExpansion { Query = query.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("query", Query));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("QueryExpansion")
+        .Required("query", PydanticType.Str, "query optimized for database search");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("QueryExpansion", ModelJsonSchema);
 }
 
-internal sealed record QAResponse
+internal sealed record QAResponse : IPydanticModel
 {
-    // PORT: the Python field name is `ANSWER`. Its wire name stays `ANSWER` (R2).
     internal required string Answer { get; set; }
+
+    internal QAResponse Validate() => this;
+
+    internal static QAResponse ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("QAResponse", data);
+        var answer = f.Required("ANSWER", Pydantic.Str);
+        f.ThrowIfAny();
+        return new QAResponse { Answer = answer.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("ANSWER", Answer));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("QAResponse")
+        .Required("ANSWER", PydanticType.Str, "how Alice would answer the question");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("QAResponse", ModelJsonSchema);
 }
 
-internal sealed record EvalResponse
+internal sealed record EvalResponse : IPydanticModel
 {
     internal required bool IsCorrect { get; set; }
 
     internal required string Reasoning { get; set; }
+
+    internal EvalResponse Validate() => this;
+
+    internal static EvalResponse ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("EvalResponse", data);
+        var isCorrect = f.Required("is_correct", Pydantic.Bool);
+        var reasoning = f.Required("reasoning", Pydantic.Str);
+        f.ThrowIfAny();
+        return new EvalResponse { IsCorrect = isCorrect.Value, Reasoning = reasoning.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("is_correct", IsCorrect), ("reasoning", Reasoning));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("EvalResponse")
+        .Required("is_correct", PydanticType.Bool, "boolean if the answer is correct or incorrect")
+        .Required("reasoning", PydanticType.Str, "why you determined the response was correct or incorrect");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("EvalResponse", ModelJsonSchema);
 }
 
-internal sealed record EvalAddEpisodeResults
+internal sealed record EvalAddEpisodeResults : IPydanticModel
 {
     internal required bool CandidateIsWorse { get; set; }
 
     internal required string Reasoning { get; set; }
+
+    internal EvalAddEpisodeResults Validate() => this;
+
+    internal static EvalAddEpisodeResults ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("EvalAddEpisodeResults", data);
+        var candidateIsWorse = f.Required("candidate_is_worse", Pydantic.Bool);
+        var reasoning = f.Required("reasoning", Pydantic.Str);
+        f.ThrowIfAny();
+        return new EvalAddEpisodeResults { CandidateIsWorse = candidateIsWorse.Value, Reasoning = reasoning.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) =>
+        Pydantic.DumpFields(json, ("candidate_is_worse", CandidateIsWorse), ("reasoning", Reasoning));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("EvalAddEpisodeResults")
+        .Required("candidate_is_worse", PydanticType.Bool, "boolean if the baseline extraction is higher quality than the candidate extraction.")
+        .Required("reasoning", PydanticType.Str, "why you determined the response was correct or incorrect");
+
+    internal static readonly IResponseModel ResponseModel = new BuiltinResponseModel("EvalAddEpisodeResults", ModelJsonSchema);
 }
 
 internal interface EvalPrompt
@@ -59,28 +144,111 @@ internal interface EvalPrompt
 // PORT: `Versions` is a TypedDict that prompts/lib.py reads by key, so it has no C# type (R2).
 internal static class Eval
 {
-    // TODO(port): query_expansion
     internal static List<Message> QueryExpansion(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): query_expansion");
+        var sysPrompt = "You are an expert at rephrasing questions into queries used in a database retrieval system";
+
+        var userPrompt = "\n" + $$"""
+    Bob is asking Alice a question, are you able to rephrase the question into a simpler one about Alice in the third person
+    that maintains the relevant context?
+    <QUESTION>
+    {{PromptHelpers.ToPromptJson(context["query"])}}
+    </QUESTION>
+""" + "\n    ";
+        return
+        [
+            new Message { Role = "system", Content = sysPrompt }.Validate(),
+            new Message { Role = "user", Content = userPrompt }.Validate(),
+        ];
     }
 
-    // TODO(port): qa_prompt
     internal static List<Message> QaPrompt(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): qa_prompt");
+        var sysPrompt = "You are Alice and should respond to all questions from the first person perspective of Alice";
+
+        var userPrompt = "\n" + $$"""
+    Your task is to briefly answer the question in the way that you think Alice would answer the question.
+    You are given the following entity summaries and facts to help you determine the answer to your question.
+    <ENTITY_SUMMARIES>
+    {{PromptHelpers.ToPromptJson(context["entity_summaries"])}}
+    </ENTITY_SUMMARIES>
+    <FACTS>
+    {{PromptHelpers.ToPromptJson(context["facts"])}}
+    </FACTS>
+    <QUESTION>
+    {{Py.Str(context["query"])}}
+    </QUESTION>
+""" + "\n    ";
+        return
+        [
+            new Message { Role = "system", Content = sysPrompt }.Validate(),
+            new Message { Role = "user", Content = userPrompt }.Validate(),
+        ];
     }
 
-    // TODO(port): eval_prompt
     internal static List<Message> EvalPrompt(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): eval_prompt");
+        var sysPrompt = "You are a judge that determines if answers to questions match a gold standard answer";
+
+        // PORT: R9. The line "Although ... topic " ends in a space, so it is an ordinary string.
+        var userPrompt = "\n" + """
+    Given the QUESTION and the gold standard ANSWER determine if the RESPONSE to the question is correct or incorrect.
+    Although the RESPONSE may be more verbose, mark it as correct as long as it references the same topic
+""" + " \n" + $$"""
+    as the gold standard ANSWER. Also include your reasoning for the grade.
+    <QUESTION>
+    {{Py.Str(context["query"])}}
+    </QUESTION>
+    <ANSWER>
+    {{Py.Str(context["answer"])}}
+    </ANSWER>
+    <RESPONSE>
+    {{Py.Str(context["response"])}}
+    </RESPONSE>
+""" + "\n    ";
+        return
+        [
+            new Message { Role = "system", Content = sysPrompt }.Validate(),
+            new Message { Role = "user", Content = userPrompt }.Validate(),
+        ];
     }
 
-    // TODO(port): eval_add_episode_results
     internal static List<Message> EvalAddEpisodeResults(OrderedDictionary<string, object?> context)
     {
-        throw new NotSupportedException("TODO(port): eval_add_episode_results");
+        var sysPrompt = """
+You are a judge that determines whether a baseline graph building result from a list of messages is better
+        than a candidate graph building result based on the same messages.
+""";
+
+        // PORT: R9. Each line that ends in spaces, or holds only spaces, is an ordinary string.
+        var userPrompt = "\n" + """
+    Given the following PREVIOUS MESSAGES and MESSAGE, determine if the BASELINE graph data extracted from the
+""" + " \n" + """
+    conversation is higher quality than the CANDIDATE graph data extracted from the conversation.
+""" + "\n    \n" + """
+    Return False if the BASELINE extraction is better, and True otherwise. If the CANDIDATE extraction and
+    BASELINE extraction are nearly identical in quality, return True. Add your reasoning for your decision to the reasoning field
+""" + "\n    \n" + $$"""
+    <PREVIOUS MESSAGES>
+    {{Py.Str(context["previous_messages"])}}
+    </PREVIOUS MESSAGES>
+    <MESSAGE>
+    {{Py.Str(context["message"])}}
+    </MESSAGE>
+""" + "\n    \n" + $$"""
+    <BASELINE>
+    {{Py.Str(context["baseline"])}}
+    </BASELINE>
+""" + "\n    \n" + $$"""
+    <CANDIDATE>
+    {{Py.Str(context["candidate"])}}
+    </CANDIDATE>
+""" + "\n    ";
+        return
+        [
+            new Message { Role = "system", Content = sysPrompt }.Validate(),
+            new Message { Role = "user", Content = userPrompt }.Validate(),
+        ];
     }
 
     internal static readonly OrderedDictionary<string, PromptFunction> Versions = new()
@@ -118,27 +286,15 @@ internal abstract class EvalPrompts : IPromptGroup
 
 internal sealed class DefaultEvalPrompts : EvalPrompts
 {
-    // TODO(port): DefaultEvalPrompts.query_expansion
-    internal override ChatPrompt QueryExpansion(OrderedDictionary<string, object?> context)
-    {
-        throw new NotSupportedException("TODO(port): DefaultEvalPrompts.query_expansion");
-    }
+    internal override ChatPrompt QueryExpansion(OrderedDictionary<string, object?> context) =>
+        ChatPrompt.FromMessages(Eval.QueryExpansion(context));
 
-    // TODO(port): DefaultEvalPrompts.qa_prompt
-    internal override ChatPrompt QaPrompt(OrderedDictionary<string, object?> context)
-    {
-        throw new NotSupportedException("TODO(port): DefaultEvalPrompts.qa_prompt");
-    }
+    internal override ChatPrompt QaPrompt(OrderedDictionary<string, object?> context) =>
+        ChatPrompt.FromMessages(Eval.QaPrompt(context));
 
-    // TODO(port): DefaultEvalPrompts.eval_prompt
-    internal override ChatPrompt EvalPrompt(OrderedDictionary<string, object?> context)
-    {
-        throw new NotSupportedException("TODO(port): DefaultEvalPrompts.eval_prompt");
-    }
+    internal override ChatPrompt EvalPrompt(OrderedDictionary<string, object?> context) =>
+        ChatPrompt.FromMessages(Eval.EvalPrompt(context));
 
-    // TODO(port): DefaultEvalPrompts.eval_add_episode_results
-    internal override ChatPrompt EvalAddEpisodeResults(OrderedDictionary<string, object?> context)
-    {
-        throw new NotSupportedException("TODO(port): DefaultEvalPrompts.eval_add_episode_results");
-    }
+    internal override ChatPrompt EvalAddEpisodeResults(OrderedDictionary<string, object?> context) =>
+        ChatPrompt.FromMessages(Eval.EvalAddEpisodeResults(context));
 }
