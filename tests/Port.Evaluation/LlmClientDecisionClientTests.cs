@@ -1,15 +1,13 @@
 // Port of tests/llm_client/test_openai_decisions_client.py (port/RULES.md, R25). Each test keeps its Python name.
 //
-// Three tests of the shared pytest files wait for other units, and are not ported yet:
-// - test_shared_prompt_renders_match_zep_fixture_for_both_clients (test_openai_decisions_client.py) calls
-//   jev_prompt_overrides() and openai_decisions_prompt_overrides() with the default prompt library, so it waits for
-//   the prompt library and the dedupe_nodes and dedupe_edges prompts of layer 4 (Lib.DefaultChatPromptLibrary and
-//   Lib.GetPromptBuilder are skeletons). Its fixture is decision_prompt_fixture.json.
+// Two tests of the shared pytest files wait for another unit, and are not ported yet:
 // - test_jev_client_threshold_defaults_match_decisions_client (test_openai_decisions_client.py) builds a JevClient,
 //   so it waits for the unit graphiti_core.llm_client.jev_client.
-// - test_jev_prompt_overrides_build_n6_and_e2_questions (test_jev_client.py) calls jev_prompt_overrides() with the
-//   default prompt library, and reads the constants through the module jev_client, so it waits for layer 4 and for
-//   jev_client.
+// - test_jev_prompt_overrides_build_n6_and_e2_questions (test_jev_client.py) reads the constants through the module
+//   jev_client, so it waits for jev_client.
+// values/decision_prompt_fixture.json holds the texts of tests/llm_client/decision_prompt_fixture.json of the pinned
+// upstream (port/tools/record_decision_prompt_fixture.py), for
+// test_shared_prompt_renders_match_zep_fixture_for_both_clients.
 // The two prompt builders themselves are compared with Python in LlmClientDecisionValuesTests, with a default builder
 // that the test gives.
 //
@@ -349,5 +347,50 @@ public class LlmClientDecisionClientTests
 
         Assert.Equal(expectedBaseUrl, client.BaseUrl);
         client.HttpClient.Dispose();
+    }
+
+    [Fact]
+    public void test_shared_prompt_renders_match_zep_fixture_for_both_clients()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "values", "decision_prompt_fixture.json");
+        var expected = Py.AsDict(PyJson.Loads(File.ReadAllText(path)));
+        var nodeContext = new OrderedDictionary<string, object?>
+        {
+            ["previous_episodes"] = new List<object?> { "Alice joined Acme." },
+            ["episode_content"] = "Alice joined Acme as an engineer.",
+            ["extracted_nodes"] = new List<object?>
+            {
+                new OrderedDictionary<string, object?>
+                {
+                    ["id"] = 0L, ["name"] = "Alice", ["entity_type"] = new List<object?> { "Person" },
+                },
+                new OrderedDictionary<string, object?>
+                {
+                    ["id"] = 1L, ["name"] = "Acme", ["entity_type"] = new List<object?> { "Organization" },
+                },
+            },
+            ["existing_nodes"] = new List<object?>
+            {
+                new OrderedDictionary<string, object?> { ["candidate_id"] = 7L, ["name"] = "Alice Smith" },
+            },
+        };
+        var edgeContext = new OrderedDictionary<string, object?>
+        {
+            ["existing_edges"] = "[{\"idx\": 0, \"fact\": \"Alice works at Acme\"}]",
+            ["edge_invalidation_candidates"] = "[{\"idx\": 1, \"fact\": \"Alice was a manager at Acme\"}]",
+            ["new_edge"] = "Alice works at Acme as an engineer",
+        };
+
+        foreach (var overrides in new[]
+                 {
+                     DecisionPrompts.JevPromptOverrides(),
+                     OpenaiDecisionsClientModule.OpenaiDecisionsPromptOverrides(),
+                 })
+        {
+            var node = overrides.DedupeNodes!.Nodes!(nodeContext);
+            var edge = overrides.DedupeEdges!.ResolveEdge!(edgeContext);
+            Assert.Equal(Py.AsString(expected["node"]), node.User.Content);
+            Assert.Equal(Py.AsString(expected["edge"]), edge.User.Content);
+        }
     }
 }
