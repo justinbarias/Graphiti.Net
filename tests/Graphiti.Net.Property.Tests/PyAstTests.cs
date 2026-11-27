@@ -33,12 +33,37 @@ public class PyAstTests
         });
     }
 
+    [Fact]
+    public void LiteralEval_of_the_deepest_text_that_the_limits_accept_returns_on_a_default_stack()
+    {
+        // The other deep tests run on a large stack, so this one holds the default stack. A stack overflow ends the
+        // process, and no caller can catch it. An instrumented build uses more stack, so the test does not run there.
+        Assert.SkipWhen(
+            typeof(PyAst).Assembly.GetTypes().Any(t => t.Name == "MutantControl"),
+            "Stryker instruments this build, and the instrumented parser uses more stack.");
+        var brackets = new string('(', 200);
+        var close = new string(')', 200);
+        OnThread(
+            () =>
+            {
+                Assert.Equal(1L, PyAst.LiteralEval(brackets + "1" + close));
+
+                // 200 brackets and 799 lambdas is the deepest nesting that the two limits of the parser let through.
+                // Python raises MemoryError for this text, and the port raises another error (the remarks of PyAst).
+                Assert.NotNull(Record.Exception(() => PyAst.LiteralEval(brackets + string.Concat(Enumerable.Repeat("lambda: ", 799)) + "1" + close)));
+            },
+            0);
+    }
+
     /// <summary>
     /// Runs the body on a thread with a 256 MB stack. The parser recurses to the depth that Python allows. A build
-    /// that Stryker mutates has larger stack frames, and on a default stack the deep cases overflow there and stop the
-    /// test host, so that no mutant gets a result.
+    /// that Stryker instruments uses more stack, and on a default stack the deep cases overflow there and stop the
+    /// test host during the coverage capture, so that no mutant gets a result.
     /// </summary>
-    private static void OnLargeStack(Action body)
+    private static void OnLargeStack(Action body) => OnThread(body, 256 * 1024 * 1024);
+
+    /// <summary>Runs the body on a new thread and throws its error again here. A stack size of 0 is the default size.</summary>
+    private static void OnThread(Action body, int maxStackSize)
     {
         System.Runtime.ExceptionServices.ExceptionDispatchInfo? error = null;
         var thread = new Thread(
@@ -53,7 +78,7 @@ public class PyAstTests
                     error = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e);
                 }
             },
-            256 * 1024 * 1024);
+            maxStackSize);
         thread.Start();
         thread.Join();
         error?.Throw();

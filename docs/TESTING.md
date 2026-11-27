@@ -81,7 +81,7 @@ Limits of the list:
 - A timeout mutant names no killer in the reports of 2026-11-26. If one test covers it, that test gets the credit. If more tests cover it, none gets credit, and a listed one has a note.
 - A static mutant has an empty `coveredBy` in the reports of 2026-11-26, so its `killedBy` can be incomplete. The script counts these mutants.
 - The result holds only for the code that the run mutated.
-- A test that stops the test host gives no result for any mutant. Stryker cannot read the coverage of such a test, so it runs the test against each mutant, and each mutant gets the status `RuntimeError`. A mutated build has larger stack frames, so a test of deep recursion runs its body on a thread with a large stack (`OnLargeStack` in `PyAstTests.cs`). If a run gives only errors, look for `Failed to capture per-test coverage` in its log.
+- A test that stops the test host during the coverage capture gives no result for any mutant. Stryker cannot read the coverage of such a test, so it runs the test against each mutant, and each mutant gets the status `RuntimeError`. The instrumented build uses more stack, so the two deep tests of `PyAstTests.cs` run their body on a thread with a large stack (`OnLargeStack`). One other test there holds the default stack, and it does not run in an instrumented build. If a run gives only errors, look for `Failed to capture per-test coverage` in its log. A test that stops the host only for one mutant gives `RuntimeError` for that mutant only.
 
 The gate is in observe mode: `thresholds.break` is 0 and the CI job cannot block a merge.
 After M1 gives a baseline score, the maintainer sets an enforced threshold (M3 in the [spec](product-specs/spec.md)).
