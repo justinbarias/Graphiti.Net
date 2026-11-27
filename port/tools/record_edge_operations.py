@@ -29,6 +29,14 @@ client, the embedder, the cross-encoder, and the graph driver:
 - Each fake yields once (asyncio.sleep(0)) and then records its call. The calls and the log lines are one list. Each
   case keeps the largest count of fake calls in flight.
 
+For the cases of CANCEL_CASES the tool also runs the case again with a cancel (the form of record_node_operations.py): once
+for k = -1, where the task is canceled before its first await, and once for each call k except the last, where the fake
+that makes call k records it and then cancels the task of the call (the port cancels a token source). The case keeps the
+count of the attempts (each fake counts an attempt before its yield), the count of the recorded calls, and the events
+after call k. Python lets a CancelledError through each `except Exception`, so the port must make the same attempts and
+write the same log lines (R25). A point where the port makes one more attempt is the late cancel of GAPS F33, and the
+test names it.
+
 Fixed values on both sides: edge_operations.utc_now and dangling_endpoints.utc_now give FIXED_NOW, and the C# test
 gives the port a clock with the same time. A uuid4 that the code makes is random: the test replaces each one, in the
 order of its first appearance in the case output, by "<new:N>". A timed log line has its milliseconds replaced by
@@ -49,6 +57,7 @@ import os
 import random
 import re
 import sys
+import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -64,6 +73,12 @@ MS = re.compile(r'in [0-9.e+-]+ ms')
 rng = random.Random(SEED)
 events: list[dict] = []
 state: dict = {}
+
+# A cancel leaves the coroutines of a gather that never started. Python warns about each one, and that is no result.
+warnings.filterwarnings('ignore', message='coroutine .* was never awaited', category=RuntimeWarning)
+
+# The cases that the tool runs again with a cancel: one case of each async function. The C# test names the same cases.
+CANCEL_CASES = [0, 13, 14, 15, 16, 17, 21, 26, 29, 31, 36]
 
 
 class InsertionOrderSet(set):
@@ -665,18 +680,28 @@ FALLBACK_REPLIES = [
 ]
 
 
-async def run_case(case: dict, mods) -> dict:
+async def run_case(case: dict, mods, cancel_at=None) -> dict:
     eo, EntityEdge, EntityNode, EpisodicNode, GraphitiClients, GraphProvider, default_library, models = mods
     from graphiti_core.llm_client.config import ModelSize
     replies = case.get('replies', []) + FALLBACK_REPLIES
     texts: list[str] = []
+    state['main'] = asyncio.current_task()
+    if cancel_at == -1:
+        # A task that is canceled before its first await: the first suspension raises CancelledError.
+        state['events_at_cancel'] = 0
+        state['main'].cancel()
 
     async def enter(kind, record):
+        state['attempts'] += 1
         state['in_flight'] += 1
         state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
         try:
             await asyncio.sleep(0)
             events.append({'kind': kind, **record})
+            state['count'] += 1
+            if cancel_at is not None and state['count'] - 1 == cancel_at:
+                state['events_at_cancel'] = len(events)
+                state['main'].cancel()
         finally:
             state['in_flight'] -= 1
 
@@ -820,11 +845,36 @@ async def run_case(case: dict, mods) -> dict:
     raise AssertionError(fn)
 
 
+def reset() -> None:
+    events.clear()
+    state.update(in_flight=0, max_in_flight=0, attempts=0, count=0, main=None, events_at_cancel=None)
+
+
+def call_count(output: dict) -> int:
+    return sum(1 for e in output['events'] if e['kind'] != 'log')
+
+
+def record_cancel(case: dict, mods, k: int) -> dict:
+    """The case again with a cancel at call k (k = -1: before the first await)."""
+    reset()
+    try:
+        asyncio.run(run_case(case, mods, k))
+        error = None
+    except asyncio.CancelledError:
+        error = 'CancelledError'
+    except Exception as exc:  # noqa: BLE001 - the recording keeps each exception
+        error = type(exc).__name__
+    if error != 'CancelledError':
+        raise SystemExit(f'The cancel at call {k} gave {error} and not CancelledError')
+    after = events[state['events_at_cancel']:]
+    return placeholders({'k': k, 'error': error, 'attempts': state['attempts'], 'count': state['count'],
+                         'after': list(after)}, {})
+
+
 def record_async(mods) -> list[dict]:
     out = []
-    for case in extract_cases() + resolve_cases() + review_cases():
-        events.clear()
-        state.update(in_flight=0, max_in_flight=0)
+    for index, case in enumerate(extract_cases() + resolve_cases() + review_cases()):
+        reset()
         try:
             output = {'ok': asyncio.run(run_case(case, mods))}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -834,7 +884,10 @@ def record_async(mods) -> list[dict]:
             output = {'error': {'type': type(error).__name__, 'text': text}}
         output['events'] = list(events)
         output['max_in_flight'] = state['max_in_flight']
-        out.append({'in': case, 'out': placeholders(output, {})})
+        item = {'in': case, 'out': placeholders(output, {})}
+        if index in CANCEL_CASES:
+            item['cancel'] = [record_cancel(case, mods, k) for k in range(-1, call_count(output) - 1)]
+        out.append(item)
     return out
 
 

@@ -86,7 +86,10 @@ public partial class NodeOperationsValuesTests
                 {
                     AttemptsAtCancel = Attempts;
                     EventsAtCancel = Events.Count;
-                    await source.CancelAsync();
+                    // The cancel runs the callbacks of the token on the scheduler, before this call returns, as
+                    // `task.cancel()` of the recorder acts at one point of the loop. CancelAsync runs them on the thread
+                    // pool, where they race with the scheduler (R25).
+                    source.Cancel();
                 }
             }
             finally

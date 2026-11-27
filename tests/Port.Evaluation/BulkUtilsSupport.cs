@@ -113,6 +113,12 @@ internal sealed class BulkUtilsRun
 
     internal int Count { get; private set; }
 
+    // The count of the counted calls that start, before a fake reads its token (R25).
+    internal long Attempts { get; private set; }
+
+    // The length of the event list at the moment that a fake cancels the token source.
+    internal int EventsAtCancel { get; private set; } = -1;
+
     internal int InFlight { get; private set; }
 
     internal int MaxInFlight { get; private set; }
@@ -130,10 +136,16 @@ internal sealed class BulkUtilsRun
         ["reply"] = value,
     };
 
-    // The common part of each fake call: the token check, a yield, a second token check, and the record (R25). A call
-    // that is not counted (close) runs in a finally block, gets no token, and is not a call of the cancellation tests.
+    // The common part of each fake call: an attempt, the token check, a yield, a second token check, and the record
+    // (R25). A call that is not counted (close) runs in a finally block, gets no token, and is not a call of the
+    // cancellation tests. A counted call that is canceled still counts as an attempt, as in the fake of the recorder.
     internal async Task EnterAsync(string kind, OrderedDictionary<string, object?> record, CancellationToken cancellationToken, bool counted = true)
     {
+        if (counted)
+        {
+            Attempts++;
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         InFlight++;
         MaxInFlight = Math.Max(MaxInFlight, InFlight);
@@ -153,7 +165,12 @@ internal sealed class BulkUtilsRun
                 Tokens.Add((kind, cancellationToken));
                 if (Count++ == CancelAt)
                 {
-                    await Source.CancelAsync();
+                    EventsAtCancel = Events.Count;
+
+                    // The cancel runs the callbacks of the token on the scheduler, before this call returns, as
+                    // `task.cancel()` of the recorder acts at one point of the loop. CancelAsync runs them on the thread
+                    // pool, where they race with the scheduler (R25).
+                    Source.Cancel();
                 }
             }
         }

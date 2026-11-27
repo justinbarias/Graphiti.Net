@@ -88,6 +88,17 @@ public class CommunityOperationsValuesTests
         var eight = Dict(AsyncCases[19]["out"]);
         Assert.Equal(7, List(eight["events"]).Select(Dict).Count(e => e.GetValueOrDefault("prompt_name") is CommunityCombinedValues.PairPrompt));
         Assert.Equal(4L, (long)eight["max_in_flight"]!);
+
+        // The case of test_build_communities_uses_configured_prompt_library: build_communities with a marker prompt of
+        // summarize_pair. Each build_community gets the clients, so the pair calls send the marker, and the case with no
+        // routing (async case 55) sends other messages.
+        var routed = AsyncCases.Index().Single(c => Dict(c.Item["in"]).GetValueOrDefault("routing") is string).Index;
+        Assert.Equal(58, routed);
+        Assert.Equal("build_communities", Dict(AsyncCases[58]["in"])["fn"]);
+        static List<object?> PairMessages(int index) =>
+            [.. List(Dict(AsyncCases[index]["out"])["events"]).Select(Dict).Where(e => e.GetValueOrDefault("prompt_name") is CommunityCombinedValues.PairPrompt).Select(e => e["messages"])];
+        Assert.NotEmpty(PairMessages(58));
+        Assert.NotEqual(PyJson.Dumps(PairMessages(55)), PyJson.Dumps(PairMessages(58)));
     }
 
     // PORT: upstream defect U11: label_propagation does not end for some inputs. A wrong tie order makes a recorded
@@ -328,7 +339,7 @@ public class CommunityOperationsValuesTests
     {
         var input = run.Input;
         var defaults = input.GetValueOrDefault("defaults") is true;
-        var route = input.GetValueOrDefault("routing") is true ? run.Clients : null;
+        var route = input.GetValueOrDefault("routing") is true or string ? run.Clients : null;
         var maxCoroutines = (long?)input.GetValueOrDefault("max_coroutines");
         switch ((string)input["fn"]!)
         {

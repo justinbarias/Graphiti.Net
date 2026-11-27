@@ -16,13 +16,17 @@
 // it reads the reference time in the prompt that the fake model client gets, and the dates of the edge after the real
 // `apply_extracted_timestamps`.
 //
-// TODO(port): O10. These tests patch a function of the module itself and assert on the arguments of the patch, which has
-// no C# form:
-// - test_resolve_extracted_edges_fast_path_deduplication (`_dedupe_extracted_edge`)
-// - test_resolve_extracted_edges_fast_path_deduplicates_reverse_direction_by_fact (`_dedupe_extracted_edge`)
-// - test_resolve_extracted_edges_merges_override_candidates (`_dedupe_extracted_edge`)
-// The recording of the unit (EdgeOperationsValuesTests) has cases of the paths that these three tests reach, but it does
-// not read the arguments of the patched function.
+// PORT: test_resolve_extracted_edges_fast_path_deduplication and
+// test_resolve_extracted_edges_fast_path_deduplicates_reverse_direction_by_fact patch `_dedupe_extracted_edge`, and they
+// assert only the count of its calls, the result lists, and the count of the search awaits. The real function runs, and
+// the count of its calls is the count of the calls of the fake model client (see the two tests).
+//
+// TODO(port): O10. test_resolve_extracted_edges_merges_override_candidates patches `_dedupe_extracted_edge` with a function
+// that records its argument `related_edges`, and the test asserts that argument: the override edge is the one related
+// edge. No fake at the network boundary sees that argument unchanged. Covered by async case 16 of
+// values/edge_operations.json (scenario resolve_extracted_edges_override_routing of EdgeOperationsValuesTests): its
+// override list adds the candidates of the same pair, one of them resolves by an exact fact, and the LLM call of the other
+// edge sends the override candidates in its messages.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
@@ -353,6 +357,70 @@ public class TestEdgeOperations
         // Check UUID since the episode list gets modified
         Assert.Equal(relatedEdge0.Uuid, resolvedEdge.Uuid);
         Assert.Contains(episode.Uuid, resolvedEdge.Episodes);
+    }
+
+    // Test that resolve_extracted_edges deduplicates exact matches before parallel processing.
+    //
+    // PORT: the Python test patches `_dedupe_extracted_edge` with a function that counts its calls and returns
+    // `(extracted_edge, [], None)`. The real function runs. The search finds no edge, so it makes one call of the fake
+    // model client, the timestamp prompt, and the reply with no date keeps the edge as the patch returns it. The count of
+    // the patched calls is the count of the calls of the fake model client (Part 3, the row of `monkeypatch.setattr` on a
+    // function). The patches of `search`, `create_entity_edge_embeddings`, and `semaphore_gather` are EdgeTestSearchDriver,
+    // EdgeTestEmbedder, and the real gather (see the header). Python with the patch removed and the same fake reply gave
+    // the same result.
+    [Fact(Timeout = 5000)]
+    public async Task test_resolve_extracted_edges_fast_path_deduplication()
+    {
+        var llmClient = LlmWithoutTimestamps(new());
+        var sourceNode = Node("source_uuid", "Assistant", ["Entity"]);
+        var targetNode = Node("target_uuid", "User", ["Entity"]);
+
+        // Create 3 identical edges
+        var edge1 = Edge(sourceNode.Uuid, targetNode.Uuid, "recommends", "assistant recommends yoga poses", []);
+        var edge2 = Edge(sourceNode.Uuid, targetNode.Uuid, "recommends", "  Assistant Recommends YOGA Poses  ", []); // Different whitespace/case
+        var edge3 = Edge(sourceNode.Uuid, targetNode.Uuid, "recommends", "assistant recommends yoga poses", []);
+        var episode = Episode("episode_uuid", "Episode", "desc", "Episode content");
+
+        var (resolvedEdges, invalidatedEdges, newEdges) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgesAsync(
+            Clients(llmClient), [edge1, edge2, edge3], episode, [sourceNode, targetNode], new(), new(), cancellationToken: TestContext.Current.CancellationToken));
+
+        // Fast path should have deduplicated the 3 identical edges to 1
+        // So resolve_extracted_edge should only be called once
+        Assert.Equal(["extract_edges.extract_timestamps"], llmClient.Calls.Select(c => c.PromptName));
+        Assert.Single(resolvedEdges);
+        Assert.Empty(invalidatedEdges);
+        Assert.Equal(resolvedEdges, newEdges); // All edges are new (no graph duplicates)
+    }
+
+    // PORT: the Python test patches `_dedupe_extracted_edge` and `search`, and asserts the count of the patched calls and
+    // `search_mock.await_count`. The real function runs, as in test_resolve_extracted_edges_fast_path_deduplication. The
+    // count of the patched calls is the count of the calls of the fake model client, and the count of the search awaits
+    // is the count of the full-text searches of EdgeTestSearchDriver: each search makes one. Python with the patch of
+    // `_dedupe_extracted_edge` removed and the same fake reply gave the same result for each parameter set.
+    [Theory(Timeout = 5000)]
+    [InlineData("  Assistant Recommends YOGA Poses  ", "recommends", new[] { "edge-1" })]
+    [InlineData("assistant likes yoga poses", "recommends", new[] { "edge-1", "edge-2" })]
+    [InlineData("  Assistant Recommends YOGA Poses  ", "recommended_by", new[] { "edge-1", "edge-2" })]
+    public async Task test_resolve_extracted_edges_fast_path_deduplicates_reverse_direction_by_fact(string reverseFact, string reverseName, string[] expectedEdgeUuids)
+    {
+        var llmClient = LlmWithoutTimestamps(new());
+        var driver = new EdgeTestSearchDriver();
+        var sourceNode = Node("source_uuid", "Assistant", ["Entity"]);
+        var targetNode = Node("target_uuid", "User", ["Entity"]);
+        var edge1 = Edge(sourceNode.Uuid, targetNode.Uuid, "recommends", "assistant recommends yoga poses", [], uuid: "edge-1");
+        var edge2 = Edge(targetNode.Uuid, sourceNode.Uuid, reverseName, reverseFact, [], uuid: "edge-2");
+        var episode = Episode("episode_uuid", "Episode", "desc", "Episode content");
+
+        var (resolvedEdges, invalidatedEdges, newEdges) = await LoopGuard.RunAsync(() => EdgeOperations.ResolveExtractedEdgesAsync(
+            Clients(llmClient, driver: driver), [edge1, edge2], episode, [sourceNode, targetNode], new(), new(), cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(expectedEdgeUuids, resolvedEdges.Select(edge => edge.Uuid));
+        Assert.Same(edge1, resolvedEdges[0]);
+        Assert.Equal(expectedEdgeUuids.Length, llmClient.Calls.Count);
+        Assert.All(llmClient.Calls, call => Assert.Equal("extract_edges.extract_timestamps", call.PromptName));
+        Assert.Equal(2 * expectedEdgeUuids.Length, driver.Searches.Count);
+        Assert.Empty(invalidatedEdges);
+        Assert.Equal(resolvedEdges, newEdges);
     }
 
     // Test that edge types used across multiple node type pairs preserve all signatures.

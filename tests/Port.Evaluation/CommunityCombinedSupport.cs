@@ -193,9 +193,28 @@ internal sealed class CommunityCombinedRun
             CrossEncoder = new FakeCrossEncoder(),
             Tracer = new NoOpTracer(),
             MaxCoroutines = (long?)input.GetValueOrDefault("max_coroutines"),
-            PromptLibrary = input.GetValueOrDefault("routing") is true ? Lib.DefaultChatPromptLibrary : null,
+            PromptLibrary = RoutedLibrary(input.GetValueOrDefault("routing")),
         };
     }
+
+    // `routed_library` of the community recorder: no library, the default library (true), or a library whose
+    // summarize_pair prompt sends the marker text of `routing`, as _marker_prompt of the upstream test of prompt routing.
+    private static IPromptLibrary? RoutedLibrary(object? routing) => routing switch
+    {
+        true => Lib.DefaultChatPromptLibrary,
+        string marker => Lib.CreatePromptLibrary(new OrderedDictionary<string, OrderedDictionary<string, ChatPromptFunction>>
+        {
+            ["summarize_nodes"] = new()
+            {
+                ["summarize_pair"] = _ => new ChatPrompt
+                {
+                    System = new SystemMessage { Content = marker },
+                    User = new UserMessage { Content = marker },
+                },
+            },
+        }),
+        _ => null,
+    };
 
     internal OrderedDictionary<string, object?> Input { get; }
 
@@ -255,7 +274,10 @@ internal sealed class CommunityCombinedRun
             {
                 AttemptsAtCancel = Attempts;
                 EventsAtCancel = Events.Count;
-                await Source.CancelAsync();
+                // The cancel runs the callbacks of the token on the scheduler, before this call returns, as
+                // `task.cancel()` of the recorder acts at one point of the loop. CancelAsync runs them on the thread
+                // pool, where they race with the scheduler (R25).
+                Source.Cancel();
             }
         }
         finally

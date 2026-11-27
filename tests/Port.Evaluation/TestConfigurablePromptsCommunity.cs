@@ -11,7 +11,9 @@
 // argument must be `clients.llm_client`, and the keyword `clients` must be `clients`. Neither argument reaches a call of a
 // fake at the network boundary unchanged: the real build_community turns `clients` into the prompt of a pair call, and the
 // first patched result, `[[]]` (an empty cluster), makes the real build_community raise IndexError. So the test has no
-// form under the reading of O10.
+// form under the reading of O10. Covered by async case 58 of values/community_operations.json (CommunityOperationsValuesTests):
+// build_communities with a library whose summarize_pair prompt is the marker CUSTOM_BUILD_COMMUNITY. Each build_community
+// gets the clients, so each pair call sends the marker, and async case 55 with the same input and no routing does not.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;

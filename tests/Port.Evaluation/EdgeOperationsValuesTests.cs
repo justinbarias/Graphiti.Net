@@ -186,8 +186,25 @@ public class EdgeOperationsValuesTests
         Assert.Equal(Scenarios[name].Calls, run.Count);
     }
 
-    // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8)
-    // and makes no fake call.
+    // The cases that the recorder ran again with a cancel are the cases of Scenarios (CANCEL_CASES in
+    // port/tools/record_edge_operations.py).
+    [Fact]
+    public void Each_scenario_has_a_recorded_cancel_run_for_each_point()
+    {
+        var recorded = AsyncCases.Index().Where(c => c.Item.ContainsKey("cancel")).Select(c => c.Index).Order().ToList();
+        Assert.Equal(Scenarios.Values.Select(v => v.Case).Order().ToList(), recorded);
+        foreach (var (_, (index, calls)) in Scenarios)
+        {
+            Assert.Equal(
+                Enumerable.Range(-1, calls).Select(k => (long)k).ToList(),
+                List(AsyncCases[index]["cancel"]).Select(r => (long)Dict(r)["k"]!).ToList());
+        }
+    }
+
+    // Each async method with a canceled token throws OperationCanceledException (R8). The recorder canceled the task of
+    // the call before its first await (k = -1), so the test compares the attempts, the recorded calls, and the events
+    // that the method writes before it reads the token. A fake that is canceled throws, so a dropped token or a caught
+    // cancel gives other counts.
     [Theory(Timeout = 5000)]
     [MemberData(nameof(ScenarioNames))]
     public async Task Each_async_method_with_a_canceled_token_throws_OperationCanceledException(string name)
@@ -201,11 +218,15 @@ public class EdgeOperationsValuesTests
             await LoopGuard.RunAsync(Turns);
         }
 
-        Assert.Equal(0, run.Count);
+        AssertCancelPoint(Scenarios[name].Case, -1, run, 0);
     }
 
-    // A test with no Python original: the token is canceled at fake call k. Call k is the last call that a fake
-    // records, and the method throws OperationCanceledException (R8).
+    // The token is canceled while call k runs. Call k is the last call that a fake records. Python lets a CancelledError
+    // through each `except Exception` (it is a BaseException), so it writes no `Failed to extract timestamps` line. The
+    // recorder canceled the task of the call at the same point, so the test compares the count of the attempts (each
+    // fake counts an attempt before it reads its token), the count of the calls that a fake recorded, and the events
+    // after call k (the log lines and the later calls). The calls that a failed gather leaves run on, so the test gives
+    // the scheduler 50 turns before it counts (R25).
     [Theory(Timeout = 5000)]
     [MemberData(nameof(LaterCalls))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(string name, int k)
@@ -220,7 +241,118 @@ public class EdgeOperationsValuesTests
             await LoopGuard.RunAsync(Turns);
         }
 
-        Assert.Equal(k + 1, run.Count);
+        AssertCancelPoint(Scenarios[name].Case, k, run, run.EventsAtCancel);
+    }
+
+    [Fact]
+    public void Each_late_cancel_entry_names_one_point_of_the_recording()
+    {
+        Assert.Equal(LateCancel.Length, LateCancel.Select(e => (e.Case, e.K)).Distinct().Count());
+        Assert.All(LateCancel, e => Assert.Contains(e.K, List(AsyncCases[e.Case]["cancel"]).Select(r => (int)(long)Dict(r)["k"]!)));
+    }
+
+    private static readonly string[] CancelFields = ["attempts", "count", "after"];
+
+    // The late cancel of GAPS F33. Python cancels each task of the gathers at once. The port reads the token at the next
+    // call of a fake, so a search whose last fake call has returned goes on, and writes its debug line `search returned
+    // context` ("after"). At the last calls of a case the port also writes the debug lines that come before the next
+    // call, and at two points it makes one more attempt, and that attempt throws ("attempts"). Each point keeps the
+    // events of Python in their order. A point that agrees with Python must not be in the list, and a point in the list
+    // must differ in the way that its kind says.
+    private static readonly (int Case, int K, string Kind)[] LateCancel =
+    [
+        (13, 3, "after"),
+        (13, 4, "after"),
+        (13, 5, "after"),
+        (13, 6, "after"),
+        (13, 7, "after"),
+        (13, 8, "after"),
+        (13, 9, "after"),
+        (13, 11, "after"),
+        (13, 12, "after"),
+        (13, 13, "after"),
+        (13, 14, "after"),
+        (13, 15, "after"),
+        (13, 16, "after"),
+        (13, 17, "after"),
+        (13, 22, "after"),
+        (14, 3, "after"),
+        (14, 4, "after"),
+        (14, 5, "after"),
+        (14, 7, "after"),
+        (14, 8, "after"),
+        (14, 9, "after"),
+        (14, 12, "after"),
+        (15, 3, "after"),
+        (15, 4, "after"),
+        (15, 5, "after"),
+        (15, 6, "after"),
+        (15, 7, "after"),
+        (15, 9, "after"),
+        (15, 10, "after"),
+        (15, 11, "after"),
+        (15, 12, "after"),
+        (15, 13, "after"),
+        (15, 18, "after"),
+        (16, 3, "after"),
+        (16, 4, "after"),
+        (16, 5, "after"),
+        (16, 7, "after"),
+        (16, 8, "after"),
+        (16, 9, "after"),
+        (16, 11, "after"),
+        (17, 2, "after"),
+        (17, 3, "after"),
+        (17, 4, "after"),
+        (17, 6, "after"),
+        (17, 7, "after"),
+        (17, 8, "after"),
+        (17, 10, "after"),
+        (17, 11, "after"),
+        (17, 12, "after"),
+        (17, 14, "after"),
+        (17, 15, "after"),
+        (17, 16, "after"),
+        (17, 18, "attempts+after"),
+        (17, 20, "attempts"),
+        (17, 22, "after"),
+    ];
+
+    // The point k of a recorded cancel scenario (k = -1: the task is canceled before its first await).
+    private static void AssertCancelPoint(int index, int k, EdgeOperationsRun run, int eventsAtCancel)
+    {
+        var recorded = List(AsyncCases[index]["cancel"]).Select(Dict).Single(r => (long)r["k"]! == k);
+        var got = Dict(Placeholders(
+            new OrderedDictionary<string, object?>
+            {
+                ["k"] = (long)k,
+                ["error"] = "CancelledError",
+                ["attempts"] = run.Attempts,
+                ["count"] = (long)run.Count,
+                ["after"] = run.Events.Skip(eventsAtCancel).ToList(),
+            },
+            []));
+        var differences = string.Join(
+            "+",
+            CancelFields.Where(key => PyJson.Dumps(recorded[key]) != PyJson.Dumps(got[key])));
+        var listed = LateCancel.Where(e => e.Case == index && e.K == k).Select(e => e.Kind).ToList();
+        if (listed.Count == 0)
+        {
+            Assert.True(differences.Length == 0, $"case {index}, call {k}: the port differs from Python in {differences}: {PyJson.Dumps(recorded)} and {PyJson.Dumps(got)}");
+        }
+        else
+        {
+            Assert.Equal(listed.Single(), differences);
+
+            // The port writes more lines, never other lines: the events of Python come in the same order.
+            var port = List(got["after"]).Select(x => PyJson.Dumps(x)).ToList();
+            var next = 0;
+            foreach (var item in List(recorded["after"]).Select(x => PyJson.Dumps(x)))
+            {
+                next = port.IndexOf(item, next) + 1;
+                Assert.True(next > 0, $"case {index}, call {k}: the port lacks the event {item} of Python");
+            }
+        }
     }
 
     private static async Task Turns()

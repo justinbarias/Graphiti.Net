@@ -361,6 +361,11 @@ def cases() -> list[dict]:
     add('build_communities', defaults=True, group_ids=['g'], answers=PROJECTION)
     add('remove_communities', defaults=True)
     add('update_community', defaults=True, entity=entity, answers=[answer(NEIGHBOR, [community('k2')], 'n1')])
+    # The adversarial pass of layer 7: build_communities with a routed prompt library whose summarize_pair prompt is a
+    # marker (a `routing` text), the case that covers the upstream test
+    # test_build_communities_uses_configured_prompt_library: each build_community gets the clients, so each pair call
+    # sends the marker. The case with "defaults" above has the same input with no routing.
+    add('build_communities', group_ids=['g'], answers=PROJECTION, routing='CUSTOM_BUILD_COMMUNITY')
     return out
 
 
@@ -499,7 +504,7 @@ async def run_case(case: dict, mods, cancel_at=None) -> dict:
     driver = FakeDriver()
     clients = GraphitiClients.model_construct(
         driver=driver, llm_client=llm, embedder=embedder, cross_encoder=None, tracer=NoOpTracer(),
-        max_coroutines=case['max_coroutines'], prompt_library=default_library if case['routing'] else None)
+        max_coroutines=case['max_coroutines'], prompt_library=routed_library(case['routing'], default_library))
     route = clients if case['routing'] else None
     fn = case['fn']
     defaults = case.get('defaults')
@@ -546,6 +551,22 @@ async def run_case(case: dict, mods, cancel_at=None) -> dict:
             nodes, edges = await co.update_community(driver, llm, embedder, entity, clients=route)
         return {'communities': [community_view(n) for n in nodes], 'edges': [edge_view(e) for e in edges]}
     raise AssertionError(fn)
+
+
+def routed_library(routing, default_library):
+    """The prompt library of a case: none, the default library (True), or a library whose summarize_pair prompt sends
+    the marker text of `routing`, as _marker_prompt of tests/utils/maintenance/test_configurable_prompts.py."""
+    if routing is True:
+        return default_library
+    if not routing:
+        return None
+    from graphiti_core.prompts import create_prompt_library
+    from graphiti_core.prompts.models import ChatPrompt, SystemMessage, UserMessage
+
+    def marker_prompt(context: dict) -> ChatPrompt:
+        return ChatPrompt(system=SystemMessage(content=routing), user=UserMessage(content=routing))
+
+    return create_prompt_library({'summarize_nodes': {'summarize_pair': marker_prompt}})
 
 
 def reset() -> None:

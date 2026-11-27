@@ -54,6 +54,14 @@ two edges of one episode, the fallback to the canonical node, an identity match 
 similarity limit (0.6 and 0.55), the group of each episode in the separate extraction, episodes with another content and
 another valid_at, an `IndexError` of dedupe_nodes_bulk, and one call of each method with each optional argument left out.
 
+For the cases of CANCEL_CASES the tool also runs the case again with a cancel (the form of record_node_operations.py): once
+for k = -1, where the task is canceled before its first await, and once for each counted call k except the last, where
+the fake that makes call k records it and then cancels the task of the call (the port cancels a token source). The case
+keeps the count of the attempts (each counted fake counts an attempt before its yield), the count of the recorded calls,
+and the events after call k, with the session and close events. Python lets a CancelledError through each `except
+Exception`, so the port must make the same attempts and write the same log lines (R25). A point where the port makes one
+more attempt is the late cancel of GAPS F33, and the test names it.
+
 It writes tests/Port.Evaluation/values/bulk_utils.json. --check writes nothing and exits 1 if the file differs from
 what the run would write. The tool needs Python 3.12 and the pinned upstream in the folder of the variable
 GRAPHITI_UPSTREAM, or .upstream/graphiti. It changes nothing there. Nothing here uses the network.
@@ -590,15 +598,22 @@ def review_cases() -> list[dict]:
     return cases
 
 
-async def run_case(case: dict, mods) -> dict:
+async def run_case(case: dict, mods, cancel_at=None) -> dict:
     (bu, EntityEdge, EntityNode, EpisodicNode, EpisodicEdge, GraphitiClients, GraphProvider, default_library, models,
      GraphOperationsInterface, SearchInterface) = mods
     from graphiti_core.llm_client.config import ModelSize
     replies = case.get('replies', []) + FALLBACK_REPLIES
     texts: list[str] = []
     vectors: list[tuple[list[float], str]] = []
+    state['main'] = asyncio.current_task()
+    if cancel_at == -1:
+        # A task that is canceled before its first await: the first suspension raises CancelledError.
+        state['events_at_cancel'] = 0
+        state['main'].cancel()
 
     async def enter(kind, record, counted=True):
+        if counted:
+            state['attempts'] += 1
         state['in_flight'] += 1
         state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
         try:
@@ -606,6 +621,9 @@ async def run_case(case: dict, mods) -> dict:
             events.append({'kind': kind, **record})
             if counted:
                 state['count'] += 1
+                if cancel_at is not None and state['count'] - 1 == cancel_at:
+                    state['events_at_cancel'] = len(events)
+                    state['main'].cancel()
         finally:
             state['in_flight'] -= 1
 
@@ -855,12 +873,37 @@ async def run_case(case: dict, mods) -> dict:
     raise AssertionError(fn)
 
 
+# The cases that the tool runs again with a cancel. The C# test names the same cases.
+CANCEL_CASES = [1, 4, 5, 6, 9, 18, 19, 20, 24, 27, 32, 36, 39, 44, 48, 53]
+
+
+def reset() -> None:
+    events.clear()
+    state.update(in_flight=0, max_in_flight=0, attempts=0, count=0, main=None, events_at_cancel=None)
+
+
+def record_cancel(case: dict, mods, k: int) -> dict:
+    """The case again with a cancel at counted call k (k = -1: before the first await)."""
+    reset()
+    try:
+        asyncio.run(run_case(case, mods, k))
+        error = None
+    except asyncio.CancelledError:
+        error = 'CancelledError'
+    except Exception as exc:  # noqa: BLE001 - the recording keeps each exception
+        error = type(exc).__name__
+    if error != 'CancelledError':
+        raise SystemExit(f'The cancel at call {k} gave {error} and not CancelledError')
+    after = events[state['events_at_cancel']:]
+    return placeholders({'k': k, 'error': error, 'attempts': state['attempts'], 'count': state['count'],
+                         'after': list(after)}, {})
+
+
 def record_async(mods) -> list[dict]:
     out = []
-    for case in (write_cases() + retrieve_cases() + extract_cases() + dedupe_node_cases() + dedupe_edge_cases()
-                 + timeout_cases() + review_cases()):
-        events.clear()
-        state.update(in_flight=0, max_in_flight=0, count=0)
+    for index, case in enumerate(write_cases() + retrieve_cases() + extract_cases() + dedupe_node_cases()
+                                 + dedupe_edge_cases() + timeout_cases() + review_cases()):
+        reset()
         try:
             output = {'ok': asyncio.run(run_case(case, mods))}
         except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -871,7 +914,10 @@ def record_async(mods) -> list[dict]:
         output['events'] = list(events)
         output['max_in_flight'] = state['max_in_flight']
         output['count'] = state['count']
-        out.append({'in': case, 'out': placeholders(output, {})})
+        item = {'in': case, 'out': placeholders(output, {})}
+        if index in CANCEL_CASES:
+            item['cancel'] = [record_cancel(case, mods, k) for k in range(-1, state['count'] - 1)]
+        out.append(item)
     return out
 
 

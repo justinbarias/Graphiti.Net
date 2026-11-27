@@ -4,8 +4,10 @@
 // bulk_utils, and graphiti. The class is partial, so that each unit adds its tests to the class of the Python file.
 //
 // TODO(port): O10. test_resolve_extracted_edges_forwards_clients_only_for_prompt_routing patches
-// `edge_ops._dedupe_extracted_edge`, which has no C# form. The recording of the unit (EdgeOperationsValuesTests) covers
-// the forwarded clients: its cases with prompt routing record the calls of the routed prompt library.
+// `edge_ops._dedupe_extracted_edge` and asserts that its keyword `clients` is absent with no prompt library, which has no
+// C# form. Covered by async case 16 of values/edge_operations.json (resolve_extracted_edges with prompt routing, scenario
+// resolve_extracted_edges_override_routing of EdgeOperationsValuesTests) and async case 13 (the same function with no
+// routing): each records the calls of the model client in order.
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
