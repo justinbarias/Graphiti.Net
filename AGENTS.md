@@ -57,7 +57,7 @@ python3 scripts/db_schema.py      # write docs/generated/db-schema.md from the p
 
 1. Read the active plan in [docs/exec-plans/active](docs/PLANS.md). Each task names its model and effort.
 2. Make the change. Keep one concern in each pull request. If a later layer depends on an earlier one, stack the pull requests with `gh stack`.
-3. Run `scripts/check.sh --test`, then use the `verify` skill in `.claude/skills/verify`.
+3. Use the `verify` skill in `.claude/skills/verify`. It selects the checks for the kind of change, and it lists what it cannot verify yet.
 4. If a check still fails after three fix attempts, stop and ask the maintainer.
 5. Record commands and results in the plan. Update the documents that the change makes stale.
 6. Commit only with the maintainer's approval. Pushes, pull requests, merges, and package publishing each need their own approval.
