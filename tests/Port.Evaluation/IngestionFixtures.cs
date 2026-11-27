@@ -62,8 +62,12 @@
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
+using Graphiti.Core.Embedder;
 using Graphiti.Core.Ingestion;
+using Graphiti.Core.LlmClient;
+using Graphiti.Core.Prompts;
 using Graphiti.Core.Utils.Maintenance;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
 
 /// <summary>Test doubles for concurrent ingestion: an in-memory graph, and functions that make units and change sets.</summary>
@@ -111,7 +115,8 @@ internal static class IngestionFixtures
             Name = name,
             GroupId = Group,
             CreatedAt = T0,
-            NameEmbedding = embedding ?? X,
+            // PORT: `embedding or X`: an empty list is false, so it gives X too.
+            NameEmbedding = embedding is { Count: > 0 } ? embedding : X,
             Labels = labels ?? ["Entity"],
             Attributes = attributes ?? new(),
         }.Validate();
@@ -127,7 +132,8 @@ internal static class IngestionFixtures
             Name = "RELATES",
             Episodes = [],
             CreatedAt = T0,
-            FactEmbedding = embedding ?? X,
+            // PORT: `embedding or X`: an empty list is false, so it gives X too.
+            FactEmbedding = embedding is { Count: > 0 } ? embedding : X,
         }.Validate();
 
     internal static EpisodicNode MakeEpisode(string uuid = "ep1", PyDateTime? validAt = null, string content = "content") =>
@@ -161,7 +167,8 @@ internal sealed class FakeClock(double now = 1000.0)
 /// record that exists. Each read returns a copy.
 /// </summary>
 // PORT: the reads of FakeGraph derive from GraphReader, as the upstream fake replaces the reader. The writes wait for
-// layer 9 (see the header of this file).
+// layer 9 (see the header of this file). Each read is an `async def` with no await in Python, so it ends with no yield:
+// the port returns a completed task (R8), and it does not read the token.
 internal sealed class FakeGraph(GraphitiClients clients) : GraphReader(clients)
 {
     internal OrderedDictionary<string, EntityNode> Nodes { get; } = new();
@@ -190,12 +197,11 @@ internal sealed class FakeGraph(GraphitiClients clients) : GraphReader(clients)
         }
     }
 
-    internal override async Task<List<List<EntityNode>>> NodeCandidatesAsync(
+    internal override Task<List<List<EntityNode>>> NodeCandidatesAsync(
         List<EntityNode> nodes,
         OrderedDictionary<string, List<string>>? identityProperties = null,
         CancellationToken cancellationToken = default)
     {
-        await Task.Yield();
         Log.Add("read:node_candidates");
         List<List<EntityNode>> results = [];
         foreach (var node in nodes)
@@ -224,12 +230,11 @@ internal sealed class FakeGraph(GraphitiClients clients) : GraphReader(clients)
             results.Add(candidates);
         }
 
-        return results;
+        return Task.FromResult(results);
     }
 
-    internal override async Task<List<List<EntityEdge>>> EdgeDuplicateCandidatesAsync(List<EntityEdge> edges, CancellationToken cancellationToken = default)
+    internal override Task<List<List<EntityEdge>>> EdgeDuplicateCandidatesAsync(List<EntityEdge> edges, CancellationToken cancellationToken = default)
     {
-        await Task.Yield();
         Log.Add("read:edge_duplicate_candidates");
         List<List<EntityEdge>> results = [];
         foreach (var edge in edges)
@@ -242,26 +247,25 @@ internal sealed class FakeGraph(GraphitiClients clients) : GraphReader(clients)
             ]);
         }
 
-        return results;
+        return Task.FromResult(results);
     }
 
-    internal override async Task<List<List<EntityEdge>>> EdgeInvalidationCandidatesAsync(List<EntityEdge> edges, CancellationToken cancellationToken = default)
+    internal override Task<List<List<EntityEdge>>> EdgeInvalidationCandidatesAsync(List<EntityEdge> edges, CancellationToken cancellationToken = default)
     {
-        await Task.Yield();
         Log.Add("read:edge_invalidation_candidates");
-        return
+        List<List<EntityEdge>> results =
         [
             .. edges.Select(edge => Edges.Values
                 .Where(stored => !Hidden.Contains(stored.Uuid) && stored.Uuid != edge.Uuid && IngestionFixtures.Cosine(stored.FactEmbedding, edge.FactEmbedding) >= 0.6)
                 .Select(stored => stored.ModelCopy(deep: true))
                 .ToList()),
         ];
+        return Task.FromResult(results);
     }
 
-    internal override async Task<List<EntityNode>> NodesByUuidsAsync(List<string> uuids, string groupId, CancellationToken cancellationToken = default)
+    internal override Task<List<EntityNode>> NodesByUuidsAsync(List<string> uuids, string groupId, CancellationToken cancellationToken = default)
     {
-        await Task.Yield();
-        return
+        List<EntityNode> nodes =
         [
             .. uuids.Where(Nodes.ContainsKey).Select(uuid =>
             {
@@ -270,18 +274,19 @@ internal sealed class FakeGraph(GraphitiClients clients) : GraphReader(clients)
                 return copy;
             }),
         ];
+        return Task.FromResult(nodes);
     }
 
-    internal override async Task<List<EpisodicNode>> EpisodesByUuidsAsync(List<string> uuids, CancellationToken cancellationToken = default)
+    internal override Task<List<EpisodicNode>> EpisodesByUuidsAsync(List<string> uuids, CancellationToken cancellationToken = default)
     {
-        await Task.Yield();
-        return [.. uuids.Where(Episodes.ContainsKey).Select(uuid => Episodes[uuid].ModelCopy(deep: true))];
+        List<EpisodicNode> episodes = [.. uuids.Where(Episodes.ContainsKey).Select(uuid => Episodes[uuid].ModelCopy(deep: true))];
+        return Task.FromResult(episodes);
     }
 
-    internal override async Task<List<EntityEdge>> EdgesByUuidsAsync(List<string> uuids, CancellationToken cancellationToken = default)
+    internal override Task<List<EntityEdge>> EdgesByUuidsAsync(List<string> uuids, CancellationToken cancellationToken = default)
     {
-        await Task.Yield();
-        return [.. uuids.Where(Edges.ContainsKey).Select(uuid => Edges[uuid].ModelCopy(deep: true))];
+        List<EntityEdge> edges = [.. uuids.Where(Edges.ContainsKey).Select(uuid => Edges[uuid].ModelCopy(deep: true))];
+        return Task.FromResult(edges);
     }
 }
 
@@ -342,7 +347,22 @@ internal sealed class Harness
     internal Harness(FakeClock? clock = null, double leaseSeconds = 60.0, double writeMarginSeconds = 5.0)
     {
         using var source = new CancellationTokenSource();
-        Clients = new PhasesRun(new() { ["fn"] = "harness" }, source, -1).Clients;
+
+        // PORT: the driver of the upstream Harness is a MagicMock with `graph_operations_interface = None`, and the
+        // cross-encoder a MagicMock. A MagicMock accepts each call and returns another MagicMock, which C# has no form
+        // for. The port uses the fake driver of the phases recording (no operations interface, an empty result for each
+        // query) and its cross-encoder, which throws at a call. The commit writes go through the patched functions of
+        // FakeGraph, which wait for layer 9, so no test of the port reaches the driver of the Harness today.
+        var recording = new PhasesRun(new() { ["fn"] = "harness" }, source, -1).Clients;
+        Clients = new GraphitiClients
+        {
+            Driver = recording.Driver,
+            LlmClient = new HarnessLlm(),
+            Embedder = new HarnessEmbedder(),
+            CrossEncoder = recording.CrossEncoder,
+            Tracer = recording.Tracer,
+            MaxCoroutines = null,
+        };
         Graph = new FakeGraph(Clients);
         Clock = clock;
         Store = new LoggingStore(Graph, clock is null ? null : clock.Call);
@@ -433,5 +453,53 @@ internal sealed class Harness
         };
         await Store.SaveChangeSetAsync(IngestionFixtures.Group, unit.Seq, changeSet.ToBytes());
         return changeSet;
+    }
+}
+
+/// <summary>
+/// The model of the Harness: `AsyncMock(side_effect=AssertionError('unexpected model call'))` with `max_tokens = 32768`.
+/// </summary>
+// PORT: R4 has no row for AssertionError. The fake throws Xunit.Sdk.XunitException, the failure of a test assert, which
+// derives from Exception as AssertionError does, so an `except Exception` of the code under test catches both.
+internal sealed class HarnessLlm : LLMClient
+{
+    internal HarnessLlm()
+        : base(new LLMConfig(maxTokens: 32768), false)
+    {
+    }
+
+    internal override string PythonName => "MagicMock";
+
+    internal override Task<OrderedDictionary<string, object?>> PrivateGenerateResponseAsync(
+        List<Message> messages,
+        IResponseModel? responseModel = null,
+        long maxTokens = global::Graphiti.Core.LlmClient.Config.DefaultMaxTokens,
+        ModelSize modelSize = ModelSize.Medium,
+        string? model = null,
+        CancellationToken cancellationToken = default) => throw new Xunit.Sdk.XunitException("unexpected model call");
+
+    internal override Task<OrderedDictionary<string, object?>> GenerateResponseAsync(
+        List<Message> messages,
+        IResponseModel? responseModel = null,
+        long? maxTokens = null,
+        ModelSize modelSize = ModelSize.Medium,
+        string? groupId = null,
+        string? promptName = null,
+        bool attributeExtraction = false,
+        string? model = null,
+        CancellationToken cancellationToken = default) => throw new Xunit.Sdk.XunitException("unexpected model call");
+}
+
+/// <summary>The embedder of the Harness: `create_batch` gives X for each name.</summary>
+// PORT: `embedder.create` is a MagicMock in Python, and its await raises TypeError. R4 gives InvalidCastException.
+internal sealed class HarnessEmbedder : EmbedderClient
+{
+    internal override Task<List<double>> CreateAsync(List<string> inputData, CancellationToken cancellationToken = default) =>
+        throw new InvalidCastException("object MagicMock can't be used in 'await' expression");
+
+    internal override Task<List<List<double>>> CreateBatchAsync(List<string> inputDataList, CancellationToken cancellationToken = default)
+    {
+        List<List<double>> vectors = [.. inputDataList.Select(_ => IngestionFixtures.X)];
+        return Task.FromResult(vectors);
     }
 }

@@ -335,6 +335,43 @@ internal static class Asyncio
         WaitForAsync(Boxed(call), timeout, timeProvider, cancellationToken);
 
     /// <summary>
+    /// <c>await asyncio.sleep(seconds)</c>. The timer runs on <paramref name="timeProvider"/>, the clock of the port
+    /// (R8: <c>PortServices.Time</c>). A canceled <paramref name="cancellationToken"/> ends it with
+    /// <see cref="OperationCanceledException"/>, as a cancellation ends the sleep of a task with <c>CancelledError</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A delay of 0 or less, also <c>-inf</c>, yields once to the scheduler and returns, as <c>asyncio.sleep</c> does
+    /// with <c>__sleep0()</c>. Python raises for no input.
+    /// </para>
+    /// <para>
+    /// A delay above about 49.7 days, and <c>inf</c>, wait until the token is canceled. <see cref="Task.Delay(TimeSpan, TimeProvider, CancellationToken)"/>
+    /// refuses a delay above <c>uint.MaxValue - 1</c> milliseconds, and <c>asyncio.sleep</c> has no limit. This is the
+    /// mapping of <see cref="WaitForAsync{T}"/>.
+    /// </para>
+    /// <para>
+    /// <c>nan</c> is not 0 or less, so Python sets a loop timer at <c>nan</c>. The timer runs when it reaches the top of
+    /// the timer heap of the loop: at once when no other timer is pending, and after the timers that were set before it
+    /// otherwise. The port has no timer heap, so <c>nan</c> and a delay below one tick of the clock yield once and return.
+    /// </para>
+    /// </remarks>
+    internal static async Task SleepAsync(double seconds, TimeProvider timeProvider, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var delay = !(seconds > 0) ? TimeSpan.Zero
+            : seconds * 1000 < uint.MaxValue - 1 ? TimeSpan.FromSeconds(seconds)
+            : Timeout.InfiniteTimeSpan;
+        if (delay == TimeSpan.Zero)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            return;
+        }
+
+        await Task.Delay(delay, timeProvider, cancellationToken);
+    }
+
+    /// <summary>
     /// <c>await asyncio.shield(task)</c>. It ends with the outcome of <paramref name="task"/>. When
     /// <paramref name="cancellationToken"/> is canceled first, it ends with <see cref="OperationCanceledException"/>
     /// and <paramref name="task"/> keeps running, as the awaiter of a shield gets <c>CancelledError</c> and the inner

@@ -13,9 +13,11 @@ using Graphiti.Core.Utils.Maintenance;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.MaintenanceHelpersValuesTests;
 
-// The digest cache of delta.py is module state with no lock, as in Python: each ported call runs on one scheduler
-// thread. Two test classes that call LoadDeltaDigests at the same time would change the cache under each other, so each
-// class that calls it is in this collection, and xunit runs the classes of one collection one after the other.
+// The digest cache of delta.py is module state with no lock, as in Python: product code calls LoadDeltaDigests only on
+// the scheduler (decision D22). So each test here that calls it runs its body in one turn of the scheduler
+// (LoopGuard.RunAsync, a body with no await): no other ported code, for example a commit of the phases tests, runs
+// between its calls or changes the cache at the same time. The classes that read the state of the cache are in this
+// collection, and xunit runs the classes of one collection one after the other.
 [Collection(DigestCacheGroup)]
 public class DeltaValuesTests
 {
@@ -71,23 +73,17 @@ public class DeltaValuesTests
         Assert.Contains(Cases, c => Str(c["f"]) == "delta" && Dict(c["r"]).ContainsKey("err"));
     }
 
+    // Each case runs in one turn of the scheduler (see the comment of the class). One turn for each case, and not one for
+    // the whole loop, keeps the scheduler free for the tests that run beside it.
     [Fact]
-    public void The_port_gives_each_recorded_result()
+    public async Task The_port_gives_each_recorded_result()
     {
         List<string> failures = [];
         foreach (var (index, item) in Cases.Index())
         {
             var name = Str(item["f"]);
             var args = List(item["a"]);
-            object got;
-            try
-            {
-                got = new OrderedDictionary<string, object?> { ["ok"] = Invoke(name, args) };
-            }
-            catch (Exception error) when (error is ArgumentException or InvalidDataException)
-            {
-                got = new OrderedDictionary<string, object?> { ["err"] = ErrorView(error) };
-            }
+            var got = await LoopGuard.RunAsync(() => Task.FromResult(Got(name, args)), seconds: 30);
 
             // GAPS G17: where BLAS gave other ranks than the plain loop, the recorder gives the ranks of the loop.
             var want = PyJson.Dumps(item.GetValueOrDefault("r_loop") ?? item["r"]);
@@ -102,16 +98,13 @@ public class DeltaValuesTests
     }
 
     // The digest cache: the same units give the same digest objects, and DIGEST_CACHE_SIZE + 1 other units drop them.
+    // The calls of LoadDeltaDigests run in one turn of the scheduler. The test makes the payloads before it.
     [Fact]
-    public void The_digest_cache_keeps_and_drops_digests_as_python_does()
+    public async Task The_digest_cache_keeps_and_drops_digests_as_python_does()
     {
         var cache = Dict(Values["cache"]);
         var payloads = List(cache["payloads"]).Select(p => Convert.FromHexString(Str(p))).ToList();
         List<DeltaUnit> first = [Unit(1, "committed", payloads[0]), Unit(2, "committed", payloads[1])];
-        var one = DeltaModule.LoadDeltaDigests("cache", first).Digests;
-        var two = DeltaModule.LoadDeltaDigests("cache", [.. Enumerable.Reverse(first)]).Digests;
-        var otherStatus = DeltaModule.LoadDeltaDigests("cache", [Unit(1, "applying", payloads[0])]).Digests;
-        var otherGroup = DeltaModule.LoadDeltaDigests("cache2", first[..1]).Digests;
         var fillerChangeSet = ChangeSet.FromBytes(payloads[0]);
         List<DeltaUnit> filler = [];
         for (var i = 0; i < (long)cache["filler_count"]!; i++)
@@ -120,8 +113,18 @@ public class DeltaValuesTests
             filler.Add(Unit(1000 + i, "committed", fillerChangeSet.ToBytes()));
         }
 
-        DeltaModule.LoadDeltaDigests("cache", filler);
-        var three = DeltaModule.LoadDeltaDigests("cache", first).Digests;
+        var (one, two, otherStatus, otherGroup, three) = await LoopGuard.RunAsync(
+            () =>
+            {
+                var one = DeltaModule.LoadDeltaDigests("cache", first).Digests;
+                var two = DeltaModule.LoadDeltaDigests("cache", [.. Enumerable.Reverse(first)]).Digests;
+                var otherStatus = DeltaModule.LoadDeltaDigests("cache", [Unit(1, "applying", payloads[0])]).Digests;
+                var otherGroup = DeltaModule.LoadDeltaDigests("cache2", first[..1]).Digests;
+                DeltaModule.LoadDeltaDigests("cache", filler);
+                var three = DeltaModule.LoadDeltaDigests("cache", first).Digests;
+                return Task.FromResult((one, two, otherStatus, otherGroup, three));
+            },
+            seconds: 30);
 
         Assert.Equal(PyJson.Dumps(cache["again"]), PyJson.Dumps(one.Zip(two).Select(p => (object?)ReferenceEquals(p.First, p.Second)).ToList()));
         Assert.Equal((bool)cache["other_status"]!, ReferenceEquals(otherStatus[0], one[0]));
@@ -130,6 +133,18 @@ public class DeltaValuesTests
     }
 
     internal static DeltaUnit Unit(long seq, string status, byte[] payload) => new() { Seq = seq, Status = status, Payload = payload };
+
+    private static OrderedDictionary<string, object?> Got(string name, List<object?> args)
+    {
+        try
+        {
+            return new OrderedDictionary<string, object?> { ["ok"] = Invoke(name, args) };
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidDataException)
+        {
+            return new OrderedDictionary<string, object?> { ["err"] = ErrorView(error) };
+        }
+    }
 
     private static object? Invoke(string name, List<object?> a)
     {
@@ -338,7 +353,8 @@ public class DeltaValuesTests
 }
 
 // The sequences of review B of packet P8b on the digest cache. Each one uses its own group, so its result does not
-// depend on what the cache held before it. The class is in the collection of DeltaValuesTests (see there).
+// depend on what the cache held before it. Each body runs in one turn of the scheduler, and the class is in the
+// collection of DeltaValuesTests (see there).
 [Collection(DeltaValuesTests.DigestCacheGroup)]
 public class DeltaDigestCacheTests
 {
@@ -348,36 +364,57 @@ public class DeltaDigestCacheTests
 
     // A, then DIGEST_CACHE_SIZE - 1 other units, then A: A is the oldest entry of a full cache, and it stays.
     [Fact]
-    public void The_digest_cache_keeps_an_entry_on_the_size_limit()
+    public async Task The_digest_cache_keeps_an_entry_on_the_size_limit()
     {
-        var a = Load("limit", 1, Payloads[0]);
-        DeltaModule.LoadDeltaDigests("limit", Others());
-        Assert.Equal((bool)Cache["limit_kept"]!, ReferenceEquals(a, Load("limit", 1, Payloads[0])));
+        var others = Others();
+        await OneTurn(() =>
+        {
+            var a = Load("limit", 1, Payloads[0]);
+            DeltaModule.LoadDeltaDigests("limit", others);
+            Assert.Equal((bool)Cache["limit_kept"]!, ReferenceEquals(a, Load("limit", 1, Payloads[0])));
+        });
     }
 
     // A, B, A again, then DIGEST_CACHE_SIZE - 1 other units: the hit moved A to the end, so B leaves and A stays.
     [Fact]
-    public void A_hit_moves_the_entry_to_the_end_of_the_digest_cache()
+    public async Task A_hit_moves_the_entry_to_the_end_of_the_digest_cache()
     {
-        var a = Load("move", 1, Payloads[0]);
-        var b = Load("move", 2, Payloads[1]);
-        Load("move", 1, Payloads[0]);
-        DeltaModule.LoadDeltaDigests("move", Others());
-        List<object?> move = [ReferenceEquals(a, Load("move", 1, Payloads[0])), ReferenceEquals(b, Load("move", 2, Payloads[1]))];
-        Assert.Equal(PyJson.Dumps(Cache["move"]), PyJson.Dumps(move));
+        var others = Others();
+        await OneTurn(() =>
+        {
+            var a = Load("move", 1, Payloads[0]);
+            var b = Load("move", 2, Payloads[1]);
+            Load("move", 1, Payloads[0]);
+            DeltaModule.LoadDeltaDigests("move", others);
+            List<object?> move = [ReferenceEquals(a, Load("move", 1, Payloads[0])), ReferenceEquals(b, Load("move", 2, Payloads[1]))];
+            Assert.Equal(PyJson.Dumps(Cache["move"]), PyJson.Dumps(move));
+        });
     }
 
     // Two payloads with the same group, seq, status, and length: the hash of the payload keeps their keys apart.
     [Fact]
-    public void Two_payloads_of_one_length_give_two_digests()
+    public async Task Two_payloads_of_one_length_give_two_digests()
     {
-        var twins = List(Cache["twins"]).Select(p => Convert.FromHexString(Str(p))).ToList();
-        Assert.Equal(twins[0].Length, twins[1].Length);
-        var x = Load("twins", 7, twins[0]);
-        var y = Load("twins", 7, twins[1]);
-        Assert.Equal((bool)Cache["twins_same"]!, ReferenceEquals(x, y));
-        Assert.Equal(PyJson.Dumps(Cache["twins_names"]), PyJson.Dumps(new List<object?> { x.Nodes[0].Name, y.Nodes[0].Name }));
+        await OneTurn(() =>
+        {
+            var twins = List(Cache["twins"]).Select(p => Convert.FromHexString(Str(p))).ToList();
+            Assert.Equal(twins[0].Length, twins[1].Length);
+            var x = Load("twins", 7, twins[0]);
+            var y = Load("twins", 7, twins[1]);
+            Assert.Equal((bool)Cache["twins_same"]!, ReferenceEquals(x, y));
+            Assert.Equal(PyJson.Dumps(Cache["twins_names"]), PyJson.Dumps(new List<object?> { x.Nodes[0].Name, y.Nodes[0].Name }));
+        });
     }
+
+    // The body runs in one turn of the scheduler: it has no await, so no other ported code runs between its calls.
+    private static Task OneTurn(Action body) =>
+        LoopGuard.RunAsync(
+            () =>
+            {
+                body();
+                return Task.CompletedTask;
+            },
+            seconds: 30);
 
     private static UnitDigest Load(string groupId, long seq, byte[] payload) =>
         DeltaModule.LoadDeltaDigests(groupId, [DeltaValuesTests.Unit(seq, "committed", payload)]).Digests[0];

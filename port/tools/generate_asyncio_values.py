@@ -33,6 +33,8 @@ Operations (the C# interpreter in AsyncioScripts.cs reads the same list):
     ["wait_for", name, timeout]         await asyncio.wait_for(name(), timeout)
     ["ev_wait", e], ["ev_set", e], ["ev_clear", e], ["ev_is_set", e]
     ["to_thread", value]                await asyncio.to_thread(lambda: value)
+    ["sleep", text]                     await asyncio.sleep(float(text)), then log "slept <text>". The text is a float
+                                        literal that both sides read, also "Infinity", "-Infinity", and "NaN".
 
 Part of the scripts come from a fixed seed. A random script that does not end in Python within half a second is
 dropped (it waits for an event that no coroutine sets). Nothing here uses the network.
@@ -172,6 +174,9 @@ class Program:
                 self.event(op[1]).clear()
             elif kind == 'ev_is_set':
                 self.log(me, f'ev_is_set {op[1]} -> {fmt(self.event(op[1]).is_set())}')
+            elif kind == 'sleep':
+                await asyncio.sleep(float(op[1]))
+                self.log(me, f'slept {op[1]}')
             elif kind == 'to_thread':
                 value = op[1]
                 r = await asyncio.to_thread(lambda: value)
@@ -312,6 +317,20 @@ def hand_scripts() -> list[dict]:
         'poll': [['ev_wait', 'changed'], ['return', 1]],
     }, [['try', [['wait_for', 'poll', 0.005]], 'swallow'], ['create_task', 'setter', 's'],
         ['wait_for', 'poll', 10.0], ['await', 's']], 'the poll of ingestion/scheduler.py'))
+    # asyncio.sleep: 0 or less (also -inf) yields once, a delay above the 49.7 days of Task.Delay and inf wait with no
+    # error, and nan with no other timer pending ends at once.
+    for text in ('0', '-1.5', '-Infinity'):
+        out.append(s(f'sleep_{text}', {'bg': bg},
+            [['create_task', 'bg', 't'], ['sleep', text], ['log', 'after'], ['await', 't']],
+            'a delay of 0 or less yields once (__sleep0)'))
+    for text in ('1e7', '1e9', '1e300', 'Infinity'):
+        out.append(s(f'sleep_{text}', {'a': [['log', 's'], ['sleep', text], ['log', 'never']]},
+            [['try', [['wait_for', 'a', 0.005]], 'swallow'], ['log', 'after']],
+            'a long delay waits and raises nothing; the limit of wait_for ends it'))
+    out.append(s('sleep_NaN', {}, [['sleep', 'NaN'], ['log', 'after']],
+        'nan sets a loop timer at nan, which runs at once when no other timer is pending'))
+    out.append(s('sleep_short', {'a': [['sleep', '0.001'], ['return', 1]]},
+        [['wait_for', 'a', 10.0], ['log', 'after']], 'a short delay ends'))
     out.append(s('create_task_order', {'t1': steps('t1', 2) + [['return', 1]], 't2': steps('t2', 1) + [['return', 2]]},
         [['create_task', 't1', 'h1'], ['create_task', 't2', 'h2'], ['log', 'created'], ['yield'], ['log', 'yielded'],
          ['await', 'h1'], ['await', 'h2']], 'a task starts on the next trip through the loop'))

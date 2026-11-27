@@ -151,10 +151,6 @@ internal static partial class PhasesValues
     internal static List<object?> ReportView(OrderedDictionary<string, double> report) =>
         [.. report.Where(e => !e.Key.EndsWith("_ms", StringComparison.Ordinal)).Select(e => (object?)new List<object?> { e.Key, e.Value })];
 
-    // A failure reason that Python writes with type(error).__name__ is `<type>` (decision D50).
-    internal static string? MaskReason(string? reason) =>
-        reason is null or StateStore.ReasonExpired or StateStore.ReasonApplyFailed ? reason : "<type>";
-
     internal static List<object?> StoreView(InMemoryIngestionStateStore store)
     {
         List<object?> output = [];
@@ -176,7 +172,7 @@ internal static partial class PhasesValues
                     e.Value.StartedAt,
                     e.Value.EndedAt,
                     e.Value.Fence,
-                    MaskReason(e.Value.FailReason),
+                    e.Value.FailReason,
                     e.Value.Payload is not null,
                 }).ToList(),
                 ["unit_ids"] = group.UnitIds.Select(e => (object?)new List<object?> { e.Key, e.Value }).ToList(),
@@ -211,14 +207,13 @@ internal static partial class PhasesValues
         _ => value,
     };
 
-    // The log line of _apply_with_retries ends with type(error).__name__ in Python and the .NET type name in the port.
-    internal static string MaskTypeName(string message) => TypeNamePattern().Replace(message, "failed: <type>");
+    internal static string MaskElapsed(string message) => ElapsedPattern().Replace(message, " in <ms> ms");
+
+    [GeneratedRegex(" in [0-9.eE+-]+ ms$", RegexOptions.CultureInvariant)]
+    private static partial Regex ElapsedPattern();
 
     [GeneratedRegex("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", RegexOptions.CultureInvariant)]
     private static partial Regex Uuid4Pattern();
-
-    [GeneratedRegex("failed: [A-Za-z_]+$", RegexOptions.CultureInvariant)]
-    private static partial Regex TypeNamePattern();
 
     private static OrderedDictionary<string, object?> Load()
     {
@@ -255,8 +250,9 @@ internal sealed class PhasesLogCapture(List<object?> events) : ILoggerFactory, I
 
         public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            events.Add(new OrderedDictionary<string, object?>
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            var entry = new OrderedDictionary<string, object?>
             {
                 ["kind"] = "log",
                 ["level"] = logLevel switch
@@ -267,8 +263,18 @@ internal sealed class PhasesLogCapture(List<object?> events) : ILoggerFactory, I
                     LogLevel.Error => "ERROR",
                     _ => logLevel.ToString().ToUpperInvariant(),
                 },
-                ["message"] = PhasesValues.MaskTypeName(formatter(state, exception)),
-            });
+                // The time of an embedding call reads the system clock, as in the recorder.
+                ["message"] = PhasesValues.MaskElapsed(formatter(state, exception)),
+            };
+
+            // `exc_info` of the Python record: the log call passes the exception.
+            if (exception is not null)
+            {
+                entry["exc"] = true;
+            }
+
+            events.Add(entry);
+        }
     }
 }
 
@@ -304,6 +310,13 @@ internal sealed class PhasesRun
         {
             StoreFails[kind] = (long)count!;
         }
+
+        foreach (var (kind, seconds) in input.GetValueOrDefault("store_advance") as OrderedDictionary<string, object?> ?? new())
+        {
+            StoreAdvance[kind] = Convert.ToDouble(seconds, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        CallerToken = source.Token;
 
         foreach (var item in input.GetValueOrDefault("advance") as List<object?> ?? [])
         {
@@ -347,6 +360,11 @@ internal sealed class PhasesRun
     internal Dictionary<string, long> Fails { get; } = [];
 
     internal Dictionary<string, long> StoreFails { get; } = [];
+
+    internal Dictionary<string, double> StoreAdvance { get; } = [];
+
+    // The token of the function under test. A store call records `caller` when it gets this token (R25).
+    internal CancellationToken CallerToken { get; set; }
 
     internal List<object?[]> Advance { get; } = [];
 
@@ -409,7 +427,10 @@ internal sealed class PhasesRun
 
             if (Count - 1 == CancelAt)
             {
-                await Source.CancelAsync();
+                // Cancel() and not CancelAsync(): Cancel() runs the callbacks of the token at once on the scheduler
+                // thread, as task.cancel() acts at once in Python. CancelAsync() runs them on the thread pool, and the
+                // result then changes from run to run.
+                Source.Cancel();
             }
 
             if (Fails.TryGetValue(kind, out var fails) && fails > 0)
@@ -732,100 +753,112 @@ internal sealed class PhasesRun
     }
 
     // LoggingStore of the fixtures: each call is recorded with no yield, and the inner store runs it. A payload is left
-    // out of the record, because the compressed bytes differ between the two sides (GAPS F39).
+    // out of the record, because the compressed bytes differ between the two sides (GAPS F39). Each record has the
+    // token of the call, as `task`.
     internal sealed class LoggingStore(PhasesRun run, InMemoryIngestionStateStore inner) : IngestionStateStore
     {
         internal override Task<Admission?> BeginAdmitAsync(string groupId, string unitId, double ttl, CancellationToken cancellationToken = default)
         {
-            Record("begin_admit", groupId, unitId, ttl);
+            Record("begin_admit", cancellationToken, groupId, unitId, ttl);
             return inner.BeginAdmitAsync(groupId, unitId, ttl, cancellationToken);
         }
 
         internal override Task EndAdmitAsync(string groupId, long seq, CancellationToken cancellationToken = default)
         {
-            Record("end_admit", groupId, seq);
+            Record("end_admit", cancellationToken, groupId, seq);
             return inner.EndAdmitAsync(groupId, seq, cancellationToken);
         }
 
         internal override Task<AnalysisStart> StartAnalysisAsync(string groupId, long seq, CancellationToken cancellationToken = default)
         {
-            Record("start_analysis", groupId, seq);
+            Record("start_analysis", cancellationToken, groupId, seq);
             return inner.StartAnalysisAsync(groupId, seq, cancellationToken);
         }
 
         internal override Task SaveChangeSetAsync(string groupId, long seq, byte[] payload, CancellationToken cancellationToken = default)
         {
-            Record("save_change_set", groupId, seq);
+            Record("save_change_set", cancellationToken, groupId, seq);
             return inner.SaveChangeSetAsync(groupId, seq, payload, cancellationToken);
         }
 
         internal override Task HeartbeatAsync(string groupId, long seq, double ttl, long? fence = null, CancellationToken cancellationToken = default)
         {
-            Record("heartbeat", groupId, seq, ttl, fence);
+            Record("heartbeat", cancellationToken, groupId, seq, ttl, fence);
             return inner.HeartbeatAsync(groupId, seq, ttl, fence, cancellationToken);
         }
 
         internal override Task<BeginCommitResult> BeginCommitAsync(string groupId, long seq, double ttl, CancellationToken cancellationToken = default)
         {
-            Record("begin_commit", groupId, seq, ttl);
+            Record("begin_commit", cancellationToken, groupId, seq, ttl);
             return inner.BeginCommitAsync(groupId, seq, ttl, cancellationToken);
         }
 
         internal override Task<List<DeltaUnit>> LoadDeltaAsync(string groupId, long afterSeq, long beforeSeq, double since, CancellationToken cancellationToken = default)
         {
-            Record("load_delta", groupId, afterSeq, beforeSeq, since);
+            Record("load_delta", cancellationToken, groupId, afterSeq, beforeSeq, since);
             return inner.LoadDeltaAsync(groupId, afterSeq, beforeSeq, since, cancellationToken);
         }
 
         internal override Task SaveFinalAsync(string groupId, long seq, long fence, byte[] payload, CancellationToken cancellationToken = default)
         {
-            Record("save_final", groupId, seq, fence);
+            Record("save_final", cancellationToken, groupId, seq, fence);
             return inner.SaveFinalAsync(groupId, seq, fence, payload, cancellationToken);
         }
 
         internal override Task FinishCommitAsync(string groupId, long seq, long fence, List<string> nodeUuids, double retainSeconds, CancellationToken cancellationToken = default)
         {
-            Record("finish_commit", groupId, seq, fence, nodeUuids, retainSeconds);
+            Record("finish_commit", cancellationToken, groupId, seq, fence, nodeUuids, retainSeconds);
             return inner.FinishCommitAsync(groupId, seq, fence, nodeUuids, retainSeconds, cancellationToken);
         }
 
         internal override Task FailAsync(string groupId, long seq, string reason, long? fence = null, CancellationToken cancellationToken = default)
         {
-            Record("fail", groupId, seq, PhasesValues.MaskReason(reason), fence);
+            Record("fail", cancellationToken, groupId, seq, reason, fence);
             return inner.FailAsync(groupId, seq, reason, fence, cancellationToken);
         }
 
         internal override Task<List<string>> ReadyEnrichAsync(string groupId, long seq, CancellationToken cancellationToken = default)
         {
-            Record("ready_enrich", groupId, seq);
+            Record("ready_enrich", cancellationToken, groupId, seq);
             return inner.ReadyEnrichAsync(groupId, seq, cancellationToken);
         }
 
         internal override Task FinishEnrichAsync(string groupId, long seq, List<string> nodeUuids, CancellationToken cancellationToken = default)
         {
-            Record("finish_enrich", groupId, seq, nodeUuids);
+            Record("finish_enrich", cancellationToken, groupId, seq, nodeUuids);
             return inner.FinishEnrichAsync(groupId, seq, nodeUuids, cancellationToken);
         }
 
         internal override Task CloseAsync(CancellationToken cancellationToken = default)
         {
-            Record("close");
+            Record("close", cancellationToken);
             return inner.CloseAsync(cancellationToken);
         }
 
-        private void Record(string method, params object?[] args)
+        // `task` is the token of the call (R25): `caller` for the token of the function under test, and also for a call
+        // with no token after that token was canceled (a cleanup that R8 runs with CancellationToken.None, where Python
+        // runs it in the canceled task). `other` is the token of a task that the function made, and `none` a call with no
+        // token before a cancellation.
+        private void Record(string method, CancellationToken cancellationToken, params object?[] args)
         {
+            var task = cancellationToken == run.CallerToken || (!cancellationToken.CanBeCanceled && run.CallerToken.IsCancellationRequested)
+                ? "caller"
+                : cancellationToken.CanBeCanceled ? "other" : "none";
             run.Events.Add(new OrderedDictionary<string, object?>
             {
                 ["kind"] = "store",
                 ["method"] = method,
                 ["args"] = PhasesValues.Encode(args.ToList()),
+                ["task"] = task,
             });
             if (run.StoreFails.TryGetValue(method, out var fails) && fails > 0)
             {
                 run.StoreFails[method] = fails - 1;
                 throw new InvalidOperationException("store " + method + " failed");
             }
+
+            // A store call that takes time: the clock moves before the inner store runs.
+            run.Clock.Now += run.StoreAdvance.GetValueOrDefault(method);
         }
     }
 }

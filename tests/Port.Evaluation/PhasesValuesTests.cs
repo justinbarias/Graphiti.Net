@@ -4,11 +4,14 @@
 // graph driver with its session and its transaction, and the graph reader. The state store is the real in-memory store
 // in a recording wrapper. The calls, the store calls, and the log lines of each case are one ordered list.
 //
-// admit_episode, admit_bulk, analyze_episode, analyze_bulk, commit_unit, enrich_unit, and _save_analysis call a method
-// of `Graphiti` first (graphiti._resolve_request_scope), and GraphitiCore is a skeleton until layer 9. They wait for
-// layer 9, and so do the paths of _build_saga_links that call graphiti._find_saga or
-// graphiti._saga_get_previous_episode_uuid. The other paths of _build_saga_links and _written_episode read no member of
-// `Graphiti` but its `store_raw_episode_content`, so the test gives them an object that no constructor made.
+// admit_episode, admit_bulk, analyze_episode, analyze_bulk, commit_unit, and enrich_unit call a method of `Graphiti`
+// first (graphiti._resolve_request_scope), and GraphitiCore is a skeleton until layer 9. They wait for layer 9, and so do
+// the paths of _build_saga_links that call graphiti._find_saga or graphiti._saga_get_previous_episode_uuid. The other
+// paths of _build_saga_links, _written_episode, and _save_analysis read no member of `Graphiti` but
+// `store_raw_episode_content`, so the test gives them an object that no constructor made.
+//
+// A failure reason and the type name of the log line of _apply_with_retries are the Python type name in the recording.
+// The port writes the .NET type name (decision D50), and the test compares it with the name that R4 gives (NetName).
 namespace Graphiti.Port.Evaluation;
 
 using System.Runtime.CompilerServices;
@@ -19,7 +22,7 @@ using Graphiti.Internal;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.PhasesValues;
 
-public class PhasesValuesTests
+public partial class PhasesValuesTests
 {
     private static readonly List<OrderedDictionary<string, object?>> SyncCases =
         List(PhasesValues.Document["cases"]).Select(Dict).ToList();
@@ -44,6 +47,7 @@ public class PhasesValuesTests
         ["groups_bulk_False:1"] = 1,
         ["groups_bulk_False:2"] = 2,
         ["groups_bulk_False:3"] = 1,
+        ["saga_new:6"] = 1,
     };
 
     public static TheoryData<int> SyncCaseIndexes() => Indexes(SyncCases.Count);
@@ -79,6 +83,71 @@ public class PhasesValuesTests
         return data;
     }
 
+    // R4: the .NET type that the port throws for a Python exception class. A failure reason is the name of that type
+    // (decision D50).
+    internal static string NetName(string pythonName) => pythonName switch
+    {
+        "RuntimeError" => nameof(InvalidOperationException),
+        "KeyError" or "LookupError" => nameof(KeyNotFoundException),
+        "ValueError" => nameof(ArgumentException),
+        "ValidationError" => nameof(ValidationException),
+        "UnitExpiredError" => nameof(UnitExpiredException),
+        "StaleCommitError" => nameof(StaleCommitException),
+        "UnitInProgressError" => nameof(UnitInProgressException),
+        "NodeNotFoundError" => nameof(NodeNotFoundException),
+
+        // The await of a canceled task throws TaskCanceledException, the subclass of OperationCanceledException.
+        "CancelledError" => nameof(TaskCanceledException),
+        _ => throw new InvalidOperationException("no .NET name for " + pythonName),
+    };
+
+    // The recording with the .NET names of decision D50, and with the rows of a report as [key, value]. The third item of
+    // a row is the Python type that the span of commit_unit gets, which the test compares when commit_unit runs (layer 9).
+    internal static object? Expected(object? value, string? key = null)
+    {
+        switch (value)
+        {
+            case OrderedDictionary<string, object?> d:
+                {
+                    var copy = new OrderedDictionary<string, object?>();
+                    foreach (var (k, v) in d)
+                    {
+                        copy[k] = Expected(v, k);
+                    }
+
+                    if (d.GetValueOrDefault("kind") is "store" && d.GetValueOrDefault("method") is "fail")
+                    {
+                        var args = List(copy["args"]);
+                        args[2] = Reason((string?)args[2]);
+                    }
+
+                    if (d.GetValueOrDefault("kind") is "log" && copy["message"] is string message)
+                    {
+                        copy["message"] = LogTypeName().Replace(message, m => "failed: " + NetName(m.Groups[1].Value));
+                    }
+
+                    return copy;
+                }
+
+            case List<object?> l when key == "report":
+                return l.Select(row => (object?)List(row).Take(2).ToList()).ToList();
+            case List<object?> l when key == "units":
+                return l.Select(row =>
+                {
+                    var unit = List(Expected(row));
+                    unit[8] = Reason((string?)unit[8]);
+                    return (object?)unit;
+                }).ToList();
+            case List<object?> l:
+                return l.Select(v => Expected(v)).ToList();
+            default:
+                return value;
+        }
+
+        static string? Reason(string? reason) =>
+            reason is null or StateStore.ReasonExpired or StateStore.ReasonApplyFailed ? reason : NetName(reason);
+    }
+
     // R4: the Python name of the class of an exception that the port throws.
     internal static string PythonName(Exception e) => e switch
     {
@@ -112,7 +181,7 @@ public class PhasesValuesTests
             "_move_end_date_to_earliest_contradiction", "_check_driver", "UnitLease", "UnitLease.heartbeat", "_begin_admit",
             "_fail_unit", "_fail_admission", "_written_episodes", "_episodes_with_stored_links", "rebase_change_set",
             "apply_change_set", "_write_saga_links", "_apply_with_retries", "_mark_apply_failed", "_recover_unit",
-            "_build_saga_links", "_hydrate_nodes",
+            "_build_saga_links", "_hydrate_nodes", "_save_analysis",
         })
         {
             Assert.Contains(name, names);
@@ -140,6 +209,7 @@ public class PhasesValuesTests
         }
 
         output["events"] = events;
+        expected = Dict(Expected(expected));
         if ((string)input["fn"]! == "new_report")
         {
             // PORT: Python stores the int 0, and the port the double 0 (the report is a dict[str, float]). The test
@@ -161,7 +231,7 @@ public class PhasesValuesTests
         var input = Dict(AsyncCases[index]["in"]);
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var (run, output) = await RunAsync(input, source, -1);
-        var expected = new OrderedDictionary<string, object?>(Dict(AsyncCases[index]["out"]));
+        var expected = Dict(Expected(Dict(AsyncCases[index]["out"])));
         expected.Remove("cancel");
         var expectedEvents = List(expected["events"]);
         var actualEvents = List(output["events"]);
@@ -173,7 +243,9 @@ public class PhasesValuesTests
         Assert.Equal(PyJson.Dumps(expected), PyJson.Dumps(output));
 
         // Each fake call got the token of the call (R25). A saga save runs in asyncio.wait_for with the write budget
-        // (R8), so its query gets the token of the limit, which the token of the call also cancels.
+        // (R8), so its query gets the token of the limit, which the token of the call also cancels. WaitForAsync
+        // disposes that linked source when the call ends, so the link to the caller cannot be read after the run: the
+        // cancel points of the saga case saga_new test it. The store calls record their token as `task`.
         foreach (var (kind, token) in run.Tokens)
         {
             if (token != source.Token)
@@ -229,6 +301,9 @@ public class PhasesValuesTests
         Assert.Equal("CancelledError", Dict(output["error"])["type"]);
         Assert.Equal(0, run.Count);
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex("failed: ([A-Za-z_]+)$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex LogTypeName();
 
     private static TheoryData<int> Indexes(int count)
     {
@@ -470,36 +545,41 @@ public class PhasesValuesTests
     {
         List<BeginCommitResult> results = [];
         var store = run.Inner;
+        var g = "g";
         foreach (var step in input.GetValueOrDefault("setup") as List<object?> ?? [])
         {
             var s = List(step);
             switch ((string)s[0]!)
             {
+                case "group":
+                    // The steps after it use this group.
+                    g = (string)s[1]!;
+                    break;
                 case "admit":
                     {
-                        var admission = await store.BeginAdmitAsync("g", (string)s[1]!, run.Config.LeaseSeconds);
-                        await store.EndAdmitAsync("g", Py.NotNone(admission, "seq").Seq);
+                        var admission = await store.BeginAdmitAsync(g, (string)s[1]!, run.Config.LeaseSeconds);
+                        await store.EndAdmitAsync(g, Py.NotNone(admission, "seq").Seq);
                         break;
                     }
 
                 case "admitting":
-                    await store.BeginAdmitAsync("g", (string)s[1]!, run.Config.LeaseSeconds);
+                    await store.BeginAdmitAsync(g, (string)s[1]!, run.Config.LeaseSeconds);
                     break;
                 case "analyze":
-                    await store.StartAnalysisAsync("g", (long)s[1]!);
-                    await store.SaveChangeSetAsync("g", (long)s[1]!, ChangeSetOf(s[2]).ToBytes());
+                    await store.StartAnalysisAsync(g, (long)s[1]!);
+                    await store.SaveChangeSetAsync(g, (long)s[1]!, ChangeSetOf(s[2]).ToBytes());
                     break;
                 case "begin_commit":
-                    results.Add(await store.BeginCommitAsync("g", (long)s[1]!, run.Config.LeaseSeconds));
+                    results.Add(await store.BeginCommitAsync(g, (long)s[1]!, run.Config.LeaseSeconds));
                     break;
                 case "save_final":
-                    await store.SaveFinalAsync("g", (long)s[1]!, (long)s[2]!, ChangeSetOf(s[3]).ToBytes());
+                    await store.SaveFinalAsync(g, (long)s[1]!, (long)s[2]!, ChangeSetOf(s[3]).ToBytes());
                     break;
                 case "finish_commit":
-                    await store.FinishCommitAsync("g", (long)s[1]!, (long)s[2]!, [.. List(s[3]).Cast<string>()], run.Config.IndexLagSeconds);
+                    await store.FinishCommitAsync(g, (long)s[1]!, (long)s[2]!, [.. List(s[3]).Cast<string>()], run.Config.IndexLagSeconds);
                     break;
                 case "fail":
-                    await store.FailAsync("g", (long)s[1]!, (string)s[2]!, (long?)s[3]);
+                    await store.FailAsync(g, (long)s[1]!, (string)s[2]!, (long?)s[3]);
                     break;
                 case "advance":
                     run.Clock.Now += (double)s[1]!;
@@ -565,8 +645,13 @@ public class PhasesValuesTests
                     if (input.GetValueOrDefault("cancel_in_shield") is true)
                     {
                         using var shieldSource = new CancellationTokenSource();
+                        run.CallerToken = shieldSource.Token;
                         var task = Phases.BeginAdmitAsync(store, run.Config, "g", (string)input["unit_id"]!, WaitAsync, shieldSource.Token);
-                        await shieldSource.CancelAsync();
+
+                        // Cancel() and not CancelAsync(): Cancel() runs the callbacks of the token at once on the
+                        // scheduler thread, as task.cancel() acts at once in Python. CancelAsync() runs them on the thread
+                        // pool, where they race with the continuation of the store call.
+                        shieldSource.Cancel();
                         try
                         {
                             await task;
@@ -735,7 +820,7 @@ public class PhasesValuesTests
                 }
 
             case "_mark_apply_failed":
-                await Phases.MarkApplyFailedAsync(store, "g", (long)input["seq"]!, (long)input["fence"]!, token);
+                await Phases.MarkApplyFailedAsync(store, (string?)input.GetValueOrDefault("group_id") ?? "g", (long)input["seq"]!, (long)input["fence"]!, token);
                 return new() { ["store"] = StoreView(run.Inner) };
 
             case "_recover_unit":
@@ -759,7 +844,7 @@ public class PhasesValuesTests
 
                     var report = Phases.NewReport();
                     await Phases.RecoverUnitAsync(
-                        run.Clients, store, run.Config, "g", recover, run.Clock.Now, run.Clock.Read, turns, report, run.Reader, token);
+                        run.Clients, store, run.Config, (string?)input.GetValueOrDefault("group_id") ?? "g", recover, run.Clock.Now, run.Clock.Read, turns, report, run.Reader, token);
                     return new()
                     {
                         ["recover"] = CommitView(recover),
@@ -784,6 +869,14 @@ public class PhasesValuesTests
                     };
                 }
 
+            case "_save_analysis":
+                {
+                    var changeSet = ChangeSetOf(input["change_set"]);
+                    var span = new PhasesRecordingSpan();
+                    await Phases.SaveAnalysisAsync(Graphiti(true), store, Admitted(input["unit"]), changeSet, run.Clients, span, 0.0, token);
+                    return new() { ["change_set"] = changeSet.ModelDump(json: true), ["span"] = span.Attributes, ["store"] = StoreView(run.Inner) };
+                }
+
             case "_hydrate_nodes":
                 {
                     var changeSet = ChangeSetOf(input["change_set"]);
@@ -795,5 +888,36 @@ public class PhasesValuesTests
             default:
                 throw new InvalidOperationException("unknown function " + fn);
         }
+    }
+}
+
+/// <summary>
+/// The span of the recording: each attribute with the name of its Python type. The value of `duration_ms` reads the
+/// system clock.
+/// </summary>
+internal sealed class PhasesRecordingSpan : TracerSpan
+{
+    internal List<object?> Attributes { get; } = [];
+
+    internal override void AddAttributes(OrderedDictionary<string, object?> attributes)
+    {
+        foreach (var (key, value) in attributes)
+        {
+            var type = value switch
+            {
+                long => "int",
+                double => "float",
+                _ => value?.GetType().Name,
+            };
+            Attributes.Add(new List<object?> { key, key == "duration_ms" ? null : value, type });
+        }
+    }
+
+    internal override void SetStatus(string status, string? description = null)
+    {
+    }
+
+    internal override void RecordException(Exception exception)
+    {
     }
 }

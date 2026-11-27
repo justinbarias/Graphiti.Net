@@ -27,15 +27,22 @@ and _hydrate_nodes. The fakes are at the network boundary:
 - The reader derives from GraphReader, as FakeGraph of tests/ingestion/ingestion_fixtures.py replaces the reader. It
   records each read and answers from the case: each call returns new objects.
 - The state store is the real InMemoryIngestionStateStore with a fake clock, inside a wrapper that records each call
-  (with no yield, as LoggingStore of the fixtures). A case can move the clock at a named fake call (`advance`), and a
-  fake call can fail (`fail`).
+  (with no yield, as LoggingStore of the fixtures). The record of a store call has `task`: `caller` when the call runs in
+  the task of the function under test, and `other` when it runs in a task that the function made (R25: the token of a
+  call). A case can move the clock at a named fake call (`advance`) or inside a store call (`store_advance`), and a fake
+  call can fail (`fail`).
+- A log line has `exc: true` when the record has exc_info.
 - Each fake yields once (asyncio.sleep(0)) and then records its call. The calls, the store calls, and the log lines are
   one list. Each case keeps the largest count of fake calls in flight.
 
 Values that the recording leaves out of the comparison, by name:
-- The `*_ms` keys of a commit report: phases.py reads time.time() (the system clock) for them.
-- The failure reason that _fail_unit stores, and the type name in the log line of _apply_with_retries: Python writes
-  type(error).__name__ and the port the .NET type name (decision D50, R15). The recording writes `<type>`.
+- The `*_ms` keys of a commit report: phases.py reads time.time() (the system clock) for them, the value of
+  `duration_ms` of the span of _save_analysis, and the time in milliseconds at the end of a log line (`in <ms> ms`).
+- The failure reason that _fail_unit stores, and the type name in the log line of _apply_with_retries, are the Python
+  type names. The port writes the .NET type name (decision D50, R15), and the test compares it with the name that R4
+  gives for the Python name.
+- Each row of a report is [key, value as a float, Python type name]. The type is the type that the span of commit_unit
+  gets (an int count or a float time). The test compares the type when commit_unit runs (layer 9).
 - Each uuid4 that the code makes (the edge UUIDs of a saga link): the test replaces each one, in the order of its
   first appearance, by "<new:N>".
 
@@ -43,9 +50,12 @@ The cancel scenarios: for each case with `cancel`, the recorder runs the case ag
 makes call k records it and then cancels the main task. The recorder keeps the count of attempts (fake entries, also
 an entry that the cancellation stops) and the events after call k.
 
+_save_analysis reads no member of `graphiti`, so the case passes None (the test passes an object that no constructor
+made), and a span that records its attributes with their Python type names.
+
 Paths that wait for layer 9, because they call a method of `Graphiti` (graphiti._resolve_request_scope and the others)
 and GraphitiCore is a skeleton: admit_episode, admit_bulk, analyze_episode, analyze_bulk, commit_unit, enrich_unit,
-_save_analysis, and the paths of _build_saga_links that call graphiti._find_saga or
+and the paths of _build_saga_links that call graphiti._find_saga or
 graphiti._saga_get_previous_episode_uuid. _admit_heartbeat is not recorded: its only effect is a heartbeat after
 lease_seconds / 3 of real time. An apply on FalkorDB is not recorded: the bulk save of FalkorDB is a list of queries, and
 the port of utils/bulk_utils.py throws NotSupportedException there (R24).
@@ -80,7 +90,7 @@ T1 = T0 + timedelta(days=10)
 T2 = T0 + timedelta(days=20)
 T3 = T0 + timedelta(days=30)
 UUID4 = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
-TYPE_NAME = re.compile(r'failed: [A-Za-z_]+$')
+ELAPSED = re.compile(r' in [0-9.e+-]+ ms$')
 VALIDATION_INPUT = re.compile(r', input_value=.*?, input_type=\w+\]')
 
 X = [1.0, 0.0, 0.0]
@@ -153,21 +163,30 @@ def episode(uuid='ep1', valid_at=T0, content='content', group_id='g', entity_edg
             'entity_edges': entity_edges or []}
 
 
-def episodic(source, target, uuid=None):
-    return {'uuid': uuid or f'ee-{source}-{target}', 'group_id': 'g', 'source_node_uuid': source,
+def episodic(source, target, uuid=None, group_id='g'):
+    return {'uuid': uuid or f'ee-{source}-{target}', 'group_id': group_id, 'source_node_uuid': source,
             'target_node_uuid': target, 'created_at': dt(T0)}
 
 
-def unit(seq=1, episodes=None, previous=None, bulk=False):
-    episodes = episodes or [episode()]
-    return {'group_id': 'g', 'unit_id': f'u{seq}', 'seq': seq, 'created_at': dt(T0), 'bulk': bulk,
+def unit(seq=1, episodes=None, previous=None, bulk=False, group_id='g'):
+    episodes = episodes or [episode(group_id=group_id)]
+    return {'group_id': group_id, 'unit_id': f'u{seq}', 'seq': seq, 'created_at': dt(T0), 'bulk': bulk,
             'episodes': episodes, 'previous_episodes': previous if previous is not None else [[] for _ in episodes]}
 
 
 CS_MODULES: dict = {}
 
 
-def change_set(seq=1, **fields):
+def regroup(value, group_id):
+    """A copy of a case value with each `group_id` 'g' replaced by `group_id`."""
+    if isinstance(value, dict):
+        return {k: (group_id if k == 'group_id' and v == 'g' else regroup(v, group_id)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [regroup(v, group_id) for v in value]
+    return value
+
+
+def change_set(seq=1, group_id='g', **fields):
     """A change set as the JSON of model_dump(mode='json'), which each side reads with model_validate."""
     ChangeSet = CS_MODULES['ChangeSet']
     EntityNode = CS_MODULES['EntityNode']
@@ -176,7 +195,7 @@ def change_set(seq=1, **fields):
     EpisodicEdge = CS_MODULES['EpisodicEdge']
     SagaNode = CS_MODULES['SagaNode']
     values = dict(fields)
-    values.setdefault('episodes', [episode()])
+    values.setdefault('episodes', [episode(group_id=group_id)])
     values['episodes'] = [EpisodicNode(**decode(e)) for e in values['episodes']]
     values['create_nodes'] = [EntityNode(**decode(n)) for n in values.get('create_nodes', [])]
     values['create_edges'] = [EntityEdge(**decode(e)) for e in values.get('create_edges', [])]
@@ -186,7 +205,7 @@ def change_set(seq=1, **fields):
     values.setdefault('node_uuids', [n.uuid for n in values['create_nodes']])
     values['operations'] = decode(values.get('operations', []))
     values['saga_links'] = decode(values.get('saga_links', []))
-    cs = ChangeSet(group_id='g', unit_id=f'u{seq}', seq=seq, snapshot_seq=values.pop('snapshot_seq', 0),
+    cs = ChangeSet(group_id=group_id, unit_id=f'u{seq}', seq=seq, snapshot_seq=values.pop('snapshot_seq', 0),
                    analysis_started_at=1000.0, **values)
     return cs.model_dump(mode='json')
 
@@ -416,8 +435,9 @@ def edge_view(e) -> dict:
 
 
 def report_view(report: dict) -> list:
-    # The *_ms keys read the system clock (time.time()), so the recording leaves them out.
-    return [[k, float(v)] for k, v in report.items() if not k.endswith('_ms')]
+    # The *_ms keys read the system clock (time.time()), so the recording leaves them out. The type name is the type
+    # that the span of commit_unit gets for the key.
+    return [[k, float(v), type(v).__name__] for k, v in report.items() if not k.endswith('_ms')]
 
 
 def store_view(store) -> list:
@@ -426,8 +446,6 @@ def store_view(store) -> list:
         units = []
         for seq, u in group.units.items():
             reason = u.fail_reason
-            if reason is not None and reason not in ('expired', 'apply_failed'):
-                reason = '<type>'
             units.append([seq, u.unit_id, u.status, u.deadline, u.snapshot_seq, u.started_at, u.ended_at, u.fence,
                           reason, u.payload is not None])
         out.append({'group_id': group_id, 'next_seq': group.next_seq, 'watermark': group.watermark,
@@ -643,19 +661,21 @@ def run_env(case: dict, mods):
             bound = inspect.signature(getattr(inner, name)).bind(*args)
             bound.apply_defaults()
             shown = [a for a in bound.arguments.values() if not isinstance(a, bytes)]
-            if name == 'fail' and shown[2] not in ('expired', 'apply_failed'):
-                shown[2] = '<type>'
-            events.append({'kind': 'store', 'method': name, 'args': encode(shown)})
+            task = 'caller' if asyncio.current_task() is state['caller'] else 'other'
+            events.append({'kind': 'store', 'method': name, 'args': encode(shown), 'task': task})
             fails = state['case'].get('store_fail', {})
             if fails.get(name, 0) > 0:
                 fails[name] -= 1
                 raise RuntimeError(f'store {name} failed')
+            # A store call that takes time: the clock moves before the inner store runs.
+            state['clock'].now += state['case'].get('store_advance', {}).get(name, 0.0)
             return await getattr(inner, name)(*args)
 
         return call
 
     # LoggingStore of the fixtures: each call is recorded with no yield, and the inner store runs it. A payload (bytes)
-    # is left out of the record: the compressed bytes differ between the two sides (GAPS F39).
+    # is left out of the record: the compressed bytes differ between the two sides (GAPS F39). A failure reason is the
+    # Python type name of the error.
     LoggingStore = type('LoggingStore', (mods['IngestionStateStore'],), {
         name: logged(name) for name in ('begin_admit', 'end_admit', 'start_analysis', 'save_change_set', 'heartbeat',
                                         'begin_commit', 'load_delta', 'save_final', 'finish_commit', 'fail',
@@ -667,24 +687,28 @@ def run_env(case: dict, mods):
 async def setup_store(store, inner, case: dict, config, clock, mods) -> list:
     """Runs the setup steps on the inner store, with no record. Each begin_commit result is kept."""
     results = []
+    g = 'g'
     for step in case.get('setup', []):
         op = step[0]
-        if op == 'admit':
-            admission = await inner.begin_admit('g', step[1], config.lease_seconds)
-            await inner.end_admit('g', admission.seq)
+        if op == 'group':
+            # The steps after it use this group.
+            g = step[1]
+        elif op == 'admit':
+            admission = await inner.begin_admit(g, step[1], config.lease_seconds)
+            await inner.end_admit(g, admission.seq)
         elif op == 'admitting':
-            await inner.begin_admit('g', step[1], config.lease_seconds)
+            await inner.begin_admit(g, step[1], config.lease_seconds)
         elif op == 'analyze':
-            await inner.start_analysis('g', step[1])
-            await inner.save_change_set('g', step[1], mods['ChangeSet'].model_validate(step[2]).to_bytes())
+            await inner.start_analysis(g, step[1])
+            await inner.save_change_set(g, step[1], mods['ChangeSet'].model_validate(step[2]).to_bytes())
         elif op == 'begin_commit':
-            results.append(await inner.begin_commit('g', step[1], config.lease_seconds))
+            results.append(await inner.begin_commit(g, step[1], config.lease_seconds))
         elif op == 'save_final':
-            await inner.save_final('g', step[1], step[2], mods['ChangeSet'].model_validate(step[3]).to_bytes())
+            await inner.save_final(g, step[1], step[2], mods['ChangeSet'].model_validate(step[3]).to_bytes())
         elif op == 'finish_commit':
-            await inner.finish_commit('g', step[1], step[2], step[3], config.index_lag_seconds)
+            await inner.finish_commit(g, step[1], step[2], step[3], config.index_lag_seconds)
         elif op == 'fail':
-            await inner.fail('g', step[1], step[2], step[3])
+            await inner.fail(g, step[1], step[2], step[3])
         elif op == 'advance':
             clock.now += step[1]
         else:
@@ -719,6 +743,9 @@ def lease_cases() -> list[dict]:
         ([['admit', 'u1'], ['advance', 59.0]], None, ['heartbeat', 'write_budget']),
     ):
         cases.append({'fn': 'UnitLease.heartbeat', 'setup': setup, 'fence': fence, 'steps': steps})
+    # The heartbeat call takes 10 seconds: the deadline is the time before the call plus the lease.
+    cases.append({'fn': 'UnitLease.heartbeat', 'setup': [['admit', 'u1']], 'fence': None,
+                  'steps': ['heartbeat', 'write_budget'], 'store_advance': {'heartbeat': 10.0}})
     return cases
 
 
@@ -760,6 +787,8 @@ def rebase_cases() -> list[dict]:
                 'delta': [list(d) for d in delta], 'unit': u or unit(1), 'identity_properties': identity}
         if replies:
             case['replies'] = replies
+        # Each case with no defaults passes a report and compares it.
+        case['report'] = not extra.get('defaults', False)
         case.update(extra)
         cases.append(case)
 
@@ -913,8 +942,37 @@ def rebase_cases() -> list[dict]:
         episodes=[episode('ep1', entity_edges=['e-new'])], node_uuids=['n-new', 'n-b'],
         node_first_episode={'n-new': 'ep1', 'n-b': 'ep1'}),
         reader={'node_candidates': {'n-new': [node('n-old', 'Alice')]},
-                'duplicates': {'e-new': [edge('e-old', 'n-old', 'n-b', 'alice knows bob', episodes=['ep0'])]}},
-        report=True)
+                'duplicates': {'e-new': [edge('e-old', 'n-old', 'n-b', 'alice knows bob', episodes=['ep0'])]}})
+    # Two delta nodes that the search does not return, created in the order n-z, n-a, and a delta node with the UUID of
+    # a node that the unit creates: the read is sorted and leaves out the own UUID.
+    rebase('c3_missing_order', change_set(3, create_nodes=[node('n-new', 'Bob', Y)]),
+           reader={'nodes': [node('n-z', 'Bob', Y), node('n-a', 'Bob', Y)]},
+           delta=[(2, 'committed', change_set(2, create_nodes=[node('n-z', 'Bob', Y), node('n-a', 'Bob', Y),
+                                                               node('n-new', 'Bob', Y)], episodes=[episode('ep2', T1)]))],
+           u=unit(3))
+    # A seen candidate of a created node is another node that the unit creates, and the delta patches it: the read of
+    # the missing records leaves out the UUID of the unit itself.
+    rebase('c3_missing_own', change_set(3, create_nodes=[node('n-new', 'Bob', Y), node('n-x', 'Zed', Z)],
+                                        seen_node_candidates={'n-new': ['n-x', 'n-p']}),
+           reader={'nodes': [node('n-p', 'Pat', Z)]},
+           delta=[(2, 'committed', change_set(2, operations=[patch('n-x', ['Entity'], {'a': 1}),
+                                                            patch('n-p', ['Entity'], {'a': 1})]))],
+           u=unit(3))
+    # Two delta edges that the search does not return, in the order e-z, e-a.
+    rebase('c6_missing_order', change_set(
+        3, create_edges=[edge('e-new', 'a', 'b', 'Alice lives in Rome', NEAR_X, valid_at=dt(T2), episodes=['ep1'])],
+        episodes=[episode('ep1', entity_edges=['e-new'])]),
+        reader={'edges': [edge('e-z', 'a', 'd', 'Alice lives in Oslo', X, valid_at=dt(T0)),
+                          edge('e-a', 'a', 'f', 'Alice lives in Bern', X, valid_at=dt(T0))]},
+        delta=[(2, 'committed', change_set(2, create_edges=[
+            edge('e-z', 'a', 'd', 'Alice lives in Oslo', X, valid_at=dt(T0)),
+            edge('e-a', 'a', 'f', 'Alice lives in Bern', X, valid_at=dt(T0))]))],
+        replies={'dedupe_edges.resolve_edge': [edge_reply([], [0])]}, u=unit(3))
+    # The cases of another group than g: the reads, the model calls, and the change set carry group h.
+    for base in ('c3_delta_node', 'c3_model_merge', 'c6_delta_edge_stored_True'):
+        case = regroup(next(c for c in cases if c['name'] == base), 'h')
+        case['name'] = base + '_group_h'
+        cases.append(case)
     return cases
 
 
@@ -955,7 +1013,7 @@ def apply_cases() -> list[dict]:
     apply('bulk_write_fails', full, fail={'execute_write': 1})
     apply('update_fails', full, fail={'tx_run': 4})
     saga_cs = dict(saga_node=saga_node(), saga_links=[link('ep1', 'ep0', 'has-1', 'next-1')], create_saga=True)
-    apply('saga_new', change_set(1, **saga_cs), budgets=(5.0, 4.0, 3.0, 2.0, 1.0))
+    apply('saga_new', change_set(1, **saga_cs), budgets=(5.0, 4.0, 3.0, 2.0, 1.0), cancel=True)
     apply('saga_new_not_created', change_set(1, **{**saga_cs, 'create_saga': False}))
     apply('saga_stored', change_set(1, saga_node=saga_node(first='ep-a', last='ep-b'),
                                     saga_links=[link('ep1', None, 'has-1'), link('ep2', 'ep1', 'has-2', 'next-2')]),
@@ -963,6 +1021,13 @@ def apply_cases() -> list[dict]:
     apply('saga_other_group', change_set(1, **saga_cs), extra_rows=[[SAGA_GET, [saga_row(group_id='h')]]])
     apply('saga_no_links', change_set(1, saga_node=saga_node(), create_saga=True))
     apply('saga_budget_expired', change_set(1, **saga_cs), budgets=(5.0, 'expired'))
+    # Another group than g: the bulk write and the saga writes carry group h.
+    group_h = regroup(next(c for c in cases if c['name'] == 'operations'), 'h')
+    group_h.update(name='operations_group_h', cancel=False)
+    cases.append(group_h)
+    saga_h = regroup(next(c for c in cases if c['name'] == 'saga_stored'), 'h')
+    saga_h['name'] = 'saga_stored_group_h'
+    cases.append(saga_h)
     for case in cases:
         case['rows'] = case.pop('extra_rows', []) + case['rows']
     # _write_saga_links alone, with an async budget.
@@ -979,6 +1044,8 @@ def apply_cases() -> list[dict]:
         ('expired', {}, 3, ['expired'], None),
         ('stale', {}, 3, [9.0], ['stale']),
         ('partial_then_retry', {'tx_run': 2}, 3, [9.0], None),
+        # range(1, max_attempts + 1) with the largest int64: the first attempt succeeds.
+        ('max_attempts_int64', {}, 2 ** 63 - 1, [9.0], None),
     ):
         cases.append({'fn': '_apply_with_retries', 'name': name, 'change_set': full, 'fail': fail,
                       'max_attempts': attempts, 'budgets': budgets, 'turns': turns, 'reader': reader, 'rows': rows,
@@ -995,6 +1062,8 @@ def store_cases() -> list[dict]:
         {'fn': '_mark_apply_failed', 'seq': 1, 'fence': 1, 'setup': stopped[:4]},
         {'fn': '_mark_apply_failed', 'seq': 1, 'fence': 7, 'setup': stopped[:4]},
         {'fn': '_mark_apply_failed', 'seq': 1, 'fence': 1, 'setup': stopped[:4] + [['advance', 61.0]]},
+        # An error that is not in the suppress list leaves the function.
+        {'fn': '_mark_apply_failed', 'seq': 1, 'fence': 1, 'setup': stopped[:4], 'store_fail': {'fail': 1}},
         {'fn': '_recover_unit', 'name': 'recovered', 'setup': stopped, 'reader': reader, 'cancel': True},
         {'fn': '_recover_unit', 'name': 'each_apply_fails', 'setup': stopped, 'reader': reader,
          'fail': {'execute_write': 9}, 'config': {'max_apply_attempts': 2}},
@@ -1010,8 +1079,25 @@ def store_cases() -> list[dict]:
         {'fn': '_recover_unit', 'name': 'below_limit', 'setup': stopped, 'reader': reader,
          'advance': [['read:edges_by_uuids', 1, 54.5]], 'store_fail': {'heartbeat': 1}},
         {'fn': '_recover_unit', 'name': 'bad_payload', 'setup': stopped, 'reader': reader, 'bad_payload': True},
+        # Two groups in one run: the units of group g stay as they are, and the recovery of group h changes h only.
+        {'fn': '_recover_unit', 'name': 'two_groups', 'group_id': 'h', 'reader': regroup(reader, 'h'),
+         'setup': stopped + [['group', 'h']] + regroup(stopped, 'h')},
     ]
     return cases
+
+
+def save_analysis_cases() -> list[dict]:
+    first = node('n1', 'Ann')
+    first['name_embedding'] = None
+    third = node('n3', 'Cy', Z)
+    third['name_embedding'] = None
+    cs = change_set(1, create_nodes=[first, node('n2', 'Bea', Y), third],
+                    create_edges=[edge('e1', 'n1', 'n2', 'Ann knows Bea')], operations=[add_episodes('e9', ['ep1'])])
+    return [
+        {'fn': '_save_analysis', 'name': 'embeddings', 'change_set': cs, 'unit': unit(1), 'setup': [['admit', 'u1']],
+         'cancel': True},
+        {'fn': '_save_analysis', 'name': 'not_admitted', 'change_set': change_set(1), 'unit': unit(1)},
+    ]
 
 
 def saga_cases() -> list[dict]:
@@ -1074,6 +1160,8 @@ async def run_case(case: dict, mods) -> dict:
 
         if case.get('cancel_in_shield'):
             task = asyncio.ensure_future(ph._begin_admit(store, config, 'g', case['unit_id'], wait))
+            # The function under test runs in this task.
+            state['caller'] = task
             await asyncio.sleep(0)
             task.cancel()
             try:
@@ -1158,7 +1246,7 @@ async def run_case(case: dict, mods) -> dict:
         return {'changed': [edge_view(e) for e in result.changed_edges], 'applied': result.applied,
                 'dropped': result.dropped, 'change_set': cs.model_dump(mode='json')}
     if fn == '_mark_apply_failed':
-        await ph._mark_apply_failed(store, 'g', case['seq'], case['fence'])
+        await ph._mark_apply_failed(store, case.get('group_id', 'g'), case['seq'], case['fence'])
         return {'store': store_view(inner)}
     if fn == '_recover_unit':
         recover = results[-1]
@@ -1168,7 +1256,8 @@ async def run_case(case: dict, mods) -> dict:
             recover = mods['CommitRecover'](seq=recover.seq, fence=case['fence'], final_payload=recover.final_payload)
         turns = {int(k): v for k, v in case.get('turns', {}).items()}
         report = ph.new_report()
-        await ph._recover_unit(clients, store, config, 'g', recover, clock(), clock, turns, report, reader)
+        await ph._recover_unit(clients, store, config, case.get('group_id', 'g'), recover, clock(), clock, turns, report,
+                               reader)
         return {'recover': commit_view(recover), 'turns': [[k, v] for k, v in turns.items()],
                 'report': report_view(report), 'store': store_view(inner)}
     if fn == '_build_saga_links':
@@ -1182,6 +1271,11 @@ async def run_case(case: dict, mods) -> dict:
         return {'links': [link_view.model_dump(mode='json') for link_view in links],
                 'saga': None if saga_node_result is None else saga_node_result.model_dump(mode='json'),
                 'same': saga_node_result is saga, 'create': create}
+    if fn == '_save_analysis':
+        cs = ChangeSet.model_validate(case['change_set'])
+        span = RecordingSpan()
+        await ph._save_analysis(None, store, admitted(case['unit'], mods), cs, clients, span, 0.0)
+        return {'change_set': cs.model_dump(mode='json'), 'span': span.attributes, 'store': store_view(inner)}
     if fn == '_hydrate_nodes':
         cs = ChangeSet.model_validate(case['change_set'])
         nodes = [mods['EntityNode'](**decode(n)) for n in case['nodes']]
@@ -1191,6 +1285,17 @@ async def run_case(case: dict, mods) -> dict:
     raise AssertionError(fn)
 
 
+class RecordingSpan:
+    """A span that keeps each attribute with its Python type name. The value of `duration_ms` reads time.time()."""
+
+    def __init__(self):
+        self.attributes: list = []
+
+    def add_attributes(self, attributes: dict) -> None:
+        for k, v in attributes.items():
+            self.attributes.append([k, None if k == 'duration_ms' else v, type(v).__name__])
+
+
 def run_one(case: dict, mods, cancel_at: int) -> dict:
     events.clear()
     state.update(in_flight=0, max_in_flight=0, count=0, attempts=0, cancel_at=cancel_at, case=copy.deepcopy(case))
@@ -1198,6 +1303,7 @@ def run_one(case: dict, mods, cancel_at: int) -> dict:
     async def main():
         task = asyncio.ensure_future(run_case(state['case'], mods))
         state['task'] = task
+        state['caller'] = task
         return await task
 
     try:
@@ -1211,9 +1317,6 @@ def run_one(case: dict, mods, cancel_at: int) -> dict:
             text = '\n'.join(line for line in VALIDATION_INPUT.sub(']', text).splitlines()
                               if 'For further information visit' not in line)
         output = {'error': {'type': type(error).__name__, 'text': text}}
-    for item in events:
-        if item.get('kind') == 'log':
-            item['message'] = TYPE_NAME.sub('failed: <type>', item['message'])
     output['events'] = list(events)
     output['max_in_flight'] = state['max_in_flight']
     output['count'] = state['count']
@@ -1224,7 +1327,7 @@ def run_one(case: dict, mods, cancel_at: int) -> dict:
 def record_async(mods) -> list[dict]:
     out = []
     for case in lease_cases() + admit_cases() + rebase_cases() + apply_cases() + store_cases() + saga_cases() \
-            + hydrate_cases():
+            + hydrate_cases() + save_analysis_cases():
         output = run_one(case, mods, -1)
         if case.get('cancel'):
             cancels = []
@@ -1268,7 +1371,11 @@ def main() -> int:
 
     class Capture(logging.Handler):
         def emit(self, record):
-            events.append({'kind': 'log', 'level': record.levelname, 'message': record.getMessage()})
+            # The time of an embedding call reads the system clock.
+            entry = {'kind': 'log', 'level': record.levelname, 'message': ELAPSED.sub(' in <ms> ms', record.getMessage())}
+            if record.exc_info:
+                entry['exc'] = True
+            events.append(entry)
 
     root = logging.getLogger('graphiti_core')
     root.setLevel(logging.DEBUG)

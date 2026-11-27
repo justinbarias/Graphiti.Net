@@ -216,10 +216,11 @@ internal static partial class Phases
 {
     private static Func<CancellationToken, Task> DefaultWait(ConcurrentIngestionConfig config)
     {
-        // PORT: the nested coroutine is a local async function. `asyncio.sleep` is Task.Delay on PortServices.Time (R8).
+        // PORT: the nested coroutine is a local async function. `asyncio.sleep` is Asyncio.SleepAsync on PortServices.Time
+        // (R8). Task.Delay refuses a delay above about 49.7 days, and asyncio.sleep has no limit.
         async Task WaitAsync(CancellationToken cancellationToken)
         {
-            await Task.Delay(TimeSpan.FromSeconds(config.PollIntervalSeconds), PortServices.Time, cancellationToken);
+            await Asyncio.SleepAsync(config.PollIntervalSeconds, PortServices.Time, cancellationToken);
         }
 
         return WaitAsync;
@@ -377,7 +378,7 @@ internal static partial class Phases
         {
             while (true)
             {
-                await Task.Delay(TimeSpan.FromSeconds(config.LeaseSeconds / 3), PortServices.Time, cancellationToken);
+                await Asyncio.SleepAsync(config.LeaseSeconds / 3, PortServices.Time, cancellationToken);
                 try
                 {
                     await store.HeartbeatAsync(groupId, admission.Seq, config.LeaseSeconds, cancellationToken: cancellationToken);
@@ -577,9 +578,10 @@ internal static partial class Phases
                 }
                 catch (Exception error)
                 {
-                    // PORT: `except BaseException` also catches a cancellation, so the cleanup passes
-                    // CancellationToken.None (R8).
-                    await FailAdmissionAsync(store, resolvedGroupId, admission, error, CancellationToken.None);
+                    // PORT: `except BaseException` also catches a cancellation. A Python cancel arrives one time, so after a
+                    // cancel the cleanup runs to its end with CancellationToken.None. After another error, a later cancel
+                    // of the caller reaches the cleanup call, so it gets the token of the caller (R8).
+                    await FailAdmissionAsync(store, resolvedGroupId, admission, error, Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken);
                     throw;
                 }
 
@@ -709,9 +711,10 @@ internal static partial class Phases
                 }
                 catch (Exception error)
                 {
-                    // PORT: `except BaseException` also catches a cancellation, so the cleanup passes
-                    // CancellationToken.None (R8).
-                    await FailAdmissionAsync(store, resolvedGroupId, admission, error, CancellationToken.None);
+                    // PORT: `except BaseException` also catches a cancellation. A Python cancel arrives one time, so after a
+                    // cancel the cleanup runs to its end with CancellationToken.None. After another error, a later cancel
+                    // of the caller reaches the cleanup call, so it gets the token of the caller (R8).
+                    await FailAdmissionAsync(store, resolvedGroupId, admission, error, Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken);
                     throw;
                 }
 
@@ -760,8 +763,8 @@ internal static partial class Phases
         return [.. unique.Values];
     }
 
-    // PORT: `span: Any` is the TracerSpan of `start_span` (R16).
-    private static async Task SaveAnalysisAsync(
+    // PORT: `span: Any` is the TracerSpan of `start_span` (R16). Internal, because the recording test calls it (R2).
+    internal static async Task SaveAnalysisAsync(
         GraphitiCore graphiti,
         IngestionStateStore store,
         AdmittedUnit unit,
@@ -925,9 +928,10 @@ internal static partial class Phases
                 }
                 catch (Exception error)
                 {
-                    // PORT: `except BaseException` also catches a cancellation, so the cleanup passes
-                    // CancellationToken.None (R8).
-                    await FailUnitAsync(store, groupId, unit.Seq, error, CancellationToken.None);
+                    // PORT: `except BaseException` also catches a cancellation. A Python cancel arrives one time, so after a
+                    // cancel the cleanup runs to its end with CancellationToken.None. After another error, a later cancel
+                    // of the caller reaches the cleanup call, so it gets the token of the caller (R8).
+                    await FailUnitAsync(store, groupId, unit.Seq, error, Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken);
                     throw;
                 }
 
@@ -1103,9 +1107,10 @@ internal static partial class Phases
                 }
                 catch (Exception error)
                 {
-                    // PORT: `except BaseException` also catches a cancellation, so the cleanup passes
-                    // CancellationToken.None (R8).
-                    await FailUnitAsync(store, groupId, unit.Seq, error, CancellationToken.None);
+                    // PORT: `except BaseException` also catches a cancellation. A Python cancel arrives one time, so after a
+                    // cancel the cleanup runs to its end with CancellationToken.None. After another error, a later cancel
+                    // of the caller reaches the cleanup call, so it gets the token of the caller (R8).
+                    await FailUnitAsync(store, groupId, unit.Seq, error, Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken);
                     throw;
                 }
 
@@ -1911,7 +1916,8 @@ internal static partial class Phases
     {
         var changed = new OrderedDictionary<string, EntityEdge>(StringComparer.Ordinal);
         Exception? lastError = null;
-        for (var attempt = 1L; attempt < maxAttempts + 1; attempt++)
+        // PORT: `range(1, max_attempts + 1)`. `attempt <= maxAttempts` does not overflow for long.MaxValue.
+        for (var attempt = 1L; attempt <= maxAttempts; attempt++)
         {
             report["apply.attempts"] = attempt;
             ApplyResult result;
@@ -2285,9 +2291,11 @@ internal static partial class Phases
                 {
                     if (!finalSaved)
                     {
-                        // PORT: `except BaseException` also catches a cancellation, so the cleanup passes
-                        // CancellationToken.None (R8).
-                        await FailUnitAsync(store, groupId, unit.Seq, error, CancellationToken.None);
+                        // PORT: `except BaseException` also catches a cancellation. A Python cancel arrives one time, so
+                        // after a cancel the cleanup runs to its end with CancellationToken.None. After another error, a
+                        // later cancel of the caller reaches the cleanup call, so it gets the token of the caller (R8).
+                        await FailUnitAsync(
+                            store, groupId, unit.Seq, error, Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken);
                     }
 
                     throw;
@@ -2320,8 +2328,17 @@ internal static partial class Phases
                     groupId, unit.Seq, turn.Fence, final.NodeUuids, config.IndexLagSeconds, cancellationToken);
 
                 report["duration_ms"] = (Py.TimeSeconds() - start) * 1000;
-                var attributes = new OrderedDictionary<string, object?> { ["ingest.seq"] = unit.Seq };
+                // PORT: in Python each count of the report is an int and each `*_ms` key a float. The port keeps the
+                // report as a dict of double (R18), so the span and the log scope get each count as a long, as the other
+                // spans of the file do. CommitResult.report stays a dict of double, as pydantic coerces it to float.
+                var reportValues = new OrderedDictionary<string, object?>();
                 foreach (var (key, value) in report)
+                {
+                    reportValues[key] = key.EndsWith("_ms", StringComparison.Ordinal) ? value : (long)value;
+                }
+
+                var attributes = new OrderedDictionary<string, object?> { ["ingest.seq"] = unit.Seq };
+                foreach (var (key, value) in reportValues)
                 {
                     attributes[key] = value;
                 }
@@ -2331,7 +2348,7 @@ internal static partial class Phases
                 {
                     ["ingest_group_id"] = groupId,
                     ["ingest_seq"] = unit.Seq,
-                    ["ingest_report"] = report,
+                    ["ingest_report"] = reportValues,
                 }))
                 {
                     Log.CommittedUnit(Logger, unit.Seq, groupId);

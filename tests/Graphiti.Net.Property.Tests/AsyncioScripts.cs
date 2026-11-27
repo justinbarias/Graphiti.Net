@@ -249,6 +249,15 @@ internal sealed class AsyncioScripts
                 case "ev_is_set":
                     Log(me, $"ev_is_set {Text(op, 1)} -> {Fmt(Event(Text(op, 1)).IsSet())}");
                     break;
+                case "sleep":
+                    {
+                        // asyncio.sleep is Asyncio.SleepAsync (R8). The scripts run on the system clock.
+                        var text = Text(op, 1);
+                        await Asyncio.SleepAsync(double.Parse(text, CultureInfo.InvariantCulture), TimeProvider.System, token);
+                        Log(me, $"slept {text}");
+                        break;
+                    }
+
                 case "to_thread":
                     {
                         var value = Value(op[1]);

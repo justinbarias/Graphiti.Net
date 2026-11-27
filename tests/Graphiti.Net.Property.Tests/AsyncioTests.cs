@@ -610,6 +610,75 @@ public class AsyncioTests
         Assert.True(result.Item2);
     }
 
+    // asyncio.sleep has no upper limit. Task.Delay refuses a delay above uint.MaxValue - 1 ms (about 49.7 days), so a
+    // longer delay waits until the token is canceled. A shorter delay ends when the given clock reaches it.
+    [Theory]
+    [InlineData(1e7)]
+    [InlineData(1e9)]
+    [InlineData(1e300)]
+    [InlineData(double.PositiveInfinity)]
+    public async Task SleepAsync_above_the_limit_of_Task_Delay_waits_until_the_token_is_canceled(double seconds)
+    {
+        var clock = new ManualClock();
+        var result = await Asyncio.Run(async () =>
+        {
+            using var source = new CancellationTokenSource();
+            var task = Asyncio.SleepAsync(seconds, clock, source.Token);
+            await Task.Yield();
+            clock.Advance(TimeSpan.FromDays(10000));
+            await Task.Yield();
+            var pending = !task.IsCompleted;
+            source.Cancel();
+            var error = await Record.ExceptionAsync(() => task);
+            return (pending, error);
+        }).WaitAsync(Guard, TestToken);
+
+        Assert.True(result.pending, "the sleep ended or threw before its token was canceled");
+        Assert.IsAssignableFrom<OperationCanceledException>(result.error);
+    }
+
+    [Fact]
+    public async Task SleepAsync_runs_its_timer_on_the_given_clock()
+    {
+        var clock = new ManualClock();
+        var result = await Asyncio.Run(async () =>
+        {
+            var task = Asyncio.SleepAsync(3600.0, clock, TestToken);
+            await Task.Yield();
+            clock.Advance(TimeSpan.FromSeconds(3599.999));
+            await Task.Yield();
+            var beforeLimit = task.IsCompleted;
+            clock.Advance(TimeSpan.FromSeconds(0.001));
+            await task;
+            return beforeLimit;
+        }).WaitAsync(Guard, TestToken);
+
+        Assert.False(result, "the sleep ended before the clock reached its delay");
+    }
+
+    // asyncio.sleep(0 or less) awaits __sleep0(): one trip through the ready queue. nan sets a loop timer at nan, which
+    // runs at once when no other timer is pending (see SleepAsync).
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-1.5)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    public async Task SleepAsync_of_0_or_less_or_nan_yields_once_and_returns(double seconds)
+    {
+        var clock = new ManualClock();
+        var result = await Asyncio.Run(async () =>
+        {
+            var task = Asyncio.SleepAsync(seconds, clock, TestToken);
+            var synchronous = task.IsCompleted;
+            await Task.Yield();
+            await Task.Yield();
+            return (synchronous, task.IsCompletedSuccessfully);
+        }).WaitAsync(Guard, TestToken);
+
+        Assert.False(result.synchronous, "the sleep did not yield");
+        Assert.True(result.IsCompletedSuccessfully);
+    }
+
     [Fact]
     public async Task WaitForAsync_with_no_limit_passes_the_callers_token()
     {
