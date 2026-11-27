@@ -27,6 +27,7 @@ using Graphiti.Core.Namespaces;
 using Graphiti.Core.Prompts;
 using Graphiti.Core.Search;
 using Graphiti.Core.Utils;
+using Graphiti.Core.Utils.Maintenance;
 using Graphiti.Internal;
 using Graphiti.PyCompat;
 using Microsoft.Extensions.Logging;
@@ -36,6 +37,27 @@ using Microsoft.Extensions.Logging;
 // PORT: `dict[str, type[BaseModel]]` is an OrderedDictionary<string, GraphTypeDescriptor> (R15). `edge_type_map:
 // dict[tuple[str, str], list[str]]` is an OrderedDictionary<(string, string), List<string>>. A `uuid_map:
 // dict[str, str]` is an OrderedDictionary<string, string>, the type of `ChangeSet.uuid_map`.
+// TODO(port): no rule for the place and the name of a union type that Python does not name.
+// `saga: str | SagaNode | None` has two shapes: the name of a saga, or the saga node. Part 3 gives the form: an abstract
+// record with one derived record for each case. graphiti.py, ingestion/phases.py, and ingestion/scheduler.py pass the
+// value through. `_validate_saga_group` of this module is the first function that reads it. `| None` is `SagaOrName?`.
+internal abstract record SagaOrName
+{
+    private SagaOrName()
+    {
+    }
+
+    internal sealed record Name : SagaOrName
+    {
+        internal required string Value { get; init; }
+    }
+
+    internal sealed record Node : SagaOrName
+    {
+        internal required SagaNode Saga { get; init; }
+    }
+}
+
 internal static class GraphitiModule
 {
     // PORT: internal, because GraphitiCore logs through it (R5).
@@ -55,19 +77,16 @@ internal static class GraphitiModule
     // PORT: internal, because GraphitiCore reads it (R2).
     internal const string SagaSummarySchemaWrapper = "\n\nRespond with a JSON object in the following format:\n\n";
 
-    // PORT: `saga: str | SagaNode | None` is an `object?` that holds a string, a SagaNode, or null. The body tests it
-    // with `is SagaNode` (R15).
-    // TODO(port): no rule for the union str | SagaNode | None
+    // PORT: `saga: str | SagaNode | None` is a `SagaOrName?` (Part 3, a union of different shapes).
     // TODO(port): _validate_saga_group
-    internal static void ValidateSagaGroup(object? saga, string groupId)
+    internal static void ValidateSagaGroup(SagaOrName? saga, string groupId)
     {
         throw new NotSupportedException("TODO(port): _validate_saga_group");
     }
 
-    // TODO(port): no rule for the union str | SagaNode | None
     // TODO(port): _validate_saga_scope
     internal static Task ValidateSagaScopeAsync(
-        object? saga,
+        SagaOrName? saga,
         string groupId,
         GraphDriver driver,
         CancellationToken cancellationToken = default)
@@ -299,12 +318,10 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti.build_indices_and_constraints");
     }
 
-    // PORT: `episode: EpisodicNode | list[EpisodicNode]` is an `object` that holds an EpisodicNode or a
-    // List<EpisodicNode>. The body tests it with `is List<EpisodicNode>` (R15).
-    // TODO(port): no rule for the union EpisodicNode | list[EpisodicNode]
+    // PORT: `episode: EpisodicNode | list[EpisodicNode]` is the `EpisodeOrEpisodes` of node_operations (Part 3).
     // TODO(port): Graphiti._extract_and_resolve_nodes
     private Task<(List<EntityNode>, OrderedDictionary<string, string>, List<(EntityNode, EntityNode)>, OrderedDictionary<string, List<long>>)> ExtractAndResolveNodesAsync(
-        object episode,
+        EpisodeOrEpisodes episode,
         List<EpisodicNode> previousEpisodes,
         OrderedDictionary<string, GraphTypeDescriptor>? entityTypes,
         List<string>? excludedEntityTypes,
@@ -332,10 +349,9 @@ internal sealed class GraphitiCore
 
     // PORT: internal, because ingestion/phases.py calls it (R2). `episode` is the `object` of
     // ExtractAndResolveNodesAsync.
-    // TODO(port): no rule for the union EpisodicNode | list[EpisodicNode]
     // TODO(port): Graphiti._extract_and_resolve_edges
     internal Task<(List<EntityEdge>, List<EntityEdge>, List<EntityEdge>)> ExtractAndResolveEdgesAsync(
-        object episode,
+        EpisodeOrEpisodes episode,
         List<EntityNode> extractedNodes,
         List<EpisodicNode> previousEpisodes,
         OrderedDictionary<(string, string), List<string>> edgeTypeMap,
@@ -354,17 +370,15 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti._extract_and_resolve_edges");
     }
 
-    // PORT: `episode` is the `object` of ExtractAndResolveNodesAsync, and `saga` is an `object?` that holds a string,
-    // a SagaNode, or null.
-    // TODO(port): no rule for the unions EpisodicNode | list[EpisodicNode] and str | SagaNode | None
+    // PORT: `episode` is an `EpisodeOrEpisodes`, and `saga` is a `SagaOrName?` (Part 3).
     // TODO(port): Graphiti._process_episode_data
     private Task<(List<EpisodicEdge>, EpisodicNode)> ProcessEpisodeDataAsync(
-        object episode,
+        EpisodeOrEpisodes episode,
         List<EntityNode> nodes,
         List<EntityEdge> entityEdges,
         PyDateTime now,
         string groupId,
-        object? saga = null,
+        SagaOrName? saga = null,
         string? sagaPreviousEpisodeUuid = null,
         OrderedDictionary<string, List<long>>? nodeEpisodeIndexMap = null,
         GraphitiClients? clients = null,
@@ -413,12 +427,11 @@ internal sealed class GraphitiCore
 
     // PORT: @handle_multiple_group_ids (R16). The body is RetrieveEpisodesCoreAsync, and this method calls
     // Decorators.HandleMultipleGroupIdsAsync with it. The default of `last_n` is EPISODE_WINDOW_LEN of
-    // utils/maintenance/graph_data_operations.py, which skeleton packet S6 declares. Its value is 3.
-    // TODO(port): EPISODE_WINDOW_LEN is not declared yet, so the default is its value
+    // utils/maintenance/graph_data_operations.py.
     // TODO(port): Graphiti.retrieve_episodes
     internal Task<List<EpisodicNode>> RetrieveEpisodesAsync(
         PyDateTime referenceTime,
-        long lastN = 3,
+        long lastN = GraphDataOperations.EpisodeWindowLen,
         List<string>? groupIds = null,
         EpisodeType? source = null,
         GraphDriver? driver = null,
@@ -432,7 +445,7 @@ internal sealed class GraphitiCore
     // TODO(port): Graphiti.retrieve_episodes
     private Task<List<EpisodicNode>> RetrieveEpisodesCoreAsync(
         PyDateTime referenceTime,
-        long lastN = 3,
+        long lastN = GraphDataOperations.EpisodeWindowLen,
         List<string>? groupIds = null,
         EpisodeType? source = null,
         GraphDriver? driver = null,
@@ -449,8 +462,7 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti._resolve_request_scope");
     }
 
-    // PORT: `saga` is an `object?` that holds a string, a SagaNode, or null.
-    // TODO(port): no rule for the union str | SagaNode | None
+    // PORT: `saga` is a `SagaOrName?` (Part 3).
     // TODO(port): Graphiti.add_episode
     internal Task<AddEpisodeResults> AddEpisodeAsync(
         string name,
@@ -467,7 +479,7 @@ internal sealed class GraphitiCore
         OrderedDictionary<string, GraphTypeDescriptor>? edgeTypes = null,
         OrderedDictionary<(string, string), List<string>>? edgeTypeMap = null,
         string? customExtractionInstructions = null,
-        object? saga = null,
+        SagaOrName? saga = null,
         string? sagaPreviousEpisodeUuid = null,
         OrderedDictionary<string, List<string>>? identityProperties = null,
         CancellationToken cancellationToken = default)
@@ -475,7 +487,6 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti.add_episode");
     }
 
-    // TODO(port): no rule for the union str | SagaNode | None
     // TODO(port): Graphiti.add_episode_bulk
     internal Task<AddBulkEpisodeResults> AddEpisodeBulkAsync(
         List<RawEpisode> bulkEpisodes,
@@ -486,7 +497,7 @@ internal sealed class GraphitiCore
         OrderedDictionary<(string, string), List<string>>? edgeTypeMap = null,
         bool strictEdgeTypes = false,
         string? customExtractionInstructions = null,
-        object? saga = null,
+        SagaOrName? saga = null,
         bool useCombinedExtraction = true,
         OrderedDictionary<string, List<string>>? identityProperties = null,
         CancellationToken cancellationToken = default)

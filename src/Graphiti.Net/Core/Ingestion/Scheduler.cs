@@ -100,9 +100,8 @@ internal sealed class ConcurrentIngestor
         throw new NotSupportedException("TODO(port): ConcurrentIngestor._run_unit");
     }
 
-    // PORT: each parameter is keyword-only in Python, and only `identity_properties` has a default. `saga` is an
-    // `object?` that holds a string, a SagaNode, or null (Phases.BuildSagaLinksAsync).
-    // TODO(port): no rule for the union str | SagaNode | None
+    // PORT: each parameter is keyword-only in Python, and only `identity_properties` has a default. `saga` is the
+    // `SagaOrName?` of graphiti.py (Part 3).
     // TODO(port): ConcurrentIngestor.add_episode
     internal Task<AddEpisodeResults> AddEpisodeAsync(
         string name,
@@ -118,7 +117,7 @@ internal sealed class ConcurrentIngestor
         OrderedDictionary<string, GraphTypeDescriptor>? edgeTypes,
         OrderedDictionary<(string, string), List<string>>? edgeTypeMap,
         string? customExtractionInstructions,
-        object? saga,
+        SagaOrName? saga,
         string? sagaPreviousEpisodeUuid,
         OrderedDictionary<string, List<string>>? identityProperties = null,
         CancellationToken cancellationToken = default)
@@ -127,7 +126,6 @@ internal sealed class ConcurrentIngestor
     }
 
     // PORT: each parameter is keyword-only in Python, and only `identity_properties` has a default.
-    // TODO(port): no rule for the union str | SagaNode | None
     // TODO(port): ConcurrentIngestor.add_episode_bulk
     internal Task<AddBulkEpisodeResults> AddEpisodeBulkAsync(
         List<RawEpisode> bulkEpisodes,
@@ -138,7 +136,7 @@ internal sealed class ConcurrentIngestor
         OrderedDictionary<(string, string), List<string>>? edgeTypeMap,
         bool strictEdgeTypes,
         string? customExtractionInstructions,
-        object? saga,
+        SagaOrName? saga,
         bool useCombinedExtraction,
         OrderedDictionary<string, List<string>>? identityProperties = null,
         CancellationToken cancellationToken = default)

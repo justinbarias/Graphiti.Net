@@ -521,15 +521,13 @@ internal static partial class Phases
         throw new NotSupportedException("TODO(port): _recover_unit");
     }
 
-    // PORT: `saga: str | SagaNode | None` is an `object?` that holds a string, a SagaNode, or null. The body tests it
-    // with `is string` and `is SagaNode` (R15).
-    // TODO(port): no rule for the union str | SagaNode | None
+    // PORT: `saga: str | SagaNode | None` is the `SagaOrName?` of graphiti.py (Part 3).
     // TODO(port): _build_saga_links
     private static Task<(List<SagaLink>, SagaNode?, bool)> BuildSagaLinksAsync(
         GraphitiCore graphiti,
         GraphitiClients clients,
         AdmittedUnit unit,
-        object? saga,
+        SagaOrName? saga,
         string? sagaPreviousEpisodeUuid,
         CancellationToken cancellationToken = default)
     {
@@ -538,7 +536,6 @@ internal static partial class Phases
 
     // PORT: the parameters after `change_set` are keyword-only in Python. `saga` is the `object?` of
     // BuildSagaLinksAsync.
-    // TODO(port): no rule for the union str | SagaNode | None
     // TODO(port): commit_unit
     internal static Task<CommitResult> CommitUnitAsync(
         GraphitiCore graphiti,
@@ -548,7 +545,7 @@ internal static partial class Phases
         ChangeSet changeSet,
         OrderedDictionary<string, GraphTypeDescriptor>? entityTypes = null,
         OrderedDictionary<string, List<string>>? identityProperties = null,
-        object? saga = null,
+        SagaOrName? saga = null,
         string? sagaPreviousEpisodeUuid = null,
         Func<CancellationToken, Task>? wait = null,
         UnitLease? lease = null,
