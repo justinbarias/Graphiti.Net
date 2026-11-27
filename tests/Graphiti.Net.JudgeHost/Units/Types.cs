@@ -47,12 +47,12 @@ internal static class TypesBindings
     }
 
     /// <summary>
-    /// A <c>SimpleNamespace</c> as a <c>GraphDriver</c>: the driver that a <c>fulltext_query</c> case passes. It gives the
-    /// <c>provider</c> and <c>fulltext_syntax</c> attributes that the namespace has, and <c>build_fulltext_query</c>
-    /// reads the namespace at the call. <c>Provider</c> and <c>FulltextSyntax</c> are plain properties of
-    /// <c>GraphDriver</c>, so a read of an attribute that the namespace lacks cannot throw at the read itself. The
-    /// binding calls <see cref="ThrowIfAttributeRead"/> after the call and gets the <c>AttributeError</c> of Python at
-    /// the place where Python reads the attribute: after the validation of the group ids, and never at the bind.
+    /// A <c>SimpleNamespace</c> as a <c>GraphDriver</c>: the driver that a <c>fulltext_query</c> case passes. It sets
+    /// <c>Provider</c> and <c>FulltextSyntax</c> from the attributes that the namespace has, and it sets nothing for an
+    /// attribute that the namespace lacks. Both are plain properties of <c>GraphDriver</c>, so the port cannot raise
+    /// the <c>AttributeError</c> of Python for a missing attribute, and the binding does not raise it for the port. One
+    /// case passes an empty namespace. It expects the error of the group id validation, which the port raises before
+    /// it reads the driver.
     /// </summary>
     internal sealed class NamespaceDriver : GraphDriver
     {
@@ -61,33 +61,18 @@ internal static class TypesBindings
         internal NamespaceDriver(Namespace source)
         {
             this.source = source;
-            Provider = source.Attributes.TryGetValue("provider", out var provider)
-                ? (GraphProvider)JudgeTypes.Convert(typeof(GraphProvider), provider, "attribute 'provider'")!
-                : GraphProvider.Neo4j;
-            FulltextSyntax = source.Attributes.TryGetValue("fulltext_syntax", out var syntax)
-                ? (string)JudgeTypes.Convert(typeof(string), syntax, "attribute 'fulltext_syntax'")!
-                : string.Empty;
+            if (source.Attributes.TryGetValue("provider", out var provider))
+            {
+                Provider = (GraphProvider)JudgeTypes.Convert(typeof(GraphProvider), provider, "attribute 'provider'")!;
+            }
+
+            if (source.Attributes.TryGetValue("fulltext_syntax", out var syntax))
+            {
+                FulltextSyntax = (string)JudgeTypes.Convert(typeof(string), syntax, "attribute 'fulltext_syntax'")!;
+            }
         }
 
         internal override string PythonName => "SimpleNamespace";
-
-        /// <summary>
-        /// Throws the <c>AttributeError</c> of the first attribute that <c>fulltext_query</c> reads and the namespace
-        /// lacks. Python reads <c>driver.provider</c> after the validation of the group ids. For another provider than
-        /// FalkorDB it reads <c>driver.fulltext_syntax</c> once for each group id.
-        /// </summary>
-        internal void ThrowIfAttributeRead(List<string>? groupIds)
-        {
-            if (!source.Attributes.ContainsKey("provider"))
-            {
-                throw Missing("provider");
-            }
-
-            if (Provider != GraphProvider.Falkordb && groupIds is { Count: > 0 } && !source.Attributes.ContainsKey("fulltext_syntax"))
-            {
-                throw Missing("fulltext_syntax");
-            }
-        }
 
         internal override string BuildFulltextQuery(string query, List<string>? groupIds = null, long maxQueryLength = 128) =>
             throw (source.Attributes.ContainsKey("build_fulltext_query")

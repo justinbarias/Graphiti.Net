@@ -6,9 +6,8 @@ using Graphiti.JudgeHost.Core;
 /// <summary>The bindings of <c>graphiti_core/search/search_utils.py</c>.</summary>
 /// <remarks>
 /// The 19 cases of <c>fulltext_query</c> pass a <c>types:SimpleNamespace</c> as the driver. The binding wraps the
-/// namespace in <see cref="TypesBindings.NamespaceDriver"/>, which gives the attributes <c>provider</c> and
-/// <c>fulltext_syntax</c>. A namespace that lacks an attribute that Python reads gives the <c>AttributeError</c> after
-/// the validation of the group ids, as in Python.
+/// namespace in <see cref="TypesBindings.NamespaceDriver"/>, which sets the attributes <c>provider</c> and
+/// <c>fulltext_syntax</c> that the namespace has.
 /// </remarks>
 internal static class SearchUtilsBindings
 {
@@ -27,10 +26,7 @@ internal static class SearchUtilsBindings
                 return arguments.InvokeAsync(SearchUtils.FulltextQuery);
             }
 
-            var driver = new TypesBindings.NamespaceDriver(source);
-            var result = SearchUtils.FulltextQuery(query, groupIds, driver);
-            driver.ThrowIfAttributeRead(groupIds);
-            return Codec.Result(result);
+            return Codec.Result(SearchUtils.FulltextQuery(query, groupIds, new TypesBindings.NamespaceDriver(source)));
         });
         table.Pure.Add(Module + "rrf", call => call.Signature("results", "rank_const", "min_score").InvokeAsync(SearchUtils.Rrf));
         table.Pure.Add(
