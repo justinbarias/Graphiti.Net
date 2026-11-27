@@ -534,8 +534,8 @@ internal static partial class Phases
         throw new NotSupportedException("TODO(port): _build_saga_links");
     }
 
-    // PORT: the parameters after `change_set` are keyword-only in Python. `saga` is the `object?` of
-    // BuildSagaLinksAsync.
+    // PORT: the parameters after `change_set` are keyword-only in Python. `saga` is the
+    // `SagaOrName?` of graphiti.py.
     // TODO(port): commit_unit
     internal static Task<CommitResult> CommitUnitAsync(
         GraphitiCore graphiti,

@@ -91,7 +91,7 @@ internal sealed class SQLiteIngestionStateStore : IngestionStateStore
 
     // --- helpers that run inside a transaction ---
 
-    // TODO(port): no rule for sqlite3.Row
+    // PORT: a `sqlite3.Row` is an OrderedDictionary keyed by column name (R16).
     // TODO(port): SQLiteIngestionStateStore._group
     private static OrderedDictionary<string, object?> Group(SqliteConnection conn, string groupId)
     {

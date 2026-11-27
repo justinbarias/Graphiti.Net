@@ -28,9 +28,10 @@ internal static partial class DeltaModule
     // The number of delta units for which the process keeps a digest.
     internal const long DigestCacheSize = 1024;
 
-    // TODO(port): no rule for a numpy matrix (np.ndarray)
+    // PORT: a float32 numpy matrix is a `float[,]` (R18).
+    // PORT: internal, because judge cases call it (R2).
     // TODO(port): _unit_matrix
-    private static float[,] UnitMatrix(List<List<double>> vectors)
+    internal static float[,] UnitMatrix(List<List<double>> vectors)
     {
         throw new NotSupportedException("TODO(port): _unit_matrix");
     }
@@ -43,8 +44,9 @@ internal static partial class DeltaModule
 
     // PORT: `tuple[set[str], list[tuple[int, ...]]] | None`. A band is a `tuple[int, ...]` that is a part of a dict key
     // of `lsh_buckets`, so it is a PyTuple (R14). The shingles are a set that code tests only (R14).
+    // PORT: internal, because judge cases call it (R2).
     // TODO(port): _fuzzy_query
-    private static (HashSet<string> Shingles, List<PyTuple> Bands)? FuzzyQuery(string name)
+    internal static (HashSet<string> Shingles, List<PyTuple> Bands)? FuzzyQuery(string name)
     {
         throw new NotSupportedException("TODO(port): _fuzzy_query");
     }

@@ -23,7 +23,7 @@ using Graphiti.Core.Prompts;
 using Graphiti.Internal;
 using Microsoft.Extensions.Logging;
 
-// TODO(port): no rule for the place and the name of a union type that Python does not name.
+// PORT: a union that Python does not name (Part 3).
 // `episode: EpisodicNode | list[EpisodicNode]` has two shapes, and the body branches on `isinstance(episode, list)`
 // (`episode.content` for one episode, `concatenate_episodes(episode)` for a list). Part 3 gives the form: an abstract
 // record with one derived record for each case. node_operations, edge_operations, combined_extraction, and graphiti.py

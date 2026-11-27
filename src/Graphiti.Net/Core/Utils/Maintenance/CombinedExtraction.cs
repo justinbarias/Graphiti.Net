@@ -21,11 +21,11 @@ using Graphiti.Core.Prompts;
 using Graphiti.Internal;
 using Microsoft.Extensions.Logging;
 
-// PORT: the module class has the name of the module (R2). The response model of the prompt has the same name in
-// Graphiti.Core.Prompts, so the body names it as Prompts.CombinedExtraction.
-internal static class CombinedExtraction
+// PORT: the module imports the response model `CombinedExtraction` of the prompt, which has the name of the module
+// class. So the module class has the suffix `Module` (R2).
+internal static class CombinedExtractionModule
 {
-    private static ILogger Logger => PortServices.Logger(typeof(CombinedExtraction));
+    private static ILogger Logger => PortServices.Logger(typeof(CombinedExtractionModule));
 
     internal const long TimestampBatchSize = 20;
 

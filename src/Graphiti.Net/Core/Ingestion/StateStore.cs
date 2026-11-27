@@ -55,8 +55,8 @@ internal sealed record AnalysisStart
 }
 
 // PORT: `begin_commit` returns `CommitTurn | CommitWait | CommitRecover`, a union of three shapes (Part 3). It is an
-// abstract record with one derived record for each case. Python has no name for the union.
-// TODO(port): no rule for the name of a union that Python does not name
+// abstract record with one derived record for each case. Python names each case and not the union, so the cases are
+// top-level records and the lead gave the name of the base record.
 internal abstract record BeginCommitResult;
 
 // PORT: a frozen dataclass is a record with `{ get; init; }` (R7). A record compares a `byte[]` by reference, where

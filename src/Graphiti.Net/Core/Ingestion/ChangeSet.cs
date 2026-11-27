@@ -90,8 +90,7 @@ internal sealed record PatchNode : Operation
 
 // PORT: `EdgeOperation = AddEpisodesToEdge | EndEdge | SetEdgeAttributes` is a union of three models (Part 3). It is an
 // abstract record with one derived record for each case. Each case of EdgeOperation is also a case of Operation, so
-// EdgeOperation derives from Operation.
-// TODO(port): no rule for a type alias of a union that is also a part of a second union
+// EdgeOperation derives from Operation (R2, the row for a type alias).
 internal abstract record EdgeOperation : Operation;
 
 // PORT: `Operation = Annotated[... | PatchNode, Field(discriminator='op')]` is an abstract record with one derived
@@ -262,7 +261,7 @@ internal sealed record ResolutionTrace
 
     // PORT: `_edge_states: dict[int, _EdgeState]` is keyed by `id(edge)`. The key is the edge object with reference
     // equality, in insertion order, because collect_edge_operations iterates the keys.
-    // TODO(port): no rule for a dict keyed by id()
+    // PORT: R14 gives this form for a dict keyed by `id(obj)`.
     private OrderedDictionary<EntityEdge, EdgeState> edgeStates = new(ReferenceEqualityComparer.Instance);
 
     // TODO(port): ResolutionTrace.record_node_candidates

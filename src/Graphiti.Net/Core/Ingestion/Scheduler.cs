@@ -84,16 +84,18 @@ internal sealed class ConcurrentIngestor
 
     // PORT: `span: Any` is the TracerSpan of `start_span` (R16). `analyze: Any` is the nested async function `analyze`
     // of add_episode and add_episode_bulk (R8).
-    // PORT: `commit_kwargs: dict[str, Any]` holds the keyword arguments `saga`, `saga_previous_episode_uuid`, and
-    // `identity_properties` that `_run_unit` passes to commit_unit with `**commit_kwargs`.
-    // TODO(port): no rule for a dict of keyword arguments that is not a query parameter dict
+    // PORT: `commit_kwargs: dict[str, Any]` is one typed parameter for each key that a caller writes: `saga`,
+    // `saga_previous_episode_uuid`, and `identity_properties` (R2). The bulk caller writes no
+    // `saga_previous_episode_uuid` and passes null, the default of commit_unit.
     // TODO(port): ConcurrentIngestor._run_unit
     private Task<(CommitResult, List<EntityNode>)> RunUnitAsync(
         GroupState state,
         AdmittedUnit unit,
         TracerSpan span,
         Func<AdmittedUnit, CancellationToken, Task<ChangeSet>> analyze,
-        OrderedDictionary<string, object?> commitKwargs,
+        SagaOrName? saga,
+        string? sagaPreviousEpisodeUuid,
+        OrderedDictionary<string, List<string>>? identityProperties,
         OrderedDictionary<string, GraphTypeDescriptor>? entityTypes,
         CancellationToken cancellationToken = default)
     {

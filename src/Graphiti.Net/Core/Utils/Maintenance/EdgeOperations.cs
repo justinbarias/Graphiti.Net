@@ -27,7 +27,7 @@ using Microsoft.Extensions.Logging;
 
 // PORT: each private name of this module is internal, because judge cases and the recording of the unit read them
 // (R2). `edge_types: dict[str, type[BaseModel]]` is an OrderedDictionary of custom type descriptors (R15).
-// TODO(port): no rule for a dict key `tuple[str, str]` of typed data. `edge_type_map: dict[tuple[str, str], list[str]]`
+// PORT: a dict key `tuple[str, str]` of typed data is a value tuple (Part 3). `edge_type_map: dict[tuple[str, str], list[str]]`
 // is OrderedDictionary<(string, string), List<string>>: code iterates it with `.items()` (R14), and a value tuple has
 // value equality. A signature that reaches the prompt context is a PyTuple there (R6).
 internal static partial class EdgeOperations
@@ -36,7 +36,7 @@ internal static partial class EdgeOperations
 
     internal const string DefaultEdgeName = "RELATES_TO";
 
-    // TODO(port): no rule for a union of a value and a list that the function makes into a list on its first line.
+    // PORT: a union of a value and a list that the function makes into a list on its first line (R2).
     // `episode_uuid: str | list[str]` is two overloads. Judge cases pass both shapes.
     // TODO(port): build_episodic_edges
     internal static List<EpisodicEdge> BuildEpisodicEdges(

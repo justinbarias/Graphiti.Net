@@ -37,7 +37,7 @@ using Microsoft.Extensions.Logging;
 // PORT: `dict[str, type[BaseModel]]` is an OrderedDictionary<string, GraphTypeDescriptor> (R15). `edge_type_map:
 // dict[tuple[str, str], list[str]]` is an OrderedDictionary<(string, string), List<string>>. A `uuid_map:
 // dict[str, str]` is an OrderedDictionary<string, string>, the type of `ChangeSet.uuid_map`.
-// TODO(port): no rule for the place and the name of a union type that Python does not name.
+// PORT: a union that Python does not name (Part 3).
 // `saga: str | SagaNode | None` has two shapes: the name of a saga, or the saga node. Part 3 gives the form: an abstract
 // record with one derived record for each case. graphiti.py, ingestion/phases.py, and ingestion/scheduler.py pass the
 // value through. `_validate_saga_group` of this module is the first function that reads it. `| None` is `SagaOrName?`.
@@ -231,14 +231,8 @@ internal sealed class GraphitiCore
     // TODO(port): Graphiti.token_tracker
     internal TokenUsageTracker TokenTracker => throw new NotSupportedException("TODO(port): Graphiti.token_tracker");
 
-    // PORT: `client` has no annotation, and TYPE_HINTS.md gives Unknown. The callers pass the LLM client, the embedder,
-    // the cross encoder, and the driver, so the type is `object?` (R20). Its one caller is the telemetry method, which
-    // is not ported.
-    // TODO(port): Graphiti._get_provider_type
-    private string GetProviderType(object? client)
-    {
-        throw new NotSupportedException("TODO(port): Graphiti._get_provider_type");
-    }
+    // PORT: `_get_provider_type` is a part of the telemetry of decision D9, which is not ported, so it has no member.
+    // Its one caller is `_capture_initialization_telemetry`.
 
     // TODO(port): Graphiti.close
     internal Task CloseAsync(CancellationToken cancellationToken = default)
@@ -258,8 +252,9 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti._get_concurrent_ingestor");
     }
 
+    // PORT: internal, because an upstream test calls it (R2).
     // TODO(port): Graphiti._get_or_create_saga
-    private Task<SagaNode> GetOrCreateSagaAsync(
+    internal Task<SagaNode> GetOrCreateSagaAsync(
         string sagaName,
         string groupId,
         PyDateTime createdAt,
@@ -347,8 +342,8 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti._merge_materialized_endpoint_nodes");
     }
 
-    // PORT: internal, because ingestion/phases.py calls it (R2). `episode` is the `object` of
-    // ExtractAndResolveNodesAsync.
+    // PORT: internal, because ingestion/phases.py calls it (R2). `episode` is the
+    // `EpisodeOrEpisodes` of node_operations.
     // TODO(port): Graphiti._extract_and_resolve_edges
     internal Task<(List<EntityEdge>, List<EntityEdge>, List<EntityEdge>)> ExtractAndResolveEdgesAsync(
         EpisodeOrEpisodes episode,
@@ -567,11 +562,10 @@ internal sealed class GraphitiCore
         throw new NotSupportedException("TODO(port): Graphiti._search");
     }
 
-    // PORT: @handle_multiple_group_ids (R16). `search_` gives the C# name of `search`, and R2 has no row for a trailing
-    // underscore. The name is the one of the public facade (public surface design, L10). The default of `config` is
+    // PORT: @handle_multiple_group_ids (R16). `search_` gives the C# name of `search`, so it has the
+    // name of the public facade (R2, and the public surface design, L10). The default of `config` is
     // the shared recipe object COMBINED_HYBRID_SEARCH_CROSS_ENCODER, which cannot be a C# default value: null stands
     // for SearchConfigRecipes.CombinedHybridSearchCrossEncoder, the same object (R17, R21 U8).
-    // TODO(port): no rule for a name with a trailing underscore
     // TODO(port): Graphiti.search_
     internal Task<SearchResults> AdvancedSearchAsync(
         string query,

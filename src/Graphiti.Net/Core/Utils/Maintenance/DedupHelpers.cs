@@ -160,7 +160,7 @@ internal static partial class DedupHelpers
         throw new NotSupportedException("TODO(port): _normalize_identity_value");
     }
 
-    // TODO(port): no rule for a tuple that code compares with `==` and that holds a value of open data. The result
+    // PORT: a tuple that code compares with `==` and that holds a value of open data is a PyTuple (R6). The result
     // `tuple[str, tuple[tuple[str, object], ...]] | None` is a PyTuple of the identity type and a PyTuple of
     // (name, value) PyTuples, so that `==` has the value equality of Python (R6, R14).
     // TODO(port): _identity_key_for_node
