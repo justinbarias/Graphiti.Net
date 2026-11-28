@@ -212,11 +212,11 @@ public class SearchValuesTests
 
     // The points of the grid where the port differs from Python by the late cancel of GAPS F33. The grid of
     // search_cancel.json holds 153 points: 114 cancel while a query returns, 24 while the embedder returns, and 15 while
-    // the cross-encoder returns. 73 differ, and 80 agree. A point has the kind of its difference (see Compare):
-    //   event_order    51   the same exception, and the events differ by more than extra events (extra spans, and an
+    // the cross-encoder returns. 69 differ, and 84 agree. A point has the kind of its difference (see Compare):
+    //   event_order    49   the same exception, and the events differ by more than extra events (extra spans, and an
     //                       end event that comes earlier or later)
     //   full_result    18   the port returns a result, and Python ends with CancelledError
-    //   extra_events    2   the same exception, and only extra events
+    //   extra_events    0   the same exception, and only extra events
     //   other_error     2   the port ends with another exception (the reranker error, which it reaches before it reads
     //                       the token)
     // Each point that is not in this list must agree with Python. A listed point that agrees fails the test.
@@ -253,7 +253,6 @@ public class SearchValuesTests
         ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 2, "event_order"),
         ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 3, "event_order"),
         ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 4, "event_order"),
-        ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 6, "extra_events"),
         ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 7, "event_order"),
         ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 8, "event_order"),
         ("COMBINED_HYBRID_SEARCH_MMR", 2L, "query", 9, "event_order"),
@@ -269,16 +268,13 @@ public class SearchValuesTests
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 1L, "query", 9, "event_order"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 1L, "rank", 4, "full_result"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 2, "event_order"),
-        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 3, "event_order"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 4, "event_order"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 7, "event_order"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 8, "event_order"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 9, "event_order"),
-        ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "rank", 2, "extra_events"),
         ("COMBINED_HYBRID_SEARCH_CROSS_ENCODER", 2L, "rank", 4, "full_result"),
         ("NODE_HYBRID_SEARCH_CROSS_ENCODER", null, "query", 2, "event_order"),
         ("NODE_HYBRID_SEARCH_CROSS_ENCODER", null, "rank", 1, "full_result"),
-        ("NODE_HYBRID_SEARCH_CROSS_ENCODER", 2L, "query", 2, "event_order"),
         ("NODE_HYBRID_SEARCH_CROSS_ENCODER", 2L, "rank", 1, "full_result"),
         ("COMMUNITY_HYBRID_SEARCH_MMR", null, "query", 2, "event_order"),
         ("COMMUNITY_HYBRID_SEARCH_MMR", null, "query", 3, "full_result"),

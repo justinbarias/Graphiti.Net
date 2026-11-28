@@ -9,7 +9,7 @@ it imports `semaphore_gather` from the upstream package, so it runs in the upstr
 
 Timing is not an oracle, but order is. Each script is a set of named coroutines and a `main`. A coroutine is a list
 of operations: it writes log entries, yields to the loop with `await asyncio.sleep(0)`, raises, returns, and calls
-gather, semaphore_gather, create_task, cancel, shield, wait_for, Event, and to_thread. The tool runs each script on
+gather, semaphore_gather, create_task, cancel, shield, wait_for, Event, Semaphore, Lock, and to_thread. The tool runs each script on
 asyncio and records the trace: the log entries in the order in which they happened, up to the end of `main`.
 The C# tests run the same scripts on the Asyncio helpers and compare the traces.
 
@@ -33,6 +33,11 @@ Operations (the C# interpreter in AsyncioScripts.cs reads the same list):
     ["wait_for", name, timeout]         await asyncio.wait_for(name(), timeout)
     ["ev_wait", e], ["ev_set", e], ["ev_clear", e], ["ev_is_set", e]
     ["to_thread", value]                await asyncio.to_thread(lambda: value)
+    ["sem", s, value]                   s = asyncio.Semaphore(value)
+    ["lock", s]                         s = asyncio.Lock()
+    ["acquire", s]                      await s.acquire(), then log "acquired <s>"
+    ["release", s]                      s.release()
+    ["locked", s]                       log "locked <s> -> <s.locked()>"
     ["sleep", text]                     await asyncio.sleep(float(text)), then log "slept <text>". The text is a float
                                         literal that both sides read, also "Infinity", "-Infinity", and "NaN".
 
@@ -91,6 +96,7 @@ class Program:
         self.trace: list[str] = []
         self.tasks: dict[str, asyncio.Task] = {}
         self.events: dict[str, asyncio.Event] = {}
+        self.locks: dict[str, asyncio.Semaphore | asyncio.Lock] = {}
 
     def log(self, me: str, text: str) -> None:
         self.trace.append(f'{me}:{text}')
@@ -177,6 +183,17 @@ class Program:
             elif kind == 'sleep':
                 await asyncio.sleep(float(op[1]))
                 self.log(me, f'slept {op[1]}')
+            elif kind == 'sem':
+                self.locks[op[1]] = asyncio.Semaphore(op[2])
+            elif kind == 'lock':
+                self.locks[op[1]] = asyncio.Lock()
+            elif kind == 'acquire':
+                await self.locks[op[1]].acquire()
+                self.log(me, f'acquired {op[1]}')
+            elif kind == 'release':
+                self.locks[op[1]].release()
+            elif kind == 'locked':
+                self.log(me, f'locked {op[1]} -> {fmt(self.locks[op[1]].locked())}')
             elif kind == 'to_thread':
                 value = op[1]
                 r = await asyncio.to_thread(lambda: value)
@@ -421,6 +438,81 @@ def hand_scripts() -> list[dict]:
         'bg': steps('bg', 6) + [['log', 'end']], 'inner': [['return', 1]],
     }, [['create_task', 'inner', 'h'], ['yield'], ['yield'], ['create_task', 'bg', 't'], ['gather_tasks', ['h'], True],
         ['log', 'gathered'], ['await', 't']], 'a gather of a task that has ended'))
+    out.extend(lock_scripts())
+    return out
+
+
+def lock_scripts() -> list[dict]:
+    """asyncio.Semaphore and asyncio.Lock (asyncio/locks.py of CPython 3.12): the wake order, a cancel of a waiter that
+    waits and of one that is woken, locked() at each step, a value of 0, and the errors."""
+    out = []
+
+    def waiter(name: str) -> list:
+        return [['try', [['acquire', name], ['log', 'got']], 'reraise']]
+
+    def waiters(name: str, n: int) -> dict:
+        return {f'w{i}': waiter(name) for i in range(1, n + 1)}
+
+    def start(n: int) -> list:
+        return [['create_task', f'w{i}', f'h{i}'] for i in range(1, n + 1)]
+
+    def finish(n: int) -> list:
+        return [['try', [['await', f'h{i}']], 'all'] for i in range(1, n + 1)]
+
+    lk = ['locked', 's']
+    for kind in ('sem', 'lock'):
+        make = [['sem', 's', 0]] if kind == 'sem' else [['lock', 's'], ['acquire', 's']]
+        # A release of a lock wakes one waiter, and that waiter holds the lock until a release. So the second release
+        # of a lock comes after the first waiter has the lock.
+        out.append(s(f'{kind}_three_waiters_two_releases_in_one_step', waiters('s', 3),
+            [*make, lk, *start(3), ['yield'], lk, ['release', 's'], lk,
+             *([['release', 's'], lk] if kind == 'sem' else []), ['yield'], lk, ['yield'], lk,
+             *([] if kind == 'sem' else [['release', 's'], lk, ['yield'], ['yield'], lk]),
+             ['release', 's'], ['yield'], ['yield'], lk, *finish(3), lk],
+            'three waiters and releases in one step: the waiters wake in the order of their calls'))
+        out.append(s(f'{kind}_three_waiters_releases_with_a_yield', waiters('s', 3),
+            [*make, *start(3), ['yield'], ['release', 's'], lk, ['yield'], lk, ['release', 's'], lk, ['yield'], lk,
+             ['yield'], lk, ['release', 's'], ['yield'], ['yield'], lk, *finish(3), lk],
+            'three waiters and releases with one yield between them'))
+        out.append(s(f'{kind}_cancel_the_first_waiter', waiters('s', 3),
+            [*make, *start(3), ['yield'], ['cancel', 'h1'], lk, ['release', 's'], lk, ['yield'], lk,
+             ['yield'], lk, ['release', 's'], ['yield'], ['yield'], ['release', 's'], *finish(3), lk],
+            'a canceled waiter is passed over, and the next one wakes'))
+        out.append(s(f'{kind}_cancel_the_middle_waiter', waiters('s', 3),
+            [*make, *start(3), ['yield'], ['cancel', 'h2'], lk, ['release', 's'], ['yield'], ['yield'],
+             lk, ['release', 's'], ['yield'], ['yield'], lk, ['release', 's'], *finish(3), lk],
+            'a canceled waiter in the middle of the queue'))
+        out.append(s(f'{kind}_cancel_a_woken_waiter', waiters('s', 3),
+            [*make, *start(3), ['yield'], ['release', 's'], ['cancel', 'h1'], lk, ['yield'], lk,
+             ['yield'], lk, ['release', 's'], ['yield'], ['yield'], ['release', 's'], *finish(3), lk],
+            'a waiter that is woken and canceled in one step gives the slot back and wakes the next waiter'))
+        out.append(s(f'{kind}_cancel_a_woken_waiter_with_no_other_waiter', waiters('s', 1),
+            [*make, *start(1), ['yield'], ['release', 's'], ['cancel', 'h1'], ['yield'], ['yield'], lk,
+             *finish(1), ['acquire', 's'], lk],
+            'the slot of a woken and canceled waiter goes back'))
+    out.append(s('sem_release_with_no_waiter', {},
+        [['sem', 's', 1], lk, ['release', 's'], lk, ['acquire', 's'], lk, ['acquire', 's'], lk,
+         ['release', 's'], lk], 'a release with no waiter adds a slot, as Semaphore is not bounded'))
+    out.append(s('sem_value_0', waiters('s', 1),
+        [['sem', 's', 0], lk, *start(1), ['yield'], ['yield'], lk, ['release', 's'], lk, *finish(1), lk],
+        'a value of 0: the first acquire waits for a release'))
+    out.append(s('sem_negative_value', {}, [['try', [['sem', 's', -1]], 'swallow'], ['log', 'after']],
+        'Semaphore(-1) raises ValueError'))
+    out.append(s('sem_acquire_while_a_canceled_waiter_waits', waiters('s', 1),
+        [['sem', 's', 0], *start(1), ['yield'], ['cancel', 'h1'], lk, ['release', 's'], lk, ['acquire', 's'],
+         lk, *finish(1)], 'locked() passes over a canceled waiter'))
+    out.append(s('lock_second_acquire_and_release_by_another_task', {
+        'other': [['log', 'release'], ['release', 's'], lk],
+        'w1': waiter('s'),
+    }, [['lock', 's'], lk, ['acquire', 's'], lk, ['create_task', 'w1', 'h1'], ['yield'], lk,
+        ['create_task', 'other', 'ho'], ['await', 'ho'], lk, ['yield'], lk, *finish(1), lk, ['release', 's'], lk],
+        'a second acquire waits, a different task releases, and the waiter takes the lock'))
+    out.append(s('lock_release_of_a_free_lock', {},
+        [['lock', 's'], ['try', [['release', 's']], 'swallow'], lk, ['acquire', 's'], ['release', 's'],
+         ['try', [['release', 's']], 'swallow'], ['log', 'after']], 'release of a free lock raises RuntimeError'))
+    out.append(s('lock_acquire_while_a_canceled_waiter_waits', waiters('s', 1),
+        [['lock', 's'], ['acquire', 's'], *start(1), ['yield'], ['cancel', 'h1'], ['release', 's'], lk,
+         ['acquire', 's'], lk, ['release', 's'], *finish(1)], 'a free lock with a canceled waiter is taken at once'))
     return out
 
 

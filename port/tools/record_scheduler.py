@@ -31,21 +31,26 @@ The fakes:
 - The state store is the real InMemoryIngestionStateStore with a fake clock (FakeClock of the fixtures), inside a
   wrapper that yields once (asyncio.sleep(0)) and then records each call, as a store that does I/O does. A case can
   move the store clock at a named store call (`store_advance`), and the n-th call of a store method can fail
-  (`store_fail`).
+  (`store_fail`) or wait on the loop clock (`store_hold`). A held call that is canceled does cleanup work on the loop
+  clock (`hold_cleanup` seconds), records `store_cleanup`, and raises the cancel again.
 - The analysis of _run_unit is a fake that yields and records (`analyze`), waits for a gate, sleeps on the loop clock,
   marks the unit failed, and raises. It never returns: commit_unit waits for layer 9.
 - The tracer records each span, its attributes, and its status, and counts the spans in flight.
 - The calls, the store calls, the log lines, and the snapshots of each case are one ordered list. A snapshot holds the
-  state of each call, the window and the admit lock of each graph, and the spans.
+  state of each call, `locked()` of the window and of the admit lock of each graph, and the spans. A log line has
+  `exc: true` when the record has exc_info.
+- For each counted fake call, `tasks` names the task that made it: the key of a call of the case, `<inner>` for the
+  heartbeat task that _run_unit starts, or `<driver>` for the task of the case itself. The test checks the token of
+  each fake call against it.
 
-Values that the recording leaves out of the comparison, by name: the failure reason that _fail_unit stores
-(type(error).__name__ in Python, the .NET type name in the port, decision D50, R15) is `<type>`. The text of a
-cancellation is empty. Real clock sites: _run_unit builds UnitLease with its default clock time.monotonic
+The failure reason that _fail_unit stores is type(error).__name__ in Python and the .NET type name in the port (decision
+D50, R15). The test maps the .NET name to the Python name with the table of PhasesValuesTests.PythonName. The text of
+a cancellation is empty. Real clock sites: _run_unit builds UnitLease with its default clock time.monotonic
 (scheduler.py:136), which only sets the local deadline of the lease. No reachable path reads that deadline.
 
 The cancel scenarios: for each case with `cancel`, the tool runs the case again for each counted fake call k. The fake
-that makes call k records it and then cancels the task of the main call. The tool keeps the count of attempts and the
-counted calls after call k.
+that makes call k records it and then cancels the task of the main call. The tool keeps the count of attempts, and the
+counted calls and the log lines after call k (R25).
 
 It writes tests/Port.Evaluation/values/scheduler.json. --check writes nothing and exits 1 if the file differs from what
 the run would write. The tool needs Python 3.12 and the pinned upstream in the folder of the variable GRAPHITI_UPSTREAM,
@@ -70,7 +75,7 @@ OUT = ROOT / 'tests' / 'Port.Evaluation' / 'values' / 'scheduler.json'
 
 T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 DRAIN = 100
-MASKED_REASONS = ('expired', 'apply_failed', 'analysis')
+HOLD_SECONDS = 100.0
 
 events: list = []
 state: dict = {}
@@ -127,11 +132,8 @@ def store_view(store) -> list:
     for group_id, group in store._groups.items():
         units = []
         for seq, u in group.units.items():
-            reason = u.fail_reason
-            if reason is not None and reason not in ('expired', 'apply_failed'):
-                reason = '<type>'
             units.append([seq, u.unit_id, u.status, u.deadline, u.snapshot_seq, u.started_at, u.ended_at, u.fence,
-                          reason, u.payload is not None])
+                          u.fail_reason, u.payload is not None])
         out.append({'group_id': group_id, 'next_seq': group.next_seq, 'watermark': group.watermark,
                     'admit_seq': group.admit_seq, 'units': units, 'unit_ids': [[k, v] for k, v in group.unit_ids.items()],
                     'enrich': [[k, v] for k, v in group.enrich.items()]})
@@ -150,6 +152,7 @@ async def enter(kind: str, record: dict) -> None:
     try:
         await asyncio.sleep(0)
         events.append({'kind': kind, **record})
+        state['tasks'].append(task_label())
         state['count'] += 1
         for item in case.get('store_advance', []):
             if kind == 'store' and item[0] == record['method'] and item[1] > 0:
@@ -161,16 +164,29 @@ async def enter(kind: str, record: dict) -> None:
         state['in_flight'] -= 1
 
 
+def task_label() -> str:
+    current = asyncio.current_task()
+    for key, task in state['calls'].items():
+        if task is current:
+            return key
+    return '<driver>' if current is state['driver'] else '<inner>'
+
+
 def make_store(mods, inner):
     def logged(name):
         async def call(self, *args):
             bound = inspect.signature(getattr(inner, name)).bind(*args)
             bound.apply_defaults()
             shown = [a for a in bound.arguments.values() if not isinstance(a, bytes)]
-            if name == 'fail' and shown[2] not in MASKED_REASONS:
-                shown[2] = '<type>'
             await enter('store', {'method': name, 'args': encode(shown)})
             number = state['store_calls'][name] = state['store_calls'].get(name, 0) + 1
+            if number in state['case'].get('store_hold', {}).get(name, []):
+                try:
+                    await asyncio.sleep(HOLD_SECONDS)
+                except asyncio.CancelledError:
+                    await asyncio.sleep(state['case']['hold_cleanup'])
+                    events.append({'kind': 'store_cleanup', 'method': name})
+                    raise
             if number in state['case'].get('store_fail', {}).get(name, []):
                 raise RuntimeError(f'store {name} failed')
             return await getattr(inner, name)(*args)
@@ -251,7 +267,7 @@ def call_view(task) -> list:
 
 
 def groups_view(ingestor) -> list:
-    return [[group_id, g.window._value, g.admit_lock.locked(), g.changed.is_set()]
+    return [[group_id, g.window.locked(), g.admit_lock.locked(), g.changed.is_set()]
             for group_id, g in ingestor._groups.items()]
 
 
@@ -329,6 +345,17 @@ def cases() -> list[dict]:
                                                    ('drain',), ('snapshot',), ('loop', 0.25), ('drain',),
                                                    ('snapshot',), ('store',), ('cancel', 'h'), ('drain',)],
          setup=admit1 + [('begin_commit', 1)])
+    # The sleep of the heartbeat with a lease of inf (Python sleeps for ever) and of 1e9 (a delay above the limit of
+    # Task.Delay). The case with inf admits no unit, because JSON has no inf for its deadline.
+    for name, seconds in (('heartbeat_lease_of_inf', 'inf'), ('heartbeat_lease_of_1e9', 1e9)):
+        case(name, [('heartbeat', 'h', 1, None), ('drain',), ('loop', 1000000.0), ('drain',), ('snapshot',),
+                    ('cancel', 'h'), ('drain',), ('snapshot',)],
+             config={'lease_seconds': seconds}, setup=() if seconds == 'inf' else admit1)
+    # A cancel of the heartbeat task while its store call waits: the task ends canceled and logs nothing.
+    case('heartbeat_cancel_during_the_store_call',
+         [('heartbeat', 'h', 1, None), ('drain',), ('loop', 0.25), ('drain',), ('snapshot',), ('cancel', 'h'),
+          ('drain',), ('snapshot',), ('loop', 0.0625), ('drain',), ('snapshot',)],
+         setup=admit1, store_hold={'heartbeat': [1]}, hold_cleanup=0.0625)
     case('heartbeat_with_the_turn', [('heartbeat', 'h', 1, 1), ('drain',), ('clock', 0.5), ('loop', 0.3125),
                                      ('drain',), ('store',), ('cancel', 'h'), ('drain',), ('snapshot',)],
          setup=admit1 + [('begin_commit', 1)])
@@ -367,6 +394,15 @@ def cases() -> list[dict]:
     run('cancel_during_the_analysis', [['call'], ['gate'], ['raise', 'runtime']],
         actions=[('drain',), ('snapshot',), ('cancel', 'r'), ('drain',)])
     run('cancel_before_the_call_starts', [['call'], ['raise', 'runtime']], actions=[('cancel', 'r'), ('drain',)])
+    # The cleanup of _run_unit: the heartbeat task is in a store call that takes loop time after a cancel. The cleanup
+    # of that call ends, then _run_unit ends, then the waiter of the group wakes.
+    case('cleanup_waits_for_the_heartbeat_task',
+         [('group', 'g'), ('run_unit', 'r', 1, 'u1', [['call'], ['gate'], ['raise', 'runtime']]), ('drain',),
+          ('loop', 0.25), ('drain',), ('wait', 'w', 'g'), ('drain',), ('snapshot',), ('release', 'r'), ('drain',),
+          ('snapshot',), ('loop', 0.03125), ('drain',), ('snapshot',), ('loop', 0.03125), ('drain',), ('snapshot',),
+          ('store',)],
+         config={'poll_interval_seconds': 50.0}, setup=admit1, main='r', store_hold={'heartbeat': [2]},
+         hold_cleanup=0.0625)
     case('two_units_and_a_waiter',
          [('group', 'g'), ('run_unit', 'r1', 1, 'u1', [['call'], ['gate'], ['raise', 'runtime']]),
           ('run_unit', 'r2', 2, 'u2', [['call'], ['gate'], ['raise', 'value']]), ('wait', 'w', 'g'), ('drain',),
@@ -406,6 +442,9 @@ def cases() -> list[dict]:
 
 
 async def run_case(case: dict, mods) -> dict:
+    state['driver'] = asyncio.current_task()
+    # JSON has no inf, so a case writes the text 'inf'.
+    case = {**case, 'config': {k: float(v) if v == 'inf' else v for k, v in case['config'].items()}}
     clock = FakeClock()
     state['clock'] = clock
     inner = mods['InMemoryIngestionStateStore'](clock=clock)
@@ -490,7 +529,7 @@ async def run_case(case: dict, mods) -> dict:
             first = ingestor._groups.get(action[1])
             group = ingestor._group(action[1])
             events.append({'kind': 'group', 'group_id': action[1], 'before': before, 'same': group is first,
-                           'window': group.window._value, 'admit_locked': group.admit_lock.locked(),
+                           'window_locked': group.window.locked(), 'admit_locked': group.admit_lock.locked(),
                            'changed': group.changed.is_set()})
         elif op == 'notify_view':
             group = ingestor._group(action[1])
@@ -575,13 +614,14 @@ async def run_case(case: dict, mods) -> dict:
 def run_one(case: dict, mods, cancel_at: int) -> dict:
     events.clear()
     state.update(in_flight=0, max_in_flight=0, count=0, attempts=0, cancel_at=cancel_at, case=copy.deepcopy(case),
-                 calls={}, store_calls={})
+                 calls={}, store_calls={}, tasks=[], driver=None)
     with asyncio.Runner(loop_factory=VirtualLoop) as runner:
         output = runner.run(run_case(state['case'], mods))
     output['events'] = list(events)
     output['max_in_flight'] = state['max_in_flight']
     output['count'] = state['count']
     output['attempts'] = state['attempts']
+    output['tasks'] = list(state['tasks'])
     return output
 
 
@@ -593,10 +633,11 @@ def record(mods) -> list[dict]:
             cancels = []
             for k in range(output['count']):
                 cancelled = run_one(case, mods, k)
-                counted = [e for e in cancelled['events'] if e['kind'] in ('store', 'analyze')]
+                kept = [e for e in cancelled['events'] if e['kind'] in ('store', 'analyze', 'log')]
+                at = [i for i, e in enumerate(kept) if e['kind'] != 'log'][k]
                 main = dict(cancelled['calls'])[case['main']]
                 cancels.append({'k': k, 'attempts': cancelled['attempts'], 'count': cancelled['count'],
-                                'error': main[0], 'after': counted[k + 1:]})
+                                'error': main[0], 'after': kept[at + 1:]})
             output['cancel'] = cancels
         out.append({'in': case, 'out': output})
     return out
@@ -618,7 +659,10 @@ def main() -> int:
 
     class Capture(logging.Handler):
         def emit(self, record):
-            events.append({'kind': 'log', 'level': record.levelname, 'message': record.getMessage()})
+            entry = {'kind': 'log', 'level': record.levelname, 'message': record.getMessage()}
+            if record.exc_info:
+                entry['exc'] = True
+            events.append(entry)
 
     root = logging.getLogger('graphiti_core')
     root.setLevel(logging.DEBUG)

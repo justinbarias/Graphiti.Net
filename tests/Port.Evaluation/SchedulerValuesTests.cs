@@ -26,27 +26,19 @@ public class SchedulerValuesTests
 
     private static readonly List<OrderedDictionary<string, object?>> Cases = LoadCases();
 
-    // The cancel points where the port and Python differ: the late cancel of GAPS F33. Each one is a cancel that arrives
-    // in a call after which the main call awaits only the cleanup of _run_unit. Python delivers task.cancel() at the next
-    // suspension of the task, which is inside that cleanup: the store call of _fail_unit, or the gather of the heartbeat
-    // task in `finally`. The port reads the token only at its next check, and the cleanup passes CancellationToken.None
-    // (R8). So at the last call before the error (6 points) the port makes the store call of _fail_unit, which Python
-    // cancels, and at the store call of _fail_unit (7 points) the port ends with the error of the analysis, where Python
-    // ends with CancelledError. The count of attempts is the same at each point. The value is the result of the port at
+    // The cancel points where the port and Python differ: the late cancel of GAPS F33. At each one the cancel arrives
+    // inside the store call of _fail_unit, after the analysis raised an error that is not a cancel. The fake call yields,
+    // records, and returns without a second read of the token. Python delivers task.cancel() at the next suspension of the
+    // task, the await of that store call, so the main call ends with CancelledError. The port ends with the error of the
+    // analysis. The count of attempts and the events after call k are the same. The value is the result of the port at
     // that point. A listed point that agrees with Python fails the test.
     private static readonly Dictionary<string, string> LateCancel = new(StringComparer.Ordinal)
     {
-        ["analysis_fails:1"] = """{"k": 1, "attempts": 3, "count": 3, "error": "RuntimeError", "after": [{"kind": "store", "method": "fail", "args": ["g", 1, "<type>", null]}]}""",
         ["analysis_fails:2"] = """{"k": 2, "attempts": 3, "count": 3, "error": "RuntimeError", "after": []}""",
-        ["analysis_raises_a_value_error:2"] = """{"k": 2, "attempts": 4, "count": 4, "error": "ValueError", "after": [{"kind": "store", "method": "fail", "args": ["g", 1, "<type>", null]}]}""",
         ["analysis_raises_a_value_error:3"] = """{"k": 3, "attempts": 4, "count": 4, "error": "ValueError", "after": []}""",
-        ["analysis_fails_after_heartbeats:4"] = """{"k": 4, "attempts": 6, "count": 6, "error": "RuntimeError", "after": [{"kind": "store", "method": "fail", "args": ["g", 1, "<type>", null]}]}""",
         ["analysis_fails_after_heartbeats:5"] = """{"k": 5, "attempts": 6, "count": 6, "error": "RuntimeError", "after": []}""",
-        ["analysis_marks_the_unit_failed:2"] = """{"k": 2, "attempts": 4, "count": 4, "error": "RuntimeError", "after": [{"kind": "store", "method": "fail", "args": ["g", 1, "<type>", null]}]}""",
         ["analysis_marks_the_unit_failed:3"] = """{"k": 3, "attempts": 4, "count": 4, "error": "RuntimeError", "after": []}""",
-        ["first_heartbeat_store_error:0"] = """{"k": 0, "attempts": 2, "count": 2, "error": "RuntimeError", "after": [{"kind": "store", "method": "fail", "args": ["g", 1, "<type>", null]}]}""",
         ["first_heartbeat_store_error:1"] = """{"k": 1, "attempts": 2, "count": 2, "error": "RuntimeError", "after": []}""",
-        ["turn_of_a_different_attempt:1"] = """{"k": 1, "attempts": 3, "count": 3, "error": "RuntimeError", "after": [{"kind": "store", "method": "fail", "args": ["g", 1, "<type>", null]}]}""",
         ["turn_of_a_different_attempt:2"] = """{"k": 2, "attempts": 3, "count": 3, "error": "RuntimeError", "after": []}""",
         ["heartbeat_error_during_the_analysis:4"] = """{"k": 4, "attempts": 5, "count": 5, "error": "RuntimeError", "after": []}""",
     };
@@ -93,9 +85,11 @@ public class SchedulerValuesTests
     public async Task The_port_makes_each_recorded_call_and_gives_each_result(int index)
     {
         var input = Dict(Cases[index]["in"]);
-        var (run, output) = await RunAsync(input, -1, Dict(Cases[index]["out"]), TestContext.Current.CancellationToken);
+        var (run, output) = await RunAsync(input, -1, TestContext.Current.CancellationToken);
         var expected = new OrderedDictionary<string, object?>(Dict(Cases[index]["out"]));
         expected.Remove("cancel");
+        var tasks = List(expected["tasks"]).Select(t => (string)t!).ToList();
+        expected.Remove("tasks");
         var expectedEvents = List(expected["events"]);
         var actualEvents = List(output["events"]);
         for (var i = 0; i < Math.Min(expectedEvents.Count, actualEvents.Count); i++)
@@ -105,38 +99,47 @@ public class SchedulerValuesTests
 
         Assert.Equal(PyJson.Dumps(expected), PyJson.Dumps(output));
 
-        // Each store call and each call of the fake analysis got the token of its call (R25). A store call of the
-        // heartbeat task gets the token of that task, and the store call of _fail_unit gets CancellationToken.None (R8).
+        // Each store call and each call of the fake analysis got the token of the task that made it, as the recorder
+        // names it (R25). A call of the heartbeat task that _run_unit starts (`<inner>`) gets the token of that task. The
+        // store call of _fail_unit after a caught cancellation gets CancellationToken.None (R8).
+        var counted = actualEvents.Select(Dict).Where(e => (string)e["kind"]! is "store" or "analyze").ToList();
+        Assert.Equal(tasks.Count, run.EventTokens.Count);
         var callTokens = run.Calls.Values.Select(c => c.Cancel.Token).ToList();
-        foreach (var (method, token) in run.Tokens)
+        foreach (var (i, task) in tasks.Index())
         {
-            if (callTokens.Contains(token) || (method == "close" && token == TestContext.Current.CancellationToken))
-            {
-                continue;
-            }
-
-            if (method == "fail")
+            var token = run.EventTokens[i];
+            var args = counted[i].GetValueOrDefault("args") as List<object?>;
+            if ((string?)counted[i].GetValueOrDefault("method") == "fail" && args is not null && (string?)args[2] == "CancelledError")
             {
                 Assert.Equal(CancellationToken.None, token);
             }
+            else if (task == "<driver>")
+            {
+                Assert.Equal(TestContext.Current.CancellationToken, token);
+            }
+            else if (task == "<inner>")
+            {
+                Assert.True(token.CanBeCanceled && !callTokens.Contains(token), $"call {i}: the token of the heartbeat task");
+            }
             else
             {
-                Assert.Equal("heartbeat", method);
-                Assert.True(token.CanBeCanceled);
+                Assert.True(run.Calls[task].Cancel.Token == token, $"call {i}: the token of {task}");
             }
         }
     }
 
     // The theory that cancels at call k: the fake that makes call k records it and cancels the main call. Python ran the
-    // same cancel. The test compares the count of attempts, the end of the main call, and the fake calls after call k.
+    // same cancel. The test compares the count of attempts, the end of the main call, and the fake calls and the log lines
+    // after call k (R25).
     [Theory(Timeout = 10000)]
     [MemberData(nameof(CancelPoints))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(int index, int k)
     {
         var input = Dict(Cases[index]["in"]);
         var expected = Dict(List(Dict(Cases[index]["out"])["cancel"]).Select(Dict).Single(p => (long)p["k"]! == k));
-        var (_, output) = await RunAsync(input, k, null, TestContext.Current.CancellationToken);
-        var counted = List(output["events"]).Select(Dict).Where(e => (string)e["kind"]! is "store" or "analyze").Select(e => (object?)e).ToList();
+        var (_, output) = await RunAsync(input, k, TestContext.Current.CancellationToken);
+        var kept = List(output["events"]).Select(Dict).Where(e => (string)e["kind"]! is "store" or "analyze" or "log").ToList();
+        var at = kept.Index().Where(e => (string)e.Item["kind"]! != "log").Select(e => e.Index).ElementAt(k);
         var main = List(List(output["calls"]).Select(List).Single(c => (string)c[0]! == (string)input["main"]!)[1]);
         var actual = new OrderedDictionary<string, object?>
         {
@@ -144,13 +147,23 @@ public class SchedulerValuesTests
             ["attempts"] = output["attempts"],
             ["count"] = output["count"],
             ["error"] = main[0],
-            ["after"] = counted.Skip(k + 1).ToList(),
+            ["after"] = kept.Skip(at + 1).Select(e => (object?)e).ToList(),
         };
         var key = $"{(string)input["name"]!}:{k}";
         if (LateCancel.TryGetValue(key, out var port))
         {
             Assert.NotEqual(PyJson.Dumps(expected), PyJson.Dumps(actual));
             Assert.Equal(port, PyJson.Dumps(actual));
+
+            // The events of Python after call k are a part of the events of the port, in their order.
+            var portAfter = List(actual["after"]).Select(e => PyJson.Dumps(e)).ToList();
+            var position = 0;
+            foreach (var item in List(expected["after"]).Select(e => PyJson.Dumps(e)))
+            {
+                position = portAfter.IndexOf(item, position) + 1;
+                Assert.True(position > 0, $"the port leaves out {item}");
+            }
+
             return;
         }
 
@@ -261,7 +274,22 @@ public class SchedulerValuesTests
     }
 
     private static List<object?> GroupsView(ConcurrentIngestor ingestor) =>
-        [.. ingestor.groups.Select(e => (object?)new List<object?> { e.Key, (long)e.Value.Window.CurrentCount, e.Value.AdmitLock.CurrentCount == 0, e.Value.Changed.IsSet() })];
+        [.. ingestor.groups.Select(e => (object?)new List<object?> { e.Key, e.Value.Window.Locked(), e.Value.AdmitLock.Locked(), e.Value.Changed.IsSet() })];
+
+    // The store view of the phases test, with the failure reason as the recorder writes it (PythonReason).
+    private static List<object?> SchedulerStoreView(InMemoryIngestionStateStore store)
+    {
+        var view = StoreView(store);
+        foreach (var group in view.Select(Dict))
+        {
+            foreach (var unit in List(group["units"]).Select(List))
+            {
+                unit[8] = SchedulerRun.PythonReason((string?)unit[8]);
+            }
+        }
+
+        return view;
+    }
 
     private static List<object?> SpansView(SchedulerTracer tracer) =>
         [.. tracer.Spans.Select(s => (object?)new List<object?> { s.Name, Encode(s.Attributes), s.Status })];
@@ -281,7 +309,6 @@ public class SchedulerValuesTests
     private static async Task<(SchedulerRun Run, OrderedDictionary<string, object?> Output)> RunAsync(
         OrderedDictionary<string, object?> input,
         int cancelAt,
-        OrderedDictionary<string, object?>? expected,
         CancellationToken driver)
     {
         var run = new SchedulerRun(Dict(PyJson.Loads(PyJson.Dumps(input))), cancelAt);
@@ -289,7 +316,7 @@ public class SchedulerValuesTests
         OrderedDictionary<string, object?> output;
         using (PortServices.Use(time: time, loggerFactory: new PhasesLogCapture(run.Events)))
         {
-            output = await LoopGuard.RunAsync(() => RunCaseAsync(run, time, expected, driver), 30);
+            output = await LoopGuard.RunAsync(() => RunCaseAsync(run, time, driver), 30);
         }
 
         output["events"] = run.Events;
@@ -302,11 +329,19 @@ public class SchedulerValuesTests
     private static async Task<OrderedDictionary<string, object?>> RunCaseAsync(
         SchedulerRun run,
         VirtualTime time,
-        OrderedDictionary<string, object?>? expected,
         CancellationToken driver)
     {
         var input = run.Input;
         var caseConfig = Dict(input["config"]);
+        // JSON has no inf, so a case writes the text "inf".
+        foreach (var key in caseConfig.Keys.ToList())
+        {
+            if (caseConfig[key] is "inf")
+            {
+                caseConfig[key] = double.PositiveInfinity;
+            }
+        }
+
         var leaseSeconds = (double)caseConfig["lease_seconds"]!;
         var inner = new InMemoryIngestionStateStore(run.Clock.Read);
         var store = new SchedulerRun.RecordingStore(run, inner);
@@ -373,7 +408,7 @@ public class SchedulerValuesTests
                         await gates[unit.Seq].WaitAsync(cancellationToken);
                         break;
                     case "sleep":
-                        await Task.Delay(TimeSpan.FromSeconds((double)step[1]!), PortServices.Time, cancellationToken);
+                        await Asyncio.SleepAsync((double)step[1]!, PortServices.Time, cancellationToken);
                         break;
                     case "mark_failed":
                         await ingestor.Store.FailAsync(unit.GroupId, unit.Seq, "analysis", cancellationToken: cancellationToken);
@@ -388,17 +423,9 @@ public class SchedulerValuesTests
             throw new InvalidOperationException("an analysis that returns calls commit_unit, which waits for layer 9");
         }
 
-        // The drain of the recorder: Python runs the ready tasks until none is left. A wake-up of a SemaphoreSlim waiter
-        // with a token that can be canceled resumes on the thread pool first, and then on the scheduler (R8), so the port
-        // can need a pause for it, and the length of that pause depends on the load of the machine. So the drain waits
-        // until the state equals the state that Python recorded at that point: the next snapshot, or the calls and the
-        // spans at the end. It waits at most 5 seconds, and the state must then stay the same for three more rounds. A
-        // drain with no recorded state after it ends when the state is the same after three rounds.
-        var expectedSnapshots = expected is null
-            ? []
-            : List(expected["events"]).Select(Dict).Where(e => (string)e["kind"]! == "snapshot").Select(e => PyJson.Dumps(e)).ToList();
-        var snapshotIndex = 0;
-
+        // The drain of the recorder: Python runs the ready tasks until none is left. Each wait of the port runs on the
+        // scheduler (AsyncSemaphore, AsyncLock, AsyncEvent, and the virtual clock), so the drain yields until the state
+        // stays the same for three rounds. It does not wait for a state that Python recorded.
         OrderedDictionary<string, object?> Snapshot() => new()
         {
             ["kind"] = "snapshot",
@@ -407,11 +434,10 @@ public class SchedulerValuesTests
             ["spans"] = SpansView(tracer),
         };
 
-        async Task DrainAsync(Func<string> state, string? target)
+        async Task DrainAsync()
         {
             var last = string.Empty;
             var same = 0;
-            var deadline = DateTime.UtcNow.AddSeconds(5);
             while (same < 3)
             {
                 for (var i = 0; i < Drain; i++)
@@ -419,13 +445,9 @@ public class SchedulerValuesTests
                     await Task.Yield();
                 }
 
-                var now = state();
-                same = now == last && (target is null || now == target || DateTime.UtcNow > deadline) ? same + 1 : 0;
+                var now = Progress();
+                same = now == last ? same + 1 : 0;
                 last = now;
-                if (same < 3)
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(1), TimeProvider.System, driver);
-                }
             }
         }
 
@@ -441,24 +463,13 @@ public class SchedulerValuesTests
             [.. Enumerable.Range(0, (int)count).Select(i => new RawEpisode { Name = $"episode-{i}", Content = "content", SourceDescription = "test", Source = EpisodeType.Text, ReferenceTime = T0 })];
 
         var actions = List(input["actions"]).Select(List).ToList();
-        foreach (var (index, action) in actions.Index())
+        foreach (var action in actions)
         {
             switch ((string)action[0]!)
             {
                 case "drain":
-                    {
-                        var next = index + 1 < actions.Count ? (string)actions[index + 1][0]! : null;
-                        if (next == "snapshot" && snapshotIndex < expectedSnapshots.Count)
-                        {
-                            await DrainAsync(() => PyJson.Dumps(Snapshot()), expectedSnapshots[snapshotIndex]);
-                        }
-                        else
-                        {
-                            await DrainAsync(Progress, null);
-                        }
-
-                        break;
-                    }
+                    await DrainAsync();
+                    break;
 
                 case "loop":
                     time.Advance((double)action[1]!);
@@ -468,10 +479,9 @@ public class SchedulerValuesTests
                     break;
                 case "snapshot":
                     run.Events.Add(Snapshot());
-                    snapshotIndex++;
                     break;
                 case "store":
-                    run.Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "store_state", ["store"] = StoreView(inner) });
+                    run.Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "store_state", ["store"] = SchedulerStoreView(inner) });
                     break;
                 case "init":
                     run.Events.Add(new OrderedDictionary<string, object?>
@@ -496,8 +506,8 @@ public class SchedulerValuesTests
                             ["group_id"] = groupId,
                             ["before"] = before,
                             ["same"] = ReferenceEquals(group, first),
-                            ["window"] = (long)group.Window.CurrentCount,
-                            ["admit_locked"] = group.AdmitLock.CurrentCount == 0,
+                            ["window_locked"] = group.Window.Locked(),
+                            ["admit_locked"] = group.AdmitLock.Locked(),
                             ["changed"] = group.Changed.IsSet(),
                         });
                         break;
@@ -562,10 +572,10 @@ public class SchedulerValuesTests
                     run.Calls[(string)action[1]!].Cancel.Cancel();
                     break;
                 case "hold_admit":
-                    await ingestor.Group((string)action[1]!).AdmitLock.WaitAsync(driver);
+                    await ingestor.Group((string)action[1]!).AdmitLock.AcquireAsync(driver);
                     break;
                 case "hold_window":
-                    await ingestor.Group((string)action[1]!).Window.WaitAsync(driver);
+                    await ingestor.Group((string)action[1]!).Window.AcquireAsync(driver);
                     break;
                 case "release_window":
                     ingestor.Group((string)action[1]!).Window.Release();
@@ -655,20 +665,10 @@ public class SchedulerValuesTests
             run.Calls[key].Cancel.Cancel();
         }
 
-        if (expected is null)
-        {
-            await DrainAsync(Progress, null);
-        }
-        else
-        {
-            await DrainAsync(
-                () => PyJson.Dumps(new List<object?> { CallsView(run), SpansView(tracer) }),
-                PyJson.Dumps(new List<object?> { expected["calls"], expected["spans"] }));
-        }
-
+        await DrainAsync();
         foreach (var group in ingestor.groups.Values)
         {
-            if (group.AdmitLock.CurrentCount == 0)
+            if (group.AdmitLock.Locked())
             {
                 group.AdmitLock.Release();
             }
@@ -681,7 +681,7 @@ public class SchedulerValuesTests
             ["groups"] = GroupsView(ingestor),
             ["spans"] = SpansView(tracer),
             ["max_spans"] = (long)tracer.MaxInFlight,
-            ["store"] = StoreView(inner),
+            ["store"] = SchedulerStoreView(inner),
         };
         return output;
     }

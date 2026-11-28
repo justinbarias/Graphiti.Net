@@ -35,13 +35,13 @@ internal static partial class Scheduler
 }
 
 /// <summary>The window, the admit lock, and the wake-up event of one graph.</summary>
-// PORT: the private dataclass `_GroupState`. `asyncio.Semaphore(n)` and `asyncio.Lock` are SemaphoreSlim, and
+// PORT: the private dataclass `_GroupState`. `asyncio.Semaphore(n)` is AsyncSemaphore, `asyncio.Lock` is AsyncLock, and
 // `asyncio.Event` is AsyncEvent (R8).
 internal sealed record GroupState
 {
-    internal required SemaphoreSlim Window { get; set; }
+    internal required AsyncSemaphore Window { get; set; }
 
-    internal SemaphoreSlim AdmitLock { get; set; } = new(1, 1);
+    internal AsyncLock AdmitLock { get; set; } = new();
 
     internal AsyncEvent Changed { get; set; } = new();
 
@@ -89,10 +89,7 @@ internal sealed class ConcurrentIngestor
         var state = groups.GetValueOrDefault(groupId);
         if (state is null)
         {
-            // PORT: SemaphoreSlim takes an int, and `window` is a long (R18). The cast is checked: a window above
-            // int.MaxValue throws OverflowException, where asyncio.Semaphore takes it.
-            var window = (int)Config.Window;
-            state = new GroupState { Window = new SemaphoreSlim(window, window) };
+            state = new GroupState { Window = new AsyncSemaphore(Config.Window) };
             groups[groupId] = state;
         }
 
@@ -129,7 +126,7 @@ internal sealed class ConcurrentIngestor
         var interval = Py.TrueDiv(Config.LeaseSeconds, 3);
         while (true)
         {
-            await Task.Delay(TimeSpan.FromSeconds(interval), PortServices.Time, cancellationToken);
+            await Asyncio.SleepAsync(interval, PortServices.Time, cancellationToken);
             try
             {
                 await lease.HeartbeatAsync(cancellationToken);
@@ -212,8 +209,14 @@ internal sealed class ConcurrentIngestor
             if (commitResult is null)
             {
                 // The call has no effect on a unit that has a stored final change set.
-                // PORT: a cancellation of the caller can arrive here, so the call passes CancellationToken.None (R8).
-                await Phases.FailUnitAsync(store, unit.GroupId, unit.Seq, error, CancellationToken.None);
+                // PORT: after a caught cancellation the call passes CancellationToken.None (R8). After a different
+                // error, Python lets a new cancellation into the call, so it passes the token of the caller.
+                await Phases.FailUnitAsync(
+                    store,
+                    unit.GroupId,
+                    unit.Seq,
+                    error,
+                    Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken);
             }
 
             throw;
@@ -231,7 +234,7 @@ internal sealed class ConcurrentIngestor
 
     // PORT: each parameter is keyword-only in Python, and only `identity_properties` has a default. `saga` is the
     // `SagaOrName?` of graphiti.py (Part 3).
-    // PORT: `async with state.window` and `async with state.admit_lock` are WaitAsync, and Release in `finally` (R8).
+    // PORT: `async with state.window` and `async with state.admit_lock` are AcquireAsync, and Release in `finally` (R8).
     // `with graphiti.tracer.start_span(...)` is StartSpanAsync with the body as a lambda (R16).
     internal async Task<AddEpisodeResults> AddEpisodeAsync(
         string name,
@@ -255,7 +258,7 @@ internal sealed class ConcurrentIngestor
         var (graphiti, store, config) = (Graphiti, Store, Config);
         var state = Group(groupId);
 
-        await state.Window.WaitAsync(cancellationToken);
+        await state.Window.AcquireAsync(cancellationToken);
         try
         {
             return await graphiti.Tracer.StartSpanAsync(
@@ -267,7 +270,7 @@ internal sealed class ConcurrentIngestor
                     try
                     {
                         AdmittedUnit unit;
-                        await state.AdmitLock.WaitAsync(cancellationToken);
+                        await state.AdmitLock.AcquireAsync(cancellationToken);
                         try
                         {
                             unit = await Phases.AdmitEpisodeAsync(
@@ -332,12 +335,13 @@ internal sealed class ConcurrentIngestor
                         ["node.count"] = (long)nodes.Count,
                         ["edge.count"] = (long)commitResult.Edges.Count,
                     });
+                    // PORT: pydantic makes a new list for each list field, so each list is a copy (R7).
                     return new AddEpisodeResults
                     {
                         Episode = final.Episodes[0],
-                        EpisodicEdges = final.EpisodicEdges,
-                        Nodes = nodes,
-                        Edges = commitResult.Edges,
+                        EpisodicEdges = [.. final.EpisodicEdges],
+                        Nodes = [.. nodes],
+                        Edges = [.. commitResult.Edges],
                         Communities = [],
                         CommunityEdges = [],
                     }.Validate();
@@ -368,7 +372,7 @@ internal sealed class ConcurrentIngestor
         var (graphiti, store, config) = (Graphiti, Store, Config);
         var state = Group(groupId);
 
-        await state.Window.WaitAsync(cancellationToken);
+        await state.Window.AcquireAsync(cancellationToken);
         try
         {
             return await graphiti.Tracer.StartSpanAsync(
@@ -381,7 +385,7 @@ internal sealed class ConcurrentIngestor
                     try
                     {
                         AdmittedUnit unit;
-                        await state.AdmitLock.WaitAsync(cancellationToken);
+                        await state.AdmitLock.AcquireAsync(cancellationToken);
                         try
                         {
                             unit = await Phases.AdmitBulkAsync(
@@ -441,12 +445,13 @@ internal sealed class ConcurrentIngestor
                         ["node.count"] = (long)nodes.Count,
                         ["edge.count"] = (long)commitResult.Edges.Count,
                     });
+                    // PORT: pydantic makes a new list for each list field, so each list is a copy (R7).
                     return new AddBulkEpisodeResults
                     {
-                        Episodes = final.Episodes,
-                        EpisodicEdges = final.EpisodicEdges,
-                        Nodes = nodes,
-                        Edges = commitResult.Edges,
+                        Episodes = [.. final.Episodes],
+                        EpisodicEdges = [.. final.EpisodicEdges],
+                        Nodes = [.. nodes],
+                        Edges = [.. commitResult.Edges],
                         Communities = [],
                         CommunityEdges = [],
                     }.Validate();

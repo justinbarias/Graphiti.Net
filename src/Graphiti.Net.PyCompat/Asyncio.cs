@@ -190,7 +190,7 @@ internal static class Asyncio
         IReadOnlyList<Func<Task<T>>> calls, long maxCoroutines, CancellationToken cancellationToken = default)
     {
         RequireLoop(nameof(SemaphoreGatherAsync));
-        var semaphore = new LoopSemaphore(maxCoroutines);
+        var semaphore = new AsyncSemaphore(maxCoroutines);
         return GatherAsync([.. calls.Select(call => Wrap(semaphore, call, cancellationToken))], cancellationToken);
     }
 
@@ -206,7 +206,7 @@ internal static class Asyncio
         Func<Task<T1>> first, Func<Task<T2>> second, long maxCoroutines, CancellationToken cancellationToken = default)
     {
         RequireLoop(nameof(SemaphoreGatherAsync));
-        var semaphore = new LoopSemaphore(maxCoroutines);
+        var semaphore = new AsyncSemaphore(maxCoroutines);
         return GatherAsync(Wrap(semaphore, first, cancellationToken), Wrap(semaphore, second, cancellationToken), cancellationToken);
     }
 
@@ -216,7 +216,7 @@ internal static class Asyncio
         Func<Task<T1>> first, Func<Task<T2>> second, Func<Task<T3>> third, long maxCoroutines, CancellationToken cancellationToken = default)
     {
         RequireLoop(nameof(SemaphoreGatherAsync));
-        var semaphore = new LoopSemaphore(maxCoroutines);
+        var semaphore = new AsyncSemaphore(maxCoroutines);
         return GatherAsync(
             Wrap(semaphore, first, cancellationToken),
             Wrap(semaphore, second, cancellationToken),
@@ -238,7 +238,7 @@ internal static class Asyncio
         CancellationToken cancellationToken = default)
     {
         RequireLoop(nameof(SemaphoreGatherAsync));
-        var semaphore = new LoopSemaphore(maxCoroutines);
+        var semaphore = new AsyncSemaphore(maxCoroutines);
         return GatherAsync(
             Wrap(semaphore, first, cancellationToken),
             Wrap(semaphore, second, cancellationToken),
@@ -605,7 +605,7 @@ internal static class Asyncio
         return outer.Task;
     }
 
-    private static Func<Task<T>> Wrap<T>(LoopSemaphore semaphore, Func<Task<T>> call, CancellationToken token) =>
+    private static Func<Task<T>> Wrap<T>(AsyncSemaphore semaphore, Func<Task<T>> call, CancellationToken token) =>
         async () =>
         {
             await semaphore.AcquireAsync(token);
@@ -665,53 +665,222 @@ internal static class Asyncio
             await call(token);
             return null;
         };
+}
+
+/// <summary>
+/// <c>asyncio.Semaphore</c>, ported from <c>asyncio/locks.py</c> of CPython 3.12 (the class <c>Semaphore</c>). Use it on
+/// the scheduler only, as a Python semaphore belongs to one loop.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A waiter is a future in a queue, as in Python. <see cref="Release"/> wakes the first waiter that is not done, and that
+/// waiter resumes one trip through the ready queue later, as <see cref="AsyncEvent"/> does. So waiters get the semaphore
+/// in the order of their calls.
+/// </para>
+/// <para>
+/// A canceled token plays the part of <c>task.cancel()</c>. If the waiter waits, its future is canceled at once, as
+/// <c>task.cancel()</c> cancels the future that the task waits for. If the waiter has been woken and has not resumed,
+/// the cancellation arrives when it resumes, as Python throws <c>CancelledError</c> into the task. Such a waiter gives
+/// the slot back and wakes the next waiter (the branch <c>except CancelledError</c> of <c>acquire</c>).
+/// </para>
+/// <para>
+/// One difference: <see cref="AcquireAsync"/> throws <see cref="OperationCanceledException"/> for a token that is
+/// canceled before the call, also when a slot is free, as <c>Asyncio.SleepAsync</c> does. Python takes a free slot with
+/// no suspension, so a cancellation is not delivered there. A canceled token at the call is a cancellation that Python
+/// delivered at an earlier await.
+/// </para>
+/// </remarks>
+internal sealed class AsyncSemaphore
+{
+    private readonly LinkedList<TaskCompletionSource> waiters = new();
+    private long value;
 
     /// <summary>
-    /// <c>asyncio.Semaphore</c> for <see cref="SemaphoreGatherAsync{T}"/>, used on the loop only. Waiters wake in the
-    /// order that they came, one trip after a release, as in Python. A waiter whose token is canceled ends canceled
-    /// and is passed over.
+    /// <c>asyncio.Semaphore(value)</c>. A negative value throws <see cref="ArgumentException"/> with the message of
+    /// Python (R4 for <c>ValueError</c>). A value of 0 is valid: each acquire then waits for a release.
     /// </summary>
-    private sealed class LoopSemaphore
+    internal AsyncSemaphore(long value = 1)
     {
-        private readonly Queue<(TaskCompletionSource Waiter, CancellationTokenRegistration Registration)> waiters = new();
-        private long value;
-
-        internal LoopSemaphore(long value)
+        if (value < 0)
         {
-            if (value < 0)
-            {
-                throw new ArgumentException("Semaphore initial value must be >= 0");
-            }
-
-            this.value = value;
+            throw new ArgumentException("Semaphore initial value must be >= 0");
         }
 
-        internal Task AcquireAsync(CancellationToken token)
-        {
-            if (value > 0)
-            {
-                value--;
-                return Task.CompletedTask;
-            }
+        this.value = value;
+    }
 
-            var waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var registration = token.Register(() => waiter.TrySetCanceled(token));
-            waiters.Enqueue((waiter, registration));
-            return waiter.Task;
+    /// <summary><c>semaphore.locked()</c>: true if an acquire cannot take a slot at once.</summary>
+    internal bool Locked() => value == 0 || waiters.Any(w => !w.Task.IsCanceled);
+
+    /// <summary>
+    /// <c>await semaphore.acquire()</c>. It takes a slot at once if <see cref="Locked"/> is false. Otherwise it waits
+    /// in the queue. When <paramref name="cancellationToken"/> is canceled, it throws
+    /// <see cref="OperationCanceledException"/>.
+    /// </summary>
+    internal async Task AcquireAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!Locked())
+        {
+            value -= 1;
+            return;
         }
 
-        internal void Release()
+        var fut = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var node = waiters.AddLast(fut);
+
+        // The `finally` runs before the cancellation branch, so that the branch does not wake this waiter again.
+        try
         {
-            value++;
-            while (value > 0 && waiters.TryDequeue(out var next))
+            try
             {
-                next.Registration.Dispose();
-                if (next.Waiter.TrySetResult())
-                {
-                    value--;
-                }
+                await LoopFuture.WaitAsync(fut, cancellationToken);
+            }
+            finally
+            {
+                waiters.Remove(node);
             }
         }
+        catch (OperationCanceledException)
+        {
+            if (!fut.Task.IsCanceled)
+            {
+                value += 1;
+                WakeUpNext();
+            }
+
+            throw;
+        }
+
+        if (value > 0)
+        {
+            WakeUpNext();
+        }
+    }
+
+    /// <summary><c>semaphore.release()</c>: one more slot, and a wake-up of the first waiter that is not done.</summary>
+    internal void Release()
+    {
+        value += 1;
+        WakeUpNext();
+    }
+
+    private void WakeUpNext()
+    {
+        foreach (var fut in waiters)
+        {
+            // TrySetResult: a token that is canceled on another thread can end the future between the test and the set.
+            if (!fut.Task.IsCompleted && fut.TrySetResult())
+            {
+                value -= 1;
+                return;
+            }
+        }
+    }
+}
+
+/// <summary>
+/// <c>asyncio.Lock</c>, ported from <c>asyncio/locks.py</c> of CPython 3.12 (the class <c>Lock</c>). Use it on the
+/// scheduler only, as a Python lock belongs to one loop.
+/// </summary>
+/// <remarks>
+/// Waiters get the lock in the order of their calls. A woken waiter resumes one trip through the ready queue later, and
+/// a cancellation behaves as in <see cref="AsyncSemaphore"/>: a waiter that is woken and then canceled wakes the next
+/// waiter. <see cref="AcquireAsync"/> throws <see cref="OperationCanceledException"/> for a token that is canceled before
+/// the call, as <see cref="AsyncSemaphore.AcquireAsync"/> does.
+/// </remarks>
+internal sealed class AsyncLock
+{
+    private readonly LinkedList<TaskCompletionSource> waiters = new();
+    private bool locked;
+
+    /// <summary><c>lock.locked()</c>.</summary>
+    internal bool Locked() => locked;
+
+    /// <summary>
+    /// <c>await lock.acquire()</c>. It takes the lock at once if the lock is free and no waiter waits. When
+    /// <paramref name="cancellationToken"/> is canceled, it throws <see cref="OperationCanceledException"/>.
+    /// </summary>
+    internal async Task AcquireAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!locked && waiters.All(w => w.Task.IsCanceled))
+        {
+            locked = true;
+            return;
+        }
+
+        var fut = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var node = waiters.AddLast(fut);
+
+        // The `finally` runs before the cancellation branch, so that the branch does not wake this waiter again.
+        try
+        {
+            try
+            {
+                await LoopFuture.WaitAsync(fut, cancellationToken);
+            }
+            finally
+            {
+                waiters.Remove(node);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (!locked)
+            {
+                WakeUpFirst();
+            }
+
+            throw;
+        }
+
+        locked = true;
+    }
+
+    /// <summary>
+    /// <c>lock.release()</c>. A lock that is not held throws <see cref="InvalidOperationException"/> with the message of
+    /// Python (R4 for <c>RuntimeError</c>).
+    /// </summary>
+    internal void Release()
+    {
+        if (locked)
+        {
+            locked = false;
+            WakeUpFirst();
+        }
+        else
+        {
+            throw new InvalidOperationException("Lock is not acquired.");
+        }
+    }
+
+    private void WakeUpFirst()
+    {
+        // A done waiter wakes later and takes the lock, or, if it was canceled, wakes the next waiter.
+        if (waiters.First is { } first && !first.Value.Task.IsCompleted)
+        {
+            first.Value.TrySetResult();
+        }
+    }
+}
+
+/// <summary>The wait of a task for a loop future (<c>await fut</c>), with a token in the part of <c>task.cancel()</c>.</summary>
+internal static class LoopFuture
+{
+    /// <summary>
+    /// Waits for <paramref name="fut"/>. A cancellation while the future is pending cancels the future. A cancellation
+    /// after the future is done and before this waiter resumes throws <see cref="OperationCanceledException"/> at the
+    /// resume, as Python throws <c>CancelledError</c> into a task that has a cancellation pending.
+    /// </summary>
+    internal static async Task WaitAsync(TaskCompletionSource fut, CancellationToken cancellationToken)
+    {
+        using (cancellationToken.Register(() => fut.TrySetCanceled(cancellationToken)))
+        {
+            await fut.Task;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 }
 

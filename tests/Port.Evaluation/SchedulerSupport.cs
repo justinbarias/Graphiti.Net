@@ -4,8 +4,10 @@
 // tracer that records each span, and the count of fake calls with the cancel at call k (R25).
 namespace Graphiti.Port.Evaluation;
 
+using System.Runtime.CompilerServices;
 using Graphiti.Core;
 using Graphiti.Core.Ingestion;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
 
 /// <summary>
@@ -155,6 +157,8 @@ internal sealed class SchedulerTracer : Tracer
 /// </summary>
 internal sealed class SchedulerRun(OrderedDictionary<string, object?> input, int cancelAt)
 {
+    private const double HoldSeconds = 100.0;
+
     private readonly Dictionary<string, long> storeCalls = new(StringComparer.Ordinal);
 
     internal OrderedDictionary<string, object?> Input { get; } = input;
@@ -164,6 +168,9 @@ internal sealed class SchedulerRun(OrderedDictionary<string, object?> input, int
     internal List<object?> Events { get; } = [];
 
     internal List<(string Method, CancellationToken Token)> Tokens { get; } = [];
+
+    // The token of each counted fake call, in the order of the records: the order of `tasks` of the recorder.
+    internal List<CancellationToken> EventTokens { get; } = [];
 
     internal OrderedDictionary<string, (Task Task, CancellationTokenSource Cancel)> Calls { get; } = new();
 
@@ -197,6 +204,7 @@ internal sealed class SchedulerRun(OrderedDictionary<string, object?> input, int
             }
 
             Events.Add(item);
+            EventTokens.Add(cancellationToken);
             Count++;
             foreach (var row in Input.GetValueOrDefault("store_advance") as List<object?> ?? [])
             {
@@ -224,6 +232,23 @@ internal sealed class SchedulerRun(OrderedDictionary<string, object?> input, int
         Tokens.Add((method, cancellationToken));
         await EnterAsync("store", new() { ["method"] = method, ["args"] = PhasesValues.Encode(args) }, cancellationToken);
         var number = storeCalls[method] = storeCalls.GetValueOrDefault(method) + 1;
+        var holds = (Input.GetValueOrDefault("store_hold") as OrderedDictionary<string, object?>)?.GetValueOrDefault(method) as List<object?> ?? [];
+        if (holds.Contains(number))
+        {
+            // A store call that waits on the loop clock. When it is canceled, it does cleanup work on the loop clock and
+            // throws the cancel again, as the wrapper of the recorder does.
+            try
+            {
+                await Asyncio.SleepAsync(HoldSeconds, PortServices.Time, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await Asyncio.SleepAsync((double)Input["hold_cleanup"]!, PortServices.Time, CancellationToken.None);
+                Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "store_cleanup", ["method"] = method });
+                throw;
+            }
+        }
+
         var fails = (Input.GetValueOrDefault("store_fail") as OrderedDictionary<string, object?>)?.GetValueOrDefault(method) as List<object?> ?? [];
         if (fails.Contains(number))
         {
@@ -232,8 +257,25 @@ internal sealed class SchedulerRun(OrderedDictionary<string, object?> input, int
     }
 
     /// <summary>
+    /// A failure reason that the port writes as the .NET type name of the error (decision D50), as the Python name of
+    /// that type (the table of <see cref="PhasesValuesTests.PythonName"/>). A reason that is not a type name stays.
+    /// </summary>
+    internal static string? PythonReason(string? reason)
+    {
+        if (reason is null or StateStore.ReasonExpired or StateStore.ReasonApplyFailed or "analysis")
+        {
+            return reason;
+        }
+
+        var type = new[] { typeof(OperationCanceledException).Assembly, typeof(UnitExpiredException).Assembly }
+            .SelectMany(a => a.GetTypes())
+            .Single(t => t.Name == reason && typeof(Exception).IsAssignableFrom(t));
+        return PhasesValuesTests.PythonName((Exception)RuntimeHelpers.GetUninitializedObject(type));
+    }
+
+    /// <summary>
     /// The store of the recording: the real in-memory store inside a wrapper that yields once and then records each call,
-    /// as a store that does I/O does. A failure reason that Python writes with type(error).__name__ is `&lt;type&gt;`.
+    /// as a store that does I/O does. The failure reason of the record is <see cref="PythonReason"/>.
     /// </summary>
     internal sealed class RecordingStore(SchedulerRun run, InMemoryIngestionStateStore inner) : IngestionStateStore
     {
@@ -293,8 +335,7 @@ internal sealed class SchedulerRun(OrderedDictionary<string, object?> input, int
 
         internal override async Task FailAsync(string groupId, long seq, string reason, long? fence = null, CancellationToken cancellationToken = default)
         {
-            var shown = reason is StateStore.ReasonExpired or StateStore.ReasonApplyFailed or "analysis" ? reason : "<type>";
-            await run.StoreAsync("fail", [groupId, seq, shown, fence], cancellationToken);
+            await run.StoreAsync("fail", [groupId, seq, PythonReason(reason), fence], cancellationToken);
             await inner.FailAsync(groupId, seq, reason, fence, cancellationToken);
         }
 

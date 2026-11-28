@@ -226,13 +226,11 @@ public class CombinedExtractionValuesTests
         Assert.All(LateCancel, e => Assert.Contains(e.K, List(AsyncCases[e.Case]["cancel"]).Select(r => (int)(long)Dict(r)["k"]!)));
     }
 
-    // The points where the port makes one more attempt than Python (the late cancel of GAPS F33). Case 14 runs three
-    // groups of facts with a limit of 2 and a retry. At call 4 the last running call raises, and the semaphore gives its
-    // place to the third group in the same turn. Python cancels the waiting coroutine of the third group before it runs.
-    // The port reads the token at the next call of a fake, so its third group makes one more attempt, and that attempt throws.
+    // The points where the port makes one more attempt than Python (the late cancel of GAPS F33). The list has 0 points:
+    // since AsyncSemaphore (P8d fix round), a waiter that the semaphore wakes and the cancel reaches before it resumes
+    // throws, as in Python, so case 14 at call 4 agrees.
     private static readonly (int Case, int K, string Kind)[] LateCancel =
     [
-        (14, 4, "attempts"),
     ];
 
     private static async Task Turns()

@@ -2544,16 +2544,18 @@ internal static partial class Phases
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
                     // Release the enrichment order of the nodes for the later units.
-                    // PORT: `except BaseException` also catches a cancellation, so the cleanup passes
-                    // CancellationToken.None (R8). The call has no token, so `except Exception` is a plain catch.
+                    // PORT: `except BaseException` also catches a cancellation. After a caught cancellation the cleanup
+                    // passes CancellationToken.None (R8). After a different error, Python lets a new cancellation into
+                    // the cleanup, and `except Exception` does not catch it, so the cleanup passes the token of the caller.
+                    var cleanupToken = Asyncio.IsCancellation(error, cancellationToken) ? CancellationToken.None : cancellationToken;
                     try
                     {
-                        await store.FinishEnrichAsync(groupId, unit.Seq, remaining, CancellationToken.None);
+                        await store.FinishEnrichAsync(groupId, unit.Seq, remaining, cleanupToken);
                     }
-                    catch (Exception)
+                    catch (Exception releaseError) when (!Asyncio.IsCancellation(releaseError, cleanupToken))
                     {
                         Log.CouldNotReleaseEnrichment(Logger, unit.Seq, groupId);
                     }
