@@ -5,7 +5,9 @@
   <ItemGroup>
     <PackageVersion Include="Neo4j.Driver" Version="6.5.1" />
     <PackageVersion Include="CsCheck" Version="5.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="11.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Resilience" Version="11.0.1" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />

@@ -1,0 +1,3505 @@
+{
+ "graphiti": {
+  "__init__": {
+   "async": false,
+   "parameters": [
+    {
+     "name": "uri",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "user",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "password",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "llm_client",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "embedder",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "cross_encoder",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "store_raw_episode_content",
+     "default": {
+      "value": true
+     }
+    },
+    {
+     "name": "graph_driver",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "max_coroutines",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "tracer",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "trace_span_prefix",
+     "default": {
+      "value": "graphiti"
+     }
+    },
+    {
+     "name": "prompt_library",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "llm_runtime",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "concurrent_ingestion",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "close": {
+   "async": true,
+   "parameters": []
+  },
+  "summarize_saga": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "saga_id",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "group_id",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "build_indices_and_constraints": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "delete_existing",
+     "default": {
+      "value": false
+     }
+    }
+   ]
+  },
+  "retrieve_episodes": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "reference_time",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "last_n",
+     "default": {
+      "value": 3
+     }
+    },
+    {
+     "name": "group_ids",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "source",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "driver",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "saga",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "add_episode": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "name",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "episode_body",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "source_description",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "reference_time",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "source",
+     "default": {
+      "value": {
+       "enum": "EpisodeType",
+       "member": "message"
+      }
+     }
+    },
+    {
+     "name": "group_id",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "uuid",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "update_communities",
+     "default": {
+      "value": false
+     }
+    },
+    {
+     "name": "entity_types",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "excluded_entity_types",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "previous_episode_uuids",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "edge_types",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "edge_type_map",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "custom_extraction_instructions",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "saga",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "saga_previous_episode_uuid",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "identity_properties",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "add_episode_bulk": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "bulk_episodes",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "group_id",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "entity_types",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "excluded_entity_types",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "edge_types",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "edge_type_map",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "strict_edge_types",
+     "default": {
+      "value": false
+     }
+    },
+    {
+     "name": "custom_extraction_instructions",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "saga",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "use_combined_extraction",
+     "default": {
+      "value": true
+     }
+    },
+    {
+     "name": "identity_properties",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "build_communities": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "group_ids",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "driver",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "search": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "query",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "center_node_uuid",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "group_ids",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "num_results",
+     "default": {
+      "value": 10
+     }
+    },
+    {
+     "name": "search_filter",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "driver",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "search_": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "query",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "config",
+     "default": {
+      "value": {
+       "recipe": "COMBINED_HYBRID_SEARCH_CROSS_ENCODER"
+      }
+     }
+    },
+    {
+     "name": "group_ids",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "center_node_uuid",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "bfs_origin_node_uuids",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "search_filter",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "driver",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "query_vector",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "get_nodes_and_edges_by_episode": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "episode_uuids",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "group_id",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "add_triplet": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "source_node",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "edge",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "target_node",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "episode",
+     "default": {
+      "value": null
+     }
+    },
+    {
+     "name": "identity_properties",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  },
+  "remove_episode": {
+   "async": true,
+   "parameters": [
+    {
+     "name": "episode_uuid",
+     "default": {
+      "required": true
+     }
+    },
+    {
+     "name": "group_id",
+     "default": {
+      "value": null
+     }
+    }
+   ]
+  }
+ },
+ "graphiti_properties": [
+  "token_tracker"
+ ],
+ "namespaces": {
+  "EntityNodeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "nodes",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_group_id": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_id",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "load_embeddings": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "load_embeddings_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "nodes",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   }
+  },
+  "EpisodeNodeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "nodes",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_group_id": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_id",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_by_entity_node_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "entity_node_uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "retrieve_episodes": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "reference_time",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "last_n",
+      "default": {
+       "value": 3
+      }
+     },
+     {
+      "name": "group_ids",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "source",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "saga",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   }
+  },
+  "CommunityNodeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "nodes",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_group_id": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_id",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "load_name_embedding": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   }
+  },
+  "SagaNodeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "nodes",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_group_id": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_id",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   }
+  },
+  "EntityEdgeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edges",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_between_nodes": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "source_node_uuid",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "target_node_uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_node_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "node_uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "load_embeddings": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "load_embeddings_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edges",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   }
+  },
+  "EpisodicEdgeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edges",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   }
+  },
+  "CommunityEdgeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   }
+  },
+  "HasEpisodeEdgeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edges",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   }
+  },
+  "NextEpisodeEdgeNamespace": {
+   "save": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "save_bulk": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edges",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "batch_size",
+      "default": {
+       "value": 100
+      }
+     }
+    ]
+   },
+   "delete": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "edge",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "delete_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "tx",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   },
+   "get_by_uuid": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuid",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_uuids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "uuids",
+      "default": {
+       "required": true
+      }
+     }
+    ]
+   },
+   "get_by_group_ids": {
+    "async": true,
+    "parameters": [
+     {
+      "name": "group_ids",
+      "default": {
+       "required": true
+      }
+     },
+     {
+      "name": "limit",
+      "default": {
+       "value": null
+      }
+     },
+     {
+      "name": "uuid_cursor",
+      "default": {
+       "value": null
+      }
+     }
+    ]
+   }
+  }
+ },
+ "llm_config": [
+  {
+   "name": "api_key",
+   "default": {
+    "value": null
+   }
+  },
+  {
+   "name": "model",
+   "default": {
+    "value": null
+   }
+  },
+  {
+   "name": "base_url",
+   "default": {
+    "value": null
+   }
+  },
+  {
+   "name": "temperature",
+   "default": {
+    "value": 1
+   }
+  },
+  {
+   "name": "max_tokens",
+   "default": {
+    "value": 16384
+   }
+  },
+  {
+   "name": "small_model",
+   "default": {
+    "value": null
+   }
+  }
+ ],
+ "models": {
+  "Node": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "labels",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "factory": "utc_now"
+    }
+   }
+  ],
+  "EpisodicNode": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "labels",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "factory": "utc_now"
+    }
+   },
+   {
+    "name": "source",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_description",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "content",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "valid_at",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "entity_edges",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "episode_metadata",
+    "default": {
+     "value": null
+    }
+   }
+  ],
+  "EntityNode": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "labels",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "factory": "utc_now"
+    }
+   },
+   {
+    "name": "name_embedding",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "summary",
+    "default": {
+     "value": ""
+    }
+   },
+   {
+    "name": "attributes",
+    "default": {
+     "value": {}
+    }
+   }
+  ],
+  "CommunityNode": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "labels",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "factory": "utc_now"
+    }
+   },
+   {
+    "name": "name_embedding",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "summary",
+    "default": {
+     "value": ""
+    }
+   }
+  ],
+  "SagaNode": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "labels",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "factory": "utc_now"
+    }
+   },
+   {
+    "name": "summary",
+    "default": {
+     "value": ""
+    }
+   },
+   {
+    "name": "first_episode_uuid",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "last_episode_uuid",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "last_summarized_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "last_summarized_episode_valid_at",
+    "default": {
+     "value": null
+    }
+   }
+  ],
+  "Edge": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "target_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "EpisodicEdge": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "target_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "EntityEdge": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "target_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "fact",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "fact_embedding",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "episodes",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "expired_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "valid_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "invalid_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "reference_time",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "attributes",
+    "default": {
+     "value": {}
+    }
+   }
+  ],
+  "CommunityEdge": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "target_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "HasEpisodeEdge": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "target_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "NextEpisodeEdge": [
+   {
+    "name": "uuid",
+    "default": {
+     "factory": "uuid4"
+    }
+   },
+   {
+    "name": "group_id",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "target_node_uuid",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "SearchConfig": [
+   {
+    "name": "edge_config",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "node_config",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "episode_config",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "community_config",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "limit",
+    "default": {
+     "value": 10
+    }
+   },
+   {
+    "name": "reranker_min_score",
+    "default": {
+     "value": 0
+    }
+   }
+  ],
+  "EdgeSearchConfig": [
+   {
+    "name": "search_methods",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "reranker",
+    "default": {
+     "value": {
+      "enum": "EdgeReranker",
+      "member": "rrf"
+     }
+    }
+   },
+   {
+    "name": "sim_min_score",
+    "default": {
+     "value": 0.6
+    }
+   },
+   {
+    "name": "mmr_lambda",
+    "default": {
+     "value": 0.5
+    }
+   },
+   {
+    "name": "bfs_max_depth",
+    "default": {
+     "value": 3
+    }
+   }
+  ],
+  "NodeSearchConfig": [
+   {
+    "name": "search_methods",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "reranker",
+    "default": {
+     "value": {
+      "enum": "NodeReranker",
+      "member": "rrf"
+     }
+    }
+   },
+   {
+    "name": "sim_min_score",
+    "default": {
+     "value": 0.6
+    }
+   },
+   {
+    "name": "mmr_lambda",
+    "default": {
+     "value": 0.5
+    }
+   },
+   {
+    "name": "bfs_max_depth",
+    "default": {
+     "value": 3
+    }
+   }
+  ],
+  "EpisodeSearchConfig": [
+   {
+    "name": "search_methods",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "reranker",
+    "default": {
+     "value": {
+      "enum": "EpisodeReranker",
+      "member": "rrf"
+     }
+    }
+   },
+   {
+    "name": "sim_min_score",
+    "default": {
+     "value": 0.6
+    }
+   },
+   {
+    "name": "mmr_lambda",
+    "default": {
+     "value": 0.5
+    }
+   },
+   {
+    "name": "bfs_max_depth",
+    "default": {
+     "value": 3
+    }
+   }
+  ],
+  "CommunitySearchConfig": [
+   {
+    "name": "search_methods",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "reranker",
+    "default": {
+     "value": {
+      "enum": "CommunityReranker",
+      "member": "rrf"
+     }
+    }
+   },
+   {
+    "name": "sim_min_score",
+    "default": {
+     "value": 0.6
+    }
+   },
+   {
+    "name": "mmr_lambda",
+    "default": {
+     "value": 0.5
+    }
+   },
+   {
+    "name": "bfs_max_depth",
+    "default": {
+     "value": 3
+    }
+   }
+  ],
+  "SearchResults": [
+   {
+    "name": "edges",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "edge_reranker_scores",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "nodes",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "node_reranker_scores",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "episodes",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "episode_reranker_scores",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "communities",
+    "default": {
+     "value": []
+    }
+   },
+   {
+    "name": "community_reranker_scores",
+    "default": {
+     "value": []
+    }
+   }
+  ],
+  "SearchFilters": [
+   {
+    "name": "node_labels",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "edge_types",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "valid_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "invalid_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "created_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "expired_at",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "edge_uuids",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "edge_source_node_uuids",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "edge_target_node_uuids",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "property_filters",
+    "default": {
+     "value": null
+    }
+   }
+  ],
+  "DateFilter": [
+   {
+    "name": "date",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "comparison_operator",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "PropertyFilter": [
+   {
+    "name": "property_name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "property_value",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "comparison_operator",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "AddEpisodeResults": [
+   {
+    "name": "episode",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "episodic_edges",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "nodes",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "edges",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "communities",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "community_edges",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "AddBulkEpisodeResults": [
+   {
+    "name": "episodes",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "episodic_edges",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "nodes",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "edges",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "communities",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "community_edges",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "AddTripletResults": [
+   {
+    "name": "nodes",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "edges",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "RawEpisode": [
+   {
+    "name": "name",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "uuid",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "content",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source_description",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "source",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "reference_time",
+    "default": {
+     "required": true
+    }
+   }
+  ],
+  "ConcurrentIngestionConfig": [
+   {
+    "name": "window",
+    "default": {
+     "required": true
+    }
+   },
+   {
+    "name": "state_store",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "lease_seconds",
+    "default": {
+     "value": 60.0
+    }
+   },
+   {
+    "name": "write_margin_seconds",
+    "default": {
+     "value": 5.0
+    }
+   },
+   {
+    "name": "poll_interval_seconds",
+    "default": {
+     "value": 0.25
+    }
+   },
+   {
+    "name": "index_lag_seconds",
+    "default": {
+     "value": 300.0
+    }
+   },
+   {
+    "name": "max_apply_attempts",
+    "default": {
+     "value": 5
+    }
+   },
+   {
+    "name": "enabled_for_group",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "before_commit_write",
+    "default": {
+     "value": null
+    }
+   },
+   {
+    "name": "before_enrichment_write",
+    "default": {
+     "value": null
+    }
+   }
+  ]
+ },
+ "recipes": {
+  "COMBINED_HYBRID_SEARCH_RRF": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": {
+    "search_methods": [
+     {
+      "enum": "EpisodeSearchMethod",
+      "member": "bm25"
+     }
+    ],
+    "reranker": {
+     "enum": "EpisodeReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "community_config": {
+    "search_methods": [
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "CommunityReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "COMBINED_HYBRID_SEARCH_MMR": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "mmr"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 1.0,
+    "bfs_max_depth": 3
+   },
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "mmr"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 1.0,
+    "bfs_max_depth": 3
+   },
+   "episode_config": {
+    "search_methods": [
+     {
+      "enum": "EpisodeSearchMethod",
+      "member": "bm25"
+     }
+    ],
+    "reranker": {
+     "enum": "EpisodeReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "community_config": {
+    "search_methods": [
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "CommunityReranker",
+     "member": "mmr"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 1.0,
+    "bfs_max_depth": 3
+   },
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "COMBINED_HYBRID_SEARCH_CROSS_ENCODER": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bfs"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bfs"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": {
+    "search_methods": [
+     {
+      "enum": "EpisodeSearchMethod",
+      "member": "bm25"
+     }
+    ],
+    "reranker": {
+     "enum": "EpisodeReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "community_config": {
+    "search_methods": [
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "CommunityReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "EDGE_HYBRID_SEARCH_RRF": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": null,
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "EDGE_HYBRID_SEARCH_MMR": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "mmr"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": null,
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "EDGE_HYBRID_SEARCH_NODE_DISTANCE": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "node_distance"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": null,
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "EDGE_HYBRID_SEARCH_EPISODE_MENTIONS": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "episode_mentions"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": null,
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "EDGE_HYBRID_SEARCH_CROSS_ENCODER": {
+   "edge_config": {
+    "search_methods": [
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "cosine_similarity"
+     },
+     {
+      "enum": "EdgeSearchMethod",
+      "member": "bfs"
+     }
+    ],
+    "reranker": {
+     "enum": "EdgeReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "node_config": null,
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "NODE_HYBRID_SEARCH_RRF": {
+   "edge_config": null,
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "NODE_HYBRID_SEARCH_MMR": {
+   "edge_config": null,
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "mmr"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "NODE_HYBRID_SEARCH_NODE_DISTANCE": {
+   "edge_config": null,
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "node_distance"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "NODE_HYBRID_SEARCH_EPISODE_MENTIONS": {
+   "edge_config": null,
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "episode_mentions"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "NODE_HYBRID_SEARCH_CROSS_ENCODER": {
+   "edge_config": null,
+   "node_config": {
+    "search_methods": [
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "cosine_similarity"
+     },
+     {
+      "enum": "NodeSearchMethod",
+      "member": "bfs"
+     }
+    ],
+    "reranker": {
+     "enum": "NodeReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "episode_config": null,
+   "community_config": null,
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "COMMUNITY_HYBRID_SEARCH_RRF": {
+   "edge_config": null,
+   "node_config": null,
+   "episode_config": null,
+   "community_config": {
+    "search_methods": [
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "CommunityReranker",
+     "member": "rrf"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "COMMUNITY_HYBRID_SEARCH_MMR": {
+   "edge_config": null,
+   "node_config": null,
+   "episode_config": null,
+   "community_config": {
+    "search_methods": [
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "CommunityReranker",
+     "member": "mmr"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "limit": 10,
+   "reranker_min_score": 0
+  },
+  "COMMUNITY_HYBRID_SEARCH_CROSS_ENCODER": {
+   "edge_config": null,
+   "node_config": null,
+   "episode_config": null,
+   "community_config": {
+    "search_methods": [
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "bm25"
+     },
+     {
+      "enum": "CommunitySearchMethod",
+      "member": "cosine_similarity"
+     }
+    ],
+    "reranker": {
+     "enum": "CommunityReranker",
+     "member": "cross_encoder"
+    },
+    "sim_min_score": 0.6,
+    "mmr_lambda": 0.5,
+    "bfs_max_depth": 3
+   },
+   "limit": 3,
+   "reranker_min_score": 0
+  }
+ },
+ "ingestion_example": {
+  "window": 3,
+  "lease_seconds": 90.0,
+  "write_margin_seconds": 7.0,
+  "poll_interval_seconds": 0.5,
+  "index_lag_seconds": 11.0,
+  "max_apply_attempts": 4
+ }
+}

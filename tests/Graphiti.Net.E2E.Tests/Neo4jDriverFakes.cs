@@ -50,6 +50,9 @@ internal sealed class FakeClient : IDriver
 
     internal Exception? VerifyError { get; set; }
 
+    /// <summary>An error that the close throws after it records its name.</summary>
+    internal Exception? CloseError { get; set; }
+
     /// <summary>Runs inside ExecuteAsync after the first yield, with the token of the call.</summary>
     internal Func<CancellationToken, Task>? InFlight { get; set; }
 
@@ -105,6 +108,10 @@ internal sealed class FakeClient : IDriver
         await Task.Yield();
         calls.Names.Add("client.close");
         await configReader.DisposeAsync();
+        if (CloseError is not null)
+        {
+            throw CloseError;
+        }
     }
 
     private sealed class FakeQuery(FakeClient client, string cypher) : IExecutableQuery<IRecord, IRecord>
