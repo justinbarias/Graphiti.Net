@@ -17,10 +17,12 @@ limitations under the License.
 
 namespace Graphiti.Core.Ingestion;
 
+using Graphiti.Core.Utils;
 using Graphiti.PyCompat;
 
+/// <summary>Add episode UUIDs to the `episodes` list of a stored edge.</summary>
 // PORT: `op: Literal[...]` is `string`, with a test in Validate() (R7).
-internal sealed record AddEpisodesToEdge : EdgeOperation
+internal sealed record AddEpisodesToEdge : EdgeOperation, IPydanticModel
 {
     internal string Op { get; set; } = "add_episodes_to_edge";
 
@@ -28,14 +30,36 @@ internal sealed record AddEpisodesToEdge : EdgeOperation
 
     internal required List<string> EpisodeUuids { get; set; }
 
-    // TODO(port): AddEpisodesToEdge (the Literal test of op, R7)
     internal AddEpisodesToEdge Validate()
     {
-        throw new NotSupportedException("TODO(port): AddEpisodesToEdge.Validate");
+        // PORT: the Literal test of `op` (R7). The typed property holds any text, so the reader of the field runs here.
+        var f = new PydanticFields("AddEpisodesToEdge", new() { ["op"] = Op });
+        f.Required("op", v => Pydantic.Literal(v, "add_episodes_to_edge"));
+        f.ThrowIfAny();
+        return this;
     }
+
+    internal static AddEpisodesToEdge ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("AddEpisodesToEdge", data);
+        var op = f.Default("op", v => Pydantic.Literal(v, "add_episodes_to_edge"), () => "add_episodes_to_edge");
+        var edgeUuid = f.Required("edge_uuid", Pydantic.Str);
+        var episodeUuids = f.Required("episode_uuids", v => Pydantic.List(v, Pydantic.Str));
+        f.ThrowIfAny();
+        return new AddEpisodesToEdge { Op = op.Value, EdgeUuid = edgeUuid.Value, EpisodeUuids = episodeUuids.Value }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("op", Op),
+        ("edge_uuid", EdgeUuid),
+        ("episode_uuids", EpisodeUuids));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 }
 
-internal sealed record EndEdge : EdgeOperation
+/// <summary>Set the end dates of a stored edge.</summary>
+internal sealed record EndEdge : EdgeOperation, IPydanticModel
 {
     internal string Op { get; set; } = "end_edge";
 
@@ -47,14 +71,52 @@ internal sealed record EndEdge : EdgeOperation
 
     internal bool OnlyIfOpen { get; set; }
 
-    // TODO(port): EndEdge (the Literal test of op, R7)
     internal EndEdge Validate()
     {
-        throw new NotSupportedException("TODO(port): EndEdge.Validate");
+        // PORT: the Literal test of `op` (R7).
+        var f = new PydanticFields("EndEdge", new() { ["op"] = Op });
+        f.Required("op", v => Pydantic.Literal(v, "end_edge"));
+        f.ThrowIfAny();
+        return this;
     }
+
+    internal static EndEdge ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("EndEdge", data);
+        var op = f.Default("op", v => Pydantic.Literal(v, "end_edge"), () => "end_edge");
+        var edgeUuid = f.Required("edge_uuid", Pydantic.Str);
+        var invalidAt = f.Default("invalid_at", v => Pydantic.OptionalValue(v, Pydantic.DateTime), () => null);
+        var expiredAt = f.Required("expired_at", Pydantic.DateTime);
+        var onlyIfOpen = f.Default("only_if_open", Pydantic.Bool, () => false);
+        f.ThrowIfAny();
+        return new EndEdge
+        {
+            Op = op.Value,
+            EdgeUuid = edgeUuid.Value,
+            InvalidAt = invalidAt.Value,
+            ExpiredAt = expiredAt.Value,
+            OnlyIfOpen = onlyIfOpen.Value,
+        }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("op", Op),
+        ("edge_uuid", EdgeUuid),
+        ("invalid_at", InvalidAt),
+        ("expired_at", ExpiredAt),
+        ("only_if_open", OnlyIfOpen));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 }
 
-internal sealed record SetEdgeAttributes : EdgeOperation
+/// <summary>
+/// Set the attributes of a stored edge with a merge by key.
+///
+/// `base_attributes` is the map that the analysis read. `attributes` is the map that
+/// the analysis computed.
+/// </summary>
+internal sealed record SetEdgeAttributes : EdgeOperation, IPydanticModel
 {
     internal string Op { get; set; } = "set_edge_attributes";
 
@@ -64,14 +126,44 @@ internal sealed record SetEdgeAttributes : EdgeOperation
 
     internal OrderedDictionary<string, object?> Attributes { get; set; } = new();
 
-    // TODO(port): SetEdgeAttributes (the Literal test of op, R7)
     internal SetEdgeAttributes Validate()
     {
-        throw new NotSupportedException("TODO(port): SetEdgeAttributes.Validate");
+        // PORT: the Literal test of `op` (R7).
+        var f = new PydanticFields("SetEdgeAttributes", new() { ["op"] = Op });
+        f.Required("op", v => Pydantic.Literal(v, "set_edge_attributes"));
+        f.ThrowIfAny();
+        return this;
     }
+
+    internal static SetEdgeAttributes ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("SetEdgeAttributes", data);
+        var op = f.Default("op", v => Pydantic.Literal(v, "set_edge_attributes"), () => "set_edge_attributes");
+        var edgeUuid = f.Required("edge_uuid", Pydantic.Str);
+        var baseAttributes = f.Default("base_attributes", v => Pydantic.Dict(v, Pydantic.Any), () => new());
+        var attributes = f.Default("attributes", v => Pydantic.Dict(v, Pydantic.Any), () => new());
+        f.ThrowIfAny();
+        return new SetEdgeAttributes
+        {
+            Op = op.Value,
+            EdgeUuid = edgeUuid.Value,
+            BaseAttributes = baseAttributes.Value,
+            Attributes = attributes.Value,
+        }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("op", Op),
+        ("edge_uuid", EdgeUuid),
+        ("base_attributes", BaseAttributes),
+        ("attributes", Attributes));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 }
 
-internal sealed record PatchNode : Operation
+/// <summary>Overlay the labels and the attributes of an extracted node on a stored node.</summary>
+internal sealed record PatchNode : Operation, IPydanticModel
 {
     internal string Op { get; set; } = "patch_node";
 
@@ -81,11 +173,40 @@ internal sealed record PatchNode : Operation
 
     internal OrderedDictionary<string, object?> Attributes { get; set; } = new();
 
-    // TODO(port): PatchNode (the Literal test of op, R7)
     internal PatchNode Validate()
     {
-        throw new NotSupportedException("TODO(port): PatchNode.Validate");
+        // PORT: the Literal test of `op` (R7).
+        var f = new PydanticFields("PatchNode", new() { ["op"] = Op });
+        f.Required("op", v => Pydantic.Literal(v, "patch_node"));
+        f.ThrowIfAny();
+        return this;
     }
+
+    internal static PatchNode ModelValidate(OrderedDictionary<string, object?> data)
+    {
+        var f = new PydanticFields("PatchNode", data);
+        var op = f.Default("op", v => Pydantic.Literal(v, "patch_node"), () => "patch_node");
+        var nodeUuid = f.Required("node_uuid", Pydantic.Str);
+        var labels = f.Default("labels", v => Pydantic.List(v, Pydantic.Str), () => []);
+        var attributes = f.Default("attributes", v => Pydantic.Dict(v, Pydantic.Any), () => new());
+        f.ThrowIfAny();
+        return new PatchNode
+        {
+            Op = op.Value,
+            NodeUuid = nodeUuid.Value,
+            Labels = labels.Value,
+            Attributes = attributes.Value,
+        }.Validate();
+    }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("op", Op),
+        ("node_uuid", NodeUuid),
+        ("labels", Labels),
+        ("attributes", Attributes));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 }
 
 // PORT: `EdgeOperation = AddEpisodesToEdge | EndEdge | SetEdgeAttributes` is a union of three models (Part 3). It is an
@@ -94,10 +215,22 @@ internal sealed record PatchNode : Operation
 internal abstract record EdgeOperation : Operation;
 
 // PORT: `Operation = Annotated[... | PatchNode, Field(discriminator='op')]` is an abstract record with one derived
-// record for each case (R7). The unit of the module adds ModelValidate, which reads the key `op`.
-internal abstract record Operation;
+// record for each case (R7).
+internal abstract record Operation
+{
+    // PORT: the reader of the discriminated union (R7): the key `op` names the case. The reader takes the field value,
+    // so that an Operation instance passes as it is, as pydantic keeps a model instance of the union.
+    internal static Operation ModelValidate(object? value) => Pydantic.Tagged<Operation>(
+        value,
+        "op",
+        ("add_episodes_to_edge", AddEpisodesToEdge.ModelValidate),
+        ("end_edge", EndEdge.ModelValidate),
+        ("set_edge_attributes", SetEdgeAttributes.ModelValidate),
+        ("patch_node", PatchNode.ModelValidate));
+}
 
-internal sealed record SagaLink
+/// <summary>The saga records that the commit writes for one episode.</summary>
+internal sealed record SagaLink : IPydanticModel
 {
     internal required string SagaUuid { get; set; }
 
@@ -111,14 +244,48 @@ internal sealed record SagaLink
 
     internal required PyDateTime CreatedAt { get; set; }
 
-    // TODO(port): SagaLink.Validate (R7)
-    internal SagaLink Validate()
+    internal SagaLink Validate() => this;
+
+    internal static SagaLink ModelValidate(OrderedDictionary<string, object?> data)
     {
-        throw new NotSupportedException("TODO(port): SagaLink.Validate");
+        var f = new PydanticFields("SagaLink", data);
+        var sagaUuid = f.Required("saga_uuid", Pydantic.Str);
+        var episodeUuid = f.Required("episode_uuid", Pydantic.Str);
+        var previousEpisodeUuid = f.Default("previous_episode_uuid", v => Pydantic.Optional(v, Pydantic.Str), () => null);
+        var hasEpisodeEdgeUuid = f.Required("has_episode_edge_uuid", Pydantic.Str);
+        var nextEpisodeEdgeUuid = f.Default("next_episode_edge_uuid", v => Pydantic.Optional(v, Pydantic.Str), () => null);
+        var createdAt = f.Required("created_at", Pydantic.DateTime);
+        f.ThrowIfAny();
+        return new SagaLink
+        {
+            SagaUuid = sagaUuid.Value,
+            EpisodeUuid = episodeUuid.Value,
+            PreviousEpisodeUuid = previousEpisodeUuid.Value,
+            HasEpisodeEdgeUuid = hasEpisodeEdgeUuid.Value,
+            NextEpisodeEdgeUuid = nextEpisodeEdgeUuid.Value,
+            CreatedAt = createdAt.Value,
+        }.Validate();
     }
+
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("saga_uuid", SagaUuid),
+        ("episode_uuid", EpisodeUuid),
+        ("previous_episode_uuid", PreviousEpisodeUuid),
+        ("has_episode_edge_uuid", HasEpisodeEdgeUuid),
+        ("next_episode_edge_uuid", NextEpisodeEdgeUuid),
+        ("created_at", CreatedAt));
+
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
 }
 
-internal sealed record ChangeSet
+/// <summary>
+/// The records to create and the operations on stored records of one ingestion unit.
+///
+/// A change set contains no copy of a stored node or of a stored edge. A reference to
+/// a stored record is its UUID.
+/// </summary>
+internal sealed record ChangeSet : IPydanticModel
 {
     internal required string GroupId { get; set; }
 
@@ -167,57 +334,166 @@ internal sealed record ChangeSet
 
     internal bool CreateSaga { get; set; }
 
-    // TODO(port): ChangeSet.Validate (R7)
-    internal ChangeSet Validate()
-    {
-        throw new NotSupportedException("TODO(port): ChangeSet.Validate");
-    }
+    internal ChangeSet Validate() => this;
 
     // PORT: from_bytes calls model_validate_json (R7).
-    // TODO(port): ChangeSet.model_validate
     internal static ChangeSet ModelValidate(OrderedDictionary<string, object?> data)
     {
-        throw new NotSupportedException("TODO(port): ChangeSet.model_validate");
+        var f = new PydanticFields("ChangeSet", data);
+        var groupId = f.Required("group_id", Pydantic.Str);
+        var unitId = f.Required("unit_id", Pydantic.Str);
+        var seq = f.Required("seq", Pydantic.Int);
+        var snapshotSeq = f.Required("snapshot_seq", Pydantic.Int);
+        var analysisStartedAt = f.Required("analysis_started_at", Pydantic.Float);
+        var episodes = f.Default("episodes", v => Pydantic.List(v, x => Pydantic.Model(x, "EpisodicNode", EpisodicNode.ModelValidate)), () => []);
+        var createNodes = f.Default("create_nodes", v => Pydantic.List(v, x => Pydantic.Model(x, "EntityNode", EntityNode.ModelValidate)), () => []);
+        var createEdges = f.Default("create_edges", v => Pydantic.List(v, x => Pydantic.Model(x, "EntityEdge", EntityEdge.ModelValidate)), () => []);
+        var episodicEdges = f.Default("episodic_edges", v => Pydantic.List(v, x => Pydantic.Model(x, "EpisodicEdge", EpisodicEdge.ModelValidate)), () => []);
+        var operations = f.Default("operations", v => Pydantic.List(v, Operation.ModelValidate), () => []);
+        var nodeUuids = f.Default("node_uuids", v => Pydantic.List(v, Pydantic.Str), () => []);
+        var nodeFirstEpisode = f.Default("node_first_episode", v => Pydantic.Dict(v, Pydantic.Str), () => new());
+        var seenNodeCandidates = f.Default("seen_node_candidates", v => Pydantic.Dict(v, x => Pydantic.List(x, Pydantic.Str)), () => new());
+        var seenNodeLabels = f.Default("seen_node_labels", v => Pydantic.Dict(v, x => Pydantic.List(x, Pydantic.Str)), () => new());
+        var seenDuplicateCandidates = f.Default("seen_duplicate_candidates", v => Pydantic.Dict(v, x => Pydantic.List(x, Pydantic.Str)), () => new());
+        var seenInvalidationCandidates = f.Default("seen_invalidation_candidates", v => Pydantic.Dict(v, x => Pydantic.List(x, Pydantic.Str)), () => new());
+        var edgesEndedByCandidate = f.Default("edges_ended_by_candidate", v => Pydantic.List(v, Pydantic.Str), () => []);
+        var uuidMap = f.Default("uuid_map", v => Pydantic.Dict(v, Pydantic.Str), () => new());
+        var sagaLinks = f.Default("saga_links", v => Pydantic.List(v, x => Pydantic.Model(x, "SagaLink", SagaLink.ModelValidate)), () => []);
+        var sagaNode = f.Default("saga_node", v => Pydantic.Optional(v, x => Pydantic.Model(x, "SagaNode", SagaNode.ModelValidate)), () => null);
+        var createSaga = f.Default("create_saga", Pydantic.Bool, () => false);
+        f.ThrowIfAny();
+        return new ChangeSet
+        {
+            GroupId = groupId.Value,
+            UnitId = unitId.Value,
+            Seq = seq.Value,
+            SnapshotSeq = snapshotSeq.Value,
+            AnalysisStartedAt = analysisStartedAt.Value,
+            Episodes = episodes.Value,
+            CreateNodes = createNodes.Value,
+            CreateEdges = createEdges.Value,
+            EpisodicEdges = episodicEdges.Value,
+            Operations = operations.Value,
+            NodeUuids = nodeUuids.Value,
+            NodeFirstEpisode = nodeFirstEpisode.Value,
+            SeenNodeCandidates = seenNodeCandidates.Value,
+            SeenNodeLabels = seenNodeLabels.Value,
+            SeenDuplicateCandidates = seenDuplicateCandidates.Value,
+            SeenInvalidationCandidates = seenInvalidationCandidates.Value,
+            EdgesEndedByCandidate = edgesEndedByCandidate.Value,
+            UuidMap = uuidMap.Value,
+            SagaLinks = sagaLinks.Value,
+            SagaNode = sagaNode.Value,
+            CreateSaga = createSaga.Value,
+        }.Validate();
     }
 
     // PORT: to_bytes calls model_dump_json (R7).
-    // TODO(port): ChangeSet.model_dump
-    internal OrderedDictionary<string, object?> ModelDump(bool json = false)
-    {
-        throw new NotSupportedException("TODO(port): ChangeSet.model_dump");
-    }
+    internal OrderedDictionary<string, object?> ModelDump(bool json = false) => Pydantic.DumpFields(
+        json,
+        ("group_id", GroupId),
+        ("unit_id", UnitId),
+        ("seq", Seq),
+        ("snapshot_seq", SnapshotSeq),
+        ("analysis_started_at", AnalysisStartedAt),
+        ("episodes", Episodes),
+        ("create_nodes", CreateNodes),
+        ("create_edges", CreateEdges),
+        ("episodic_edges", EpisodicEdges),
+        ("operations", Operations),
+        ("node_uuids", NodeUuids),
+        ("node_first_episode", NodeFirstEpisode),
+        ("seen_node_candidates", SeenNodeCandidates),
+        ("seen_node_labels", SeenNodeLabels),
+        ("seen_duplicate_candidates", SeenDuplicateCandidates),
+        ("seen_invalidation_candidates", SeenInvalidationCandidates),
+        ("edges_ended_by_candidate", EdgesEndedByCandidate),
+        ("uuid_map", UuidMap),
+        ("saga_links", SagaLinks),
+        ("saga_node", SagaNode),
+        ("create_saga", CreateSaga));
 
-    // PORT: rebase_change_set calls model_copy(deep=True) (ingestion/phases.py:1221, R7).
-    // TODO(port): ChangeSet.model_copy
+    OrderedDictionary<string, object?> IPydanticModel.ModelDump(bool json) => ModelDump(json);
+
+    // PORT: rebase_change_set calls model_copy(deep=True) (ingestion/phases.py:1221, R7). With `deep`, each list and
+    // dict is a new object, and each model in it is a deep copy. A model that the change set holds two times is copied
+    // one time, as the memo of copy.deepcopy does (R7).
     internal ChangeSet ModelCopy(bool deep = false)
     {
-        throw new NotSupportedException("TODO(port): ChangeSet.model_copy");
+        var copy = this with { };
+        if (deep)
+        {
+            var memo = new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+            T Memo<T>(T item, Func<T, T> copyItem)
+                where T : class
+            {
+                if (memo.TryGetValue(item, out var done))
+                {
+                    return (T)done;
+                }
+
+                var made = copyItem(item);
+                memo[item] = made;
+                return made;
+            }
+
+            copy.Episodes = [.. Episodes.Select(x => Memo(x, n => n.ModelCopy(deep: true)))];
+            copy.CreateNodes = [.. CreateNodes.Select(x => Memo(x, n => n.ModelCopy(deep: true)))];
+            copy.CreateEdges = [.. CreateEdges.Select(x => Memo(x, e => e.ModelCopy(deep: true)))];
+            copy.EpisodicEdges = [.. EpisodicEdges.Select(x => Memo(x, e => e.ModelCopy(deep: true)))];
+            copy.Operations = [.. Operations.Select(x => Memo(x, o => o switch
+            {
+                AddEpisodesToEdge a => a with { EpisodeUuids = [.. a.EpisodeUuids] },
+                EndEdge e => e with { },
+                SetEdgeAttributes s => s with { BaseAttributes = Py.AsDict(Py.DeepCopy(s.BaseAttributes)), Attributes = Py.AsDict(Py.DeepCopy(s.Attributes)) },
+                PatchNode p => p with { Labels = [.. p.Labels], Attributes = Py.AsDict(Py.DeepCopy(p.Attributes)) },
+                _ => throw new InvalidOperationException("unknown operation"),
+            }))];
+            copy.NodeUuids = [.. NodeUuids];
+            copy.NodeFirstEpisode = new(NodeFirstEpisode);
+            copy.SeenNodeCandidates = new(SeenNodeCandidates.Select(kv => KeyValuePair.Create(kv.Key, new List<string>(kv.Value))));
+            copy.SeenNodeLabels = new(SeenNodeLabels.Select(kv => KeyValuePair.Create(kv.Key, new List<string>(kv.Value))));
+            copy.SeenDuplicateCandidates = new(SeenDuplicateCandidates.Select(kv => KeyValuePair.Create(kv.Key, new List<string>(kv.Value))));
+            copy.SeenInvalidationCandidates = new(SeenInvalidationCandidates.Select(kv => KeyValuePair.Create(kv.Key, new List<string>(kv.Value))));
+            copy.EdgesEndedByCandidate = [.. EdgesEndedByCandidate];
+            copy.UuidMap = new(UuidMap);
+            copy.SagaLinks = [.. SagaLinks.Select(x => Memo(x, l => l with { }))];
+            copy.SagaNode = SagaNode is null ? null : Memo(SagaNode, n => n.ModelCopy(deep: true));
+        }
+
+        return copy;
     }
 
-    // PORT: zlib.compress is ZLibStream (R18).
-    // TODO(port): ChangeSet.to_bytes
-    internal byte[] ToBytes()
-    {
-        throw new NotSupportedException("TODO(port): ChangeSet.to_bytes");
-    }
+    /// <summary>Return the compressed JSON of the change set.</summary>
+    // PORT: zlib.compress is PyZlib.Compress, with the default level 6 of Python (R18). The compressed bytes differ from the
+    // bytes of CPython: .NET compresses with zlib-ng, and CPython 3.12 with zlib 1.2.12. No level of ZLibStream gives the
+    // bytes of Python (measured on 2026-11-27 for levels 0 to 9). The compressed text is the same, and each side reads the
+    // bytes of the other. GAPS F39 names the difference.
+    internal byte[] ToBytes() => PyZlib.Compress(PyText.EncodeUtf8(Pydantic.DumpJson(ModelDump(json: true))));
 
-    // TODO(port): ChangeSet.from_bytes
-    internal static ChangeSet FromBytes(byte[] payload)
-    {
-        throw new NotSupportedException("TODO(port): ChangeSet.from_bytes");
-    }
+    /// <summary>Return the change set of a payload that `to_bytes` made.</summary>
+    // PORT: zlib.decompress is PyZlib.Decompress (R18). Bytes that are not a full zlib stream throw InvalidDataException with
+    // the text of zlib.error, where Python raises zlib.error. R4 has no row for zlib.error.
+    internal static ChangeSet FromBytes(byte[] payload) => ModelValidate(Pydantic.LoadJson(PyZlib.Decompress(payload)));
 
-    // TODO(port): ChangeSet.patches_by_node
+    /// <summary>Return the `PatchNode` operations for each node UUID, in list order.</summary>
     internal OrderedDictionary<string, List<PatchNode>> PatchesByNode()
     {
-        throw new NotSupportedException("TODO(port): ChangeSet.patches_by_node");
+        var patches = new OrderedDictionary<string, List<PatchNode>>();
+        foreach (var operation in Operations)
+        {
+            if (operation is PatchNode patchNode)
+            {
+                Py.SetDefault(patches, patchNode.NodeUuid, []).Add(patchNode);
+            }
+        }
+
+        return patches;
     }
 
-    // TODO(port): ChangeSet.edge_operations
-    internal List<EdgeOperation> EdgeOperations()
-    {
-        throw new NotSupportedException("TODO(port): ChangeSet.edge_operations");
-    }
+    /// <summary>Return the operations on stored edges, in list order.</summary>
+    internal List<EdgeOperation> EdgeOperations() =>
+        [.. Operations.Where(operation => operation is not PatchNode).Cast<EdgeOperation>()];
 }
 
 // PORT: the private dataclass `_EdgeState`. internal, because ResolutionTrace and ChangeSetModule use it (R2).
@@ -236,6 +512,13 @@ internal sealed record EdgeState
     internal bool EndedAsCandidate { get; set; }
 }
 
+/// <summary>
+/// Records what node resolution and edge resolution saw and changed.
+///
+/// The resolution functions change stored records in memory. The trace keeps the
+/// candidates that each extracted item saw, and one operation for each change to a
+/// stored record.
+/// </summary>
 internal sealed record ResolutionTrace
 {
     internal OrderedDictionary<string, List<string>> SeenNodeCandidates { get; set; } = new();
@@ -264,43 +547,104 @@ internal sealed record ResolutionTrace
     // PORT: R14 gives this form for a dict keyed by `id(obj)`.
     private OrderedDictionary<EntityEdge, EdgeState> edgeStates = new(ReferenceEqualityComparer.Instance);
 
-    // TODO(port): ResolutionTrace.record_node_candidates
     internal void RecordNodeCandidates(string nodeUuid, List<EntityNode> candidates)
     {
-        throw new NotSupportedException("TODO(port): ResolutionTrace.record_node_candidates");
+        var seen = Py.SetDefault(SeenNodeCandidates, nodeUuid, []);
+        foreach (var candidate in candidates)
+        {
+            if (!seen.Contains(candidate.Uuid, StringComparer.Ordinal))
+            {
+                seen.Add(candidate.Uuid);
+            }
+
+            // The first read of a candidate is before a promotion of its labels in memory.
+            Py.SetDefault(SeenNodeLabels, candidate.Uuid, [.. candidate.Labels]);
+        }
     }
 
-    // TODO(port): ResolutionTrace.record_node_resolution
+    /// <summary>Record that an extracted node resolved to a stored node.</summary>
     internal void RecordNodeResolution(EntityNode extractedNode, string resolvedUuid)
     {
-        throw new NotSupportedException("TODO(port): ResolutionTrace.record_node_resolution");
+        if (resolvedUuid == extractedNode.Uuid)
+        {
+            return;
+        }
+
+        StoredNodeUuids.Add(resolvedUuid);
+        Operations.Add(
+            new PatchNode
+            {
+                NodeUuid = resolvedUuid,
+                Labels = [.. extractedNode.Labels],
+                Attributes = Py.AsDict(Py.DeepCopy(extractedNode.Attributes.Count > 0 ? extractedNode.Attributes : new OrderedDictionary<string, object?>())),
+            }.Validate());
     }
 
-    // TODO(port): ResolutionTrace.record_edge_candidates
     internal void RecordEdgeCandidates(
         string edgeUuid,
         List<EntityEdge> duplicateCandidates,
         List<EntityEdge> invalidationCandidates)
     {
-        throw new NotSupportedException("TODO(port): ResolutionTrace.record_edge_candidates");
+        SeenDuplicateCandidates[edgeUuid] = [.. duplicateCandidates.Select(edge => edge.Uuid)];
+        SeenInvalidationCandidates[edgeUuid] = [
+            .. invalidationCandidates.Select(edge => edge.Uuid)
+        ];
     }
 
-    // TODO(port): ResolutionTrace.watch_stored_edges
+    /// <summary>Keep the state of stored edge objects before resolution changes them.</summary>
     internal void WatchStoredEdges(List<EntityEdge> edges)
     {
-        throw new NotSupportedException("TODO(port): ResolutionTrace.watch_stored_edges");
+        foreach (var edge in edges)
+        {
+            if (edgeStates.ContainsKey(edge))
+            {
+                continue;
+            }
+
+            edgeStates[edge] = new EdgeState
+            {
+                Edge = edge,
+                Episodes = [.. edge.Episodes],
+                Attributes = Py.AsDict(Py.DeepCopy(edge.Attributes.Count > 0 ? edge.Attributes : new OrderedDictionary<string, object?>())),
+                InvalidAt = edge.InvalidAt,
+                ExpiredAt = edge.ExpiredAt,
+            };
+        }
     }
 
-    // TODO(port): ResolutionTrace.mark_ended_as_candidate
+    /// <summary>Mark stored edges that a contradiction ended (`only_if_open=False`).</summary>
     internal void MarkEndedAsCandidate(List<EntityEdge> edges)
     {
-        throw new NotSupportedException("TODO(port): ResolutionTrace.mark_ended_as_candidate");
+        foreach (var edge in edges)
+        {
+            var state = edgeStates.GetValueOrDefault(edge);
+            if (state is not null)
+            {
+                state.EndedAsCandidate = true;
+            }
+        }
     }
 
-    // TODO(port): ResolutionTrace.collect_edge_operations
+    /// <summary>
+    /// Make one operation for each change to a watched edge, and stop the watch.
+    ///
+    /// With `edges`, only the watch of those edge objects stops. Calls that run at the
+    /// same time on one trace thus do not collect the edges of each other.
+    /// </summary>
     internal List<EdgeOperation> CollectEdgeOperations(List<EntityEdge>? edges = null)
     {
-        throw new NotSupportedException("TODO(port): ResolutionTrace.collect_edge_operations");
+        var keys = edges is null ? [.. edgeStates.Keys] : edges.ToList();
+        List<EdgeOperation> operations = [];
+        foreach (var key in keys)
+        {
+            if (edgeStates.Remove(key, out var state))
+            {
+                operations.AddRange(ChangeSetModule.DiffEdgeState(state));
+            }
+        }
+
+        Operations.AddRange(operations);
+        return operations;
     }
 }
 
@@ -308,24 +652,136 @@ internal sealed record ResolutionTrace
 internal static class ChangeSetModule
 {
     // PORT: internal, because ResolutionTrace calls it (R2).
-    // TODO(port): _diff_edge_state
     internal static List<EdgeOperation> DiffEdgeState(EdgeState state)
     {
-        throw new NotSupportedException("TODO(port): _diff_edge_state");
+        var edge = state.Edge;
+        List<EdgeOperation> operations = [];
+
+        List<string> addedEpisodes = [.. edge.Episodes.Where(uuid => !state.Episodes.Contains(uuid, StringComparer.Ordinal))];
+        if (addedEpisodes.Count > 0)
+        {
+            operations.Add(new AddEpisodesToEdge { EdgeUuid = edge.Uuid, EpisodeUuids = addedEpisodes }.Validate());
+        }
+
+        var currentAttributes = edge.Attributes.Count > 0 ? edge.Attributes : new OrderedDictionary<string, object?>();
+        if (!PyEqualityComparer<object?>.Instance.Equals(currentAttributes, state.Attributes))
+        {
+            operations.Add(
+                new SetEdgeAttributes
+                {
+                    EdgeUuid = edge.Uuid,
+                    BaseAttributes = Py.AsDict(Py.DeepCopy(state.Attributes)),
+                    Attributes = Py.AsDict(Py.DeepCopy(currentAttributes)),
+                }.Validate());
+        }
+
+        var datesChanged = edge.InvalidAt != state.InvalidAt || edge.ExpiredAt != state.ExpiredAt;
+        if (datesChanged && edge.ExpiredAt is { } expiredAt)
+        {
+            operations.Add(
+                new EndEdge
+                {
+                    EdgeUuid = edge.Uuid,
+                    InvalidAt = edge.InvalidAt != state.InvalidAt ? edge.InvalidAt : null,
+                    ExpiredAt = expiredAt,
+                    OnlyIfOpen = !state.EndedAsCandidate,
+                }.Validate());
+        }
+
+        return operations;
     }
 
-    // TODO(port): merge_edge_attributes
+    /// <summary>
+    /// Merge three attribute maps by key.
+    ///
+    /// A key with the same state in `current` and in `base` gets the state of `new`.
+    /// A key with a different state in `current` keeps the state of `current`.
+    /// </summary>
     internal static OrderedDictionary<string, object?> MergeEdgeAttributes(
         OrderedDictionary<string, object?> @base,
         OrderedDictionary<string, object?> @new,
         OrderedDictionary<string, object?> current)
     {
-        throw new NotSupportedException("TODO(port): merge_edge_attributes");
+        var missing = new object();
+        var merged = new OrderedDictionary<string, object?>();
+        foreach (var key in (List<string>)[.. current.Keys, .. @new.Keys.Where(k => !current.ContainsKey(k))])
+        {
+            var currentValue = current.GetValueOrDefault(key, missing);
+            // PORT: `current_value == base.get(key, missing)` is a plain `==` of two open values, with no identity test (R6).
+            var unchanged = PyValueEquality.PlainEqual(currentValue, @base.GetValueOrDefault(key, missing));
+            var value = unchanged ? @new.GetValueOrDefault(key, missing) : currentValue;
+            if (!ReferenceEquals(value, missing))
+            {
+                merged[key] = value;
+            }
+        }
+
+        return merged;
     }
 
-    // TODO(port): apply_edge_operation
+    /// <summary>
+    /// Apply one operation to the current state of a stored edge.
+    ///
+    /// Each rule gives the same record when it runs two times. Returns True when the
+    /// operation changed the edge.
+    /// </summary>
     internal static bool ApplyEdgeOperation(EntityEdge edge, EdgeOperation operation)
     {
-        throw new NotSupportedException("TODO(port): apply_edge_operation");
+        if (operation is AddEpisodesToEdge addEpisodesToEdge)
+        {
+            List<string> added = [.. addEpisodesToEdge.EpisodeUuids.Where(uuid => !edge.Episodes.Contains(uuid, StringComparer.Ordinal))];
+
+            // PORT: dict.fromkeys(added) keeps the first of each item in order (R14).
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var uuid in added)
+            {
+                if (seen.Add(uuid))
+                {
+                    edge.Episodes.Add(uuid);
+                }
+            }
+
+            return added.Count > 0;
+        }
+
+        if (operation is EndEdge endEdge)
+        {
+            if (endEdge.OnlyIfOpen && edge.ExpiredAt is not null)
+            {
+                return false;
+            }
+
+            var changed = false;
+            if (endEdge.InvalidAt is not null)
+            {
+                var currentInvalidAt = DatetimeUtils.EnsureUtc(edge.InvalidAt);
+                var newInvalidAt = DatetimeUtils.EnsureUtc(endEdge.InvalidAt);
+                if (currentInvalidAt is null || (
+                    newInvalidAt is not null && newInvalidAt < currentInvalidAt))
+                {
+                    edge.InvalidAt = endEdge.InvalidAt;
+                    changed = true;
+                }
+            }
+
+            if (edge.ExpiredAt is null)
+            {
+                edge.ExpiredAt = endEdge.ExpiredAt;
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        var setEdgeAttributes = (SetEdgeAttributes)operation;
+        var current = edge.Attributes.Count > 0 ? edge.Attributes : new OrderedDictionary<string, object?>();
+        var merged = MergeEdgeAttributes(setEdgeAttributes.BaseAttributes, setEdgeAttributes.Attributes, current);
+        if (PyEqualityComparer<object?>.Instance.Equals(merged, current))
+        {
+            return false;
+        }
+
+        edge.Attributes = merged;
+        return true;
     }
 }

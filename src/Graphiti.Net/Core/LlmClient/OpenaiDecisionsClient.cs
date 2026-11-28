@@ -32,7 +32,7 @@ internal static partial class OpenaiDecisionsClientModule
 {
     // PORT: an upstream test replaces _sleep (R17).
     internal static readonly PyPatch<Func<double, CancellationToken, Task>> Sleep =
-        new((seconds, cancellationToken) => Task.Delay(TimeSpan.FromSeconds(seconds), PortServices.Time, cancellationToken));
+        new((seconds, cancellationToken) => Asyncio.SleepAsync(seconds, PortServices.Time, cancellationToken));
 }
 
 /// <summary>Raised when one Decisions question cannot fit after state shrinking.</summary>

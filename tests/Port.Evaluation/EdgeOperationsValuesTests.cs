@@ -256,9 +256,8 @@ public class EdgeOperationsValuesTests
     // The late cancel of GAPS F33. Python cancels each task of the gathers at once. The port reads the token at the next
     // call of a fake, so a search whose last fake call has returned goes on, and writes its debug line `search returned
     // context` ("after"). At the last calls of a case the port also writes the debug lines that come before the next
-    // call, and at two points it makes one more attempt, and that attempt throws ("attempts"). Each point keeps the
-    // events of Python in their order. A point that agrees with Python must not be in the list, and a point in the list
-    // must differ in the way that its kind says.
+    // call ("after"). Each point keeps the events of Python in their order. A point that agrees with Python must not be in
+    // the list, and a point in the list must differ in the way that its kind says.
     private static readonly (int Case, int K, string Kind)[] LateCancel =
     [
         (13, 3, "after"),
@@ -313,8 +312,6 @@ public class EdgeOperationsValuesTests
         (17, 14, "after"),
         (17, 15, "after"),
         (17, 16, "after"),
-        (17, 18, "attempts+after"),
-        (17, 20, "attempts"),
         (17, 22, "after"),
     ];
 

@@ -827,4 +827,21 @@ public class ValueModelTests
         // Python returns 2**70. A long cannot hold it (R4).
         Assert.Throws<OverflowException>(() => Py.Int((object?)System.Numerics.BigInteger.Pow(2, 70)));
     }
+
+    [Fact]
+    public void PlainEqual_is_the_expression_a_eq_b_with_no_identity_test_at_the_top()
+    {
+        // Python: n = float('nan'). n == n is False, [n] == [n] is True, (n,) == (n,) is True, {'a': n} == {'a': n} is True.
+        object nan = double.NaN;
+        Assert.True(PyValueEquality.Equal(nan, nan));
+        Assert.False(PyValueEquality.PlainEqual(nan, nan));
+        Assert.False(PyValueEquality.PlainEqual(nan, double.NaN));
+        Assert.True(PyValueEquality.PlainEqual(new List<object?> { nan }, new List<object?> { nan }));
+        Assert.True(PyValueEquality.PlainEqual(PyTuple.From([nan]), PyTuple.From([nan])));
+        Assert.True(PyValueEquality.PlainEqual(new OrderedDictionary<string, object?> { ["a"] = nan }, new OrderedDictionary<string, object?> { ["a"] = nan }));
+        Assert.True(PyValueEquality.PlainEqual(1L, 1.0));
+        Assert.True(PyValueEquality.PlainEqual(true, 1L));
+        Assert.True(PyValueEquality.PlainEqual(null, null));
+        Assert.True(PyValueEquality.PlainEqual("a", "a"));
+    }
 }

@@ -21,6 +21,7 @@ internal sealed class AsyncioScripts
     private readonly List<string> trace = [];
     private readonly Dictionary<string, (Task<object?> Task, CancellationTokenSource Cancel)> tasks = [];
     private readonly Dictionary<string, AsyncEvent> events = [];
+    private readonly Dictionary<string, object> locks = [];
 
     private AsyncioScripts(JsonElement script)
     {
@@ -249,6 +250,52 @@ internal sealed class AsyncioScripts
                 case "ev_is_set":
                     Log(me, $"ev_is_set {Text(op, 1)} -> {Fmt(Event(Text(op, 1)).IsSet())}");
                     break;
+                case "sleep":
+                    {
+                        // asyncio.sleep is Asyncio.SleepAsync (R8). The scripts run on the system clock.
+                        var text = Text(op, 1);
+                        await Asyncio.SleepAsync(double.Parse(text, CultureInfo.InvariantCulture), TimeProvider.System, token);
+                        Log(me, $"slept {text}");
+                        break;
+                    }
+
+                case "sem":
+                    locks[Text(op, 1)] = new AsyncSemaphore(op[2].GetInt64());
+                    break;
+                case "lock":
+                    locks[Text(op, 1)] = new AsyncLock();
+                    break;
+                case "acquire":
+                    {
+                        var name = Text(op, 1);
+                        await (locks[name] is AsyncSemaphore semaphore ? semaphore.AcquireAsync(token) : ((AsyncLock)locks[name]).AcquireAsync(token));
+                        Log(me, $"acquired {name}");
+                        break;
+                    }
+
+                case "release":
+                    {
+                        var name = Text(op, 1);
+                        if (locks[name] is AsyncSemaphore semaphore)
+                        {
+                            semaphore.Release();
+                        }
+                        else
+                        {
+                            ((AsyncLock)locks[name]).Release();
+                        }
+
+                        break;
+                    }
+
+                case "locked":
+                    {
+                        var name = Text(op, 1);
+                        var locked = locks[name] is AsyncSemaphore semaphore ? semaphore.Locked() : ((AsyncLock)locks[name]).Locked();
+                        Log(me, $"locked {name} -> {Fmt(locked)}");
+                        break;
+                    }
+
                 case "to_thread":
                     {
                         var value = Value(op[1]);

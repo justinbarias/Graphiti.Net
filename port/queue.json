@@ -1733,8 +1733,8 @@
         "zlib"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/ChangeSet.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. 49 judge cases pass. `merge_edge_attributes` compares with `PyValueEquality.PlainEqual`, the `==` of Python with no identity test. `ChangeSet.from_bytes` reads with `PyZlib.Decompress` (decision D51). GAPS F39: the compressed bytes differ from CPython, and the text inside is equal in both directions. The models have no `ModelJsonSchema`, because no upstream site reads their schema. R5: no log call."
     },
     {
       "order": 80,
@@ -1753,8 +1753,8 @@
         "time"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/StateStore.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "tests_pass",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. It has no pure judge case, so it waits for the flow cases of layer 9. 101 recorded sequences run on the in-memory store, on SQLite with a file, and on SQLite in memory. `test_second_process_on_one_file` uses a second store object in one process, where upstream starts a child process. R5: no log call."
     },
     {
       "order": 81,
@@ -1772,8 +1772,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/Config.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. 18 judge cases pass. GAPS F40: a type error and a constraint error in two fields give one error list, where pydantic gives two. `record_change_set.py` holds its 300 recorded cases. R5: no log call."
     },
     {
       "order": 82,
@@ -1877,8 +1877,8 @@
         "numpy"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/Delta.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8b. 31 judge cases pass. `top_matches` sorts with `PyNumpy.ArgSort`, a port of the generic sort of numpy (decision D53). GAPS F47: on x86, numpy can give another order of equal scores. Two recorded cases compare the norm of equal rows with the loop form of GAPS G17. The digest cache is module state, so its tests run in one turn of the scheduler (rule R25). R5: no log call."
     },
     {
       "order": 86,
@@ -2007,7 +2007,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/EdgeOperations.cs",
       "status": "reviewed",
-      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7c. R5: the lines at `edge_operations.py:344`, `:743`, `:749`, and `:878` can hold text of the model reply, as in Python. Two upstream tests keep `TODO(port): O10`: `test_resolve_extracted_edges_merges_override_candidates` (async case 16 of `values/edge_operations.json` covers it) and `test_resolve_extracted_edges_forwards_clients_only_for_prompt_routing` (async cases 16 and 13). GAPS F33: 55 cancel points are in the `LateCancel` list. Two ported tests (`test_edge_type_signatures_map_*`) call no product code and go to the pruning rule. No input reaches the `max()` error near line 261. The trace paths are recorded in layer 8."
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7c. R5: the lines at `edge_operations.py:344`, `:743`, `:749`, and `:878` can hold text of the model reply, as in Python. Two upstream tests keep `TODO(port): O10`: `test_resolve_extracted_edges_merges_override_candidates` (async case 16 of `values/edge_operations.json` covers it) and `test_resolve_extracted_edges_forwards_clients_only_for_prompt_routing` (async cases 16 and 13). GAPS F33: 53 cancel points are in the `LateCancel` list. Two ported tests (`test_edge_type_signatures_map_*`) call no product code and go to the pruning rule. No input reaches the `max()` error near line 261. The trace paths are recorded in layer 8."
     },
     {
       "order": 91,
@@ -2030,8 +2030,8 @@
       ],
       "external": [],
       "target": "src/Graphiti.Net/Core/Ingestion/GraphReader.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "tests_pass",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8b. It has no pure judge case, so it waits for the flow cases of layer 9. GAPS U21: `episodes_by_uuids` and `edges_by_uuids` read with no group filter, as in Python. GAPS F33: one cancel point is in the `LateCancel` list. The packet also records `ResolutionTrace` in 17 cases and ports the 7 tests of `test_resolution_trace.py`, which closes the trace paths of layer 7. R5: no log call."
     },
     {
       "order": 92,
@@ -2064,7 +2064,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/CombinedExtraction.cs",
       "status": "reviewed",
-      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7d. R5: the warning of failed batch timestamps passes the exception, which can hold a value of the model reply. GAPS F33: one cancel point is in the `LateCancel` list."
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7d. R5: the warning of failed batch timestamps passes the exception, which can hold a value of the model reply. GAPS F33: the `LateCancel` list is empty since the fix round of packet P8d, which gave `semaphore_gather` the semaphore of Python."
     },
     {
       "order": 93,
@@ -2372,8 +2372,8 @@
         "uuid"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/Phases.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "tests_pass",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8c. It has no pure judge case, so it waits for the flow cases of layer 9. R5: the error line of a failed attribute extraction (`phases.py:1734`) passes its exception, which can hold a value of the model reply, as in Python. The stored fail reason is the .NET type name (decision D50). GAPS F33: 10 cancel points are in the `LateCancel` list. Eight functions and `CommitResult` have no recording, because each one needs the `Graphiti` object: `admit_episode`, `admit_bulk`, `analyze_episode`, `analyze_bulk`, `commit_unit`, `enrich_unit`, `_admit_heartbeat`, and `_default_wait`. Packet P9b of layer 9 records them, and it ports the upstream tests that build `Graphiti`: `test_commit_repair.py`, `test_concurrent_identity_properties.py`, and the tests that the headers of `TestFailureRules.cs`, `TestUpdateQueries.cs`, and `IngestionFixtures.cs` name. Three seeded defects pass each test until then: the type of a span attribute of `commit_unit`, the token of its cleanup call, and the sleep of `DefaultWait`. `test_falkordb_write_gets_the_limit_as_query_timeout` is not ported (decision D10)."
     },
     {
       "order": 104,
@@ -2402,8 +2402,8 @@
         "uuid"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/Scheduler.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "tests_pass",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8d. It has no pure judge case, so it waits for the flow cases of layer 9. `asyncio.Semaphore` and `asyncio.Lock` are `AsyncSemaphore` and `AsyncLock` (decision D53). R5: the heartbeat warning (`scheduler.py:105`) passes a store exception, with the sequence number and the group id. GAPS F33: 7 cancel points are in the `LateCancel` list. Four upstream tests keep a `TODO(port): O10` comment in `TestScheduler.cs`, each with the recorded cases that cover it in part: `test_window_limits_the_units_and_sequence_order_is_call_order`, `test_window_of_one_runs_one_unit_at_a_time`, `test_failed_unit_releases_its_slot_and_its_position`, and `test_heartbeat_renews_the_deadline_of_a_slow_unit`. Five more tests build `Graphiti`. The paths after the admit lock have no recording: the commit turn, the order of commits, the apply retry, a successful call, and the error exit of `add_episode`. Packet P9b of layer 9 does both."
     },
     {
       "order": 105,
@@ -3850,8 +3850,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/SqliteStateStore.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "tests_pass",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. It has no pure judge case, so it waits for the flow cases of layer 9. It shares the recording and the tests of `state_store`. Each SQL statement keeps its `group_id` filter. A test reads the busy timeout and the journal mode as pragma values. No test runs two processes that write at one time. R5: no log call."
     },
     {
       "order": 166,
