@@ -20,7 +20,7 @@ This is the canonical home of the test strategy. It follows
 | Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,999 cases: 1,965 pure and 34 flow. 11 flow scenarios use replies from a real model. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
 | Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | 55 tests for `PyCompat`: each helper against the values that Python recorded, and laws that hold for any input. |
-| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Observe mode, on `PyCompat` with its property tests only. The run of 2026-11-28 scored 89.87%. A person starts each run. The pruning rule is not applied yet (plan 0003, task 5). |
+| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Observe mode, on `PyCompat` with its property tests only. The run of 2026-11-28 scored 89.87%. A person starts each run. The pruning rule ran two times and deleted no test (plan 0003, task 5). |
 
 ### Differential judge
 
@@ -75,6 +75,9 @@ It reads "broader" as one other test that kills every mutant of the narrower tes
 Tests that kill the same mutants, with no broader test, are not in the list. The script shows each such group, and a person decides.
 It exempts `EnvironmentTests`. `--json` prints the same result for a program.
 
+One more exemption, decided by the maintainer on 2026-11-28: a test that compares the port with a value recorded from Python is not deleted by steps 2 and 3. The script still lists it, and a person leaves it.
+A mutation run cannot see what such a test is worth. For example `Digit_matches_Python_for_each_code_point` kills no mutant, because Stryker does not mutate the Unicode table that it checks, and a wrong entry in that table passes each other test. A row of a data-driven test checks one Python value, and a broader row does not check that value.
+
 Limits of the list:
 
 - Property tests use random inputs, so the list can differ between two runs of the same code. Compare two runs before you delete a test.
@@ -110,5 +113,5 @@ python3 scripts/mutation_survivors.py
 
 ## Known gaps
 
-- Nobody applied the pruning rule yet. Plan 0003, task 5 does it.
+- The pruning rule ran two times on 2026-11-28 and deleted no test, because each listed test compares the port with a value recorded from Python (plan 0003, task 5).
 - The mutation run covers `PyCompat` only. No mutation score exists for the ported code (debt T27).

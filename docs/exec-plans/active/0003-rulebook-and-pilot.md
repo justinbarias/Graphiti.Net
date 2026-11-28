@@ -10,7 +10,7 @@ Port phases 4 and 5. Starts after gate 2. Ends at gate 3.
 | 2 | Done 2026-11-25. Write the public surface design document: `AddGraphiti`, options, the `Microsoft.Extensions.AI` adapter, the cross-encoder over `IChatClient`. This is an ask-first item. | Lead, Fable 5.2, high | The maintainer approves it. |
 | 3 | Done 2026-11-25. Create `src/Graphiti.Net.PyCompat` and `tests/Graphiti.Net.Property.Tests`. Build only the helpers that the queue needs. Generate expected values from Python into a file. | Workhorse, Sonnet 5.5, medium | CsCheck property tests pass against the Python values, including negative numbers, zero divisors, empty strings, an emoji, and a combining mark. |
 | 4 | Done 2026-11-26. Write `scripts/mutation_survivors.py`. It reads the Stryker JSON report and lists the tests that the pruning rule in TESTING.md deletes. | Workhorse, Sonnet 5.5, medium | Run on the PyCompat report. Closes debt T4. |
-| 5 | Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
+| 5 | Done 2026-11-28. Run `scripts/mutate.sh` on PyCompat. Apply the pruning rule. | Lead, Fable 5.2, medium | The score and the list of deleted tests, in this plan. |
 | P1 | Done 2026-11-26. Add the `.editorconfig` entry that makes IDE0065 an error for each C# file. Move the `using` directives of the judge host and the end-to-end tests inside the namespace. Closes open item O8 and debt T22. | Lead, Fable 5.2, medium | A file with a directive at the top fails the build. The gate passes. Own pull request. |
 | P2 | Done 2026-11-26. Build the value model of `PyCompat`: `PyDict`, `PySet<T>`, `PyTuple`, `Py.Repr`, `Py.Str`, `Py.Truthy`, `Py.Len`, `Py.Get`, `Py.As*`, `Py.EnumValue`. | Workhorse, Opus 5.5, medium | Property tests pass against values that Python 3.12 recorded. |
 | P3 | Done 2026-11-26. Build `PyJson` (`Dumps`, `Loads`). Needs P2. | Workhorse, Sonnet 5.5, high | Property tests pass against values that Python 3.12 recorded. |
@@ -549,3 +549,23 @@ The lead keeps the output of each pilot unit.
 - `errors` and `search_filters` merged before the last rule changes. The support pull request moved the members of the three search filter models to the order of R7. No other rule change touches the two units.
 - `dedupe_nodes`, `content_chunking`, and `entity_node_ops` applied each changed rule in their fix rounds, before their merge.
 - The rules that changed after the last fix round write down what the output already does.
+
+### Task 5, the mutation runs and the pruning rule, 2026-11-28
+
+Two runs of `scripts/mutate.sh` on `PyCompat`, on the machine of the lead (14 cores, 35 minutes each):
+
+| | Run 1, with other work on the machine | Run 2, with no other test or gate |
+| --- | --- | --- |
+| Score | 89.87% | 89.87% |
+| Killed | 5,924 | 5,899 |
+| Survived | 546 | 548 |
+| Timeouts | 385 | 412 |
+| Tests that the script lists | 224 of 445 | 229 of 447 |
+
+- The timeouts do not come from load: the quiet run has more of them. They belong to the mutants.
+- The list is stable. Both runs name the same 71 of 74 test methods, and 218 listed rows match by name. Each run names 3 methods that the other does not.
+- In both runs, 9 tests kill no mutant (step 2), for example `Digit_matches_Python_for_each_code_point`, `Word_matches_Python_for_each_code_point`, and `EncodeUtf8_matches_Python`. About 209 rows are listed by step 3, and about 160 of them are rows of 8 data-driven tests, for example `Script_trace_matches_asyncio`.
+
+The list of deleted tests is empty. The maintainer decided on 2026-11-28 to delete no test: each listed test compares the port with a value recorded from Python, and a mutation run cannot see that worth. `docs/TESTING.md` now exempts these tests from steps 2 and 3.
+
+A run on GitHub Actions was started and cancelled on the same day, because a runner with 4 cores takes hours. The manual workflow `mutation` is still not measured (debt T27).
