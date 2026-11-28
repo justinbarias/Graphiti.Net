@@ -6,4 +6,4 @@ The requirements live in [product-specs/spec.md](product-specs/spec.md), and [pr
 - A graph that the Python build wrote must stay readable by Graphiti.Net, and the reverse. Teams run both.
 - The library is a dependency inside someone else's agent. It must not read `.env` files, send telemetry, or pick a model provider for the user.
 - The first-use path is short: start Neo4j, register Graphiti with a chat client and an embedding generator, add an episode, search. See [product-specs/new-user-onboarding.md](product-specs/new-user-onboarding.md).
-- A feature that upstream does not have needs a strong reason, because no oracle can judge it. Azure Cosmos DB Gremlin is the one planned case, and it starts with a spike.
+- A feature that upstream does not have needs a strong reason, because no oracle can judge it. The Azure Database for PostgreSQL driver is the one planned case, and it starts with a spike.
