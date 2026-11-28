@@ -268,7 +268,7 @@ Each release names its upstream version in three places: the assembly metadata v
 
 ## Weekly check
 
-A scheduled CI job runs `python3 -B port/tools/upstream_diff.py --list --exit-code` one time each week.
+The workflow `.github/workflows/upstream-release.yml` runs `python3 -B port/tools/upstream_diff.py --list --exit-code` one time each week.
 Exit code 1 means that a release after the pin exists. The job then opens the issue `Upstream release after the pin` with the report, or it replaces the text of the open issue.
 Each other exit code above 0 is an error. The job fails and opens no issue.
 The job reads the repository and writes issues. It changes no file and starts no sync.
@@ -281,7 +281,7 @@ These items are decided, and they are not in effect. Each one goes in its own pu
 | --- | --- | --- |
 | The decision rows and the new text of invariants 2 and 9 in `AGENTS.md`. [The design document](../docs/design-docs/upstream-sync-design.md) holds the proposed text. | Lead, with the maintainer's approval | Proposed |
 | The runner patch for `stale-after-pin.txt`, with the new text of the judge README | Lead writes it, the maintainer applies it | Written: `port/patches/judge-stale-after-pin.patch`. Not applied. |
-| The weekly CI job | Lead | Not written. It is the next pull request of this stack. |
+| The weekly CI job | Lead | Written: `.github/workflows/upstream-release.yml`. It did not run on GitHub. |
 | The `UpstreamVersion` metadata and the README table | Plan 0005, the packaging task | Not written |
 | The rule R21 text for a fixed defect | Lead | Proposed |
 
