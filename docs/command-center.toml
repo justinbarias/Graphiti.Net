@@ -42,6 +42,8 @@ order = [
 "0005-6" = "Test quality"
 "0005-7" = "Release"
 "0005-8" = "Parity"
+"0005-9" = "Public surface"
+"0005-10" = "Release"
 
 # The gate log in port/DECISIONS.md holds the dates. The data file copies them from there.
 [[gates]]

@@ -55,8 +55,8 @@ Each subagent start needs the maintainer's approval first.
 | --- | --- |
 | 5 | Done 2026-11-27. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
 | 6 | Done 2026-11-27. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
-| 8 | Ingest episodes in parallel into one group, and find no lost update. This test moved to layer 9, because it needs the `Graphiti` object. It is `GraphitiE8Tests.cs`. |
-| 9 | `AddEpisodeAsync`, then `SearchAsync`. A contradicting episode closes the old fact's validity window and deletes nothing. |
+| 8 | Done 2026-11-28. Ingest episodes in parallel into one group, and find no lost update. This test moved to layer 9, because it needs the `Graphiti` object. It is `GraphitiE8Tests.cs`. |
+| 9 | Done 2026-11-28. `AddEpisodeAsync`, then `SearchAsync`. It is `GraphitiE9Tests.cs`. A contradicting episode closes the old fact's validity window and deletes nothing. |
 
 After layers 5, 7, and 9, run `scripts/mutate.sh` and apply the pruning rule.
 

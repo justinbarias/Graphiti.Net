@@ -101,12 +101,17 @@ A port of upstream `server/graph_service` to ASP.NET Core minimal APIs.
 - The deferred model clients: BGE reranker, Gemini reranker, GLiNER2, Jev.
 - A repeatable process to move the pin forward to newer upstream commits. The upstream `spec/` folder describes the designs that newer work builds on.
 
-### M6. Azure Cosmos DB for Apache Gremlin driver
+### M6. Azure Database for PostgreSQL driver
+
+The requirement is a graph database that runs on Azure as a native service.
+The first plan was Azure Cosmos DB for Apache Gremlin. That API has no vector search, no scored full-text search, and no transactions.
+On 2026-11-28 the maintainer chose Azure Database for PostgreSQL flexible server, with plain tables, pgvector, and the built-in full-text search.
+[The Azure driver exploration](../design-docs/azure-driver-exploration.md) holds the comparison and each decision.
 
 This driver has no upstream equivalent, so no differential oracle exists for it.
-The milestone starts with a feasibility spike.
-The spike must answer how the driver provides vector search and full-text search, because Graphiti needs both.
-The maintainer decides whether to build the driver after the spike report.
+The feasibility spike runs after M1, as [plan 0006](../exec-plans/active/0006-postgresql-driver-spike.md).
+The spike must show how far the full-text order of PostgreSQL differs from Neo4j, because PostgreSQL does not rank with BM25.
+The maintainer decides whether to build the driver after the spike report. The build is this milestone.
 
 ## Non-goals
 
