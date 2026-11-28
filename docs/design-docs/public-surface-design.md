@@ -2,6 +2,7 @@
 
 Status: approved by the maintainer on 2026-11-25. Plan 0003, task 2. The maintainer decided D24 to D35 on that day, each with a question that listed the options, and accepted 12 lead choices.
 One adversarial review ran after the approval. On 2026-11-26 the maintainer decided D36, changed the lifetime part of D24, and accepted lead choice L13.
+On 2026-11-28 the maintainer decided the section "Typed entity types and edge types" (rows A1 to A13). That section is not implemented.
 This page designs the public .NET surface of Graphiti.Net: the `AddGraphiti` registration, the options, the `Microsoft.Extensions.AI` adapter, and the cross-encoder over `IChatClient`.
 It holds no product code. The signatures here are the contract for the code that plan 0004 writes.
 
@@ -80,6 +81,7 @@ Upstream takes `dict[str, type[BaseModel]]` and reads four things from each clas
 | Both in M1 | Best for hosts. | More design and test work before the first preview. |
 
 A typed helper `GraphTypeDefinition.From<T>()` can come after M1 on top of the descriptor.
+On 2026-11-28 the maintainer moved the typed form into M1. The section "Typed entity types and edge types" designs it, and the builder stays as the lower-level form.
 
 ### D27. The M1 public surface
 
@@ -430,6 +432,352 @@ Layer 7 of plan 0004 built `GraphTypeDefinition`. This section gave no form for 
 | A field name that pydantic refuses at class creation | `Add*` throws `ArgumentException`: a name that starts with `_`, `model_config`, and the `model_dump` and `model_validate` members of `BaseModel` |
 | Equality of two definitions | The name and the description compare by value, and the field list by reference, as "Public records" says. The internal descriptor is not part of it. |
 
+## Typed entity types and edge types
+
+Amendment of 2026-11-28. This section is not implemented. No branch holds code for it. Task 9 of [plan 0005](../exec-plans/active/0005-parity-and-release.md) builds it.
+
+The maintainer asked for a second, idiomatic way to declare a custom type. A host writes classes or records, states each relationship with a member property, and uses attributes.
+The builder of the section above stays as the lower-level form. The typed form builds the same `GraphTypeDefinition` and `EdgeTypeRule` values.
+Ported code and the judge see no change, because they receive the same descriptors as before.
+This section amends decision D26, which put the typed helper after M1.
+
+### Example
+
+```csharp
+[Description("A business organization.")]
+public sealed record Company
+{
+    [Description("The industry of the company")]
+    public string? Industry { get; init; }
+}
+
+[Description("A person is employed by a company.")]
+public sealed record WorksAt
+{
+    [Description("The job title of the person at the company")]
+    public string? Role { get; init; }
+}
+
+[Description("A human being who is named in the text.")]
+public sealed record Person
+{
+    [Identity]
+    [Description("The email address of the person")]
+    public string? Email { get; init; }
+
+    [Description("The city where the person lives")]
+    public string? HomeCity { get; init; }
+
+    [Edge<WorksAt>]
+    public Company? Employer { get; init; }
+}
+```
+
+The host registers the classes one time, and each call uses them:
+
+```csharp
+services.AddGraphiti()
+        .AddNeo4j(o => { o.Uri = "bolt://localhost:7687"; o.User = "neo4j"; o.Password = password; })
+        .AddOntology(o => o.AddEntity<Person>().AddEntity<Company>());
+
+await graphiti.AddEpisodeAsync(episode);
+
+var results = await graphiti.AdvancedSearchAsync("Who works at Acme?", SearchRecipes.NodeHybridSearchRrf);
+foreach (var node in results.Nodes.Where(n => n.Is<Person>()))
+{
+    Person person = node.As<Person>();
+}
+```
+
+The ontology of this example holds the same values as this lower-level code:
+
+```csharp
+var person = GraphTypeDefinition.Create("Person", "A human being who is named in the text.")
+    .AddString("email", "The email address of the person")
+    .AddString("home_city", "The city where the person lives");
+var company = GraphTypeDefinition.Create("Company", "A business organization.")
+    .AddString("industry", "The industry of the company");
+var worksAt = GraphTypeDefinition.Create("WORKS_AT", "A person is employed by a company.", className: "WorksAt")
+    .AddString("role", "The job title of the person at the company");
+
+var options = new AddEpisodeOptions
+{
+    EntityTypes = [person, company],
+    EdgeTypes = [worksAt],
+    EdgeTypeMap = [new EdgeTypeRule { SourceType = "Person", TargetType = "Company", EdgeTypes = ["WORKS_AT"] }],
+    IdentityProperties = new Dictionary<string, IReadOnlyList<string>> { ["Person"] = ["email"] },
+};
+```
+
+### New public members
+
+```csharp
+public sealed class GraphOntology
+{
+    public static GraphOntology Empty { get; }
+    public static GraphOntologyBuilder CreateBuilder();
+    public IReadOnlyList<GraphTypeDefinition>? EntityTypes { get; }
+    public IReadOnlyList<GraphTypeDefinition>? EdgeTypes { get; }
+    public IReadOnlyList<EdgeTypeRule>? EdgeTypeMap { get; }
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? IdentityProperties { get; }
+}
+
+public sealed class GraphOntologyBuilder
+{
+    public GraphOntologyBuilder AddEntity<T>() where T : class;
+    public GraphOntologyBuilder AddEntity(GraphTypeDefinition definition);
+    public GraphOntologyBuilder AddEdge<T>() where T : class;
+    public GraphOntologyBuilder AddEdge(GraphTypeDefinition definition);
+    public GraphOntologyBuilder AddEdgeTypeRule(EdgeTypeRule rule);
+    public GraphOntologyBuilder AddIdentityProperties(string entityType, IReadOnlyList<string> fieldNames);
+    public GraphOntology Build();
+}
+
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class GraphTypeAttribute : Attribute { public string? Name { get; init; } }
+
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GraphFieldAttribute : Attribute { public string? Name { get; init; } }
+
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class GraphIgnoreAttribute : Attribute;
+
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class IdentityAttribute : Attribute;
+
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class EdgeAttribute<TEdge> : Attribute where TEdge : class;
+
+public static class GraphTypeExtensions
+{
+    public static bool Is<T>(this EntityNode node) where T : class;
+    public static T As<T>(this EntityNode node) where T : class;
+    public static bool Is<T>(this EntityEdge edge) where T : class;
+    public static T As<T>(this EntityEdge edge) where T : class;
+}
+```
+
+Members that existing types get:
+
+| Type | New member |
+| --- | --- |
+| `IGraphitiBuilder` | `AddOntology(Action<GraphOntologyBuilder> configure)` and `AddOntology(GraphOntology ontology)` |
+| `AddEpisodeOptions`, `AddEpisodeBulkOptions` | `GraphOntology? Ontology { get; init; }` |
+| `GraphTypeDefinition` | `static GraphTypeDefinition FromEntity<T>() where T : class` and `FromEdge<T>()` of the same form |
+| `GraphTypeDefinition` | `string ClassName { get; }`, and a third parameter of `Create`: `string? className = null`. Null gives the name. |
+
+The class name is new on the builder, and it amends lead choice L11. Upstream holds two names for a type: the dict key and the Python class name.
+The key is the node label or the stored edge name. The class name is only the `title` of the JSON schema, which reaches the prompt.
+The judge cases and upstream's podcast example use the edge keys `LIKES` and `WORKS_AT` for the classes `Likes` and `WorksAt`. One `Name` cannot state such a pair.
+
+Two attributes come from the base class library, so a host needs no new name for them: `DescriptionAttribute` of `System.ComponentModel`, and `MaxLengthAttribute` of `System.ComponentModel.DataAnnotations`.
+
+### From a class to a definition
+
+A reader in `src/Graphiti.Net/Internal/` reads each class one time with reflection and keeps the result for the process. The table gives its rules.
+
+| Typed form | Lower-level form |
+| --- | --- |
+| The class name of an entity class: `Person` | The `name` of `GraphTypeDefinition.Create`, as written: `Person`. It is the dict key and the node label. |
+| The class name of an edge class: `WorksAt` | The `name` in SCREAMING_SNAKE_CASE: `WORKS_AT`. The rule is `JsonNamingPolicy.SnakeCaseUpper`. It is the dict key and the stored edge name. |
+| `[GraphType(Name = "...")]` | The `name` as written, for an entity class and for an edge class |
+| The class name, with or without `[GraphType]` | The `className` of `Create`, which is the Python class name and the schema title |
+| `[Description]` on the class | The `description` of `Create`. A class with no attribute gives null. |
+| A public instance property with a public getter | One field, with the matching `Add*` call |
+| The property name | The field name in snake_case: `HomeCity` gives `home_city`. The rule is `JsonNamingPolicy.SnakeCaseLower`. `[GraphField(Name = "...")]` gives the name as written. |
+| `[Description]` on the property | The `description` of the field. For a positional record the reader also reads the attribute on the constructor parameter. |
+| `string` | `AddString` |
+| `int`, `long` | `AddInteger` |
+| `double`, `float` | `AddNumber` |
+| `bool` | `AddBoolean` |
+| `IReadOnlyList<T>`, `List<T>`, or `T[]` of one of the six types above | `AddStringList`, `AddIntegerList`, `AddNumberList`, or `AddBooleanList` |
+| A nullable property: `string?`, `int?`, `IReadOnlyList<string>?` | `required: false`. The field has the default `None`. |
+| A property that is not nullable | `required: true` |
+| `[MaxLength(n)]` on a `string` property | `maxLength: n` |
+| `[GraphIgnore]` | No field |
+| `[Edge<TEdge>]` on a property | No field. The property is a navigation property. See "From navigation properties to the edge type map". |
+| `[Identity]` on a field property | The field name goes to the identity properties of the class, in the order of the class. |
+
+More rules of the reader:
+
+- The fields are in the order of the class. The properties of a base class come first, as pydantic orders the fields of a subclass. The order reaches the prompt and the JSON schema.
+- An item type of a list is never nullable.
+- A reference property in code with no nullable annotations (`#nullable disable`) is optional.
+- A field that is not nullable is a required field of the pydantic model. If the model gives no value for it, validation of the reply fails as in Python. The documents tell a host to write a nullable property unless each text holds the value.
+- Static properties, indexers, and properties with no public getter are not fields.
+- An edge class follows the same rules. It has no navigation property and no `[Identity]` property. A class with no property is an edge type with no field, as `IsPresidentOf` in upstream's podcast example.
+- `GraphTypeDefinition.FromEntity<T>()` and `FromEdge<T>()` give the definition of one class for a host that uses the lower-level lists. The two differ in the name rule and in the reserved names. They read no navigation property and no `[Identity]` attribute, because a definition holds neither.
+
+### From navigation properties to the edge type map
+
+A navigation property is a property with `[Edge<TEdge>]`. It states one entry of upstream's `edge_type_map`.
+
+| Part of the property | Part of the `EdgeTypeRule` |
+| --- | --- |
+| The class that declares the property | `SourceType` |
+| The property type: an entity class, or a list or array of it. The nullable form means the same. | `TargetType` |
+| The property type `EntityNode` | `TargetType` is `Entity`, which is upstream's name for each entity |
+| `TEdge` | Its edge name is one name in `EdgeTypes` |
+
+- One edge class can stand on more than one property and in more than one class. Each pair then holds its name, as `INTERPERSONAL_RELATIONSHIP` in upstream's podcast example.
+- A navigation property never holds a value. A result of Graphiti holds no neighbors, so `As<T>()` leaves it at its default.
+- The number of targets has no meaning. `Company?` and `IReadOnlyList<Company>` state the same pair.
+- A pair with `Entity` as the source has no class to hold the property. The host adds it with `AddEdgeTypeRule`.
+
+`Build()` gives the four values in a fixed order, because the order reaches prompt text (`edge_operations.py:176`):
+
+1. `EntityTypes` holds the entity types in the order of the `AddEntity` calls.
+2. `Build()` walks the `AddEntity` and `AddEdge` calls in call order. For an entity class it walks the navigation properties in the order of the class. `EdgeTypes` holds each edge type at the place of its first mention.
+3. `EdgeTypeMap` holds one rule for each pair, in the order of the first mention of the pair in the same walk. The names of a rule are in the order of their first mention.
+4. The rules of `AddEdgeTypeRule` come next, in call order. A rule for a pair that exists adds its new names to that pair.
+5. An edge type that no rule names goes to the pair (`Entity`, `Entity`), at the end. Upstream's default map has only this pair (`graphiti.py:1808`). With an explicit map, upstream extracts no attributes for an edge type that is in no pair (`edge_operations.py:711`).
+6. `IdentityProperties` holds one entry for each entity class with an `[Identity]` property, in the order of `EntityTypes`. The entries of `AddIdentityProperties` come next.
+
+A list with no item is null, as a call with no value for that parameter. `GraphOntology.Empty` holds four null values.
+
+### Registration and calls
+
+- `AddOntology(Action<GraphOntologyBuilder>)` runs the delegate and `Build()` inside the `AddOntology` call. A class with an error then fails at host startup and not at the first episode.
+- The registered ontology is the default for `AddEpisodeAsync` and `AddEpisodeBulkAsync`. A second `AddOntology` call replaces the first.
+- A call can pass its own ontology in `AddEpisodeOptions.Ontology`. It replaces the default for that call. `GraphOntology.Empty` gives a call with no custom type.
+
+The facade selects the types of a call by the first row that applies:
+
+| Call | Types in effect |
+| --- | --- |
+| `Ontology` is set, and one or more of `EntityTypes`, `EdgeTypes`, `EdgeTypeMap`, and `IdentityProperties` are set | None. The call throws `ArgumentException`. |
+| `Ontology` is set | The four values of that ontology |
+| One or more of the four lower-level properties are set | Those properties as they are today. The default is not used. |
+| A default is registered | The four values of the default |
+| None of the above | No custom type |
+
+- `ExcludedEntityTypes` stays a list of names for each call. Upstream makes sure that each name is `Entity` or an entity type in effect (`helpers.py:198`).
+- `AddTripletAsync` takes no types. If `AddTripletOptions.IdentityProperties` is null, the call uses the identity properties of the default ontology.
+- Upstream takes the types for each call only. A default for each call is a .NET addition of the facade, and `GraphitiCore` does not know it.
+
+### Reading a result as a typed class
+
+- If `Labels` holds the type name of the class, `node.Is<Person>()` is true. If `Name` equals the edge name of the class, here `WORKS_AT`, `edge.Is<WorksAt>()` is true. Both compare ordinal text.
+- `node.As<Person>()` builds the class from `Attributes`. It reads each field by its wire name with the same reader, so it needs no ontology.
+- If `Is<T>()` is false, `As<T>()` throws `InvalidCastException`, as a cast does.
+- An attribute that is null or not there gives null for a nullable property. For a property that is not nullable, `As<T>()` throws `InvalidCastException` with the field name.
+- An attribute that is not a field of the class is ignored.
+- A `long` value fits an `int` or a `long` property, and an `int` property throws `OverflowException` for a value that it cannot hold. A `double` or a `long` value fits a `double` or a `float` property. Another kind of value throws `InvalidCastException`.
+- The class needs a public constructor with no parameter and a `set` or `init` accessor on each field property. A positional record works too: its one public constructor has a parameter for each property.
+- The values of the node or the edge itself (`Name`, `Summary`, `Fact`, `Uuid`) stay on the record. The typed class holds attributes only, because upstream reserves those names.
+
+### Reserved names
+
+| Class | Field names that the reader refuses | Source |
+| --- | --- | --- |
+| Entity class | `uuid`, `name`, `group_id`, `labels`, `created_at`, `name_embedding`, `summary`, `attributes` | The fields of upstream's `EntityNode`. Upstream raises `EntityTypeValidationError` at the call (`entity_types_utils.py:32`). |
+| Edge class | `uuid`, `group_id`, `source_node_uuid`, `target_node_uuid`, `created_at`, `name`, `fact`, `fact_embedding`, `episodes`, `expired_at`, `valid_at`, `invalid_at`, `reference_time`, `attributes` | The fields of upstream's `EntityEdge`. Upstream has no such test: a save writes no attribute with one of these names (`edges.py:326`). |
+| Both | A name that starts with `_`, `model_config`, and the `model_dump` and `model_validate` members of `BaseModel` | Pydantic refuses them. `GraphTypeDefinition.Add*` throws for them today. |
+
+A C# property `Name` on an entity class becomes `name` and is refused. The host renames the property or sets `[GraphField(Name = "...")]`.
+The test of an edge class is stricter than upstream. It applies to the typed form only. The builder form keeps upstream's behavior.
+
+### Errors
+
+Each error of a class shows when the ontology is built, which is host startup for `AddOntology`.
+
+| Condition | Exception | Thrown by |
+| --- | --- | --- |
+| A property type outside the table above, with no `[Edge<TEdge>]` and no `[GraphIgnore]` | `ArgumentException` with the class name, the property name, and the type | `AddEntity<T>`, `AddEdge<T>`, `FromEntity<T>`, `FromEdge<T>`, `As<T>` |
+| A field of an entity class with a name of `EntityNode` | `EntityTypeValidationException` with upstream's message | `AddEntity<T>` |
+| A field of an edge class with a name of `EntityEdge` | `ArgumentException` | `AddEdge<T>`, and `AddEntity<T>` for the edge class of a navigation property |
+| A field name that pydantic refuses, or two properties with one field name | `ArgumentException`, from `GraphTypeDefinition.Add*` | The same members |
+| `[MaxLength]` on a property that is not a `string` | `ArgumentException` | The same members |
+| `[Identity]` on a navigation property, on a property with `[GraphIgnore]`, or in an edge class | `ArgumentException` | `AddEntity<T>`, `AddEdge<T>` |
+| `[Edge<TEdge>]` on a property whose type is not an entity class, `EntityNode`, or a list or array of one | `ArgumentException` | `AddEntity<T>` |
+| A navigation property in an edge class | `ArgumentException` | `AddEdge<T>`, `AddEntity<T>` |
+| An abstract class or a generic class | `ArgumentException` | `AddEntity<T>`, `AddEdge<T>`, `FromEntity<T>`, `FromEdge<T>`, `As<T>` |
+| The target class of a navigation property is not in the ontology | `ArgumentException` with the property and the missing class | `Build` |
+| Two types with one name, or one class as an entity type and as an edge type | `ArgumentException` | `Build` |
+| An entry of `AddIdentityProperties` for a type or a field that the ontology does not hold | `IdentityPropertyValidationException`, as upstream raises it at the call | `Build` |
+| A call sets `Ontology` and one of the four lower-level properties | `ArgumentException` | `AddEpisodeAsync`, `AddEpisodeBulkAsync` |
+| The record does not have the type of the class, or an attribute has the wrong kind | `InvalidCastException` | `As<T>` |
+| No public constructor that the reader can use | `ArgumentException` | `As<T>` |
+
+The typed form adds no test of the type name. The label tests of the call stay as they are.
+
+### Reflection, trimming, and native AOT
+
+- The reader uses reflection at run time. The package gets no source generator and no analyzer project.
+- Each generic parameter that the reader reflects on has `[DynamicallyAccessedMembers]` for public properties and public constructors: `T` of `AddEntity`, `AddEdge`, `FromEntity`, `FromEdge`, `Is`, and `As`, and `TEdge` of `EdgeAttribute<TEdge>`.
+- `Build` refuses a navigation target that the host did not add. So each target class is the `T` of an `AddEntity<T>` call, and the reader reflects on no class that only a property type names.
+- The reader calls no `Reflection.Emit` and no `MakeGenericType`. It builds a list with the four list types that it names in code.
+- A source generator can come later. It then emits the same `GraphTypeDefinition` code, so the public members of this section do not change.
+
+### Decisions of the maintainer
+
+The maintainer decided each row on 2026-11-28, from a question that listed the options. The first option of each question was the recommendation of this session, and the maintainer chose it in each row.
+Row A4 came from a second question. The first question on wire names said that the judge fixtures use the class name for each type, which is false for edge types.
+This change edits no file under `port/`. When task 9 starts, the lead of plan 0004 gives each row a number in [DECISIONS.md](../../port/DECISIONS.md).
+
+| # | Question | Choice | Other options that the maintainer saw |
+| --- | --- | --- | --- |
+| A1 | How a class becomes an entity type | A plain class with no marker. The type name is the class name. Descriptions come from `[Description]`. Attributes of Graphiti exist only where the base class library has none. | Attributes of Graphiti only. A required marker attribute with `[Description]` for the text. |
+| A2 | How a host declares a relationship | Each edge type is a class. A navigation property on the source entity names it with `[Edge<TEdge>]`. The edge type map comes from these properties. | The navigation property and also `[Connects<TSource, TTarget>]` on the edge class. The edge class only. A navigation property with an edge name and no class. |
+| A3 | The wire names of fields and of entity types | Field names in snake_case. The name of an entity type is the class name as written. An attribute changes each name. | Names as written. |
+| A4 | The name of an edge type | The class name in SCREAMING_SNAKE_CASE, and the class name as the schema title. `[GraphType(Name = "...")]` changes the edge name only. `GraphTypeDefinition` gets a class name of its own. | The class name as written for both, with no change to L11. The class name as the default edge name, with the title apart. |
+| A5 | Reflection or a source generator | Reflection at run time with trimming annotations. A generator can come later with no public break. | A source generator. Both now. |
+| A6 | Property types and optional fields | The closed set of `GraphFieldKind`. A nullable property is optional, and each other property is required. Another type throws `ArgumentException`. `[GraphIgnore]` leaves a property out. | The `required` modifier decides. Enum and date kinds now. Leave out a property of another type with no error. |
+| A7 | Where a host registers the types | One object, `GraphOntology`. `AddOntology` on `AddGraphiti` sets the default for each call, and a call can pass its own. The lower-level properties stay. | For each call only. No new object, with a helper that gives the three lists. |
+| A8 | Identity properties and excluded types | `[Identity]` on a property. `ExcludedEntityTypes` stays a list of names for each call. | `[Identity]` and typed exclusion in the ontology. Both stay as they are today. |
+| A9 | Reading a result | `Is<T>()` and `As<T>()` on `EntityNode` and `EntityEdge`. The result records do not change. | Input only for now. Generic result records such as `EntityNode<Person>`. |
+| A10 | Reserved names | The reader refuses them for entity classes and for edge classes when the ontology is built. | Bind such a property to the value of the node. The upstream test for entity classes only. Leave it to the call. |
+| A11 | A navigation target that the host did not add | `Build` throws. The order of the `AddEntity` calls is the order in the prompt. An edge class of a navigation property needs no call. | Add each class that a navigation property reaches. An assembly scan in addition. |
+| A12 | The plan and the milestone | A task in plan 0005, in M1. It runs before the quickstart and the package task, so both show the typed form. | A new plan 0006 in M1. A new plan 0006 after M1. |
+| A13 | The model of the task | An Opus 5.5 workhorse at medium effort. The lead reviews the result. | Sonnet 5.5 at high effort. The lead in its own session. |
+
+### Lead choices of this section
+
+The session that wrote this section chose these details. The maintainer accepted all 14 on 2026-11-28.
+
+| # | Choice | Reason |
+| --- | --- | --- |
+| C1 | A `GraphOntologyBuilder` with `Build()`, and an immutable `GraphOntology` that shows its four lower-level values. | Some tests need each class of the ontology, for example the target of a navigation property. The four values make the mapping visible to a host. |
+| C2 | The attribute names `Edge<TEdge>`, `GraphType`, `GraphField`, `GraphIgnore`, and `Identity`, and `[MaxLength]` from the base class library for the length limit. | Short names at the place of use. `EdgeAttribute<TEdge>` does not collide with the record `Edge`, because C# tells them apart by the type parameter. |
+| C3 | The list forms are `IReadOnlyList<T>`, `List<T>`, and `T[]`. The number types are `int`, `long`, `double`, and `float`. | The reader builds these with no generic reflection. `decimal` and the small integer types have no pydantic kind in the closed set. |
+| C4 | The properties of a base class come first. | Pydantic gives a subclass the fields of its base class first. |
+| C5 | An edge type in no rule goes to the pair (`Entity`, `Entity`). | It gives `AddEdge<T>()` the meaning of upstream's default map. Without it, upstream extracts no attributes for that edge type. |
+| C6 | The order rules of `Build()`. | Each order reaches prompt text, so it must not depend on the run. |
+| C7 | The ontology refuses two types with one name. | The lower-level lists replace the first definition, as a Python dict does. In one ontology a second class with the same name is a host error. |
+| C8 | `AddTripletAsync` uses the identity properties of the default ontology. | The host stated the identity of a type one time. A triplet with another rule then gives two nodes for one entity. |
+| C9 | If `Is<T>()` is false, `As<T>()` throws. | A cast to a wrong type is an error in .NET. A host that wants no exception calls `Is<T>()` first. |
+| C10 | A second `AddOntology` call replaces the first. | One container holds one Graphiti (lead choice L1), so it holds one default. |
+| C11 | `GraphTypeDefinition.FromEntity<T>()` and `FromEdge<T>()` exist. | Decision D26 named a helper `From<T>()`. An entity class and an edge class differ in the name rule, so one member cannot serve both. |
+| C12 | `AddIdentityProperties` on the builder. | A call cannot set `IdentityProperties` together with an ontology, so a builder-form entity type needs a place for them. |
+| C13 | `Is` and `As` are extension methods in `GraphTypeExtensions`. | The result records stay data only, as decision D25 says. |
+| C14 | The class name on the builder is the parameter `className` of `Create` and the property `ClassName`. Equality of two definitions compares it by value. | Decision A4 needs the value. The lead of plan 0004 owns the builder and can change the form. |
+
+### Facts and open points
+
+Facts, read on 2026-11-28. Upstream paths are under `.upstream/graphiti/graphiti_core` at the pinned commit.
+
+| Claim | Source |
+| --- | --- |
+| `add_episode` takes `entity_types`, `excluded_entity_types`, `edge_types`, `edge_type_map`, and `identity_properties` for each call. Nothing is registered on the `Graphiti` object. | `graphiti.py:1640` |
+| With no `edge_type_map`, upstream uses one pair (`Entity`, `Entity`) with each edge type. | `graphiti.py:1808` |
+| A node matches a pair by each of its labels and by `Entity`. | `edge_operations.py:705` |
+| An identity property must be a field of an entity type of the same call, and its list must not be empty. | `entity_types_utils.py:40` |
+| Upstream's prompts ask the model for a relation name in SCREAMING_SNAKE_CASE. | `prompts/extract_edges.py:35` |
+| The podcast example and the judge cases use edge keys such as `WORKS_AT` for a class `WorksAt`. For an entity type, the key equals the class name in both. | `examples/podcast/podcast_runner.py`, the flow cases under `port/judge/cases/` |
+| The public records hold `Attributes` as a dictionary with wire names. | `GraphNodes.cs` and `GraphEdges.cs` on the branch `port/public-surface` |
+| No project sets `IsTrimmable` or `IsAotCompatible`. No build step proves trimming for a part of the library. | `Directory.Build.props` and the project files |
+
+Open points. Task 9 answers the first three with a test before it builds on them.
+
+| # | Point | Owner |
+| --- | --- | --- |
+| P1 | `Type.GetProperties` documents no order. The reader sorts the properties of one class by `MetadataToken`, which is the order of the source for compiler output. A test must prove the order, also in a trimmed build. | Task 9 |
+| P2 | The reader finds a nullable reference type with `NullabilityInfoContext`. A trimmed application can turn that type off with a feature switch. Make sure that a trimmed build and a native AOT build give the same definitions as a normal build. | Task 9 |
+| P3 | Make sure that the trimmer honors `[DynamicallyAccessedMembers]` on the type parameter of the generic attribute `EdgeAttribute<TEdge>`. If it does not, the reader needs another way to keep the members of an edge class. | Task 9 |
+| P4 | Does the library declare `IsAotCompatible`? Only the typed form gets annotations here. Nobody measured the ported code under the trimmer. | Maintainer, after M1 |
+| P5 | More field kinds, for example an enum and a date. Each kind needs a rule for pydantic's schema text. It replaces the second half of open question 9. | Maintainer, after M1 |
+| P6 | Typed helpers for the names in `SearchFilters` (`NodeLabels`, `EdgeTypes`) and in `ExcludedEntityTypes`. | Maintainer, after M1 |
+
 ## The chat adapter
 
 `ChatClientLlmClient` derives from the ported `LLMClient` and implements `_generate_response`, by decision D17.
@@ -681,7 +1029,7 @@ The lead made these choices. The maintainer accepts or changes them with this pa
 | L8 | The response cache of `LLMClient` has no option. It stays off. | A host adds a cache as middleware on its `IChatClient`. The ported cache stays for the evaluation tests (GAPS J4). |
 | L9 | Tracing uses one `ActivitySource` named `Graphiti.Net`. A host turns it on with `AddSource("Graphiti.Net")`. | With no listener an `ActivitySource` does no work, which equals upstream's no-op tracer. |
 | L10 | The name `MaxCoroutines` stays, and `search_` becomes `AdvancedSearchAsync`. | The first name ties the option to the upstream documents. A trailing underscore is not a .NET name. |
-| L11 | `GraphTypeDefinition.Name` is both the dict key and the class name. | They are equal in the judge fixtures and in the upstream examples. |
+| L11 | `GraphTypeDefinition.Name` is both the dict key and the class name. | They are equal in the judge fixtures and in the upstream examples. Corrected on 2026-11-28: that holds for entity types only. Decision A4 of the section "Typed entity types and edge types" gives the builder a class name of its own. |
 | L12 | The public namespaces mirror upstream, without the `tx` parameter. | A host reads the upstream documents for these calls. |
 | L13 | Added after the review and accepted on 2026-11-26: with routes, each chat adapter of one Graphiti shares one usage tracker. | Upstream's `token_tracker` shows the default client only, so routed calls are not visible to a host. |
 
@@ -750,7 +1098,7 @@ Checked on 2026-11-25. Upstream paths are under `.upstream/graphiti/graphiti_cor
 | 6 | The driver session member for a write with a timeout (rulebook O6) is still open. This page does not decide it. | Maintainer | Layer 7 of plan 0004 |
 | 7 | Does a second `AddGraphiti` in one process with other options fail or share? L1 says that the containers share the process-wide parts. | Lead | The facade unit |
 | 8 | The chat adapter does not strip a markdown code fence. A local model that wraps its JSON in a fence then fails after 4 attempts. A strip step is a .NET extension below the judge seam. | Maintainer | The adapter unit |
-| 9 | The typed helper `GraphTypeDefinition.From<T>()` and more field kinds. | Maintainer | After M1 |
+| 9 | More field kinds. The typed helper was the first half of this question. The section "Typed entity types and edge types" answers it. | Maintainer | After M1 |
 | 10 | Plan 0004 gives layer 3, with "the new `Microsoft.Extensions.AI` adapter", to a Sonnet 5.5 workhorse. The adapters, the facade, and the seams are lead code by rule R1. The plan needs a row for them. | Lead | Layer 3 of plan 0004 |
 | 11 | A value in `attributes` that the value model cannot hold, for example a Neo4j point, throws at the facade. Nobody listed which values the Neo4j project can return. | Lead | The facade unit |
 | 12 | Two ported namespaces can hold one class name. Two `using` directives inside a namespace are then ambiguous. Nobody searched upstream for such pairs. | Lead | Layer 0 of plan 0004 |
