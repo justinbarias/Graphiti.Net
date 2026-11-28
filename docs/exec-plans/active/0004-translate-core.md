@@ -735,6 +735,18 @@ Differences that the lead accepted by name: GAPS F48, F49, U22, and 132 more can
 
 No `TODO(port)` marker is new in a ported unit. 20 upstream tests keep a `TODO(port): O10` comment: 18 in the ingestion test files and 2 in `TestAddTriplet.cs`. Each one replaces a function of a module with a result, and the queue names the recorded case that covers it.
 
+Commands at the tip of the branch, 2026-11-28, on a Neo4j 5.26.2 with an empty graph:
+
+| Command | Result |
+| --- | --- |
+| `scripts/check.sh --test` | `check: passed`, 19,268 tests, 0 failed |
+| `dotnet test --project tests/Port.Evaluation` | 18,664 tests, 0 failed, 0 skipped |
+| `dotnet test --project tests/Graphiti.Net.E2E.Tests` | 164 tests, 0 failed, 0 skipped |
+| `python3 -B port/judge/run.py --build dotnet` | 1,999 cases, 1,933 passed, 66 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong, `judge: passed` |
+| `record_graphiti.py --check`, `record_phases.py --check`, `record_scheduler.py --check` | Each one is current |
+
+The adversarial pass of the pull request found four minor points and no behavior difference. Each of its nine seeded defects fails a test. The four points are corrected in this section, in the queue, and in GAPS F50 and debt row T31.
+
 What is not checked:
 
 - Two lines of `phases` have no recording: line 820 and line 1810.
