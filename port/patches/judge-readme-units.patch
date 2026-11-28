@@ -1,6 +1,6 @@
---- a/port/judge/README.md	2026-11-26 21:32:51
-+++ b/port/judge/README.md	2026-11-26 21:32:51
-@@ -193,7 +193,7 @@
+--- a/port/judge/README.md	2026-11-28 12:41:50
++++ b/port/judge/README.md	2026-11-28 12:41:50
+@@ -195,7 +195,7 @@
  
  ## Bindings in the .NET host
  
