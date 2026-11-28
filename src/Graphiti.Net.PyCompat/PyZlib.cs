@@ -52,6 +52,13 @@ internal static class PyZlib
     /// <summary><c>zlib.compress(data)</c>, with the default level 6.</summary>
     internal static byte[] Compress(byte[] data)
     {
+        // For no data, ZLibStream writes no byte at all. Python writes a stream of 8 bytes: the header, one empty
+        // block with the fixed code, and the check value 1.
+        if (data.Length == 0)
+        {
+            return [0x78, 0x9C, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01];
+        }
+
         using var output = new MemoryStream();
         using (var zlib = new ZLibStream(output, new ZLibCompressionOptions { CompressionLevel = 6 }, leaveOpen: true))
         {

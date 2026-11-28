@@ -15,7 +15,9 @@ public class PyZlibTests
     [Fact]
     public void Decompress_reads_each_stream_that_the_runtime_writes()
     {
-        Gen.Select(Gen.Int[0, 4], Gen.Int[0, 70_000], Gen.Int[0, 3], Gen.Int).Sample(
+        // The length starts at 1. For no data, ZLibStream writes no byte at all, and that is not a zlib stream: the next
+        // test covers it.
+        Gen.Select(Gen.Int[0, 4], Gen.Int[1, 70_000], Gen.Int[0, 3], Gen.Int).Sample(
             t =>
             {
                 var (kind, length, level, seed) = t;
@@ -23,6 +25,32 @@ public class PyZlibTests
                 Assert.Equal(data, PyZlib.Decompress(RuntimeCompress(data, Levels[level])));
             },
             iter: 400);
+    }
+
+    [Fact]
+    public void Decompress_rejects_the_empty_output_that_the_runtime_writes_for_no_data()
+    {
+        // CPython 3.12: zlib.decompress(b'') raises zlib.error with this text.
+        foreach (var level in Levels)
+        {
+            var packed = RuntimeCompress([], level);
+            Assert.Empty(packed);
+            var error = Assert.Throws<InvalidDataException>(() => PyZlib.Decompress(packed));
+            Assert.Equal("Error -5 while decompressing data: incomplete or truncated stream", error.Message);
+        }
+    }
+
+    [Fact]
+    public void Compress_writes_the_stream_of_Python_for_no_data()
+    {
+        // CPython 3.12: zlib.compress(b'').hex() == '789c030000000001'.
+        var packed = PyZlib.Compress([]);
+        Assert.Equal(Convert.FromHexString("789C030000000001"), packed);
+        Assert.Empty(PyZlib.Decompress(packed));
+        using var source = new ZLibStream(new MemoryStream(packed), CompressionMode.Decompress);
+        using var target = new MemoryStream();
+        source.CopyTo(target);
+        Assert.Empty(target.ToArray());
     }
 
     [Fact]
