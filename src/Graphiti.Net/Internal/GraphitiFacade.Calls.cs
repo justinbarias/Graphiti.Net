@@ -222,9 +222,9 @@ internal sealed partial class GraphitiFacade : IGraphiti
     private static Exception ErrorOfTheCall(Exception wrap)
     {
         var error = wrap;
-        while (IsSpanWrap(error))
+        while (error is InvalidOperationException { Message: Core.OpenTelemetryTracer.GeneratorDidNotStopAfterThrow, InnerException: { } inner })
         {
-            error = error.InnerException!;
+            error = inner;
         }
 
         return error;
