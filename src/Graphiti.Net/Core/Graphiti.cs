@@ -76,7 +76,10 @@ internal static partial class GraphitiModule
     internal const long SagaSummaryMaxEpisodeBytes = 100_000;
     internal static readonly PyPatch<long> SagaSummaryMaxPromptBytes = new(128 * 1024);
     internal const long MaxSagaEpisodesForSummary = 20;
-    internal const long SummaryRebuildBatchSize = 10;
+
+    // PORT: tests/test_graphiti_mock.py replaces SUMMARY_REBUILD_BATCH_SIZE with monkeypatch.setattr, and remove_episode reads
+    // the module name at each call, so it is a PyPatch (R17).
+    internal static readonly PyPatch<long> SummaryRebuildBatchSize = new(10);
     internal const long SagaSummaryMaxTokens = 8192;
 
     // PORT: internal, because GraphitiCore reads it (R2).
@@ -3491,9 +3494,9 @@ internal sealed class GraphitiCore
                 ];
                 Py.SortInPlace(remainingEpisodes, remaining => remaining.ValidAt);
                 node.Summary = string.Empty;
-                for (long batchStart = 0; batchStart < remainingEpisodes.Count; batchStart += GraphitiModule.SummaryRebuildBatchSize)
+                for (long batchStart = 0; batchStart < remainingEpisodes.Count; batchStart += GraphitiModule.SummaryRebuildBatchSize.Value)
                 {
-                    var episodeBatch = Py.Slice(remainingEpisodes, batchStart, batchStart + GraphitiModule.SummaryRebuildBatchSize);
+                    var episodeBatch = Py.Slice(remainingEpisodes, batchStart, batchStart + GraphitiModule.SummaryRebuildBatchSize.Value);
                     await NodeOperations.ExtractEntitySummariesBatchAsync(
                         clients.LlmClient,
                         [node],

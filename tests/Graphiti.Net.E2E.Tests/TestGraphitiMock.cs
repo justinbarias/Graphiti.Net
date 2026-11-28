@@ -9,9 +9,8 @@
 // groups of its own (GraphFixture) and filters each read by them. Where a call reads the whole graph, a PORT comment names
 // the change.
 //
-// The upstream test `test_remove_episode_rebuilds_summary_in_batches` and `test_remove_episode_keeps_old_summary_when_rebuild_fails`
-// patch the module value SUMMARY_REBUILD_BATCH_SIZE. In C# it is a `const` (GraphitiModule.SummaryRebuildBatchSize), so
-// no patch is possible: see the PORT comments of the two tests.
+// The upstream tests `test_remove_episode_rebuilds_summary_in_batches` and `test_remove_episode_keeps_old_summary_when_rebuild_fails`
+// replace the module value SUMMARY_REBUILD_BATCH_SIZE. Each C# test replaces GraphitiModule.SummaryRebuildBatchSize, a PyPatch (R17).
 namespace Graphiti.E2E.Tests;
 
 using Graphiti.Core;
@@ -366,13 +365,8 @@ public sealed class TestGraphitiMock
         });
     }
 
-    // PORT: the upstream test sets SUMMARY_REBUILD_BATCH_SIZE to 2 with `monkeypatch.setattr`. The port has it as a `const`
-    // (GraphitiModule.SummaryRebuildBatchSize, 10), so the batch size cannot change. The same condition comes from the data:
-    // twelve remaining episodes (the batch size is 10) give a first batch of ten episodes and a second batch of two. The
-    // assertions of the Python test read the first and second batch the same way: the oldest episodes are in the first prompt,
-    // the newest episodes are in the second prompt, and the second prompt holds the summary of the first reply. The recorded
-    // case remove_episode/remove_eleven_episodes of values/graphiti.json (tests/Port.Evaluation) covers the same split of
-    // eleven episodes by the batch size of ten.
+    // The batch size is 2, as upstream. Three episodes remain: the two oldest ones are in the first prompt, and the newest
+    // one is in the second prompt, which also holds the summary of the first reply.
     [Fact(Timeout = TimeLimit)]
     public async Task test_remove_episode_rebuilds_summary_in_batches()
     {
@@ -380,7 +374,8 @@ public sealed class TestGraphitiMock
         await using var g = new GraphFixture();
         await Guard(async () =>
         {
-            const int batchSize = (int)GraphitiModule.SummaryRebuildBatchSize;
+            const int batchSize = 2;
+            using var patch = GraphitiModule.SummaryRebuildBatchSize.Use(batchSize);
             var embedder = new MockEmbedder();
             var llm = new MockLlmClient(Summaries(("Alice", "summary-1")), Summaries(("Alice", "summary-2")));
             var graphiti = g.Graphiti(llm, embedder);
@@ -390,10 +385,10 @@ public sealed class TestGraphitiMock
             var group = g.GroupId;
             var episodeToRemove = Episode(group, "episode_to_remove", "Alice mentioned OLD_MARKER and spoke with Bob.", PyClock.Plus(now, -40), PyClock.Plus(now, -40));
 
-            // The remaining episodes, oldest first: batchSize in the first batch and two in the second batch.
+            // The remaining episodes, oldest first: batchSize in the first batch and one in the second batch.
             List<EpisodicNode> remaining =
             [
-                .. Enumerable.Range(0, batchSize + 2).Select(i => Episode(
+                .. Enumerable.Range(0, batchSize + 1).Select(i => Episode(
                     group,
                     $"episode_{i:D2}",
                     $"Alice finished the remaining project number {i:D2}.",
@@ -441,9 +436,8 @@ public sealed class TestGraphitiMock
         });
     }
 
-    // PORT: the upstream test sets SUMMARY_REBUILD_BATCH_SIZE to 1 (see the test above for the constant). Here the
-    // remaining episodes are one more than the batch size: the first batch has ten episodes and the second batch has one
-    // episode, and the second reply is a RuntimeError, as upstream. `caplog` is a log factory (AllLogsFactory) that
+    // The batch size is 1, as upstream. Two episodes remain: the first batch has one episode and the second batch has one
+    // episode, and the second reply is a RuntimeError. `caplog` is a log factory (AllLogsFactory) that
     // PortServices.Use gives to the ported code. The ERROR record of Python names the uuid of the entity in its message.
     [Fact(Timeout = TimeLimit)]
     public async Task test_remove_episode_keeps_old_summary_when_rebuild_fails()
@@ -454,7 +448,8 @@ public sealed class TestGraphitiMock
         using var logs = Graphiti.Internal.PortServices.Use(loggerFactory: new AllLogsFactory(lines));
         await Guard(async () =>
         {
-            const int batchSize = (int)GraphitiModule.SummaryRebuildBatchSize;
+            const int batchSize = 1;
+            using var patch = GraphitiModule.SummaryRebuildBatchSize.Use(batchSize);
             var embedder = new MockEmbedder();
             var llm = new MockLlmClient(Summaries(("Alice", "summary-1")), new InvalidOperationException("summary failure"));
             var graphiti = g.Graphiti(llm, embedder);

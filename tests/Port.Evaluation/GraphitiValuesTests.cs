@@ -147,7 +147,7 @@ public class GraphitiValuesTests
         Assert.Equal(GraphitiModule.SagaSummaryMaxEpisodeBytes, (long)constants["SAGA_SUMMARY_MAX_EPISODE_BYTES"]!);
         Assert.Equal((long)constants["SAGA_SUMMARY_MAX_PROMPT_BYTES"]!, GraphitiModule.SagaSummaryMaxPromptBytes.Value);
         Assert.Equal(GraphitiModule.MaxSagaEpisodesForSummary, (long)constants["MAX_SAGA_EPISODES_FOR_SUMMARY"]!);
-        Assert.Equal(GraphitiModule.SummaryRebuildBatchSize, (long)constants["SUMMARY_REBUILD_BATCH_SIZE"]!);
+        Assert.Equal((long)constants["SUMMARY_REBUILD_BATCH_SIZE"]!, GraphitiModule.SummaryRebuildBatchSize.Value);
         Assert.Equal(GraphitiModule.SagaSummaryMaxTokens, (long)constants["SAGA_SUMMARY_MAX_TOKENS"]!);
         Assert.Equal(GraphitiModule.SagaSummarySchemaWrapper, (string)constants["_SAGA_SUMMARY_SCHEMA_WRAPPER"]!);
     }
