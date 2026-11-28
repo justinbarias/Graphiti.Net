@@ -338,6 +338,8 @@ Example questions form open rows without boxes. Thin translucent rules separate 
 A hover underlines the question and brightens the arrow. It does not change the padding.
 Each question uses `11px 26px 11px 2px` padding, the data type size, and a `1.4` line height.
 Hover moves the left padding to `8px` and brightens the arrow. The rows keep a clear background.
+CopilotKit places the input block over the bottom of the message list. The block has the rail color and a `44px` fade above it, so a message leaves view before it meets the input.
+The footer holds the attribution in one short sentence for the Act and one for the Bill.
 The input uses the secondary rail surface and a capsule shape. Its transparent border becomes secondary rail ink on focus.
 The textarea has `8px` left padding and a secondary rail ink placeholder.
 The round send button uses rail ink over rail blue. Its disabled state uses `rail-3` with secondary rail ink text.
@@ -394,6 +396,13 @@ The fact table holds the full text. The source mark carries the line color, and 
 A polite live region announces the selected fact text.
 
 **The Still Hover Rule.** A hover never changes the size of an element. It changes color, opacity, or decoration only.
+
+**The Pinned First Rule.** A pinned selection moves its rows to the top of the fact table and of the section texts. A hover never changes an order.
+A pinned fact comes first in the fact table, and the sections that state it come first in the section texts, and they are open.
+A pinned section brings its facts and its text to the top in the same way. The other rows follow in the order of the result, dimmed.
+The rows of the ruler, the key, and the graph never change their order, so the element under the pointer does not move.
+A fact that the reader pins in the fact table itself stays in its place there. Only the section texts change their order.
+The order of the result returns when the reader clears the pin. The page adds no announcement: the fact detail is the one live region.
 
 ### Validity ruler
 

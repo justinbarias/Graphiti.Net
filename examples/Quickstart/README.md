@@ -227,12 +227,12 @@ This is the rule of the post that the section "The ontology" names: when the sou
 
 The result of the full run of the Bill, with the placeholder date:
 
-- The split gave 226 episodes for this run: 109 new sections, 58 changes of words, and 59 repealed sections. The split now gives 228, because a later rule keeps 2 more changes of words (Schedule 2 item 48 and Schedule 3 item 13). These 2 are not in the numbers below. The split leaves 89 items out.
-- The 167 model episodes used about 6.2 million input tokens and 0.59 million output tokens of `gpt-6-luna`, about 0.46 USD, in about 31 minutes. The command stopped 6 times with the validation error of "How it works", and each new run continued.
-- The group then held 476 episodes, 594 entities, and 1,768 facts. Each entity has one of the seven types.
+- The split gives 228 episodes: 109 new sections, 60 changes of words, and 59 repealed sections. It leaves 89 items out.
+- The 169 model episodes used about 6.2 million input tokens and 0.59 million output tokens of `gpt-6-luna`, about 0.46 USD, in about 31 minutes. The command stopped 6 times with the validation error of "How it works", and each new run continued.
+- The group then held 478 episodes, 595 entities, and 1,769 facts. Each entity has one of the seven types.
 - 327 facts have an end date. The repeal step ended 309 of them. Graphiti ended the other 18 through a new fact that contradicts the old one, for example the civil penalty of 500 penalty units of section 91, which ends on 26 November 2026.
 - 295 of the 1,110 facts of the 2021 Act have an end date. Each of the 87 facts of the Act that name the basic online safety expectations ends on 25 November 2027. 65 of the 71 facts that name an industry code or an industry standard end on that day. The other 6 are also stated by a section that stays.
-- 215 new facts start on 26 November 2026, and 442 start on 25 November 2027. One new fact has no start date.
+- 215 new facts start on 26 November 2026, and 443 start on 25 November 2027. One new fact has no start date.
 
 An example. The question: "What happens to the basic online safety expectations under the Digital Duty of Care Bill, and from which date? What duty replaces them?" The answer, shortened: the Bill repeals the expectations from 25 November 2027, and this date is a placeholder because the Bill has no Royal Assent (Online Safety Act 2021 s 45 (repealed by the Digital Duty of Care Bill 2026, Sch 2 item 13)). A digital duty of care replaces them: a person responsible for an online service must take appropriate action to ensure a safe online environment (Online Safety Act 2021 s 26 (inserted by the Digital Duty of Care Bill 2026, Sch 2 item 8)).
 

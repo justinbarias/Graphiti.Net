@@ -57,8 +57,8 @@ function Workspace() {
           <CopilotChat labels={{ chatInputPlaceholder: "Ask about the Act or the Bill", welcomeMessageText: "Ask a question, or start with one of these." }} />
         </div>
         <footer>
-          Text of the Act: Federal Register of Legislation, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Text of the
-          Bill: Parliament of Australia, as passed by both Houses. Each date of the Bill counts from its day of Royal Assent, which is a setting.
+          Act: Federal Register of Legislation, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Bill: Parliament of
+          Australia, as passed by both Houses.
         </footer>
       </aside>
       <main id="result" className="result" tabIndex={-1}>

@@ -1268,6 +1268,22 @@ pre {
   color: var(--rail-ink-2);
 }
 
+/*
+ * CopilotKit puts the input over the bottom of the message list, and the block has no background of its own. So a
+ * message that scrolls behind it showed through, around the input and under the note. The block gets the colour of the
+ * rail, and a short fade above it, so a message goes out of view before it meets the input.
+ */
+.rail [data-testid="copilot-input-overlay"] > div {
+  background: var(--rail);
+}
+
+.rail [data-testid="copilot-input-overlay"] > div::before {
+  content: "";
+  position: absolute;
+  inset: -44px 0 100% 0;
+  background: linear-gradient(to bottom, transparent, var(--rail));
+}
+
 /* The page takes no file, so the button that adds one is not shown. */
 .rail [data-testid="copilot-add-menu-button"] {
   display: none;

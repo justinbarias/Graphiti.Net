@@ -14,6 +14,8 @@ const policy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // The badge of the Next.js dev server sits in the bottom left corner, over the attribution of the rail. It is off.
+  devIndicators: false,
   async headers() {
     return [{ source: "/:path*", headers: [{ key: "Content-Security-Policy", value: policy }] }];
   },

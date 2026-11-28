@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TemporalGraph, validity } from "./graph";
 import { lineOf, linesOf, parseResult, sourceParts, sourceText, statedIn, timeFraction, type Fact, type SearchResult } from "./result";
 import { eventsOf, useStore, type Focus, type ToolCall } from "./store";
@@ -296,8 +296,21 @@ function Detail({ result, lines, focus }: { result: SearchResult; lines: string[
   );
 }
 
+/**
+ * The facts in the order of the result, with the facts of the pinned selection first. Only a pinned selection changes
+ * the order. A hover never does, so no row moves under the pointer.
+ */
+function hoist<T>(items: T[], first: (item: T) => boolean): T[] {
+  return [...items.filter(first), ...items.filter((item) => !first(item))];
+}
+
 function Facts({ result, lines, focus }: { result: SearchResult; lines: string[]; focus: Focus }) {
   const { setHover, togglePin, pinned } = useStore();
+  // A fact that the reader pins in this table stays in its place. The row under the pointer must not move away.
+  // The store keeps the object of a pin, so a pin from the graph or the ruler is another object, and it moves the row.
+  const [pinnedHere, setPinnedHere] = useState<Focus>(null);
+  const moved = pinned !== null && pinned !== pinnedHere;
+  const facts = moved ? hoist(result.facts, (fact) => isLit(fact, pinned)) : result.facts;
   return (
     <div className="scroll">
       <table className="facts">
@@ -311,7 +324,7 @@ function Facts({ result, lines, focus }: { result: SearchResult; lines: string[]
             <th scope="col">Invalid from</th>
           </tr>
         </thead>
-        {result.facts.map((fact) => {
+        {facts.map((fact) => {
           const target: Focus = { kind: "fact", id: fact.uuid };
           return (
             <tbody
@@ -329,7 +342,16 @@ function Facts({ result, lines, focus }: { result: SearchResult; lines: string[]
                 </td>
                 <td>{fact.source.name}</td>
                 <td>
-                  <button type="button" aria-pressed={same(pinned, target)} onFocus={() => setHover(target)} onBlur={() => setHover(null)} onClick={() => togglePin(target)}>
+                  <button
+                    type="button"
+                    aria-pressed={same(pinned, target)}
+                    onFocus={() => setHover(target)}
+                    onBlur={() => setHover(null)}
+                    onClick={() => {
+                      setPinnedHere(target);
+                      togglePin(target);
+                    }}
+                  >
                     {fact.name.split("_").map((part, i) => (
                       <span key={i}>
                         {i > 0 && "_"}
@@ -356,18 +378,26 @@ function Facts({ result, lines, focus }: { result: SearchResult; lines: string[]
 }
 
 function Sections({ result, lines, focus }: { result: SearchResult; lines: string[]; focus: Focus }) {
-  const { setHover } = useStore();
+  const { setHover, pinned } = useStore();
+  // The sections of the pinned selection come first: the sections that state the pinned fact, or the pinned section.
+  const pinnedFact = pinned?.kind === "fact" ? result.facts.find((f) => f.uuid === pinned.id) : undefined;
+  const first = (sectionId: string) =>
+    pinned !== null && (pinned.kind === "line" ? pinned.id === sectionId : pinnedFact !== undefined && statedIn(pinnedFact, sectionId));
+  const sections = hoist(
+    result.sections.map((section, i) => ({ section, i })),
+    ({ section }) => first(section.section_id),
+  );
   const focusFact = focus?.kind === "fact" ? result.facts.find((f) => f.uuid === focus.id) : undefined;
   const lit = (sectionId: string) => !focus || (focus.kind === "line" ? focus.id === sectionId : focusFact !== undefined && statedIn(focusFact, sectionId));
   return (
     <div className="sections">
-      {result.sections.map((section, i) => {
+      {sections.map(({ section, i }) => {
         const stated = lines.includes(section.section_id);
         return (
           <details
             // Section 5 of the Act is five episodes with the same section id, so the key also has the position.
             key={`${section.section_id}#${i}`}
-            open={i < 2}
+            open={i < 2 || first(section.section_id)}
             style={lineStyle(lines, section.section_id)}
             data-dim={!lit(section.section_id)}
             onMouseEnter={() => stated && setHover({ kind: "line", id: section.section_id })}
