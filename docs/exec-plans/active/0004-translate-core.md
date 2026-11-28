@@ -612,3 +612,13 @@ Evidence that waits for layer 9:
 - Nobody ran the oracle on x86, where numpy can sort equal scores in another order (GAPS F47).
 
 The mutation run of plan 0003, task 5 did not run after layer 7: the machine stopped under its load. It is still owed.
+
+One more Opus 5.5 high reviewer read the whole layer diff. It found two important gaps and six minor ones, and each one is resolved. A recorder, `record_resolution_trace.py`, could not make its value file again. One seeded defect in `AsyncSemaphore` passed each test, and a second look found one in `AsyncLock`. Three new recorded scripts fail for them.
+
+Commands at the tip, after the rebase on `main`:
+
+- `scripts/check.sh --test`: `check: passed`. 18,080 tests, 0 failed.
+- `dotnet test --project tests/Port.Evaluation`: 17,554 tests, 0 failed.
+- `dotnet test --project tests/Graphiti.Net.E2E.Tests`: 86 tests, 0 failed.
+- The recorders with `--check`: `change_set` 1,365 cases, `state_store` 223, `delta` 373, `graph_reader` 26, `resolution_trace` 17, `phases` 48 and 115 async cases, and `scheduler` 50. Each one is current.
+- `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,899 passed, 100 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong. 98 ids left `expected-failures.txt`. The pull request lists the ids.
