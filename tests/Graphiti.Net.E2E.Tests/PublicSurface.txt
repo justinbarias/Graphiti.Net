@@ -1,0 +1,894 @@
+﻿assembly Graphiti.Net
+sealed class Graphiti.AddEpisodeBulkOptions : System.IEquatable<Graphiti.AddEpisodeBulkOptions>
+  ctor()
+  method Graphiti.AddEpisodeBulkOptions <Clone>$()
+  method System.Boolean Equals(Graphiti.AddEpisodeBulkOptions? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.SagaNode? SagaNode { get; init; }
+  property System.Boolean StrictEdgeTypes { get; init; }
+  property System.Boolean UseCombinedExtraction { get; init; }
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Collections.Generic.IReadOnlyList<System.String>>? IdentityProperties { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.EdgeTypeRule>? EdgeTypeMap { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.GraphTypeDefinition>? EdgeTypes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.GraphTypeDefinition>? EntityTypes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? ExcludedEntityTypes { get; init; }
+  property System.String? CustomExtractionInstructions { get; init; }
+  property System.String? GroupId { get; init; }
+  property System.String? Saga { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AddEpisodeBulkOptions? left, Graphiti.AddEpisodeBulkOptions? right)
+  static method System.Boolean op_Inequality(Graphiti.AddEpisodeBulkOptions? left, Graphiti.AddEpisodeBulkOptions? right)
+sealed class Graphiti.AddEpisodeBulkResult : System.IEquatable<Graphiti.AddEpisodeBulkResult>
+  ctor()
+  method Graphiti.AddEpisodeBulkResult <Clone>$()
+  method System.Boolean Equals(Graphiti.AddEpisodeBulkResult? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityEdge> CommunityEdges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode> Communities { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge> Edges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode> Nodes { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicEdge> EpisodicEdges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode> Episodes { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AddEpisodeBulkResult? left, Graphiti.AddEpisodeBulkResult? right)
+  static method System.Boolean op_Inequality(Graphiti.AddEpisodeBulkResult? left, Graphiti.AddEpisodeBulkResult? right)
+sealed class Graphiti.AddEpisodeOptions : System.IEquatable<Graphiti.AddEpisodeOptions>
+  ctor()
+  method Graphiti.AddEpisodeOptions <Clone>$()
+  method System.Boolean Equals(Graphiti.AddEpisodeOptions? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.SagaNode? SagaNode { get; init; }
+  property System.Boolean UpdateCommunities { get; init; }
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Collections.Generic.IReadOnlyList<System.String>>? IdentityProperties { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.EdgeTypeRule>? EdgeTypeMap { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.GraphTypeDefinition>? EdgeTypes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.GraphTypeDefinition>? EntityTypes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? ExcludedEntityTypes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? PreviousEpisodeUuids { get; init; }
+  property System.String? CustomExtractionInstructions { get; init; }
+  property System.String? GroupId { get; init; }
+  property System.String? Saga { get; init; }
+  property System.String? SagaPreviousEpisodeUuid { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AddEpisodeOptions? left, Graphiti.AddEpisodeOptions? right)
+  static method System.Boolean op_Inequality(Graphiti.AddEpisodeOptions? left, Graphiti.AddEpisodeOptions? right)
+sealed class Graphiti.AddEpisodeResult : System.IEquatable<Graphiti.AddEpisodeResult>
+  ctor()
+  method Graphiti.AddEpisodeResult <Clone>$()
+  method System.Boolean Equals(Graphiti.AddEpisodeResult? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  required property Graphiti.EpisodicNode Episode { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityEdge> CommunityEdges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode> Communities { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge> Edges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode> Nodes { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicEdge> EpisodicEdges { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AddEpisodeResult? left, Graphiti.AddEpisodeResult? right)
+  static method System.Boolean op_Inequality(Graphiti.AddEpisodeResult? left, Graphiti.AddEpisodeResult? right)
+sealed class Graphiti.AddTripletOptions : System.IEquatable<Graphiti.AddTripletOptions>
+  ctor()
+  method Graphiti.AddTripletOptions <Clone>$()
+  method System.Boolean Equals(Graphiti.AddTripletOptions? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.EpisodicNode? Episode { get; init; }
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Collections.Generic.IReadOnlyList<System.String>>? IdentityProperties { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AddTripletOptions? left, Graphiti.AddTripletOptions? right)
+  static method System.Boolean op_Inequality(Graphiti.AddTripletOptions? left, Graphiti.AddTripletOptions? right)
+sealed class Graphiti.AddTripletResult : System.IEquatable<Graphiti.AddTripletResult>
+  ctor()
+  method Graphiti.AddTripletResult <Clone>$()
+  method System.Boolean Equals(Graphiti.AddTripletResult? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge> Edges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode> Nodes { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AddTripletResult? left, Graphiti.AddTripletResult? right)
+  static method System.Boolean op_Inequality(Graphiti.AddTripletResult? left, Graphiti.AddTripletResult? right)
+sealed class Graphiti.AdvancedSearchOptions : System.IEquatable<Graphiti.AdvancedSearchOptions>
+  ctor()
+  method Graphiti.AdvancedSearchOptions <Clone>$()
+  method System.Boolean Equals(Graphiti.AdvancedSearchOptions? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.SearchFilters? SearchFilter { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? BfsOriginNodeUuids { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? GroupIds { get; init; }
+  property System.ReadOnlyMemory<System.Double>? QueryVector { get; init; }
+  property System.String? CenterNodeUuid { get; init; }
+  static method System.Boolean op_Equality(Graphiti.AdvancedSearchOptions? left, Graphiti.AdvancedSearchOptions? right)
+  static method System.Boolean op_Inequality(Graphiti.AdvancedSearchOptions? left, Graphiti.AdvancedSearchOptions? right)
+sealed class Graphiti.BuildCommunitiesResult : System.IEquatable<Graphiti.BuildCommunitiesResult>
+  ctor()
+  method Graphiti.BuildCommunitiesResult <Clone>$()
+  method System.Boolean Equals(Graphiti.BuildCommunitiesResult? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityEdge> CommunityEdges { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode> Communities { get; init; }
+  static method System.Boolean op_Equality(Graphiti.BuildCommunitiesResult? left, Graphiti.BuildCommunitiesResult? right)
+  static method System.Boolean op_Inequality(Graphiti.BuildCommunitiesResult? left, Graphiti.BuildCommunitiesResult? right)
+class Graphiti.ChangeSetRejectedException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String reason = "change set rejected")
+  ctor(System.String reason, System.Exception? innerException)
+sealed class Graphiti.ChatPrompt : System.IEquatable<Graphiti.ChatPrompt>
+  ctor(System.String System, System.String User)
+  method Graphiti.ChatPrompt <Clone>$()
+  method System.Boolean Equals(Graphiti.ChatPrompt? other)
+  method System.Void Deconstruct(System.String& System, System.String& User)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.String System { get; init; }
+  property System.String User { get; init; }
+  static method System.Boolean op_Equality(Graphiti.ChatPrompt? left, Graphiti.ChatPrompt? right)
+  static method System.Boolean op_Inequality(Graphiti.ChatPrompt? left, Graphiti.ChatPrompt? right)
+sealed class Graphiti.CommunityEdge : Graphiti.Edge, System.IEquatable<Graphiti.CommunityEdge>, System.IEquatable<Graphiti.Edge>
+  ctor()
+  method System.Boolean Equals(Graphiti.CommunityEdge? other)
+  method System.Boolean Equals(Graphiti.Edge? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.CommunityEdge? left, Graphiti.CommunityEdge? right)
+  static method System.Boolean op_Inequality(Graphiti.CommunityEdge? left, Graphiti.CommunityEdge? right)
+  virtual method Graphiti.CommunityEdge <Clone>$()
+sealed class Graphiti.CommunityNode : Graphiti.Node, System.IEquatable<Graphiti.CommunityNode>, System.IEquatable<Graphiti.Node>
+  ctor()
+  method System.Boolean Equals(Graphiti.CommunityNode? other)
+  method System.Boolean Equals(Graphiti.Node? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.ReadOnlyMemory<System.Double>? NameEmbedding { get; init; }
+  property System.String Summary { get; init; }
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.CommunityNode? left, Graphiti.CommunityNode? right)
+  static method System.Boolean op_Inequality(Graphiti.CommunityNode? left, Graphiti.CommunityNode? right)
+  virtual method Graphiti.CommunityNode <Clone>$()
+enum Graphiti.CommunityReranker : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value CrossEncoder = 2
+  value Mmr = 1
+  value Rrf = 0
+sealed class Graphiti.CommunitySearchConfig : System.IEquatable<Graphiti.CommunitySearchConfig>
+  ctor()
+  method Graphiti.CommunitySearchConfig <Clone>$()
+  method System.Boolean Equals(Graphiti.CommunitySearchConfig? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.CommunityReranker Reranker { get; init; }
+  property System.Double MmrLambda { get; init; }
+  property System.Double SimMinScore { get; init; }
+  property System.Int32 BfsMaxDepth { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.CommunitySearchMethod> SearchMethods { get; init; }
+  static method System.Boolean op_Equality(Graphiti.CommunitySearchConfig? left, Graphiti.CommunitySearchConfig? right)
+  static method System.Boolean op_Inequality(Graphiti.CommunitySearchConfig? left, Graphiti.CommunitySearchConfig? right)
+enum Graphiti.CommunitySearchMethod : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value Bm25 = 1
+  value CosineSimilarity = 0
+enum Graphiti.ComparisonOperator : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value Equals = 0
+  value GreaterThan = 2
+  value GreaterThanEqual = 4
+  value IsNotNull = 7
+  value IsNull = 6
+  value LessThan = 3
+  value LessThanEqual = 5
+  value NotEquals = 1
+sealed class Graphiti.ConcurrentIngestionOptions
+  ctor()
+  property System.Func<System.String, System.Boolean>? EnabledForGroup { get; set; }
+  property System.Int32 MaxApplyAttempts { get; set; }
+  property System.String? StateStorePath { get; set; }
+  property System.TimeSpan IndexLag { get; set; }
+  property System.TimeSpan Lease { get; set; }
+  property System.TimeSpan PollInterval { get; set; }
+  property System.TimeSpan WriteMargin { get; set; }
+  required property System.Int32 Window { get; set; }
+sealed class Graphiti.DateFilter : System.IEquatable<Graphiti.DateFilter>
+  ctor()
+  method Graphiti.DateFilter <Clone>$()
+  method System.Boolean Equals(Graphiti.DateFilter? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.DateTimeOffset? Date { get; init; }
+  required property Graphiti.ComparisonOperator ComparisonOperator { get; init; }
+  static method System.Boolean op_Equality(Graphiti.DateFilter? left, Graphiti.DateFilter? right)
+  static method System.Boolean op_Inequality(Graphiti.DateFilter? left, Graphiti.DateFilter? right)
+abstract class Graphiti.Edge : System.IEquatable<Graphiti.Edge>
+  abstract method Graphiti.Edge <Clone>$()
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.String Uuid { get; init; }
+  protected ctor(Graphiti.Edge original)
+  protected virtual method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected virtual property System.Type EqualityContract { get; }
+  required property System.DateTimeOffset CreatedAt { get; init; }
+  required property System.String GroupId { get; init; }
+  required property System.String SourceNodeUuid { get; init; }
+  required property System.String TargetNodeUuid { get; init; }
+  static method System.Boolean op_Equality(Graphiti.Edge? left, Graphiti.Edge? right)
+  static method System.Boolean op_Inequality(Graphiti.Edge? left, Graphiti.Edge? right)
+  virtual method System.Boolean Equals(Graphiti.Edge? other)
+class Graphiti.EdgeNotFoundException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String uuid)
+  ctor(System.String uuid, System.Exception? innerException)
+enum Graphiti.EdgeReranker : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value CrossEncoder = 4
+  value EpisodeMentions = 2
+  value Mmr = 3
+  value NodeDistance = 1
+  value Rrf = 0
+sealed class Graphiti.EdgeSearchConfig : System.IEquatable<Graphiti.EdgeSearchConfig>
+  ctor()
+  method Graphiti.EdgeSearchConfig <Clone>$()
+  method System.Boolean Equals(Graphiti.EdgeSearchConfig? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.EdgeReranker Reranker { get; init; }
+  property System.Double MmrLambda { get; init; }
+  property System.Double SimMinScore { get; init; }
+  property System.Int32 BfsMaxDepth { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EdgeSearchMethod> SearchMethods { get; init; }
+  static method System.Boolean op_Equality(Graphiti.EdgeSearchConfig? left, Graphiti.EdgeSearchConfig? right)
+  static method System.Boolean op_Inequality(Graphiti.EdgeSearchConfig? left, Graphiti.EdgeSearchConfig? right)
+enum Graphiti.EdgeSearchMethod : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value Bfs = 2
+  value Bm25 = 1
+  value CosineSimilarity = 0
+sealed class Graphiti.EdgeTypeRule : System.IEquatable<Graphiti.EdgeTypeRule>
+  ctor()
+  method Graphiti.EdgeTypeRule <Clone>$()
+  method System.Boolean Equals(Graphiti.EdgeTypeRule? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  required property System.Collections.Generic.IReadOnlyList<System.String> EdgeTypes { get; init; }
+  required property System.String SourceType { get; init; }
+  required property System.String TargetType { get; init; }
+  static method System.Boolean op_Equality(Graphiti.EdgeTypeRule? left, Graphiti.EdgeTypeRule? right)
+  static method System.Boolean op_Inequality(Graphiti.EdgeTypeRule? left, Graphiti.EdgeTypeRule? right)
+class Graphiti.EdgesNotFoundException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.Collections.Generic.List<System.String> uuids)
+  ctor(System.Collections.Generic.List<System.String> uuids, System.Exception? innerException)
+sealed class Graphiti.EmbeddingOptions
+  ctor()
+  property System.Int32 Dimensions { get; set; }
+  property System.String? Model { get; set; }
+class Graphiti.EmptyResponseException : System.Exception, System.Runtime.Serialization.ISerializable
+  ctor(System.String message)
+  ctor(System.String message, System.Exception? innerException)
+sealed class Graphiti.EntityEdge : Graphiti.Edge, System.IEquatable<Graphiti.Edge>, System.IEquatable<Graphiti.EntityEdge>
+  ctor()
+  method System.Boolean Equals(Graphiti.Edge? other)
+  method System.Boolean Equals(Graphiti.EntityEdge? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> Attributes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String> Episodes { get; init; }
+  property System.DateTimeOffset? ExpiredAt { get; init; }
+  property System.DateTimeOffset? InvalidAt { get; init; }
+  property System.DateTimeOffset? ReferenceTime { get; init; }
+  property System.DateTimeOffset? ValidAt { get; init; }
+  property System.ReadOnlyMemory<System.Double>? FactEmbedding { get; init; }
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  required property System.String Fact { get; init; }
+  required property System.String Name { get; init; }
+  static method System.Boolean op_Equality(Graphiti.EntityEdge? left, Graphiti.EntityEdge? right)
+  static method System.Boolean op_Inequality(Graphiti.EntityEdge? left, Graphiti.EntityEdge? right)
+  virtual method Graphiti.EntityEdge <Clone>$()
+sealed class Graphiti.EntityNode : Graphiti.Node, System.IEquatable<Graphiti.EntityNode>, System.IEquatable<Graphiti.Node>
+  ctor()
+  method System.Boolean Equals(Graphiti.EntityNode? other)
+  method System.Boolean Equals(Graphiti.Node? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> Attributes { get; init; }
+  property System.ReadOnlyMemory<System.Double>? NameEmbedding { get; init; }
+  property System.String Summary { get; init; }
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.EntityNode? left, Graphiti.EntityNode? right)
+  static method System.Boolean op_Inequality(Graphiti.EntityNode? left, Graphiti.EntityNode? right)
+  virtual method Graphiti.EntityNode <Clone>$()
+class Graphiti.EntityTypeValidationException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String entityType, System.String entityTypeAttribute)
+  ctor(System.String entityType, System.String entityTypeAttribute, System.Exception? innerException)
+sealed class Graphiti.EpisodeInput : System.IEquatable<Graphiti.EpisodeInput>
+  ctor()
+  method Graphiti.EpisodeInput <Clone>$()
+  method System.Boolean Equals(Graphiti.EpisodeInput? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.EpisodeType Source { get; init; }
+  property System.String? Uuid { get; init; }
+  required property System.DateTimeOffset ReferenceTime { get; init; }
+  required property System.String Content { get; init; }
+  required property System.String Name { get; init; }
+  required property System.String SourceDescription { get; init; }
+  static method System.Boolean op_Equality(Graphiti.EpisodeInput? left, Graphiti.EpisodeInput? right)
+  static method System.Boolean op_Inequality(Graphiti.EpisodeInput? left, Graphiti.EpisodeInput? right)
+enum Graphiti.EpisodeReranker : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value CrossEncoder = 1
+  value Rrf = 0
+sealed class Graphiti.EpisodeSearchConfig : System.IEquatable<Graphiti.EpisodeSearchConfig>
+  ctor()
+  method Graphiti.EpisodeSearchConfig <Clone>$()
+  method System.Boolean Equals(Graphiti.EpisodeSearchConfig? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.EpisodeReranker Reranker { get; init; }
+  property System.Double MmrLambda { get; init; }
+  property System.Double SimMinScore { get; init; }
+  property System.Int32 BfsMaxDepth { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.EpisodeSearchMethod> SearchMethods { get; init; }
+  static method System.Boolean op_Equality(Graphiti.EpisodeSearchConfig? left, Graphiti.EpisodeSearchConfig? right)
+  static method System.Boolean op_Inequality(Graphiti.EpisodeSearchConfig? left, Graphiti.EpisodeSearchConfig? right)
+enum Graphiti.EpisodeSearchMethod : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value Bm25 = 0
+enum Graphiti.EpisodeType : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value FactTriple = 3
+  value Json = 1
+  value Message = 0
+  value Text = 2
+sealed class Graphiti.EpisodicEdge : Graphiti.Edge, System.IEquatable<Graphiti.Edge>, System.IEquatable<Graphiti.EpisodicEdge>
+  ctor()
+  method System.Boolean Equals(Graphiti.Edge? other)
+  method System.Boolean Equals(Graphiti.EpisodicEdge? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.EpisodicEdge? left, Graphiti.EpisodicEdge? right)
+  static method System.Boolean op_Inequality(Graphiti.EpisodicEdge? left, Graphiti.EpisodicEdge? right)
+  virtual method Graphiti.EpisodicEdge <Clone>$()
+sealed class Graphiti.EpisodicNode : Graphiti.Node, System.IEquatable<Graphiti.EpisodicNode>, System.IEquatable<Graphiti.Node>
+  ctor()
+  method System.Boolean Equals(Graphiti.EpisodicNode? other)
+  method System.Boolean Equals(Graphiti.Node? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object>? EpisodeMetadata { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String> EntityEdges { get; init; }
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  required property Graphiti.EpisodeType Source { get; init; }
+  required property System.DateTimeOffset ValidAt { get; init; }
+  required property System.String Content { get; init; }
+  required property System.String SourceDescription { get; init; }
+  static method System.Boolean op_Equality(Graphiti.EpisodicNode? left, Graphiti.EpisodicNode? right)
+  static method System.Boolean op_Inequality(Graphiti.EpisodicNode? left, Graphiti.EpisodicNode? right)
+  virtual method Graphiti.EpisodicNode <Clone>$()
+sealed class Graphiti.GraphFieldDefinition : System.IEquatable<Graphiti.GraphFieldDefinition>
+  method Graphiti.GraphFieldDefinition <Clone>$()
+  method System.Boolean Equals(Graphiti.GraphFieldDefinition? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.GraphFieldKind Kind { get; }
+  property System.Boolean Required { get; }
+  property System.Int32? MaxLength { get; }
+  property System.String Name { get; }
+  property System.String? Description { get; }
+  static method System.Boolean op_Equality(Graphiti.GraphFieldDefinition? left, Graphiti.GraphFieldDefinition? right)
+  static method System.Boolean op_Inequality(Graphiti.GraphFieldDefinition? left, Graphiti.GraphFieldDefinition? right)
+enum Graphiti.GraphFieldKind : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value Boolean = 3
+  value BooleanList = 7
+  value Integer = 1
+  value IntegerList = 5
+  value Number = 2
+  value NumberList = 6
+  value String = 0
+  value StringList = 4
+sealed class Graphiti.GraphTypeDefinition : System.IEquatable<Graphiti.GraphTypeDefinition>
+  method Graphiti.GraphTypeDefinition <Clone>$()
+  method Graphiti.GraphTypeDefinition AddBoolean(System.String name, System.String? description = null, System.Boolean required = false)
+  method Graphiti.GraphTypeDefinition AddBooleanList(System.String name, System.String? description = null, System.Boolean required = false)
+  method Graphiti.GraphTypeDefinition AddInteger(System.String name, System.String? description = null, System.Boolean required = false)
+  method Graphiti.GraphTypeDefinition AddIntegerList(System.String name, System.String? description = null, System.Boolean required = false)
+  method Graphiti.GraphTypeDefinition AddNumber(System.String name, System.String? description = null, System.Boolean required = false)
+  method Graphiti.GraphTypeDefinition AddNumberList(System.String name, System.String? description = null, System.Boolean required = false)
+  method Graphiti.GraphTypeDefinition AddString(System.String name, System.String? description = null, System.Boolean required = false, System.Int32? maxLength = null)
+  method Graphiti.GraphTypeDefinition AddStringList(System.String name, System.String? description = null, System.Boolean required = false)
+  method System.Boolean Equals(Graphiti.GraphTypeDefinition? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyList<Graphiti.GraphFieldDefinition> Fields { get; }
+  property System.String Name { get; }
+  property System.String? Description { get; }
+  static method Graphiti.GraphTypeDefinition Create(System.String name, System.String? description = null)
+  static method System.Boolean op_Equality(Graphiti.GraphTypeDefinition? left, Graphiti.GraphTypeDefinition? right)
+  static method System.Boolean op_Inequality(Graphiti.GraphTypeDefinition? left, Graphiti.GraphTypeDefinition? right)
+class Graphiti.GraphitiException : System.Exception, System.Runtime.Serialization.ISerializable
+  ctor(System.String message = "")
+  ctor(System.String message, System.Exception? innerException)
+static class Graphiti.GraphitiModelCall
+  static property Graphiti.ModelCallInfo? Current { get; }
+sealed class Graphiti.GraphitiOptions
+  ctor()
+  property Graphiti.ConcurrentIngestionOptions? ConcurrentIngestion { get; set; }
+  property Graphiti.EmbeddingOptions Embedding { get; }
+  property Graphiti.LlmOptions Llm { get; }
+  property Graphiti.PromptOptions Prompts { get; }
+  property Graphiti.RerankerOptions Reranker { get; }
+  property System.Boolean StoreRawEpisodeContent { get; set; }
+  property System.Int32? MaxCoroutines { get; set; }
+  property System.String TraceSpanPrefix { get; set; }
+class Graphiti.GroupIdValidationException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String groupId)
+  ctor(System.String groupId, System.Exception? innerException)
+class Graphiti.GroupsEdgesNotFoundException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.Collections.Generic.List<System.String> groupIds)
+  ctor(System.Collections.Generic.List<System.String> groupIds, System.Exception? innerException)
+class Graphiti.GroupsNodesNotFoundException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.Collections.Generic.List<System.String> groupIds)
+  ctor(System.Collections.Generic.List<System.String> groupIds, System.Exception? innerException)
+sealed class Graphiti.HasEpisodeEdge : Graphiti.Edge, System.IEquatable<Graphiti.Edge>, System.IEquatable<Graphiti.HasEpisodeEdge>
+  ctor()
+  method System.Boolean Equals(Graphiti.Edge? other)
+  method System.Boolean Equals(Graphiti.HasEpisodeEdge? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.HasEpisodeEdge? left, Graphiti.HasEpisodeEdge? right)
+  static method System.Boolean op_Inequality(Graphiti.HasEpisodeEdge? left, Graphiti.HasEpisodeEdge? right)
+  virtual method Graphiti.HasEpisodeEdge <Clone>$()
+interface Graphiti.IChatLogProbabilities
+  method System.Collections.Generic.IReadOnlyList<Graphiti.TokenLogProbability>? ReadFirstToken(Microsoft.Extensions.AI.ChatResponse response)
+  method System.Void Request(Microsoft.Extensions.AI.ChatOptions options, System.Int32 topLogProbabilityCount, System.Collections.Generic.IReadOnlyDictionary<System.Int32, System.Int32> logitBias)
+interface Graphiti.ICommunityEdgeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.CommunityEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.CommunityEdge> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.CommunityEdge> SaveAsync(Graphiti.CommunityEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.CommunityEdge>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.CommunityEdge>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.ICommunityNodeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.CommunityNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByGroupIdAsync(System.String groupId, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode> nodes, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.CommunityNode> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.CommunityNode> LoadNameEmbeddingAsync(Graphiti.CommunityNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.CommunityNode> SaveAsync(Graphiti.CommunityNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.ICrossEncoder
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, System.Double>>> RankAsync(System.String query, System.Collections.Generic.IReadOnlyList<System.String> passages, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.IEdgeNamespaces
+  property Graphiti.ICommunityEdgeNamespace Community { get; }
+  property Graphiti.IEntityEdgeNamespace Entity { get; }
+  property Graphiti.IEpisodicEdgeNamespace Episodic { get; }
+  property Graphiti.IHasEpisodeEdgeNamespace HasEpisode { get; }
+  property Graphiti.INextEpisodeEdgeNamespace NextEpisode { get; }
+interface Graphiti.IEntityEdgeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.EntityEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge> edges, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EntityEdge> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EntityEdge> LoadEmbeddingsAsync(Graphiti.EntityEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EntityEdge> SaveAsync(Graphiti.EntityEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge>> GetBetweenNodesAsync(System.String sourceNodeUuid, System.String targetNodeUuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge>> GetByNodeUuidAsync(System.String nodeUuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge>> LoadEmbeddingsBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge> edges, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.IEntityNodeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.EntityNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByGroupIdAsync(System.String groupId, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode> nodes, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EntityNode> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EntityNode> LoadEmbeddingsAsync(Graphiti.EntityNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EntityNode> SaveAsync(Graphiti.EntityNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode>> LoadEmbeddingsBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode> nodes, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.IEpisodeNodeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.EpisodicNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByGroupIdAsync(System.String groupId, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode> nodes, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EpisodicNode> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EpisodicNode> SaveAsync(Graphiti.EpisodicNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode>> GetByEntityNodeUuidAsync(System.String entityNodeUuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode>> RetrieveEpisodesAsync(System.DateTimeOffset referenceTime, System.Int32 lastN = 3, System.Collections.Generic.IReadOnlyList<System.String>? groupIds = null, System.String? source = null, System.String? saga = null, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.IEpisodicEdgeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.EpisodicEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicEdge> edges, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EpisodicEdge> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.EpisodicEdge> SaveAsync(Graphiti.EpisodicEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicEdge>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicEdge>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.IGraphiti
+  method System.Threading.Tasks.Task BuildIndicesAndConstraintsAsync(System.Boolean deleteExisting = false, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task RemoveEpisodeAsync(System.String episodeUuid, System.String? groupId = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.AddEpisodeBulkResult> AddEpisodeBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.EpisodeInput> episodes, Graphiti.AddEpisodeBulkOptions? options = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.AddEpisodeResult> AddEpisodeAsync(Graphiti.EpisodeInput episode, Graphiti.AddEpisodeOptions? options = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.AddTripletResult> AddTripletAsync(Graphiti.EntityNode source, Graphiti.EntityEdge edge, Graphiti.EntityNode target, Graphiti.AddTripletOptions? options = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.BuildCommunitiesResult> BuildCommunitiesAsync(System.Collections.Generic.IReadOnlyList<System.String>? groupIds = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.SagaNode> SummarizeSagaAsync(System.String sagaId, System.String? groupId = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.SearchResults> AdvancedSearchAsync(System.String query, Graphiti.SearchConfig config, Graphiti.AdvancedSearchOptions? options = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.SearchResults> GetNodesAndEdgesByEpisodeAsync(System.Collections.Generic.IReadOnlyList<System.String> episodeUuids, System.String? groupId = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge>> SearchAsync(System.String query, Graphiti.SearchOptions? options = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode>> RetrieveEpisodesAsync(System.DateTimeOffset referenceTime, Graphiti.RetrieveEpisodesOptions? options = null, System.Threading.CancellationToken cancellationToken = null)
+  property Graphiti.IEdgeNamespaces Edges { get; }
+  property Graphiti.INodeNamespaces Nodes { get; }
+  property Graphiti.ITokenUsageTracker TokenUsage { get; }
+interface Graphiti.IHasEpisodeEdgeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.HasEpisodeEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.HasEpisodeEdge> edges, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.HasEpisodeEdge> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.HasEpisodeEdge> SaveAsync(Graphiti.HasEpisodeEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.HasEpisodeEdge>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.HasEpisodeEdge>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.INextEpisodeEdgeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.NextEpisodeEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.NextEpisodeEdge> edges, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.NextEpisodeEdge> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.NextEpisodeEdge> SaveAsync(Graphiti.NextEpisodeEdge edge, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.NextEpisodeEdge>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.NextEpisodeEdge>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.INodeNamespaces
+  property Graphiti.ICommunityNodeNamespace Community { get; }
+  property Graphiti.IEntityNodeNamespace Entity { get; }
+  property Graphiti.IEpisodeNodeNamespace Episode { get; }
+  property Graphiti.ISagaNodeNamespace Saga { get; }
+interface Graphiti.ISagaNodeNamespace
+  method System.Threading.Tasks.Task DeleteAsync(Graphiti.SagaNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByGroupIdAsync(System.String groupId, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task DeleteByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task SaveBulkAsync(System.Collections.Generic.IReadOnlyList<Graphiti.SagaNode> nodes, System.Int32 batchSize = 100, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.SagaNode> GetByUuidAsync(System.String uuid, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<Graphiti.SagaNode> SaveAsync(Graphiti.SagaNode node, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.SagaNode>> GetByGroupIdsAsync(System.Collections.Generic.IReadOnlyList<System.String> groupIds, System.Int32? limit = null, System.String? uuidCursor = null, System.Threading.CancellationToken cancellationToken = null)
+  method System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Graphiti.SagaNode>> GetByUuidsAsync(System.Collections.Generic.IReadOnlyList<System.String> uuids, System.Threading.CancellationToken cancellationToken = null)
+interface Graphiti.ITokenUsageTracker
+  method Graphiti.TokenUsage GetTotalUsage()
+  method System.Collections.Generic.IReadOnlyDictionary<System.String, Graphiti.PromptTokenUsage> GetUsage()
+  method System.Void Reset()
+class Graphiti.IdentityPropertyValidationException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String entityType, System.String reason)
+  ctor(System.String entityType, System.String reason, System.Exception? innerException)
+sealed class Graphiti.LlmOptions
+  ctor()
+  property System.Collections.Generic.IDictionary<System.String, Graphiti.ModelRoute> Routes { get; }
+  property System.Func<System.Exception, Graphiti.ModelCallFailure>? ClassifyFailure { get; set; }
+  property System.Int32 MaxTokens { get; set; }
+  property System.Single? Temperature { get; set; }
+  property System.String? Model { get; set; }
+  property System.String? SmallModel { get; set; }
+enum Graphiti.ModelCallFailure : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value None = 0
+  value RateLimit = 1
+  value ServerError = 2
+sealed class Graphiti.ModelCallInfo : System.IEquatable<Graphiti.ModelCallInfo>
+  ctor(System.String Operation, System.String? PromptName, System.String? ResponseModel, System.String? ModelSize, System.String? Model, System.String? ResponseSchema)
+  method Graphiti.ModelCallInfo <Clone>$()
+  method System.Boolean Equals(Graphiti.ModelCallInfo? other)
+  method System.Void Deconstruct(System.String& Operation, System.String&? PromptName, System.String&? ResponseModel, System.String&? ModelSize, System.String&? Model, System.String&? ResponseSchema)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.String Operation { get; init; }
+  property System.String? Model { get; init; }
+  property System.String? ModelSize { get; init; }
+  property System.String? PromptName { get; init; }
+  property System.String? ResponseModel { get; init; }
+  property System.String? ResponseSchema { get; init; }
+  static method System.Boolean op_Equality(Graphiti.ModelCallInfo? left, Graphiti.ModelCallInfo? right)
+  static method System.Boolean op_Inequality(Graphiti.ModelCallInfo? left, Graphiti.ModelCallInfo? right)
+sealed class Graphiti.ModelRoute
+  ctor()
+  property System.Collections.Generic.IDictionary<System.String, Graphiti.PromptBuilder> PromptOverrides { get; }
+  property System.Int32? MaxTokens { get; init; }
+  property System.Object? ChatClientKey { get; init; }
+  required property System.String ModelId { get; init; }
+sealed class Graphiti.NextEpisodeEdge : Graphiti.Edge, System.IEquatable<Graphiti.Edge>, System.IEquatable<Graphiti.NextEpisodeEdge>
+  ctor()
+  method System.Boolean Equals(Graphiti.Edge? other)
+  method System.Boolean Equals(Graphiti.NextEpisodeEdge? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.NextEpisodeEdge? left, Graphiti.NextEpisodeEdge? right)
+  static method System.Boolean op_Inequality(Graphiti.NextEpisodeEdge? left, Graphiti.NextEpisodeEdge? right)
+  virtual method Graphiti.NextEpisodeEdge <Clone>$()
+abstract class Graphiti.Node : System.IEquatable<Graphiti.Node>
+  abstract method Graphiti.Node <Clone>$()
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyList<System.String> Labels { get; init; }
+  property System.DateTimeOffset CreatedAt { get; init; }
+  property System.String Uuid { get; init; }
+  protected ctor(Graphiti.Node original)
+  protected virtual method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected virtual property System.Type EqualityContract { get; }
+  required property System.String GroupId { get; init; }
+  required property System.String Name { get; init; }
+  static method System.Boolean op_Equality(Graphiti.Node? left, Graphiti.Node? right)
+  static method System.Boolean op_Inequality(Graphiti.Node? left, Graphiti.Node? right)
+  virtual method System.Boolean Equals(Graphiti.Node? other)
+class Graphiti.NodeLabelValidationException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.Collections.Generic.List<System.String> nodeLabels)
+  ctor(System.Collections.Generic.List<System.String> nodeLabels, System.Exception? innerException)
+class Graphiti.NodeNotFoundException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String uuid)
+  ctor(System.String uuid, System.Exception? innerException)
+enum Graphiti.NodeReranker : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value CrossEncoder = 4
+  value EpisodeMentions = 2
+  value Mmr = 3
+  value NodeDistance = 1
+  value Rrf = 0
+sealed class Graphiti.NodeSearchConfig : System.IEquatable<Graphiti.NodeSearchConfig>
+  ctor()
+  method Graphiti.NodeSearchConfig <Clone>$()
+  method System.Boolean Equals(Graphiti.NodeSearchConfig? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.NodeReranker Reranker { get; init; }
+  property System.Double MmrLambda { get; init; }
+  property System.Double SimMinScore { get; init; }
+  property System.Int32 BfsMaxDepth { get; init; }
+  required property System.Collections.Generic.IReadOnlyList<Graphiti.NodeSearchMethod> SearchMethods { get; init; }
+  static method System.Boolean op_Equality(Graphiti.NodeSearchConfig? left, Graphiti.NodeSearchConfig? right)
+  static method System.Boolean op_Inequality(Graphiti.NodeSearchConfig? left, Graphiti.NodeSearchConfig? right)
+enum Graphiti.NodeSearchMethod : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  value Bfs = 2
+  value Bm25 = 1
+  value CosineSimilarity = 0
+delegate Graphiti.PromptBuilder : System.ICloneable, System.Runtime.Serialization.ISerializable
+  ctor(System.Object object, System.IntPtr method)
+  virtual method Graphiti.ChatPrompt EndInvoke(System.IAsyncResult result)
+  virtual method Graphiti.ChatPrompt Invoke(Graphiti.PromptContext context)
+  virtual method System.IAsyncResult BeginInvoke(Graphiti.PromptContext context, System.AsyncCallback callback, System.Object object)
+sealed class Graphiti.PromptContext
+  method Graphiti.ChatPrompt BuildDefault()
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> Values { get; }
+  property System.String Name { get; }
+sealed class Graphiti.PromptOptions
+  ctor()
+  property System.Collections.Generic.IDictionary<System.String, Graphiti.PromptBuilder> Overrides { get; }
+sealed class Graphiti.PromptTokenUsage : System.IEquatable<Graphiti.PromptTokenUsage>
+  ctor()
+  method Graphiti.PromptTokenUsage <Clone>$()
+  method System.Boolean Equals(Graphiti.PromptTokenUsage? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Double AvgInputTokens { get; }
+  property System.Double AvgOutputTokens { get; }
+  property System.Int64 CallCount { get; init; }
+  property System.Int64 TotalInputTokens { get; init; }
+  property System.Int64 TotalOutputTokens { get; init; }
+  property System.Int64 TotalTokens { get; }
+  required property System.String PromptName { get; init; }
+  static method System.Boolean op_Equality(Graphiti.PromptTokenUsage? left, Graphiti.PromptTokenUsage? right)
+  static method System.Boolean op_Inequality(Graphiti.PromptTokenUsage? left, Graphiti.PromptTokenUsage? right)
+sealed class Graphiti.PropertyFilter : System.IEquatable<Graphiti.PropertyFilter>
+  ctor()
+  method Graphiti.PropertyFilter <Clone>$()
+  method System.Boolean Equals(Graphiti.PropertyFilter? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Object? PropertyValue { get; init; }
+  required property Graphiti.ComparisonOperator ComparisonOperator { get; init; }
+  required property System.String PropertyName { get; init; }
+  static method System.Boolean op_Equality(Graphiti.PropertyFilter? left, Graphiti.PropertyFilter? right)
+  static method System.Boolean op_Inequality(Graphiti.PropertyFilter? left, Graphiti.PropertyFilter? right)
+class Graphiti.RateLimitException : System.Exception, System.Runtime.Serialization.ISerializable
+  ctor(System.String message = "Rate limit exceeded. Please try again later.")
+  ctor(System.String message, System.Exception? innerException)
+class Graphiti.RefusalException : System.Exception, System.Runtime.Serialization.ISerializable
+  ctor(System.String message)
+  ctor(System.String message, System.Exception? innerException)
+sealed class Graphiti.RerankerOptions
+  ctor()
+  property System.String? Model { get; set; }
+sealed class Graphiti.RetrieveEpisodesOptions : System.IEquatable<Graphiti.RetrieveEpisodesOptions>
+  ctor()
+  method Graphiti.RetrieveEpisodesOptions <Clone>$()
+  method System.Boolean Equals(Graphiti.RetrieveEpisodesOptions? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.EpisodeType? Source { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? GroupIds { get; init; }
+  property System.Int32 LastN { get; init; }
+  property System.String? Saga { get; init; }
+  static method System.Boolean op_Equality(Graphiti.RetrieveEpisodesOptions? left, Graphiti.RetrieveEpisodesOptions? right)
+  static method System.Boolean op_Inequality(Graphiti.RetrieveEpisodesOptions? left, Graphiti.RetrieveEpisodesOptions? right)
+sealed class Graphiti.SagaNode : Graphiti.Node, System.IEquatable<Graphiti.Node>, System.IEquatable<Graphiti.SagaNode>
+  ctor()
+  method System.Boolean Equals(Graphiti.Node? other)
+  method System.Boolean Equals(Graphiti.SagaNode? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.DateTimeOffset? LastSummarizedAt { get; init; }
+  property System.DateTimeOffset? LastSummarizedEpisodeValidAt { get; init; }
+  property System.String Summary { get; init; }
+  property System.String? FirstEpisodeUuid { get; init; }
+  property System.String? LastEpisodeUuid { get; init; }
+  protected override method System.Boolean PrintMembers(System.Text.StringBuilder builder)
+  protected override property System.Type EqualityContract { get; }
+  static method System.Boolean op_Equality(Graphiti.SagaNode? left, Graphiti.SagaNode? right)
+  static method System.Boolean op_Inequality(Graphiti.SagaNode? left, Graphiti.SagaNode? right)
+  virtual method Graphiti.SagaNode <Clone>$()
+sealed class Graphiti.SearchConfig : System.IEquatable<Graphiti.SearchConfig>
+  ctor()
+  method Graphiti.SearchConfig <Clone>$()
+  method System.Boolean Equals(Graphiti.SearchConfig? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.CommunitySearchConfig? CommunityConfig { get; init; }
+  property Graphiti.EdgeSearchConfig? EdgeConfig { get; init; }
+  property Graphiti.EpisodeSearchConfig? EpisodeConfig { get; init; }
+  property Graphiti.NodeSearchConfig? NodeConfig { get; init; }
+  property System.Double RerankerMinScore { get; init; }
+  property System.Int32 Limit { get; init; }
+  static method System.Boolean op_Equality(Graphiti.SearchConfig? left, Graphiti.SearchConfig? right)
+  static method System.Boolean op_Inequality(Graphiti.SearchConfig? left, Graphiti.SearchConfig? right)
+sealed class Graphiti.SearchFilters : System.IEquatable<Graphiti.SearchFilters>
+  ctor()
+  method Graphiti.SearchFilters <Clone>$()
+  method System.Boolean Equals(Graphiti.SearchFilters? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyList<Graphiti.PropertyFilter>? PropertyFilters { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<Graphiti.DateFilter>>? CreatedAt { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<Graphiti.DateFilter>>? ExpiredAt { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<Graphiti.DateFilter>>? InvalidAt { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<Graphiti.DateFilter>>? ValidAt { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? EdgeSourceNodeUuids { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? EdgeTargetNodeUuids { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? EdgeTypes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? EdgeUuids { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? NodeLabels { get; init; }
+  static method System.Boolean op_Equality(Graphiti.SearchFilters? left, Graphiti.SearchFilters? right)
+  static method System.Boolean op_Inequality(Graphiti.SearchFilters? left, Graphiti.SearchFilters? right)
+sealed class Graphiti.SearchOptions : System.IEquatable<Graphiti.SearchOptions>
+  ctor()
+  method Graphiti.SearchOptions <Clone>$()
+  method System.Boolean Equals(Graphiti.SearchOptions? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property Graphiti.SearchFilters? SearchFilter { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.String>? GroupIds { get; init; }
+  property System.Int32 NumResults { get; init; }
+  property System.String? CenterNodeUuid { get; init; }
+  static method System.Boolean op_Equality(Graphiti.SearchOptions? left, Graphiti.SearchOptions? right)
+  static method System.Boolean op_Inequality(Graphiti.SearchOptions? left, Graphiti.SearchOptions? right)
+static class Graphiti.SearchRecipes
+  static property Graphiti.SearchConfig CombinedHybridSearchCrossEncoder { get; }
+  static property Graphiti.SearchConfig CombinedHybridSearchMmr { get; }
+  static property Graphiti.SearchConfig CombinedHybridSearchRrf { get; }
+  static property Graphiti.SearchConfig CommunityHybridSearchCrossEncoder { get; }
+  static property Graphiti.SearchConfig CommunityHybridSearchMmr { get; }
+  static property Graphiti.SearchConfig CommunityHybridSearchRrf { get; }
+  static property Graphiti.SearchConfig EdgeHybridSearchCrossEncoder { get; }
+  static property Graphiti.SearchConfig EdgeHybridSearchEpisodeMentions { get; }
+  static property Graphiti.SearchConfig EdgeHybridSearchMmr { get; }
+  static property Graphiti.SearchConfig EdgeHybridSearchNodeDistance { get; }
+  static property Graphiti.SearchConfig EdgeHybridSearchRrf { get; }
+  static property Graphiti.SearchConfig NodeHybridSearchCrossEncoder { get; }
+  static property Graphiti.SearchConfig NodeHybridSearchEpisodeMentions { get; }
+  static property Graphiti.SearchConfig NodeHybridSearchMmr { get; }
+  static property Graphiti.SearchConfig NodeHybridSearchNodeDistance { get; }
+  static property Graphiti.SearchConfig NodeHybridSearchRrf { get; }
+class Graphiti.SearchRerankerException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String text)
+  ctor(System.String text, System.Exception? innerException)
+sealed class Graphiti.SearchResults : System.IEquatable<Graphiti.SearchResults>
+  ctor()
+  method Graphiti.SearchResults <Clone>$()
+  method System.Boolean Equals(Graphiti.SearchResults? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Collections.Generic.IReadOnlyList<Graphiti.CommunityNode> Communities { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.EntityEdge> Edges { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.EntityNode> Nodes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<Graphiti.EpisodicNode> Episodes { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Double> CommunityRerankerScores { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Double> EdgeRerankerScores { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Double> EpisodeRerankerScores { get; init; }
+  property System.Collections.Generic.IReadOnlyList<System.Double> NodeRerankerScores { get; init; }
+  static method System.Boolean op_Equality(Graphiti.SearchResults? left, Graphiti.SearchResults? right)
+  static method System.Boolean op_Inequality(Graphiti.SearchResults? left, Graphiti.SearchResults? right)
+class Graphiti.StaleCommitException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String groupId, System.Int64 seq)
+  ctor(System.String groupId, System.Int64 seq, System.Exception? innerException)
+struct Graphiti.TokenLogProbability : System.IEquatable<Graphiti.TokenLogProbability>
+  ctor(System.String Token, System.Double LogProbability)
+  method System.Boolean Equals(Graphiti.TokenLogProbability other)
+  method System.Void Deconstruct(System.String& Token, System.Double& LogProbability)
+  override method System.Boolean Equals(System.Object obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Double LogProbability { get; init; }
+  property System.String Token { get; init; }
+  static method System.Boolean op_Equality(Graphiti.TokenLogProbability left, Graphiti.TokenLogProbability right)
+  static method System.Boolean op_Inequality(Graphiti.TokenLogProbability left, Graphiti.TokenLogProbability right)
+sealed class Graphiti.TokenUsage : System.IEquatable<Graphiti.TokenUsage>
+  ctor()
+  method Graphiti.TokenUsage <Clone>$()
+  method System.Boolean Equals(Graphiti.TokenUsage? other)
+  override method System.Boolean Equals(System.Object? obj)
+  override method System.Int32 GetHashCode()
+  override method System.String ToString()
+  property System.Int64 InputTokens { get; init; }
+  property System.Int64 OutputTokens { get; init; }
+  property System.Int64 TotalTokens { get; }
+  static method System.Boolean op_Equality(Graphiti.TokenUsage? left, Graphiti.TokenUsage? right)
+  static method System.Boolean op_Inequality(Graphiti.TokenUsage? left, Graphiti.TokenUsage? right)
+class Graphiti.UnitExpiredException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String groupId, System.Int64 seq)
+  ctor(System.String groupId, System.Int64 seq, System.Exception? innerException)
+class Graphiti.UnitInProgressException : Graphiti.GraphitiException, System.Runtime.Serialization.ISerializable
+  ctor(System.String groupId, System.String unitId, System.Int64 seq)
+  ctor(System.String groupId, System.String unitId, System.Int64 seq, System.Exception? innerException)
+  property System.Int64 Seq { get; }
+  property System.String GroupId { get; }
+  property System.String UnitId { get; }
+static class Microsoft.Extensions.DependencyInjection.GraphitiServiceCollectionExtensions
+  static method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder AddGraphiti(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Graphiti.GraphitiOptions>? configure = null)
+interface Microsoft.Extensions.DependencyInjection.IGraphitiBuilder
+  method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder UseChatClient(System.Func<System.IServiceProvider, Microsoft.Extensions.AI.IChatClient> factory)
+  method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder UseChatLogProbabilities(System.Func<System.IServiceProvider, Graphiti.IChatLogProbabilities> factory)
+  method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder UseCrossEncoder(System.Func<System.IServiceProvider, Graphiti.ICrossEncoder> factory)
+  method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder UseEmbeddingGenerator(System.Func<System.IServiceProvider, Microsoft.Extensions.AI.IEmbeddingGenerator<System.String, Microsoft.Extensions.AI.Embedding<System.Double>>> factory)
+  method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder UseEmbeddingGenerator(System.Func<System.IServiceProvider, Microsoft.Extensions.AI.IEmbeddingGenerator<System.String, Microsoft.Extensions.AI.Embedding<System.Single>>> factory)
+  method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder UseKeyedChatClient(System.Object serviceKey)
+  property Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get; }
+assembly Graphiti.Net.Neo4j
+sealed class Graphiti.Neo4jOptions
+  ctor()
+  property System.String Database { get; set; }
+  property System.String? Password { get; set; }
+  property System.String? Uri { get; set; }
+  property System.String? User { get; set; }
+static class Microsoft.Extensions.DependencyInjection.GraphitiNeo4jBuilderExtensions
+  static method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder AddNeo4j(Microsoft.Extensions.DependencyInjection.IGraphitiBuilder builder, System.Action<Graphiti.Neo4jOptions> configure)
+  static method Microsoft.Extensions.DependencyInjection.IGraphitiBuilder AddNeo4j(Microsoft.Extensions.DependencyInjection.IGraphitiBuilder builder, System.Func<System.IServiceProvider, Neo4j.Driver.IDriver> factory)

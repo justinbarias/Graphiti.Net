@@ -57,6 +57,7 @@ internal sealed class GraphitiRegistration
             services.AddOptions<GraphitiOptions>().ValidateOnStart();
             services.AddSingleton<IValidateOptions<GraphitiOptions>, GraphitiOptionsValidator>();
             services.AddSingleton(sp => GraphitiFacade.Create(sp, sp.GetRequiredService<GraphitiRegistration>()));
+            services.AddSingleton<IGraphiti>(sp => sp.GetRequiredService<GraphitiFacade>());
         }
 
         if (configure is not null)

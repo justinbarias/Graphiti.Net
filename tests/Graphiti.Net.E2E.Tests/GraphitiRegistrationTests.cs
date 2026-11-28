@@ -110,7 +110,7 @@ public sealed class GraphitiRegistrationTests
         using var provider = services.BuildServiceProvider();
 
         Assert.Equal(count + 1, services.Count);
-        Assert.Single(services, d => d.ServiceType == typeof(GraphitiFacade));
+        Assert.Single(services, d => d.ServiceType == typeof(IGraphiti));
         var options = provider.GetRequiredService<IOptions<GraphitiOptions>>().Value;
         Assert.Equal("medium", options.Llm.Model);
         Assert.Equal("small", options.Llm.SmallModel);
@@ -151,7 +151,7 @@ public sealed class GraphitiRegistrationTests
         return services;
     }
 
-    private static Func<object> Resolve(IServiceProvider provider) => () => provider.GetRequiredService<GraphitiFacade>();
+    private static Func<object> Resolve(IServiceProvider provider) => () => provider.GetRequiredService<IGraphiti>();
 
     private static void Spoil(GraphitiOptions options, string kind)
     {
