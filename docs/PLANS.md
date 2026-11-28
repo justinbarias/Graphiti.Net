@@ -17,6 +17,7 @@ An execution plan is a file in `exec-plans/`. It holds scope, tasks, acceptance 
 | [0003 Rulebook, PyCompat, and pilot](exec-plans/active/0003-rulebook-and-pilot.md) | 4, 5 | Gate 2 |
 | [0004 Translate the core](exec-plans/active/0004-translate-core.md) | 6 | 0003 |
 | [0005 Parity, cutover, and release](exec-plans/active/0005-parity-and-release.md) | 7, 8 | 0004 |
+| [0006 PostgreSQL driver spike](exec-plans/active/0006-postgresql-driver-spike.md) | None. Milestone M6. | 0005 (M1) |
 
 ## Completed
 
