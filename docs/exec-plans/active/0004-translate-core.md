@@ -766,8 +766,9 @@ This section is the second pull request of layer 9: the public .NET surface of `
 | Review | Two Opus 5.5 high reviewers | 8 and 12 findings. 95 of 147 seeded defects passed each test. |
 | Fix round | 6 decisions on the code and 8 on the evidence | 7 new test classes, and one recorder, `port/tools/record_public_surface.py`. |
 | Follow-up | The error of a call (upstream defect U19) | One more test class. |
+| Adversarial pass | One Opus 5.5 high reviewer over the whole diff | 9 findings, 1 of them important. 8 of its 24 seeded defects passed each test. One more commit and one more test class resolved them. |
 
-After the fix round and the follow-up, 150 of 154 seeded defects fail a test. The lead accepts the other four as changes with no effect: the labels of an episode (no query returns them), the metadata of an episode (no query stores it), a vector cut to 32 bits (Neo4j stores 32 bits), and the index build (a test must not drop the shared indexes).
+After the fix round and the follow-up, 150 of 154 seeded defects of the reviews fail a test. Of the 8 seeded defects of the adversarial pass that passed, 7 fail a test now, and the eighth is in the list at the end of this section. The lead accepts the other four as changes with no effect: the labels of an episode (no query returns them), the metadata of an episode (no query stores it), a vector cut to 32 bits (Neo4j stores 32 bits), and the index build (a test must not drop the shared indexes).
 
 What the reviews changed in the product code:
 
@@ -777,7 +778,8 @@ What the reviews changed in the product code:
 | The core compiled against two packages that it did not reference. | Direct references to `Microsoft.Extensions.DependencyInjection.Abstractions` and `Microsoft.Extensions.Options` 11.0.0, as the library table of `port/DECISIONS.md` says. `Microsoft.Extensions.Primitives` moves from 10.0.15 to 11.0.0 in each project. |
 | `AddNeo4j` with a driver factory did not read the database name. | It reads `Neo4jOptions.Database`, and an empty value gives `neo4j`. |
 | Three `!` operators in product code. | Each one is a pattern or a `throw` now (rule R24). |
-| A sync `Dispose` on the scheduler thread blocked for good, and a failed close hid the first error of a failed build. | The sync `Dispose` throws there and names `DisposeAsync`. The cleanup logs a failed close and throws the first error. |
+| A sync `Dispose` on the scheduler thread blocked for good, and a failed close hid the first error of a failed build. | The sync `Dispose` throws there and names `DisposeAsync`. The cleanup logs a failed close and throws the first error. On the scheduler thread, the cleanup starts the close and does not wait for it. |
+| A dispose of one container during the first resolution of another left the default logger, clock, and failure classifier for the process. | The facade applies its services again in the lock section that adds it to the list of live facades. |
 | Each error inside a span reached the host as `InvalidOperationException: generator didn't stop after throw()`, because the facade always passes a tracer and the ported tracer keeps upstream defect U19. The span sites are `add_episode`, `add_episode_bulk`, `search`, the model call, and the ingestion phases. A namespace call starts no span. | The two `RunAsync` helpers of the facade give the host the error of the call, as the exception table of the design says. The ported tracer does not change. |
 | The comments of the embedding properties said that a save keeps 64-bit values. | Neo4j stores 32-bit values, and the comments and the design say so. |
 
@@ -789,6 +791,7 @@ The evidence:
 - `GraphitiNamespaceMembersTests` runs each of the 75 namespace members and reads Neo4j as the proof.
 - `GraphitiArgumentsTests` and `GraphitiSearchArgumentsTests` cover each argument of the 12 calls, and the 10 kinds of search filter.
 - `GraphitiModelOptionsTests` covers the model by size, the token limit, the temperature, the routes, the overrides, and the default reranker over a scripted log probability client.
+- `GraphitiOptionEffectsTests` covers five options that no test reached before the adversarial pass: the trace span prefix, `MaxCoroutines`, the embedding model, the embedding dimensions (by the length of a stored vector), and the group selector of concurrent ingestion.
 - `GraphitiCallErrorTests` runs four failing calls, each with and with no listener on the activity source `Graphiti.Net`. Three give the real error type of the call, and the fourth shows that an `InvalidOperationException` of the host arrives as it is.
 
 Commands at the tip of the branch, 2026-11-28:
@@ -797,7 +800,7 @@ Commands at the tip of the branch, 2026-11-28:
 | --- | --- |
 | `scripts/check.sh --test` on a Neo4j with an empty graph | `check: passed` |
 | `dotnet test --project tests/Port.Evaluation` | 18,664 tests, 0 failed, 0 skipped |
-| `dotnet test --project tests/Graphiti.Net.E2E.Tests` | 339 tests, 0 failed, 0 skipped |
+| `dotnet test --project tests/Graphiti.Net.E2E.Tests` | 346 tests, 0 failed, 0 skipped |
 | `python3 -B port/judge/run.py --build dotnet` | 1,999 cases, 1,933 passed, 66 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong, `judge: passed` |
 | `record_public_surface.py --check` | Current |
 
@@ -831,7 +834,7 @@ Decisions of the lead under D49, for the maintainer at gate 4:
 - The reason of lead choice L3 is corrected. The public embedding type stays `ReadOnlyMemory<double>`.
 - The two direct package references, and the move of `Microsoft.Extensions.Primitives` to 11.0.0.
 - In a process with two containers, the latest live facade owns the process-wide services.
-- Rule R24 has one exception: the sync `Dispose` and the cleanup after a failed build block on the close of the core, off the scheduler.
+- Rule R24 has one exception: the sync `Dispose` and the cleanup after a failed build block on the close of the core, and only off the scheduler.
 - The facade reads the arguments of a call on its scheduler and makes no copy first. A host must not change a collection that it passed before the task of the call completes. The summaries of `IGraphiti` and of the two namespace roots say so. Python shares the list in the same way, on one thread.
 - The reason of lead choice L9 is corrected: with no listener, the ported tracer still wraps an error of a span body, and the facade removes the wrap.
 
