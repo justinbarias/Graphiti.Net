@@ -192,15 +192,18 @@ After step 1, `main` is green: each case that the port now fails is in the stale
 8. Record: `python3 port/judge/run.py --build python --record`. Read each `judge: review` line.
 9. Run `python3 port/judge/run.py --build python` two times. Both runs must pass.
 10. Read `git diff --stat port/judge/golden`. A new property, label, or index in a `queries` capture or a `graph` dump is class D: stop and pass gate S1.
-11. Build the .NET solution, then run `python3 port/judge/run.py --build dotnet --list-failures`.
-12. If the runner prints `passes now. Remove it from expected-failures.txt` for an id, remove that id (decision D38).
-13. Write each id that fails and is not in `expected-failures.txt` into `port/judge/stale-after-pin.txt`, with its unit and the target version. These are the stale cases.
-14. Set each stale unit to `todo` in [queue.json](queue.json), and update [STATE.md](STATE.md) and the sync log.
-15. Run `scripts/check.sh --test`. It must print `check: passed`.
+11. Build the .NET solution, then run `python3 port/judge/run.py --build dotnet`. The run fails, and it prints each case that fails.
+12. If the run prints `passes now. Remove it from expected-failures.txt` for an id, remove that id (decision D38).
+13. Read the line `judge: accepted differences=N of M`. If N is lower than M, or the run prints an id of `port/judge/accepted-differences.txt`, stop and tell the maintainer. Only the maintainer changes that list (decision D55).
+14. Run the same command with `--list-failures`. Write each id that it prints into `port/judge/stale-after-pin.txt`, with its unit and the target version. These are the stale cases.
+15. Run the command of step 11 again. If it prints that a stale id answers `JudgeTypeRejected`, remove that id from the stale list and tell the maintainer. A port cannot change that answer, so the maintainer decides the case by name (decision D55), and the pin pull request waits for that decision.
+16. Set each stale unit to `todo` in [queue.json](queue.json), and update [STATE.md](STATE.md) and the sync log.
+17. Run `scripts/check.sh --test`. It must print `check: passed`.
 
 The pin pull request can change these paths, and no other path:
 `port/UPSTREAM_PIN`, `port/judge/golden/`, `port/judge/replies/`, `port/judge/stale-after-pin.txt`, `port/queue.json`, `port/STATE.md`, `port/UPSTREAM.md`, and the execution plan.
 In `port/judge/expected-failures.txt`, it can only remove an id that passes now. It adds no id there.
+It never changes `port/judge/accepted-differences.txt`.
 The lead never changes `port/judge/cases/`, `port/judge/count.txt`, `port/judge/run.py`, or `port/judge/host-python/` in it.
 Its description lists each stale id with its unit, the number of golden rows that changed, and the replies that were added and removed.
 
@@ -229,14 +232,17 @@ When the stale list is empty and `scripts/check.sh --test` passes on `main`, the
 
 ## The stale list
 
-`port/judge/stale-after-pin.txt` holds the cases that a pin move made wrong. `expected-failures.txt` holds the cases that the port did not reach yet, and a sync never adds an id to it.
+`port/judge/stale-after-pin.txt` holds the cases that a pin move made wrong.
+`expected-failures.txt` is empty since gate 4, and a sync never adds an id to it.
+`accepted-differences.txt` holds the 45 cases that the maintainer accepted by name (decision D55), and a sync never changes it.
 
 | Rule | Text |
 | --- | --- |
 | Line format | `<case id> <unit> <target version>`. A line that starts with `#` is a comment. |
 | Who adds an id | The lead, and only in a pin pull request. |
 | Who removes an id | The lead, in the pull request that makes the case pass. |
-| What the runner allows | A listed case can be bound and give a wrong result. A listed case that passes fails the run until its line is removed. |
+| What the runner allows | A listed case can be bound and give a wrong result. A listed case that passes fails the run until its line is removed. An id cannot also be in one of the other two lists. |
+| A type rejection | A listed case cannot answer `JudgeTypeRejected`. The maintainer decides such a case by name (decision D55). |
 | Release | No package is published while the list has an id. |
 
 ## Upstream defects
@@ -283,6 +289,7 @@ These items are decided, and they are not in effect. Each one goes in its own pu
 | The runner patch for `stale-after-pin.txt`, with the new text of the judge README | Lead writes it, the maintainer applies it | Written: `port/patches/judge-stale-after-pin.patch`. Not applied. |
 | The weekly CI job | Lead | Written: `.github/workflows/upstream-release.yml`. It did not run on GitHub. |
 | The `UpstreamVersion` metadata and the README table | Plan 0005, the packaging task | Not written |
+| The status board counts a stale case as a case that passes. `scripts/command_center_data.py` must subtract the ids of the stale list. | Lead | Not written |
 | The rule R21 text for a fixed defect | Lead | Proposed |
 
 ## Sync log

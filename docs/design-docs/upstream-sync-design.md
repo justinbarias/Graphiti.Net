@@ -109,7 +109,8 @@ A new row for the table of files:
 A new paragraph at the end of "Bindings in the .NET host":
 
 ```text
-A case in `stale-after-pin.txt` can be bound and give a wrong result. If such a case passes, the runner fails until its line is removed. An id cannot be in both lists, and each id must name a case.
+A case in `stale-after-pin.txt` can be bound and give a wrong result, from a pin move until its unit is ported again (port/UPSTREAM.md).
+If such a case passes, the runner fails until its line is removed. The runner also fails for an id there that no case has, and for an id that is also in one of the other two lists.
 ```
 
 A new paragraph at the end of "Rule for changes after gate 2":
@@ -134,35 +135,46 @@ The deny rules stop the `Edit` and `Write` tools. The recording writes the golde
 ## The runner patch
 
 The patch is `port/patches/judge-stale-after-pin.patch`. The maintainer did not apply it.
-It changes 29 lines of `run.py` and 7 lines of the judge README, with the comment on the .NET command. `git apply --check` passes on `main` at `6e7d067`, also together with `judge-readme-units.patch`.
+It changes 39 lines of `run.py` and 9 lines of the judge README. `git apply --check` passes on `main` at `727116a`, also together with `judge-readme-units.patch`.
+
+This is the second version of the patch. Pull request 70 (decision D55) changed the runner one minute before the first version merged, and the first version did not apply after that.
+The runner now has three lists: `expected-failures.txt` (empty since gate 4), `accepted-differences.txt` (45 cases), and the stale list.
 
 | Behavior | Expected result |
 | --- | --- |
 | The runner reads `port/judge/stale-after-pin.txt`. The first word of a line is a case id. A line that starts with `#` is a comment. | A missing file is an empty list. |
-| A stale case fails in the .NET build, bound or not. | The run passes. The summary line prints `stale=<count>`. |
+| A stale case fails in the .NET build, bound or not. | The run passes. The line `judge: stale after a pin move=<count>` gives the number of listed ids in the run. |
 | A stale case passes in the .NET build. | `FAIL <id> passes now. Remove it from stale-after-pin.txt.` |
-| An id is in both lists. | `FAIL <id> is in both lists.` |
-| An id names no case. | `FAIL <id> names no case.` |
+| An id is also in `expected-failures.txt` or in `accepted-differences.txt`. | `FAIL <id> is in stale-after-pin.txt and in another list. Keep it in one list only.` |
+| No case has the id. | `FAIL <id> is in stale-after-pin.txt, and no case has this id.` |
+| A stale case answers `JudgeTypeRejected`. | `FAIL <id> is in stale-after-pin.txt and answers JudgeTypeRejected. A port cannot change that answer. The maintainer decides the case by name.` |
+| The file is not UTF-8 text. | `FAIL stale-after-pin.txt is not UTF-8 text.` A byte order mark at the start is not an error. |
 | The Python build | The runner does not read the list. |
 | A run with `--filter` or `--layer` | The runner uses only the listed ids that the run selects. |
 
-Two checks are about the list itself: an id in both lists, and an id that names no case. They read the whole lists, also in a run with `--filter` or `--layer`.
+Two checks are about the list itself: an id in two lists, and an id that no case has. They read the whole lists, also in a run with `--filter` or `--layer`.
+The pass lines of the runner stay as they are. The count of the stale list is on a line of its own.
 
-The runs of 2026-11-28 used a copy of `port/judge/` outside the repository, with the patch applied and the .NET host of `main` at `6e7d067`.
+The runs of 2026-11-28 used a copy of `port/judge/` outside the repository, with the patch applied and the .NET host of `main` at `727116a`.
 Each run was `run.py --build dotnet --layer pure`, except where the row says more. The bound case is `pure.text.lucene_sanitize.plain`.
 
 | Run | Result |
 | --- | --- |
-| No list file, and a list with a comment only | `expected failures=66 unexpected=0 fixed=0 bound_wrong=0 stale=0`, passed |
-| Control: a wrong golden row for the bound case, and no list | `FAIL pure.text.lucene_sanitize.plain (not in expected-failures.txt)`, failed |
-| The same wrong golden row, and the case in the list | `unexpected=0 fixed=0 bound_wrong=0 stale=1`, passed |
-| A case with no binding, moved from `expected-failures.txt` to the list | `expected failures=65 unexpected=0 stale=1`, passed |
+| No list file, and a list with a comment and blank lines only | `expected failures=0 unexpected=0 fixed=0 bound_wrong=0`, `stale after a pin move=0`, passed |
+| Control: a wrong golden row for the bound case, and no list | `FAIL pure.text.lucene_sanitize.plain (not in expected-failures.txt)`, failed, exit code 1 |
+| The same wrong golden row, and the case in the list two times, one line with a Windows line end | `unexpected=0`, `stale after a pin move=1`, passed |
 | The bound case in the list, with its correct golden row | `FAIL pure.text.lucene_sanitize.plain passes now. Remove it from stale-after-pin.txt.`, failed |
-| An id in both lists | `FAIL pure.chunking._chunk_json_array.wrong_type_none is in both lists.`, failed |
-| The id `pure.no.such.case` in the list | `FAIL pure.no.such.case names no case.`, failed, exit code 1 |
+| An id of `accepted-differences.txt` in the list | `FAIL pure.chunking._chunk_json_array.wrong_type_none is in stale-after-pin.txt and in another list. Keep it in one list only.`, failed |
+| The bound case in the list and in `expected-failures.txt`, with the wrong golden row | The same message, and `is bound and wrong`, failed |
+| The id `pure.no.such.case` in the list | `FAIL pure.no.such.case is in stale-after-pin.txt, and no case has this id.`, failed |
 | `--build python --layer pure` with three bad lines in the list | `cases=1965 passed=1965 failed=0`, passed |
-| The wrong golden row and the listed case, with `--filter` on another case | `cases=1 passed=1`, `stale=0`, passed |
-| The same, with `--filter` on the listed case | `cases=1 passed=0 failed=1`, `stale=1`, passed |
+| The wrong golden row and the listed case, with `--filter` on another case | `stale after a pin move=0`, passed |
+| The same, with `--filter` on the listed case | `stale after a pin move=1`, passed |
+| The same, with `--list-failures` | The output holds the listed id. |
+| A golden `TypeError` changed to a value for `pure.chunking.estimate_tokens.wrong_type_none`, and no list | `FAIL ... (not in expected-failures.txt)`, failed |
+| The same case in the list | `FAIL ... is in stale-after-pin.txt and answers JudgeTypeRejected. ...`, failed |
+| The wrong golden row and the listed case, in a file with a byte order mark | `stale after a pin move=1`, passed |
+| A list file that is not UTF-8 | `FAIL stale-after-pin.txt is not UTF-8 text.`, failed |
 
 ## The weekly job
 
@@ -187,6 +199,7 @@ The tool ends with exit code 2 for each error, also for a Python exception. Exit
 - No sync ran. Steps 1 and 2 of the runbook come from the judge README and the unit loop, not from a run.
 - The rules of the tool for class C and class D were tested on the tool's own repository and on one real minor move. No reviewer compared its output with a hand classification.
 - One adversarial review ran (the next section). No second review ran on the fixes.
+- A second review read the second version of the runner patch (the next section). No review ran on its fixes.
 - The runner patch ran on the pure layer only. No run used the flow layer or the full case set.
 - The workflow did not run on GitHub. The schedule, the permissions, and the two `gh` commands that write an issue are not tested.
 
@@ -209,3 +222,16 @@ It reported 9 important findings and 3 smaller ones. It reproduced 7 of the impo
 | N1. A changed keyword line of a call that spans lines got class B. | Fixed. The tool compares the syntax tree of each model call. |
 | N2. The write rule missed `SET n:Label`, `REMOVE`, `CREATE (`, and index name constants. | Fixed, except a keyword in small letters, which the runbook lists as a limit. |
 | N3. Six smaller points. They are the default of a stored field, missing self-test cases, and two gaps in the README text. The last two are the word "stale" for two things and the release row of class A. | Fixed. The self-test has 86 checks. |
+
+### Second review, of the second version of the runner patch
+
+One Opus 5.5 subagent at high effort, 2026-11-28. It reported 2 important findings and 4 smaller ones. It reproduced 3 of the 6 by a run.
+
+| Finding | State |
+| --- | --- |
+| I1. A case with a golden `TypeError` that becomes a value after a pin move still answers `JudgeTypeRejected`. In the stale list it passed, and no port can remove it. | Fixed. The runner fails for a stale case that answers `JudgeTypeRejected`, and step 15 of the runbook sends the case to the maintainer. |
+| I2. Step 12 of the runbook read a message that `--list-failures` does not print. | Fixed. Step 11 runs with no option, and step 14 runs with `--list-failures`. |
+| N1. An accepted case that passes by the type error rule after a pin move is not reported. | Fixed in the runbook. Step 13 reads the line `judge: accepted differences=N of M`. |
+| N2. A list file that is not UTF-8 stopped the runner with a traceback, and a byte order mark became part of an id. | Fixed. |
+| N3. The status board counts a stale case as a case that passes. | Open. The runbook lists it in "Before the first sync". |
+| N4. The README gave a line format that the runner does not enforce. | Fixed. The README says that the runner reads the first word only. |
