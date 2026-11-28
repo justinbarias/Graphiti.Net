@@ -18,7 +18,7 @@
 - `NEO4J_PASSWORD=password` in `.env.example`, `docker-compose.yml`, and the test fixture is a local test value. The sidecar binds to `127.0.0.1` only.
 - The library never reads `.env` files. The host application supplies connection values and model clients.
 - The quickstart in `examples/Quickstart` needs a real LLM key. Pass it as an environment variable, or put it in the git-ignored `.env` file at the repository root. Only the .NET server of the example reads the key, and the page never gets it. In a Claude cloud environment, store the key as a network secret.
-- NuGet publishing needs an API key that only the maintainer holds. An agent never publishes without approval.
+- NuGet publishing runs in a GitHub workflow with trusted publishing, so the repository holds no API key (plan 0005, task 10). An agent never publishes without approval.
 
 ## Telemetry
 
