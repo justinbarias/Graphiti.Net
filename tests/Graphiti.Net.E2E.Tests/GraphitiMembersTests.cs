@@ -236,6 +236,23 @@ public sealed class GraphitiMembersTests
     }
 
     [Fact(Timeout = TimeLimit)]
+    public async Task A_blocking_wait_on_a_synchronization_context_does_not_deadlock()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var scope = new GraphitiScope(Ana);
+        await AddAnaAsync(scope, ct);
+        using var context = new PumpContext();
+
+        // The thread of the context blocks on the task. The task completes off the context (ConfigureAwait(false)), so
+        // the wait ends. A continuation that waits for the context would never run.
+        var completed = await context.RunAsync(() => Task.FromResult(
+            scope.Graphiti.RetrieveEpisodesAsync(January.AddDays(1), new RetrieveEpisodesOptions { GroupIds = [scope.Group] }, ct)
+                .Wait(TimeSpan.FromSeconds(20), ct)));
+
+        Assert.True(completed);
+    }
+
+    [Fact(Timeout = TimeLimit)]
     public async Task A_prompt_override_changes_the_prompt_that_the_chat_client_receives()
     {
         var ct = TestContext.Current.CancellationToken;

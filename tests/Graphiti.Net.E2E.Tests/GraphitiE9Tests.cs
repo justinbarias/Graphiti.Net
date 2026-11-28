@@ -26,13 +26,23 @@ public sealed partial class GraphitiE9Tests
             new AddEpisodeOptions { GroupId = scope.Group },
             ct);
         Assert.Equal(scope.Group, first.Episode.GroupId);
-        Assert.Contains(first.Edges, e => e.Fact == "Kendra loves Adidas shoes.");
+        var firstEdge = Assert.Single(first.Edges);
+        Assert.Equal("Kendra loves Adidas shoes.", firstEdge.Fact);
+
+        // The result holds what the graph holds: the two entities, and one MENTIONS edge from the episode to each.
+        Assert.Equal(["Adidas shoes", "Kendra"], first.Nodes.Select(n => n.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            first.Nodes.Select(n => n.Uuid).Order(StringComparer.Ordinal),
+            (await scope.QueryAsync("MATCH (n:Entity) WHERE n.group_id = $g RETURN n.uuid AS u")).Select(r => r["u"].As<string>()).Order(StringComparer.Ordinal));
+        Assert.Equal(2, first.EpisodicEdges.Count);
+        Assert.All(first.EpisodicEdges, e => Assert.Equal(first.Episode.Uuid, e.SourceNodeUuid));
+        Assert.Equal(first.Nodes.Select(n => n.Uuid).Order(StringComparer.Ordinal), first.EpisodicEdges.Select(e => e.TargetNodeUuid).Order(StringComparer.Ordinal));
+        Assert.Empty(first.Communities);
+        Assert.Empty(first.CommunityEdges);
+        Assert.Equal(Counts(3, 1, 2, 2, 1), await CountsAsync(scope));
 
         var found = await graphiti.SearchAsync("Kendra Adidas shoes", new SearchOptions { GroupIds = [scope.Group] }, ct);
         Assert.Contains(found, e => e.Fact == "Kendra loves Adidas shoes." && e.GroupId == scope.Group);
-
-        var nodesBefore = await scope.CountAsync("MATCH (n) WHERE n.group_id = $g RETURN count(n) AS c");
-        var edgesBefore = await scope.CountAsync("MATCH (a)-[r]->(b) WHERE r.group_id = $g RETURN count(r) AS c");
 
         var second = await graphiti.AddEpisodeAsync(
             new EpisodeInput
@@ -57,9 +67,35 @@ public sealed partial class GraphitiE9Tests
         Assert.Equal(1, await scope.CountAsync(
             "MATCH (:Entity {group_id: $g, name: 'Kendra'})-[r:RELATES_TO]->(:Entity {name: 'Nike shoes'}) WHERE r.fact = $fact RETURN count(r) AS c",
             new { fact = "Kendra now loves Nike shoes." }));
-        Assert.True(await scope.CountAsync("MATCH (n) WHERE n.group_id = $g RETURN count(n) AS c") >= nodesBefore);
-        Assert.True(await scope.CountAsync("MATCH (a)-[r]->(b) WHERE r.group_id = $g RETURN count(r) AS c") >= edgesBefore);
+
+        // Episode 2 adds one episode, the entity Nike shoes, three MENTIONS edges, and two facts. It deletes nothing:
+        // each node and each edge of the first episode still exists, with its uuid.
+        Assert.Equal(Counts(5, 2, 3, 5, 3), await CountsAsync(scope));
+        string[] firstNodes = [first.Episode.Uuid, .. first.Nodes.Select(n => n.Uuid)];
+        string[] firstEdges = [.. first.Edges.Select(e => e.Uuid), .. first.EpisodicEdges.Select(e => e.Uuid)];
+        Assert.Equal(firstNodes.Length, await scope.CountAsync("MATCH (n) WHERE n.uuid IN $us AND n.group_id = $g RETURN count(n) AS c", new { us = firstNodes }));
+        Assert.Equal(firstEdges.Length, await scope.CountAsync("MATCH ()-[r]->() WHERE r.uuid IN $us AND r.group_id = $g RETURN count(r) AS c", new { us = firstEdges }));
+        var reread = await graphiti.Edges.Entity.GetByUuidAsync(firstEdge.Uuid, ct);
+        Assert.Equal((firstEdge.Fact, firstEdge.ValidAt, (DateTimeOffset?)June), (reread.Fact, reread.ValidAt, reread.InvalidAt));
+        var stored = (await scope.QueryAsync(
+            "MATCH ()-[r:RELATES_TO {uuid: $u}]->() RETURN r.reference_time AS t, r.expired_at AS x, r.created_at AS c", new { u = firstEdge.Uuid })).Single();
+        Assert.Equal(stored["t"].As<ZonedDateTime>().ToDateTimeOffset(), reread.ReferenceTime);
+        Assert.Equal(March, reread.ReferenceTime);
+        Assert.Equal(stored["x"].As<ZonedDateTime>().ToDateTimeOffset(), reread.ExpiredAt);
+        Assert.Equal(stored["c"].As<ZonedDateTime>().ToDateTimeOffset(), reread.CreatedAt);
+        Assert.NotEqual(reread.CreatedAt, reread.ExpiredAt);
     }
+
+    private static (long Nodes, long Episodes, long Entities, long Mentions, long Facts) Counts(
+        long nodes, long episodes, long entities, long mentions, long facts) => (nodes, episodes, entities, mentions, facts);
+
+    /// <summary>The count of the nodes, the episodes, the entities, the MENTIONS edges, and the facts of the group.</summary>
+    private static async Task<(long, long, long, long, long)> CountsAsync(GraphitiScope scope) => (
+        await scope.CountAsync("MATCH (n) WHERE n.group_id = $g RETURN count(n) AS c"),
+        await scope.CountAsync("MATCH (n:Episodic) WHERE n.group_id = $g RETURN count(n) AS c"),
+        await scope.CountAsync("MATCH (n:Entity) WHERE n.group_id = $g RETURN count(n) AS c"),
+        await scope.CountAsync("MATCH ()-[r:MENTIONS]->() WHERE r.group_id = $g RETURN count(r) AS c"),
+        await scope.CountAsync("MATCH ()-[r:RELATES_TO]->() WHERE r.group_id = $g RETURN count(r) AS c"));
 
     /// <summary>
     /// The replies of the Kendra scenario of the judge (flow.hand.contradiction), by prompt name. The second episode

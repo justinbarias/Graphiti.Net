@@ -16,6 +16,9 @@ public sealed class GraphitiNamespacesTests
     private static readonly DateTimeOffset Created = new DateTimeOffset(2023, 12, 31, 23, 59, 59, TimeSpan.FromMinutes(-210)).AddTicks(9_999_999);
     private static readonly DateTimeOffset CreatedCut = new DateTimeOffset(2023, 12, 31, 23, 59, 59, TimeSpan.FromMinutes(-210)).AddTicks(9_999_990);
 
+    private static readonly DateTimeOffset Expired = new(2025, 2, 3, 4, 5, 6, TimeSpan.FromHours(9));
+    private static readonly DateTimeOffset Reference = new(2024, 7, 8, 9, 10, 11, TimeSpan.FromHours(-7));
+
     public static TheoryData<EpisodeType> EpisodeTypes => [.. Enum.GetValues<EpisodeType>()];
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -130,15 +133,26 @@ public sealed class GraphitiNamespacesTests
             Episodes = ["ep"],
             ValidAt = Precise,
             InvalidAt = null,
-            ExpiredAt = Created,
+            ExpiredAt = Expired,
+            ReferenceTime = Reference,
+            Attributes = new Dictionary<string, object?> { ["since"] = 2020L },
         };
 
         var saved = await scope.Graphiti.Edges.Entity.SaveAsync(edge, ct);
         Assert.NotNull(saved.FactEmbedding);
         var read = await scope.Graphiti.Edges.Entity.GetByUuidAsync(edge.Uuid, ct);
         Assert.Equal(
-            (edge.Fact, edge.Name, a.Uuid, b.Uuid, (DateTimeOffset?)PreciseCut, (DateTimeOffset?)CreatedCut, (DateTimeOffset?)null),
+            (edge.Fact, edge.Name, a.Uuid, b.Uuid, (DateTimeOffset?)PreciseCut, (DateTimeOffset?)Expired, (DateTimeOffset?)null),
             (read.Fact, read.Name, read.SourceNodeUuid, read.TargetNodeUuid, read.ValidAt, read.ExpiredAt, read.InvalidAt));
+        Assert.Equal((CreatedCut, TimeSpan.FromMinutes(-210)), (read.CreatedAt, read.CreatedAt.Offset));
+        Assert.Equal(TimeSpan.FromHours(9), read.ExpiredAt!.Value.Offset);
+
+        // The namespace save of entity_edge_ops.py writes no reference_time, so a read gives null. Test E9 reads the
+        // reference time of an edge that add_episode saved.
+        Assert.Null(read.ReferenceTime);
+        // The namespace save stores source_uuid and target_uuid as edge properties, and get_entity_edge_from_record keeps
+        // them in the attributes, as in Python.
+        Assert.Equal(new Dictionary<string, object?> { ["source_uuid"] = a.Uuid, ["target_uuid"] = b.Uuid, ["since"] = 2020L }, read.Attributes);
         Assert.Equal(["ep"], read.Episodes);
         Assert.Single(await scope.Graphiti.Edges.Entity.GetBetweenNodesAsync(a.Uuid, b.Uuid, ct));
 

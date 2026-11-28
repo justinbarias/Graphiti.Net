@@ -43,16 +43,32 @@ public sealed class GraphitiLifetimeTests
         Assert.InRange(created, before.AddMilliseconds(-1), after.AddMilliseconds(1));
     }
 
-    [Fact(Timeout = TimeLimit)]
-    public async Task A_host_driver_uses_the_database_of_the_Neo4j_options()
+    [Theory(Timeout = TimeLimit)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_host_driver_uses_the_database_of_the_Neo4j_options(bool hostDriver)
     {
         var ct = TestContext.Current.CancellationToken;
         var database = $"graphitinet-missing-{Guid.NewGuid():N}";
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(GraphitiRegistrationTests.Chat());
         services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new HashEmbeddingGenerator());
-        services.AddGraphiti().AddNeo4j(_ => GraphDatabase.Driver(Neo4jSidecar.Uri, AuthTokens.Basic(Neo4jSidecar.User, Neo4jSidecar.Password)));
-        services.Configure<Neo4jOptions>(o => o.Database = database);
+        if (hostDriver)
+        {
+            services.AddGraphiti().AddNeo4j(_ => GraphDatabase.Driver(Neo4jSidecar.Uri, AuthTokens.Basic(Neo4jSidecar.User, Neo4jSidecar.Password)));
+            services.Configure<Neo4jOptions>(o => o.Database = database);
+        }
+        else
+        {
+            services.AddGraphiti().AddNeo4j(o =>
+            {
+                o.Uri = Neo4jSidecar.Uri;
+                o.User = Neo4jSidecar.User;
+                o.Password = Neo4jSidecar.Password;
+                o.Database = database;
+            });
+        }
+
         await using var provider = services.BuildServiceProvider();
         var graphiti = provider.GetRequiredService<IGraphiti>();
 
@@ -101,6 +117,74 @@ public sealed class GraphitiLifetimeTests
         Assert.Equal(14, error.SqliteErrorCode);
         Assert.Equal(["client.close"], driver.Calls.Names);
         Assert.False(Directory.Exists(folder));
+    }
+
+    [Fact(Timeout = TimeLimit)]
+    public async Task A_second_container_in_one_process_has_its_own_graph_clients_and_usage()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var first = new GraphitiScope(GraphitiMembersTests.Ana);
+        await using var second = new GraphitiScope(GraphitiMembersTests.Ana);
+        try
+        {
+            var a = await GraphitiMembersTests.AddAnaAsync(first, ct);
+            var b = await GraphitiMembersTests.AddAnaAsync(second, ct);
+
+            Assert.NotSame(first.Graphiti, second.Graphiti);
+            Assert.Equal(first.Chat.Calls.Count, first.Graphiti.TokenUsage.GetUsage().Values.Sum(u => u.CallCount));
+            Assert.Equal(second.Chat.Calls.Count, second.Graphiti.TokenUsage.GetUsage().Values.Sum(u => u.CallCount));
+            Assert.Equal([a.Episode.Uuid], await GraphitiNamespaceMembersTests.UuidsAsync(first, "MATCH (n:Episodic) WHERE n.group_id = $g RETURN n.uuid AS u"));
+            Assert.Equal([b.Episode.Uuid], await GraphitiNamespaceMembersTests.UuidsAsync(second, "MATCH (n:Episodic) WHERE n.group_id = $g RETURN n.uuid AS u"));
+        }
+        finally
+        {
+            await first.DisposeAsync();
+        }
+
+        // The second container still works after the first one is disposed.
+        var calls = second.Chat.Calls.Count;
+        await second.Graphiti.AddEpisodeAsync(
+            GraphitiMembersTests.Episode("a2", new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero)), new AddEpisodeOptions { GroupId = second.Group }, ct);
+        Assert.True(second.Chat.Calls.Count > calls);
+        Assert.Equal(2, await second.CountAsync("MATCH (n:Episodic) WHERE n.group_id = $g RETURN count(n) AS c"));
+    }
+
+    [Fact(Timeout = TimeLimit)]
+    public async Task Llm_ClassifyFailure_classifies_the_errors_of_the_default_reranker()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var hook = new FirstTokenTrue();
+        await using var scope = new GraphitiScope(
+            GraphitiMembersTests.Ana,
+            o => o.Llm.ClassifyFailure = e => e is TimeoutException ? ModelCallFailure.RateLimit : ModelCallFailure.None,
+            build: b => b.UseChatLogProbabilities(_ => hook));
+        scope.Chat.Rerank = _ => throw new TimeoutException("the provider is slow");
+        await scope.Graphiti.BuildIndicesAndConstraintsAsync(cancellationToken: ct);
+        await GraphitiModelOptionsTests.TwoFactsAsync(scope, ct);
+
+        // openai_reranker_client.py raises RateLimitError for a rate limit of the client. The classifier of the options
+        // says that a TimeoutException is a rate limit. Each search span around the rerank raises "generator didn't
+        // stop after throw()" with the error of its body (GAPS U19).
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => scope.Graphiti.AdvancedSearchAsync(
+            "Ana", SearchRecipes.EdgeHybridSearchCrossEncoder, new AdvancedSearchOptions { GroupIds = [scope.Group] }, ct));
+        var chain = new List<Exception>();
+        for (Exception? e = error; e is not null; e = e.InnerException)
+        {
+            chain.Add(e);
+        }
+
+        Assert.All(chain.SkipLast(2), e => Assert.Equal("generator didn't stop after throw()", Assert.IsType<InvalidOperationException>(e).Message));
+        Assert.IsType<RateLimitException>(chain[^2]);
+        Assert.IsType<TimeoutException>(chain[^1]);
+    }
+
+    private sealed class FirstTokenTrue : IChatLogProbabilities
+    {
+        public void Request(ChatOptions options, int topLogProbabilityCount, IReadOnlyDictionary<int, int> logitBias)
+        {
+        }
+
+        public IReadOnlyList<TokenLogProbability>? ReadFirstToken(ChatResponse response) => [new("True", 0)];
     }
 
     /// <summary>A clock that runs at the system rate with a fixed shift.</summary>

@@ -13,8 +13,17 @@ using Microsoft.Extensions.AI;
 /// </summary>
 internal sealed class ScriptedChatClient(Func<string, string, string?> script) : IChatClient
 {
-    /// <summary>Gets each call: the prompt name, the model id of the options, and the user text.</summary>
-    internal ConcurrentQueue<(string Prompt, string? ModelId, string User)> Calls { get; } = new();
+    /// <summary>
+    /// Gets each chat call: the prompt name, the model id of the options, the user text, the options, and the model
+    /// size of <see cref="GraphitiModelCall.Current"/>.
+    /// </summary>
+    internal ConcurrentQueue<(string Prompt, string? ModelId, string User, ChatOptions? Options, string? ModelSize)> Calls { get; } = new();
+
+    /// <summary>Gets each rerank call: the user text and the options.</summary>
+    internal ConcurrentQueue<(string User, ChatOptions? Options)> Reranks { get; } = new();
+
+    /// <summary>Gets or sets the reply text of a rerank call, by the user text. Null fails a rerank call.</summary>
+    internal Func<string, string>? Rerank { get; set; }
 
     /// <summary>Gets each thread and synchronization context that a call ran on.</summary>
     internal ConcurrentQueue<(bool OnScheduler, SynchronizationContext? Context)> Places { get; } = new();
@@ -24,10 +33,17 @@ internal sealed class ScriptedChatClient(Func<string, string, string?> script) :
     {
         cancellationToken.ThrowIfCancellationRequested();
         Places.Enqueue((Graphiti.PyCompat.Asyncio.IsOnLoop, SynchronizationContext.Current));
+        var user = string.Join("\n", messages.Where(m => m.Role == ChatRole.User).Select(m => m.Text));
+        if (GraphitiModelCall.Current is { Operation: "rerank" })
+        {
+            Reranks.Enqueue((user, options));
+            var reply = Rerank?.Invoke(user) ?? throw new InvalidOperationException("The script has no rerank reply.");
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+        }
+
         var prompt = GraphitiModelCall.Current?.PromptName
             ?? throw new InvalidOperationException("The chat call has no prompt name.");
-        var user = string.Join("\n", messages.Where(m => m.Role == ChatRole.User).Select(m => m.Text));
-        Calls.Enqueue((prompt, options?.ModelId, user));
+        Calls.Enqueue((prompt, options?.ModelId, user, options, GraphitiModelCall.Current?.ModelSize));
         var text = script(prompt, user)
             ?? throw new InvalidOperationException($"The script has no reply for the prompt {prompt}.");
         return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text))
@@ -52,6 +68,9 @@ internal sealed class HashEmbeddingGenerator(int dimensions = 1024) : IEmbedding
 {
     internal int Calls;
 
+    /// <summary>Gets or sets an action that runs at each call, after the call is counted and before the token check.</summary>
+    internal Action? OnCall { get; set; }
+
     internal static float[] Vector(string text, int dimensions)
     {
         var values = new float[dimensions];
@@ -72,8 +91,10 @@ internal sealed class HashEmbeddingGenerator(int dimensions = 1024) : IEmbedding
     public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
         IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        // The call counts before the token check, so that a call that starts with a canceled token is seen.
         Interlocked.Increment(ref Calls);
+        OnCall?.Invoke();
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(
             values.Select(text => new Embedding<float>(Vector(text, dimensions)))));
     }
