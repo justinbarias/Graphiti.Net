@@ -33,10 +33,13 @@ internal static class ExtractNodesBindings
         // (validate_entity_types, validate_excluded_entity_types, validate_identity_properties).
         // PORT: the $ref is a GraphTypeDescriptor, which is also an IResponseModel, so it serves both uses. The descriptor
         // is written here and not built from the product model ExtractedEntities.ResponseModel (a BuiltinResponseModel),
-        // which a custom type parameter cannot hold. It has the Python name and the one Python field, extracted_entities,
-        // which is required. Its kind is a placeholder: the three functions read only the field names, and the encoder of a
-        // response model reads only the name. So its ModelJsonSchema and its ModelValidate are not Python's, and no judge
-        // case reads them (the schema case reads the table of schemas below).
+        // which a custom type parameter cannot hold. It differs from the Python class in these ways: the field
+        // extracted_entities is list[ExtractedEntity] in Python, and the descriptor has the placeholder kind String with
+        // IsList, so a list of strings; the field has no description ("List of extracted entities" in Python); and the
+        // descriptor has no docstring, as the Python class has none. So its ModelJsonSchema and its ModelValidate are not
+        // Python's, and no judge case reads them (the schema case reads the table of schemas below). The three functions of
+        // the ten cases (validate_entity_types, validate_excluded_entity_types, validate_identity_properties) read only the
+        // field names, and the encoder of a response model reads only the name.
         table.Registry
             .AddRef(Module + ":extract_message", (PromptFunction)ExtractNodes.ExtractMessage)
             .AddRef(

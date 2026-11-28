@@ -19,15 +19,13 @@ internal static class TypesBindings
     }
 
     /// <summary>
-    /// The <c>library</c> argument of <c>validate_prompt_library</c>. A dict is a library that has no attribute: Python reads
-    /// the groups with <c>hasattr</c>, and a dict has the attributes of the class <c>dict</c> only, none of which is the
-    /// name of a prompt group (<c>PROMPT_GROUPS</c>). Python raises <c>ValueError</c> for the first group, as it does for an
-    /// empty namespace. Any other value is read as an <see cref="IPromptLibrary"/>.
+    /// The <c>library</c> argument of <c>validate_prompt_library</c>. A library, a namespace or the default library,
+    /// is itself. Each other value (a dict, a list, <c>None</c>, text, a number, a bool, a class) has no attribute with
+    /// the name of a prompt group (<c>PROMPT_GROUPS</c>), because Python reads the groups with <c>hasattr</c>. So it is a
+    /// library with no group, and Python raises <c>ValueError</c> for the first group, as it does for an empty namespace.
     /// </summary>
     internal static IPromptLibrary AsPromptLibrary(object? value) =>
-        value is OrderedDictionary<string, object?> or PyDict
-            ? new Namespace([])
-            : (IPromptLibrary)JudgeTypes.Convert(typeof(IPromptLibrary), value, "argument 'library'")!;
+        value as IPromptLibrary ?? new Namespace([]);
 
     /// <summary>
     /// A <c>SimpleNamespace</c>: one attribute for each key of the data. <c>hasattr</c> is the result of a

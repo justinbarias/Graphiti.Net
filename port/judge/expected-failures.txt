@@ -26,6 +26,7 @@ pure.queries.get_vector_cosine_func_query.non_str
 pure.ranking.SearchConfig.model_copy.recipe_update_unvalidated_bad_type
 pure.ranking.normalize_l2.two_dimensional_per_column
 pure.ranking.rrf.inner_not_list_string
+pure.ranking.rrf.rank_const_fraction
 pure.text._build_directed_uuid_map.wrong_type_short_pair
 pure.text.compress_uuid_map.wrong_type_short_pair
 pure.text.get_default_group_id.wrong_type_none

@@ -1713,11 +1713,10 @@ internal static partial class SearchUtils
     }
 
     // takes in a list of rankings of uuids
-    // PORT: `rank_const` has no annotation and is only used in `1 / (i + rank_const)`, so it is a double: a whole number gives
-    // the same quotient as in Python, and a fraction is a valid argument.
+    // PORT: `rank_const` has no annotation. TYPE_HINTS.md gives int.
     // PORT: defaultdict(float) is an OrderedDictionary with Py.Get and a default of 0.0 (R14). The sort has a float key,
     // so it is Py.SortInPlace (R14, GAPS F19).
-    internal static (List<string>, List<double>) Rrf(List<List<string>> results, double rankConst = 1, double minScore = 0)
+    internal static (List<string>, List<double>) Rrf(List<List<string>> results, long rankConst = 1, double minScore = 0)
     {
         var scores = new OrderedDictionary<string, double>(StringComparer.Ordinal);
         foreach (var result in results)
