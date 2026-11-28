@@ -266,6 +266,14 @@ internal sealed record AddEpisodeResults
             CommunityEdges = communityEdges.Value,
         }.Validate();
     }
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("AddEpisodeResults")
+        .Required("episode", PydanticType.Model(EpisodicNode.ModelJsonSchema))
+        .Required("episodic_edges", PydanticType.List(PydanticType.Model(EpisodicEdge.ModelJsonSchema)))
+        .Required("nodes", PydanticType.List(PydanticType.Model(EntityNode.ModelJsonSchema)))
+        .Required("edges", PydanticType.List(PydanticType.Model(EntityEdge.ModelJsonSchema)))
+        .Required("communities", PydanticType.List(PydanticType.Model(CommunityNode.ModelJsonSchema)))
+        .Required("community_edges", PydanticType.List(PydanticType.Model(CommunityEdge.ModelJsonSchema)));
 }
 
 internal sealed record AddBulkEpisodeResults
@@ -283,6 +291,14 @@ internal sealed record AddBulkEpisodeResults
     internal required List<CommunityEdge> CommunityEdges { get; set; }
 
     internal AddBulkEpisodeResults Validate() => this;
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("AddBulkEpisodeResults")
+        .Required("episodes", PydanticType.List(PydanticType.Model(EpisodicNode.ModelJsonSchema)))
+        .Required("episodic_edges", PydanticType.List(PydanticType.Model(EpisodicEdge.ModelJsonSchema)))
+        .Required("nodes", PydanticType.List(PydanticType.Model(EntityNode.ModelJsonSchema)))
+        .Required("edges", PydanticType.List(PydanticType.Model(EntityEdge.ModelJsonSchema)))
+        .Required("communities", PydanticType.List(PydanticType.Model(CommunityNode.ModelJsonSchema)))
+        .Required("community_edges", PydanticType.List(PydanticType.Model(CommunityEdge.ModelJsonSchema)));
 }
 
 internal sealed record AddTripletResults
@@ -292,6 +308,10 @@ internal sealed record AddTripletResults
     internal required List<EntityEdge> Edges { get; set; }
 
     internal AddTripletResults Validate() => this;
+
+    internal static readonly PydanticSchema ModelJsonSchema = new PydanticSchema("AddTripletResults")
+        .Required("nodes", PydanticType.List(PydanticType.Model(EntityNode.ModelJsonSchema)))
+        .Required("edges", PydanticType.List(PydanticType.Model(EntityEdge.ModelJsonSchema)));
 }
 
 // PORT: the class `Graphiti` of graphiti.py is GraphitiCore (R2, decision D24). It is internal (R3), and the public

@@ -208,7 +208,7 @@ internal static class Helpers
     }
 
     /// <summary>Validate a list of group ids used by search paths.</summary>
-    internal static bool ValidateGroupIds(List<string>? groupIds)
+    internal static bool ValidateGroupIds(IEnumerable<string?>? groupIds)
     {
         if (groupIds is null)
         {

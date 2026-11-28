@@ -29,6 +29,17 @@ internal static class ExtractNodesBindings
         // has list[int] with default_factory=lambda: [0], so no anyOf and no default in the schema, and [0] for a
         // missing key. So its ModelJsonSchema and ModelValidate are not Python's. No judge case reads the schema or the
         // validation of this descriptor.
+        // The cases also pass the class ExtractedEntities, both as a response model (PromptSpec) and as a custom type
+        // (validate_entity_types, validate_excluded_entity_types, validate_identity_properties).
+        // PORT: the $ref is a GraphTypeDescriptor, which is also an IResponseModel, so it serves both uses. The descriptor
+        // is written here and not built from the product model ExtractedEntities.ResponseModel (a BuiltinResponseModel),
+        // which a custom type parameter cannot hold. It differs from the Python class in these ways: the field
+        // extracted_entities is list[ExtractedEntity] in Python, and the descriptor has the placeholder kind String with
+        // IsList, so a list of strings; the field has no description ("List of extracted entities" in Python); and the
+        // descriptor has no docstring, as the Python class has none. So its ModelJsonSchema and its ModelValidate are not
+        // Python's, and no judge case reads them (the schema case reads the table of schemas below). The three functions of
+        // the ten cases (validate_entity_types, validate_excluded_entity_types, validate_identity_properties) read only the
+        // field names, and the encoder of a response model reads only the name.
         table.Registry
             .AddRef(Module + ":extract_message", (PromptFunction)ExtractNodes.ExtractMessage)
             .AddRef(
@@ -41,7 +52,12 @@ internal static class ExtractNodesBindings
                         new GraphFieldDescriptor("entity_type_id", GraphFieldKind.Integer, false, null, true, null),
                         new GraphFieldDescriptor("episode_indices", GraphFieldKind.Integer, true, null, false, null),
                     ]))
-            .AddRef(Module + ":ExtractedEntities", ExtractedEntities.ResponseModel)
+            .AddRef(
+                Module + ":ExtractedEntities",
+                new GraphTypeDescriptor(
+                    "ExtractedEntities",
+                    null,
+                    [new GraphFieldDescriptor("extracted_entities", GraphFieldKind.String, true, null, true, null)]))
             .AddModel(Module + ":ExtractedEntity", data => ExtractedEntity.ModelValidate(data));
 
         table.Schemas.Add(Module + ":ExtractedEntity", ExtractedEntity.ModelJsonSchema);

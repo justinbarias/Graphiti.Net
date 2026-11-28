@@ -26,7 +26,9 @@ internal static class LibBindings
         table.Pure.Add(Module + ":ensure_chat_prompt", call => call.Signature("result", "label").InvokeAsync(Lib.EnsureChatPrompt));
         table.Pure.Add(Module + ":get_prompt_builder", call => call.Signature("library", "prompt_name").InvokeAsync(Lib.GetPromptBuilder));
         table.Pure.Add(Module + ":create_prompt_library", call => call.Signature("overrides").InvokeAsync(Lib.CreatePromptLibrary));
-        table.Pure.Add(Module + ":validate_prompt_library", call => call.Signature("library").InvokeAsync(Lib.ValidatePromptLibrary));
+        // PORT: a dict is a library with no attribute (TypesBindings.AsPromptLibrary).
+        table.Pure.Add(Module + ":validate_prompt_library", call =>
+            call.Signature("library").InvokeAsync((Action<object?>)(library => Lib.ValidatePromptLibrary(TypesBindings.AsPromptLibrary(library)))));
 
         // `prompt_library.<group>.<function>(context)`: the legacy wrapper, which returns list[Message].
         Legacy(table, "extract_nodes.extract_message", Lib.PromptLibrary.ExtractNodes.ExtractMessage);
