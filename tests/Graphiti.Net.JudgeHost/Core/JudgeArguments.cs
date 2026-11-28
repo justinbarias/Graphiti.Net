@@ -289,7 +289,9 @@ internal sealed class JudgeParameters
 /// int out of the range is rejected.</item>
 /// <item>A <c>bool</c> takes only a <c>bool</c>. An enum takes only its own member.</item>
 /// <item>A <c>List&lt;T&gt;</c>, an <c>IEnumerable&lt;T&gt;</c>, or an <c>IReadOnlyList&lt;T&gt;</c> takes a list, with
-/// each item read by these rules. A tuple is not a list.</item>
+/// each item read by these rules. A tuple is not a list. One exception: a parameter of the exact type
+/// <c>IEnumerable&lt;T&gt;</c> is the port of <c>Iterable[T]</c>, and a tuple is an iterable, so it also takes a
+/// tuple.</item>
 /// <item>An <c>OrderedDictionary&lt;K, V&gt;</c> or a <c>Dictionary&lt;K, V&gt;</c> takes a dict, with each key and
 /// each value read by these rules.</item>
 /// <item>A value tuple takes a tuple of the same length, with each item read by these rules.</item>
@@ -358,7 +360,8 @@ internal static class JudgeTypes
 
         if (definition == typeof(List<>) || definition == typeof(IEnumerable<>) || definition == typeof(IReadOnlyList<>) || definition == typeof(IReadOnlyCollection<>))
         {
-            if (value is not List<object?> list)
+            var list = value as List<object?> ?? (definition == typeof(IEnumerable<>) && value is PyTuple tuple ? [.. tuple] : null);
+            if (list is null)
             {
                 throw Rejected(target, value, what);
             }

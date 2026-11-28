@@ -7,7 +7,6 @@ pure.datetime.ensure_utc.wrong_type_date_only
 pure.datetime.parse_db_date.neo4j_datetime_naive
 pure.dedupe.hash_shingle.seed_str
 pure.dedupe.lsh_bands.strings
-pure.dedupe.lsh_bands.tuple_input
 pure.dedupe.minhash_signature.none
 pure.dedupe.name_entropy.wrong_type_none
 pure.filters.edge_search_filter_query_constructor.provider_none
