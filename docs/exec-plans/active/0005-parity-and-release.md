@@ -89,21 +89,41 @@ The evidence of task 2 in the plan table says that `expected-failures.txt` is em
 
 ### Task 3, the scanner and the merge checks, 2026-11-28
 
-`port/tools/scan_port.py` is a copy of the scanner of the port skill, with one more option: `--allow FILE`. `scripts/check.sh` runs it on `src/` after the format step, so each local gate and the CI job `check` run it.
+`port/tools/scan_port.py` is a copy of the scanner of the port skill. `scripts/check.sh` runs it on `src/` after the format step, so each local gate and the CI job `check` run it. The copy differs from the skill's scanner in two ways:
 
-| Finding of the scanner on `src/` | Lines | Why the allow file accepts it |
+- It has two more options: `--allow FILE` and `--write-allow`.
+- It finds the null-forgiving `!` operator in each place after a name, a closing parenthesis, or a closing square bracket. The skill's scanner finds it only before five characters.
+
+| Finding of the scanner on `src/` | Lines | State |
 | --- | --- | --- |
-| `stub` | 186 | 115 lines throw `NotImplementedException` where upstream raises `NotImplementedError`. 71 lines catch it where upstream catches `NotImplementedError`. |
-| `port TODO` | 14 | 7 `TODO(port)` markers of 2 lines each. `port/STATE.md` lists them under "Blocked units". |
-| `dynamic type`, `warning switched off`, `null-forgiving operator`, `calls Python` | 0 | Nothing to accept. |
+| `stub` | 186 | In the allow file. 115 lines throw `NotImplementedException` where upstream raises `NotImplementedError`. 71 lines catch it where upstream catches `NotImplementedError`. |
+| `port TODO` | 14 | In the allow file. 7 `TODO(port)` markers of 2 lines each. `port/STATE.md` lists them under "Blocked units". |
+| `null-forgiving operator` | 0 | The first run of the wider pattern found one use in `Graphiti.cs`. Its own pull request removed it. |
+| `dynamic type`, `warning switched off`, `calls Python` | 0 | Nothing to accept. |
 
-The evidence of task 3 in the plan table is "No finding". The scanner reports 200 findings with no allow file. With `port/tools/scan_port_allow.txt` it reports 0 findings and accepts 200 by path, label, and count. A count that differs fails the scan, so a new site and a removed site both need a change of the allow file. The maintainer accepts or rejects each `TODO(port)` marker at gate 4.
+The evidence of task 3 in the plan table is "No finding". That is not the state: with no allow file the scanner reports 200 findings. The gate passes because `port/tools/scan_port_allow.txt` names each of them.
 
-Seeds, each one undone: a `dynamic` field, a `!` operator, a new `TODO(port)` line, and a `#pragma warning disable` in `Helpers.cs` gave 4 findings and exit code 1. One removed stub line in `Embedder/Client.cs` gave exit code 1.
+The allow file is a decision of the lead under D49, and it is not the acceptance of the maintainer. Item 5 of "Decisions for the maintainer" in `port/STATE.md` says that the maintainer accepts the stub sites by name at gate 4, and the `TODO(port)` markers wait for the same gate. The allow file is that list of names: 166 lines, each with a path, a label, a count, the member that holds the line, and the text of the line. Until gate 4 it keeps the gate green and stops a new shortcut.
 
-The judge was a merge check before this task: `scripts/check.sh --test` runs it, and the CI job `check` runs that command for each pull request. Two things changed here:
+What fails the scan: a finding that the file does not name, a count that differs, a line of the file that the scan does not find, and two lines of the file for one key.
 
-- The judge call of `scripts/check.sh` has `--verbose`. A case that fails and is not listed then prints 20 difference lines, where it printed 3 (debt T32).
+Seeds, each one undone:
+
+- A `dynamic` field, a `!` operator, a new `TODO(port)` line, and a `#pragma warning disable` in `Helpers.cs` gave 4 findings and exit code 1.
+- One stub replaced by another exception, with a new stub in a new member of `Nodes.cs`: exit code 1.
+- A `throw new NotImplementedException()` added to a `catch` line that the file names: exit code 1.
+- A `TODO(port)` comment moved to the end of `SearchUtils.cs`: exit code 1.
+
+Limits of the scan, which a reviewer still covers:
+
+- The scanner reads lines and not syntax. It finds the member of a line by the text of the nearest declaration with a modifier.
+- It does not see a line that moves inside its member, or a new line with the same text as a line that leaves the same member.
+- It does not see `<NoWarn>` in a project file, an exception of another type that stands for unported code, or an empty method body.
+- It scans `src/` only. The plan names that folder. The example and the test projects are not scanned.
+
+The CI job `check` ran the judge for each pull request before this task, because `scripts/check.sh --test` runs it. Two facts about the judge in the gate:
+
+- The judge call of `scripts/check.sh` now has `--verbose`. A case that fails and is not listed, or that is listed and bound and wrong, then prints 20 difference lines, where it printed 3 (debt T32).
 - The count of judge cases cannot go down: the judge fails if it runs fewer cases than `port/judge/count.txt` says. This check existed before.
 
 One thing is not done. The branch `main` has no protection rule on GitHub, so GitHub does not require the job `check` for a merge. The lead merges only after the job passes. A protection rule is a repository setting, which the maintainer decides.

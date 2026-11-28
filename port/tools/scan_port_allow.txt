@@ -1,25 +1,175 @@
-# The findings of port/tools/scan_port.py that the port accepts. scripts/check.sh reads this file.
-# Each line has a path, a label, and a count, with one tab between them.
-# A count that differs fails the scan, so a new site and a removed site both need a change of this file.
+# The findings of port/tools/scan_port.py that the port accepts for now. scripts/check.sh reads this file.
+# Each line has a path, a label, a count, the member that holds the line, and the text of the line, with tabs between them.
+# The scan fails for a finding that is not here, for a count that differs, and for a line here that it does not find.
 #
-# stub: each line is a port of upstream code. 115 lines throw NotImplementedException where upstream raises
+# The lead wrote this list on 2026-11-28 (plan 0005, task 3). The maintainer accepts or rejects each line at gate 4
+# (port/STATE.md, "Decisions for the maintainer", item 5, and "Blocked units").
+# stub: each line ports upstream code. 115 lines throw NotImplementedException where upstream raises
 # NotImplementedError, and 71 lines catch it where upstream catches NotImplementedError.
-# port TODO: 14 lines at 7 TODO(port) markers. port/STATE.md lists them under "Blocked units".
-# The maintainer accepts or rejects each marker at gate 4.
-src/Graphiti.Net/Core/Driver/Driver.cs	stub	1
-src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	87
-src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	14
-src/Graphiti.Net/Core/Edges.cs	stub	27
-src/Graphiti.Net/Core/Embedder/Client.cs	stub	1
-src/Graphiti.Net/Core/Graphiti.cs	stub	3
-src/Graphiti.Net/Core/LlmClient/OpenaiDecisionsClient.cs	stub	1
-src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	5
-src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	4
-src/Graphiti.Net/Core/Nodes.cs	port TODO	2
-src/Graphiti.Net/Core/Nodes.cs	stub	27
-src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	8
-src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	9
-src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	4
-src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	3
-src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs	stub	2
-src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs	stub	2
+# port TODO: 14 lines at 7 TODO(port) markers of the Neptune and FalkorDB paths that decision D10 leaves out.
+src/Graphiti.Net/Core/Driver/Driver.cs	stub	1	BuildFulltextQuery	throw new NotImplementedException("build_fulltext_query not implemented for " + Py.Str(Provider));
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeUpdateBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeDeleteByGroupIdAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeGetByNamesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeGetByAttributeValuesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeLoadEmbeddingsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NodeLoadEmbeddingsBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeDeleteByGroupIdAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	RetrieveEpisodesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeDeleteByGroupIdAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeDeleteByGroupIdAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	SagaNodeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	2	SagaGetPreviousEpisodeUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeUpdateBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeLoadEmbeddingsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeLoadEmbeddingsBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicEdgeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityEdgeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityEdgeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityEdgeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityEdgeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityEdgeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityEdgeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	HasEpisodeEdgeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeSaveAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeDeleteAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeSaveBulkAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeDeleteByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeGetByUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeGetByUuidsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	NextEpisodeEdgeGetByGroupIdsAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GetMentionedNodesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GetCommunitiesByNodesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	ClearDataAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GetCommunityClustersAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	2	RemoveCommunitiesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EpisodicNodeGetByEntityNodeUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	CommunityNodeLoadNameEmbeddingAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeGetBetweenNodesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	EdgeGetByNodeUuidAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	EdgeFulltextSearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	EdgeSimilaritySearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	NodeFulltextSearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	NodeSimilaritySearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	EpisodeFulltextSearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	EdgeBfsSearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	NodeBfsSearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	CommunityFulltextSearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	CommunitySimilaritySearchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	3	GetEmbeddingsForCommunitiesAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	BuildNodeSearchFilters	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	BuildEdgeSearchFilters	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Edges.cs	stub	3	DeleteAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	DeleteByUuidsAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	5	SaveAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	4	GetByUuidAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	4	GetByUuidsAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	5	GetByGroupIdsAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	LoadFactEmbeddingAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	GetByUuidAsync	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Edges.cs	stub	1	GetBetweenNodesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	GetByUuidsAsync	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Edges.cs	stub	1	GetByNodeUuidAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Embedder/Client.cs	stub	1	CreateBatchAsync	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Graphiti.cs	stub	2	SagaGetPreviousEpisodeUuidAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Graphiti.cs	stub	1	RetrieveEpisodesCoreAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/LlmClient/OpenaiDecisionsClient.cs	stub	1	PrivateGenerateResponseAsync	throw new NotImplementedException("OpenAIDecisionsClient requires a dedupe prompt_name through LLMRuntime");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace	internal EntityEdgeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " does not implement entity_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace	internal EpisodicEdgeNamespace Episodic => episodic ?? throw new NotImplementedException(driverName + " does not implement episodic_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace	internal CommunityEdgeNamespace Community => community ?? throw new NotImplementedException(driverName + " does not implement community_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace	internal HasEpisodeEdgeNamespace HasEpisode => hasEpisode ?? throw new NotImplementedException(driverName + " does not implement has_episode_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace	internal NextEpisodeEdgeNamespace NextEpisode => nextEpisode ?? throw new NotImplementedException(driverName + " does not implement next_episode_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace	internal EntityNodeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " does not implement entity_node_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace	internal EpisodeNodeNamespace Episode => episode ?? throw new NotImplementedException(driverName + " does not implement episode_node_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace	internal CommunityNodeNamespace Community => community ?? throw new NotImplementedException(driverName + " does not implement community_node_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace	internal SagaNodeNamespace Saga => saga ?? throw new NotImplementedException(driverName + " does not implement saga_node_ops");
+src/Graphiti.Net/Core/Nodes.cs	stub	1	FromStr	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Nodes.cs	stub	2	DeleteAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	DeleteByGroupIdAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	DeleteByUuidsAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	4	SaveAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	GetByUuidAsync	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	GetByUuidsAsync	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Nodes.cs	stub	4	GetByGroupIdsAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	GetByEntityNodeUuidAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	2	LoadNameEmbeddingAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	3	GetByUuidAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	3	GetByUuidsAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	GetByNamesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	GetByAttributeValuesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	GetByAttributeValuesAsync	throw new NotImplementedException("Attribute lookup is not supported for " + Py.Str(Py.EnumValue(driver.Provider)));
+src/Graphiti.Net/Core/Nodes.cs	port TODO	1	SaveAsync	// TODO(port): no rule for driver.save_to_aoss. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Nodes.cs	port TODO	1	SaveAsync	throw new NotSupportedException("TODO(port): no rule for driver.save_to_aoss");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	GetMentionedNodesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	GetCommunitiesByNodesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	EdgeFulltextSearchAsync	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	EdgeFulltextSearchAsync	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	EdgeBfsSearchAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	NodeFulltextSearchAsync	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	NodeFulltextSearchAsync	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	NodeBfsSearchAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	EpisodeFulltextSearchAsync	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	EpisodeFulltextSearchAsync	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	CommunityFulltextSearchAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	CommunityFulltextSearchAsync	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	CommunityFulltextSearchAsync	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	CommunitySimilaritySearchAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	2	static	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	GetEmbeddingsForCommunitiesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	UpdateEntityNodesTxAsync	// TODO(port): no rule for a list of queries in tx.run. On FalkorDB and Neptune the query builder returns a
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	UpdateEntityNodesTxAsync	throw new NotSupportedException("TODO(port): no rule for a list of queries in tx.run");
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	AddNodesAndEdgesBulkTxAsync	// TODO(port): no rule for a list of queries in tx.run. On FalkorDB and Neptune the query builder returns
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	AddNodesAndEdgesBulkTxAsync	throw new NotSupportedException("TODO(port): no rule for a list of queries in tx.run");
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	1	GetCommunityClustersAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	1	RemoveCommunitiesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	1	OrderedDictionary	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs	stub	1	ClearDataAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs	stub	1	RetrieveEpisodesAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs	stub	1	LookupNodeAsync	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs	stub	1	EmbedQueriesAsync	catch (NotImplementedException)
