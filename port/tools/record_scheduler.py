@@ -18,12 +18,10 @@ and prepared units can reach with no method of `Graphiti`:
   window on its limit, two graphs), the span of each call, and a cancel of a call that waits for the window or for the
   admit lock.
 
-Paths that wait for layer 9: after the admit lock, add_episode and add_episode_bulk call admit_episode and admit_bulk,
-and an analysis that returns calls commit_unit and enrich_unit. Each one calls graphiti._resolve_request_scope first,
-and GraphitiCore is a skeleton until layer 9. So the wait for a commit turn, the order of the commits, and the retry
-of an apply wait for layer 9 here. The recording of phases.py (P8c) covers the parts of them that need no `Graphiti`.
-The `graphiti` of this tool has a `tracer` and a `_resolve_request_scope` that raises AssertionError, so a case that
-reaches a skeleton member fails the recording.
+The cases of this first part give the scheduler a `graphiti` with a `tracer` and a `_resolve_request_scope` that
+raises AssertionError. The paths after the admit lock (layer 9, packet P9b) are in the graphiti part at the end of
+this file: a real `Graphiti`, the commit turn, the order of the commits, the retry of an apply, a successful call,
+and the error exit of add_episode and add_episode_bulk. Their cases are in the key `graphiti_cases`.
 
 The fakes:
 - The loop has a virtual clock. It moves only at a `loop` step of a case, as the TimeProvider of the C# test does.
@@ -59,13 +57,17 @@ or .upstream/graphiti. It changes nothing there. Nothing here uses the network.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import copy
 import inspect
 import json
 import logging
 import os
+import re
 import sys
-from datetime import datetime, timezone
+import warnings
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -643,6 +645,632 @@ def record(mods) -> list[dict]:
     return out
 
 
+# --- the graphiti part (plan 0004, layer 9, packet P9b) ------------------------------------------------------------
+#
+# The cases of this part build a real `Graphiti` with the fakes of port/tools/record_graphiti.py (its class Run: the
+# graph driver with its session and transaction, the LLM client, the embedder, the cross-encoder, and the tracer that
+# records each span). The state store is the real InMemoryIngestionStateStore with a fake clock, inside a wrapper that
+# yields once and then records each call. The calls run on the virtual loop of this tool. One counted fake call
+# function serves the fakes of record_graphiti.py and the store: an attempt, a yield, the record, the task of the call,
+# the cancel at call k, and the failure that the case asks for (`fail`, by kind).
+#
+# Values that the recording fixes or leaves out:
+# - utc_now gives the time of the loop clock (1970-01-01T00:16:40 and later). The TimeProvider of the C# test gives
+#   the same UTC time.
+# - UnitLease gets the loop clock as its default clock, in place of time.monotonic: the port reads PortServices.Time
+#   there (R8), which is the virtual clock in the C# test.
+# - time.time() is the system clock. A span attribute with `duration` or `_ms` has the value "<ms>", and so has each
+#   `_ms` key of the `ingest_report` of a log line and of a commit report.
+# - Each UUID that the code makes (uuid4, and the uuid5 of a unit_id that uuid4 made) is replaced, in the order of its
+#   first appearance, by "<new:N>".
+# - The failure reason that _fail_unit stores is the Python type name. The C# test maps the .NET name (decision D50).
+#
+# The task of each counted fake call: the key of the call of the case, `<inner>` for a task that a phase function or
+# the scheduler starts on its own (the heartbeat of the admission, the heartbeat of _run_unit, and the shielded
+# begin_admit call), or `<driver>`. A task that asyncio.gather makes for a call belongs to that call.
+
+CALL = contextvars.ContextVar('call', default=None)
+INNER_TASKS = ('_admit_heartbeat.<locals>.beat', 'ConcurrentIngestor._heartbeat',
+               'graphiti_store.<locals>.logged.<locals>.call')
+ANY_UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+MS_TEXT = re.compile(r'in [0-9.e+-]+ ms')
+STORE_METHODS = ('begin_admit', 'end_admit', 'start_analysis', 'save_change_set', 'heartbeat', 'begin_commit',
+                 'load_delta', 'save_final', 'finish_commit', 'fail', 'ready_enrich', 'finish_enrich', 'close')
+G: dict = {}
+
+
+def g_label() -> str:
+    current = asyncio.current_task()
+    if current is state['driver']:
+        return '<driver>'
+    if current.get_coro().__qualname__ in INNER_TASKS:
+        return '<inner>'
+    key = CALL.get()
+    return '<inner>' if key is None else key
+
+
+async def g_enter(kind: str, record: dict, counted: bool = True) -> None:
+    """The counted fake call of the graphiti part (the form of `enter` of record_graphiti.py, with the task)."""
+    case = state['case']
+    state['attempts'] += 1
+    state['in_flight'] += 1
+    state['max_in_flight'] = max(state['max_in_flight'], state['in_flight'])
+    try:
+        await asyncio.sleep(0)
+        events.append({'kind': kind, **record})
+        if not counted:
+            return
+        state['tasks'].append(g_label())
+        state['count'] += 1
+        if state['count'] - 1 == state['cancel_at'] and case['main'] in state['calls']:
+            state['calls'][case['main']].cancel()
+        fails = case.get('fail', {})
+        if fails.get(kind, 0) > 0:
+            fails[kind] -= 1
+            raise RuntimeError(f'{kind} failed')
+    finally:
+        state['in_flight'] -= 1
+
+
+def graphiti_store(m, inner):
+    def logged(name):
+        async def call(self, *args):
+            bound = inspect.signature(getattr(inner, name)).bind(*args)
+            bound.apply_defaults()
+            shown = [a for a in bound.arguments.values() if not isinstance(a, bytes)]
+            await g_enter('store', {'method': name, 'args': encode(shown)})
+            case = state['case']
+            number = state['store_calls'][name] = state['store_calls'].get(name, 0) + 1
+            for item in case.get('store_advance', []):
+                if item[0] == name and item[1] == number:
+                    state['clock'].now += item[2]
+            if number in case.get('store_hold', {}).get(name, []):
+                try:
+                    await asyncio.sleep(HOLD_SECONDS)
+                except asyncio.CancelledError:
+                    events.append({'kind': 'store_cleanup', 'method': name})
+                    raise
+            if number in case.get('store_fail', {}).get(name, []):
+                raise RuntimeError(f'store {name} failed')
+            return await getattr(inner, name)(*args)
+
+        return call
+
+    Store = type('GraphitiStore', (m['IngestionStateStore'],), {name: logged(name) for name in STORE_METHODS})
+    return Store()
+
+
+def graphiti_setup() -> dict:
+    """The setup of record_graphiti.py (its `main`), with the loop clock for utc_now and for UnitLease."""
+    if G:
+        return G
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    os.environ.pop('GRAPHITI_ATTRIBUTE_MAX_LENGTH', None)
+    os.environ.pop('SEMAPHORE_LIMIT', None)
+    os.environ['GRAPHITI_TELEMETRY_ENABLED'] = 'false'
+    warnings.filterwarnings('ignore', message=r"coroutine '.*' was never awaited", category=RuntimeWarning)
+    import record_bulk_utils as rbu
+    import record_graphiti as rg
+
+    import graphiti_core
+    from graphiti_core import graphiti as graphiti_module
+    from graphiti_core.cross_encoder.client import CrossEncoderClient
+    from graphiti_core.driver.driver import GraphDriver, GraphDriverSession, GraphProvider
+    from graphiti_core.driver.graph_operations.graph_operations import GraphOperationsInterface
+    from graphiti_core.edges import EntityEdge, EpisodicEdge
+    from graphiti_core.embedder.client import EmbedderClient
+    from graphiti_core.ingestion import phases
+    from graphiti_core.ingestion.change_set import ChangeSet
+    from graphiti_core.ingestion.config import ConcurrentIngestionConfig
+    from graphiti_core.ingestion.state_store import IngestionStateStore, InMemoryIngestionStateStore
+    from graphiti_core.llm_client import LLMClient, LLMRuntime
+    from graphiti_core.llm_client.prompt_config import LLMTransport
+    from graphiti_core.nodes import EntityNode, EpisodeType, EpisodicNode, SagaNode
+    from graphiti_core.prompts import create_prompt_library
+    from graphiti_core.search.search_filters import SearchFilters
+    from graphiti_core.tracer import Tracer
+    from graphiti_core.utils.bulk_utils import RawEpisode
+
+    standard = set(vars(logging.LogRecord('n', logging.INFO, 'p', 1, 'm', None, None))) | {'message', 'asctime'}
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            item = {'kind': 'log', 'level': record.levelname, 'message': MS_TEXT.sub('in <ms> ms', record.getMessage())}
+            extra = {k: encode_extra(k, v) for k, v in vars(record).items() if k not in standard}
+            if extra:
+                item['extra'] = extra
+            if record.exc_info:
+                item['exc'] = True
+            events.append(item)
+
+    root = logging.getLogger('graphiti_core')
+    root.setLevel(logging.DEBUG)
+    root.propagate = False
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+    root.addHandler(Capture(logging.DEBUG))
+
+    def loop_now():
+        return datetime.fromtimestamp(asyncio.get_running_loop().time(), timezone.utc)
+
+    for name, module in list(sys.modules.items()):
+        if name.startswith('graphiti_core') and hasattr(module, 'utc_now'):
+            module.utc_now = loop_now
+    del graphiti_core
+    # time.monotonic of UnitLease is the loop clock (R8: PortServices.Time in the port).
+    phases.UnitLease.__init__.__defaults__ = (lambda: asyncio.get_running_loop().time(),)
+    graphiti_module.capture_event = lambda *args, **kwargs: None
+    graphiti_module.set = rg.EntityFirstSet
+    from pydantic import ConfigDict
+
+    from graphiti_core.utils import bulk_utils
+    from graphiti_core.utils.maintenance import attribute_utils, dedup_helpers, edge_operations, node_operations
+    from graphiti_core.utils.maintenance import combined_extraction as ce
+
+    bulk_utils.set = rbu.InsertionOrderSet
+    dedup_helpers.set = rbu.InsertionOrderSet
+    attribute_utils.set = rbu.InsertionOrderSet
+    edge_operations.set = rbu.InsertionOrderSet
+
+    class OrderedLabelsEntityNode(EntityNode):
+        model_config = ConfigDict(title='EntityNode')
+
+        def __init__(self, **data):
+            labels = data.get('labels')
+            if labels is not None and 'Entity' in labels:
+                data['labels'] = ['Entity'] + [label for label in labels if label != 'Entity']
+            super().__init__(**data)
+
+    OrderedLabelsEntityNode.__name__ = 'EntityNode'
+    OrderedLabelsEntityNode.__qualname__ = 'EntityNode'
+    node_operations.EntityNode = OrderedLabelsEntityNode
+    ce.EntityNode = OrderedLabelsEntityNode
+
+    # The fakes of record_graphiti.py write to the event list of this tool, and count with g_enter.
+    rg.events = events
+    rg.enter = g_enter
+    G.update(rg=rg, phases=phases, graphiti_module=graphiti_module, Graphiti=graphiti_module.Graphiti,
+             GraphDriver=GraphDriver, GraphDriverSession=GraphDriverSession, GraphProvider=GraphProvider,
+             GraphOperationsInterface=GraphOperationsInterface, EntityEdge=EntityEdge, EpisodicEdge=EpisodicEdge,
+             EntityNode=EntityNode, EpisodicNode=EpisodicNode, SagaNode=SagaNode, EpisodeType=EpisodeType,
+             EmbedderClient=EmbedderClient, CrossEncoderClient=CrossEncoderClient, LLMClient=LLMClient,
+             LLMRuntime=LLMRuntime, LLMTransport=LLMTransport, ConcurrentIngestionConfig=ConcurrentIngestionConfig,
+             InMemoryIngestionStateStore=InMemoryIngestionStateStore, IngestionStateStore=IngestionStateStore,
+             create_prompt_library=create_prompt_library, SearchFilters=SearchFilters, Tracer=Tracer,
+             RawEpisode=RawEpisode, ChangeSet=ChangeSet, constants={})
+    return G
+
+
+def encode_extra(key, value):
+    value = G['rg'].encode(value)
+    if key == 'ingest_report' and isinstance(value, dict):
+        return {k: '<ms>' if k.endswith('_ms') else v for k, v in value.items()}
+    return value
+
+
+def any_placeholders(value, known: dict):
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            key = any_placeholders(k, known)
+            out[key] = any_placeholders(v, known)
+        return out
+    if isinstance(value, list):
+        return [any_placeholders(v, known) for v in value]
+    if isinstance(value, str):
+        def repl(match):
+            if match.group(0) not in known:
+                known[match.group(0)] = f'<new:{len(known)}>'
+            return known[match.group(0)]
+
+        return ANY_UUID.sub(repl, value)
+    return value
+
+
+def unit_view(unit) -> dict:
+    rg = G['rg']
+    return {'group_id': unit.group_id, 'unit_id': unit.unit_id, 'seq': unit.seq, 'created_at': rg.dt(unit.created_at),
+            'bulk': unit.bulk, 'episodes': [rg.view_episode(e) for e in unit.episodes],
+            'previous_episodes': [[e.uuid for e in previous] for previous in unit.previous_episodes]}
+
+
+def change_set_view(change_set) -> dict:
+    return json.loads(change_set.model_dump_json())
+
+
+def g_result_view(value):
+    rg = G['rg']
+    name = type(value).__name__
+    if name == 'AdmittedUnit':
+        return {'unit': unit_view(value)}
+    if name == 'ChangeSet':
+        return {'change_set': change_set_view(value)}
+    if name == 'CommitResult':
+        return {'commit': {'change_set': change_set_view(value.change_set),
+                           'edges': [rg.view_edge(e) for e in value.edges],
+                           'report': [[k, '<ms>' if k.endswith('_ms') else v] for k, v in value.report.items()]}}
+    if name == 'AddEpisodeResults':
+        return {'add_episode': {'episode': rg.view_episode(value.episode),
+                                'episodic_edges': [rg.view_episodic_edge(e) for e in value.episodic_edges],
+                                'nodes': [rg.view_node(n) for n in value.nodes],
+                                'edges': [rg.view_edge(e) for e in value.edges],
+                                'communities': len(value.communities), 'community_edges': len(value.community_edges)}}
+    if name == 'AddBulkEpisodeResults':
+        return {'add_episode_bulk': {'episodes': [rg.view_episode(e) for e in value.episodes],
+                                     'episodic_edges': [rg.view_episodic_edge(e) for e in value.episodic_edges],
+                                     'nodes': [rg.view_node(n) for n in value.nodes],
+                                     'edges': [rg.view_edge(e) for e in value.edges],
+                                     'communities': len(value.communities),
+                                     'community_edges': len(value.community_edges)}}
+    if isinstance(value, list):
+        return {'nodes': [rg.view_node(n) for n in value]}
+    raise AssertionError(name)
+
+
+def g_call_view(task) -> list:
+    if not task.done():
+        return ['pending']
+    if task.cancelled():
+        return ['CancelledError', '']
+    error = task.exception()
+    if error is None:
+        return ['ok', g_result_view(task.result())]
+    return [type(error).__name__, G['rg'].error_text(error)]
+
+
+async def g_drain(calls) -> None:
+    # The drain of the C# test: rounds of DRAIN yields until the state stays the same for three rounds.
+    last, same = None, 0
+    while same < 3:
+        for _ in range(DRAIN):
+            await asyncio.sleep(0)
+        now = json.dumps([[k, t.done()] for k, t in calls.items()] + [len(events)])
+        same = same + 1 if now == last else 0
+        last = now
+
+
+def g_episode_args(a: dict, m) -> dict:
+    rg = m['rg']
+    kwargs = rg.decode(copy.deepcopy(a))
+    if 'source' in kwargs:
+        kwargs['source'] = m['EpisodeType'](kwargs['source'])
+    if 'saga' in kwargs:
+        kwargs['saga'] = rg.saga_arg(a['saga'], m)
+    for key in ('entity_types', 'edge_types'):
+        if key in kwargs:
+            kwargs[key] = rg.types_of(kwargs[key], m)
+    if 'edge_type_map' in kwargs:
+        kwargs['edge_type_map'] = rg.type_map_of(kwargs['edge_type_map'])
+    if 'bulk_episodes' in kwargs:
+        kwargs['bulk_episodes'] = [m['RawEpisode'](**{**e, 'source': m['EpisodeType'](e['source'])})
+                                   for e in kwargs['bulk_episodes']]
+    return kwargs
+
+
+def g_unit(data: dict, m):
+    rg = m['rg']
+    EpisodicNode = m['EpisodicNode']
+    return m['phases'].AdmittedUnit(
+        group_id=data.get('group_id', 'g'), unit_id=data['unit_id'], seq=data['seq'],
+        created_at=rg.decode(data['created_at']), bulk=data.get('bulk', False),
+        episodes=[EpisodicNode(**rg.decode(e)) for e in data['episodes']],
+        previous_episodes=[[EpisodicNode(**rg.decode(p)) for p in previous] for previous in data['previous_episodes']])
+
+
+async def run_graphiti_case(case: dict, m) -> dict:
+    rg, phases = m['rg'], m['phases']
+    state['driver'] = asyncio.current_task()
+    clock = FakeClock()
+    state['clock'] = clock
+    inner = m['InMemoryIngestionStateStore'](clock=clock)
+    store = graphiti_store(m, inner)
+    lease_seconds = case['config'].get('lease_seconds', 60.0)
+    results: dict = {}
+    for step in case.get('setup', []):
+        op = step[0]
+        if op == 'admit':
+            admission = await inner.begin_admit(step[2] if len(step) > 2 else 'g', step[1], lease_seconds)
+            await inner.end_admit(step[2] if len(step) > 2 else 'g', admission.seq)
+        elif op == 'begin_admit':
+            await inner.begin_admit('g', step[1], lease_seconds)
+        elif op == 'advance':
+            clock.now += step[1]
+        elif op == 'fail':
+            await inner.fail('g', step[1], step[2])
+        elif op == 'begin_commit':
+            await inner.begin_commit('g', step[1], lease_seconds)
+        elif op == 'final':
+            # The stored final change set of an earlier attempt of the unit (step C1 of commit_unit).
+            turn = await inner.begin_commit('g', step[1], lease_seconds)
+            final = m['ChangeSet'](group_id='g', unit_id=step[2], seq=step[1], snapshot_seq=0,
+                                   analysis_started_at=1000.0, node_uuids=[])
+            await inner.save_final('g', step[1], turn.fence, final.to_bytes())
+        elif op == 'committed':
+            # An earlier unit that committed its nodes and did not enrich them yet.
+            admission = await inner.begin_admit('g', step[2], lease_seconds)
+            await inner.end_admit('g', admission.seq)
+            analysis = await inner.start_analysis('g', admission.seq)
+            final = m['ChangeSet'](group_id='g', unit_id=step[2], seq=admission.seq,
+                                   snapshot_seq=analysis.snapshot_seq, analysis_started_at=analysis.started_at,
+                                   node_uuids=list(step[3]))
+            await inner.save_change_set('g', admission.seq, final.to_bytes())
+            turn = await inner.begin_commit('g', admission.seq, lease_seconds)
+            await inner.save_final('g', admission.seq, turn.fence, final.to_bytes())
+            await inner.finish_commit('g', admission.seq, turn.fence, list(step[3]), 300.0)
+        elif op == 'analyzed':
+            # A different attempt stored the change set of the unit.
+            analysis = await inner.start_analysis('g', step[1])
+            final = m['ChangeSet'](group_id='g', unit_id=step[2], seq=step[1], snapshot_seq=analysis.snapshot_seq,
+                                   analysis_started_at=analysis.started_at, node_uuids=[])
+            await inner.save_change_set('g', step[1], final.to_bytes())
+        elif op == 'change_set':
+            results[step[1]] = m['ChangeSet'](group_id='g', unit_id=step[3], seq=step[2], snapshot_seq=0,
+                                              analysis_started_at=1000.0, node_uuids=[])
+        elif op == 'unit':
+            results[step[1]] = g_unit(step[2], m)
+        else:
+            raise AssertionError(op)
+
+    run = rg.Run(case, m)
+    config_values = dict(case['config'])
+    enabled_for = config_values.pop('enabled_for', None)
+    graphiti = run.make_graphiti({**case.get('init', {}), 'concurrent_ingestion': config_values})
+    config = graphiti.concurrent_ingestion
+    if enabled_for is not None:
+        config.enabled_for_group = lambda group_id: group_id in enabled_for
+    config.state_store = store
+    tracer = rg.make_tracer(m)
+    graphiti.tracer = tracer
+    graphiti.clients.tracer = tracer
+    finals: list = []
+    hooks = case.get('hooks', {})
+    if 'before_commit_write' in hooks:
+        kind = hooks['before_commit_write']
+
+        async def before_commit_write(final):
+            events.append({'kind': 'hook', 'name': 'before_commit_write', 'seq': final.seq,
+                           'nodes': [n.uuid for n in final.create_nodes]})
+            finals.append(final)
+            if kind == 'reject':
+                raise ValueError('rejected by the hook')
+            return final
+
+        config.before_commit_write = before_commit_write
+    if 'before_enrichment_write' in hooks:
+        kind = hooks['before_enrichment_write']
+
+        async def before_enrichment_write(nodes, unit):
+            events.append({'kind': 'hook', 'name': 'before_enrichment_write', 'seq': unit.seq,
+                           'nodes': [n.uuid for n in nodes]})
+            return [] if kind == 'drop' else nodes
+
+        config.before_enrichment_write = before_enrichment_write
+
+    loop = asyncio.get_running_loop()
+    calls: dict = state['calls']
+
+    async def tagged(key, coroutine):
+        CALL.set(key)
+        return await coroutine
+
+    def result_of(key):
+        if key in results:
+            return results[key]
+        return calls[key].result()
+
+    def ready(*keys):
+        # A call that reads the result of an earlier call starts only when that call returned (a cancel point can end
+        # the earlier call).
+        return all(k in results or (calls[k].done() and not calls[k].cancelled() and calls[k].exception() is None)
+                   for k in keys)
+
+    def start(key, coroutine):
+        if key == case['main']:
+            state['main_first'] = state['count']
+        calls[key] = asyncio.ensure_future(tagged(key, coroutine))
+
+    for action in case['actions']:
+        op = action[0]
+        if op == 'drain':
+            await g_drain(calls)
+        elif op == 'loop':
+            due = [h.when() for h in loop._scheduled if not h.cancelled() and h.when() <= loop.now + action[1]]
+            if len(due) != len(set(due)):
+                raise SystemExit(f'{case["name"]}: two timers fire at one time: {sorted(due)}')
+            loop.now += action[1]
+        elif op == 'clock':
+            clock.now += action[1]
+        elif op == 'store':
+            events.append({'kind': 'store_state', 'store': store_view(inner)})
+        elif op == 'cancel':
+            calls[action[1]].cancel()
+        elif op == 'fail_unit':
+            # An earlier unit of the setup fails (no record).
+            await inner.fail('g', action[1], action[2])
+        elif op == 'finish_enrich':
+            # The earlier unit of the setup ends its enrichment (no record).
+            await inner.finish_enrich('g', action[1], list(action[2]))
+        elif op == 'arm':
+            # The next `action[2]` fake calls of a kind fail, from this step on.
+            state['case'].setdefault('fail', {})[action[1]] = action[2]
+        elif op == 'final_after_mutation':
+            # A change of the lists of a result does not change the final change set (scheduler.py:259, :335).
+            result = calls[action[1]].result()
+            for name in ('episodic_edges', 'nodes', 'edges', 'episodes'):
+                if hasattr(result, name):
+                    getattr(result, name).clear()
+            events.append({'kind': 'final_after_mutation', 'finals': [
+                [len(f.episodes), len(f.episodic_edges), len(f.create_edges)] for f in finals]})
+        elif op == 'add':
+            start(action[1], graphiti.add_episode(**g_episode_args(action[2], m)))
+        elif op == 'add_bulk':
+            start(action[1], graphiti.add_episode_bulk(**g_episode_args(action[2], m)))
+        elif op == 'admit':
+            start(action[1], phases.admit_episode(graphiti, store, config, **g_episode_args(action[2], m)))
+        elif op == 'admit_bulk':
+            start(action[1], phases.admit_bulk(graphiti, store, config, **g_episode_args(action[2], m)))
+        elif op == 'analyze' and ready(action[2]):
+            start(action[1], phases.analyze_episode(graphiti, store, config, result_of(action[2]),
+                                                    **g_episode_args(action[3], m)))
+        elif op == 'analyze_bulk' and ready(action[2]):
+            start(action[1], phases.analyze_bulk(graphiti, store, config, result_of(action[2]),
+                                                 **g_episode_args(action[3], m)))
+        elif op == 'commit' and ready(action[2], action[3]):
+            start(action[1], phases.commit_unit(graphiti, store, config, result_of(action[2]), result_of(action[3]),
+                                                **g_episode_args(action[4], m)))
+        elif op == 'enrich' and ready(action[2], action[3]):
+            start(action[1], phases.enrich_unit(graphiti, store, config, result_of(action[2]), result_of(action[3]),
+                                                **g_episode_args(action[4], m)))
+        elif op not in ('analyze', 'analyze_bulk', 'commit', 'enrich'):
+            raise AssertionError(op)
+
+    pending = [k for k, t in calls.items() if not t.done()]
+    for key in pending:
+        calls[key].cancel()
+    await g_drain(calls)
+    leftover = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if leftover:
+        raise SystemExit(f'{case["name"]}: tasks stay after the case: {leftover}')
+    return {'pending_at_end': pending, 'calls': [[k, g_call_view(t)] for k, t in calls.items()],
+            'store': store_view(inner)}
+
+
+def run_graphiti_one(case: dict, m, cancel_at: int) -> dict:
+    events.clear()
+    state.update(in_flight=0, max_in_flight=0, count=0, attempts=0, cancel_at=cancel_at, case=copy.deepcopy(case),
+                 calls={}, store_calls={}, tasks=[], driver=None, main_first=None)
+    with asyncio.Runner(loop_factory=VirtualLoop) as runner:
+        output = runner.run(run_graphiti_case(state['case'], m))
+    output['events'] = list(events)
+    output['max_in_flight'] = state['max_in_flight']
+    output['count'] = state['count']
+    output['attempts'] = state['attempts']
+    output['tasks'] = list(state['tasks'])
+    output['main_first'] = state['main_first']
+    return output
+
+
+# The events that are not a counted fake call. The events after call k keep the log lines (R25).
+G_COUNTED_SKIP = ('log', 'session', 'session_close', 'span', 'span_attrs', 'span_status', 'span_exception', 'span_end',
+                  'clone', 'store_cleanup', 'store_state', 'hook', 'final_after_mutation')
+
+
+def g_events_after(items: list, k: int) -> list:
+    seen = 0
+    after = []
+    for item in items:
+        if seen > k and (item['kind'] not in G_COUNTED_SKIP or item['kind'] == 'log'):
+            after.append(item)
+        if item['kind'] not in G_COUNTED_SKIP:
+            seen += 1
+    return after
+
+
+def record_graphiti(cases: list, m) -> list:
+    """Run each case, and for a case with `cancel` each cancel point from the first call of the main call."""
+    out = []
+    for case in cases:
+        output = run_graphiti_one(case, m, -1)
+        if case.get('cancel'):
+            cancels = []
+            # The cancel points start at the first fake call after the start of the main call.
+            for k in range(output['main_first'], output['count']):
+                cancelled = run_graphiti_one(case, m, k)
+                main = dict(cancelled['calls'])[case['main']]
+                cancels.append({'k': k, 'attempts': cancelled['attempts'], 'count': cancelled['count'],
+                                'error': None if main[0] == 'ok' else main[0],
+                                'after': any_placeholders(g_events_after(cancelled['events'], k), {})})
+            output['cancel'] = cancels
+        out.append({'in': case, 'out': any_placeholders(output, {})})
+    return out
+
+
+# Embeddings with no similarity between two names, and between two facts. With the default vectors of the fakes
+# ([i, 1, 0]) each name is similar to each other name, so the commit reads two or more delta nodes in the order of their
+# uuid4 values (phases.py:943 sorts them), and that order is random from run to run.
+VECTORS = {'Alice': [1.0, 0.0, 0.0], 'Bob': [0.0, 1.0, 0.0], 'Carol': [0.0, 0.0, 1.0],
+           'Alice knows Bob': [1.0, 0.0, 0.0], 'Alice met Carol': [0.0, 1.0, 0.0], 'Bob met Carol': [0.0, 0.0, 1.0]}
+
+
+def graphiti_case(name, actions, config=None, **extra) -> dict:
+    return {'name': name, 'config': {'window': 2, 'lease_seconds': 60.0, 'poll_interval_seconds': 50.0,
+                                     **(config or {})},
+            'actions': [list(a) for a in actions], 'vectors': VECTORS, **extra}
+
+
+def scheduler_graphiti_cases() -> list[dict]:
+    """The paths of scheduler.py after the admit lock: scheduler.py:205-259, 293-335, and 143, 154, 155, 165."""
+    import record_graphiti as rg
+
+    t1 = rg.dt(rg.T1)
+    replies = {'extract_nodes.extract_message': [{'reply': rg.entities('Alice', 'Bob')}],
+               'extract_edges.edge': [{'reply': rg.facts(('Alice', 'Bob', 'KNOWS', 'Alice knows Bob'))}],
+               'extract_nodes.extract_summaries_batch': [{'reply': rg.summaries(('Alice', 'Alice met Bob.'))}]}
+    # The bulk unit shares one node name with the first unit. A unit that shares two reads the delta nodes in the order
+    # of their uuid4 values (phases.py sorts them), and that order is random from run to run.
+    bulk_replies = {'extract_nodes_and_edges.extract_message': [
+        {'reply': rg.combined(['Alice', 'Carol'], [('Alice', 'Carol', 'MET', 'Alice met Carol')])}]}
+
+    # The read of enrich_unit gives a stored node, so the enrichment extracts and writes it.
+    nodes_get = [['MATCH (n:Entity) WHERE n.uuid IN $uuids', [rg.node_row('n-alice', 'Alice', summary='old')]]]
+
+    def episode(name, body='Alice met Bob at Acme.', **more):
+        return {'name': name, 'episode_body': body, 'source_description': 'chat', 'reference_time': t1,
+                'group_id': 'g', **more}
+
+    def bulk(*names):
+        return {'bulk_episodes': [rg.raw(n, f'{n}: Alice met Bob.') for n in names], 'group_id': 'g'}
+
+    out = [
+        graphiti_case('add_episode', [('add', 'a1', episode('one')), ('drain',), ('store',)], main='a1',
+                      replies=replies, rows=nodes_get, cancel=True),
+        graphiti_case('add_episode_bulk', [('add_bulk', 'b1', bulk('b1', 'b2')), ('drain',), ('store',)], main='b1',
+                      replies=bulk_replies, rows=nodes_get, cancel=True),
+        # Two and three calls of one graph: the wait for the commit turn, and the order of the commits.
+        graphiti_case('two_calls', [('add', 'a1', episode('one')), ('add', 'a2', episode('two', 'Bob met Carol.')),
+                                    ('drain',), ('store',)], main='a2', replies=replies),
+        graphiti_case('three_calls_window_of_two',
+                      [('add', 'a1', episode('one')), ('add', 'a2', episode('two', 'Bob met Carol.')),
+                       ('add_bulk', 'b3', bulk('b3')), ('drain',), ('store',)],
+                      main='a2', replies={**replies, **bulk_replies}),
+        graphiti_case('three_calls_window_of_one',
+                      [('add', 'a1', episode('one')), ('add', 'a2', episode('two')), ('add', 'a3', episode('three')),
+                       ('drain',), ('store',)], config={'window': 1}, main='a3', replies=replies),
+        # The second call waits for the commit turn while the first holds its begin_commit call.
+        graphiti_case('commit_turn_wait',
+                      [('add', 'a1', episode('one')), ('add', 'a2', episode('two')), ('drain',), ('store',),
+                       ('loop', 100.0), ('drain',), ('store',)], main='a2', replies=replies,
+                      store_hold={'begin_commit': [1]}),
+        # An apply that fails and is tried again, up to max_apply_attempts.
+        graphiti_case('apply_fails_once',
+                      [('add', 'a1', episode('one')), ('drain',), ('arm', 'execute_write', 1), ('loop', 100.0),
+                       ('drain',), ('store',)], main='a1', replies=replies, store_hold={'begin_commit': [1]}),
+        graphiti_case('apply_fails_each_attempt',
+                      [('add', 'a1', episode('one')), ('drain',), ('arm', 'execute_write', 2), ('loop', 100.0),
+                       ('drain',), ('store',)], config={'max_apply_attempts': 2}, main='a1', replies=replies,
+                      store_hold={'begin_commit': [1]}),
+        # Finding B-4: an error in the admit step. The next call of the graph gets the admit lock, and the span gets its
+        # status and the exception.
+        graphiti_case('admit_fails', [('add', 'a1', episode('one')), ('add', 'a2', episode('two')), ('drain',),
+                                      ('store',)], main='a1', replies=replies, store_fail={'begin_admit': [1]},
+                      cancel=True),
+        graphiti_case('admit_bulk_fails', [('add_bulk', 'b1', bulk('b1')), ('add_bulk', 'b2', bulk('b2')), ('drain',),
+                                           ('store',)], main='b1', replies=bulk_replies,
+                      store_fail={'begin_admit': [1]}, cancel=True),
+        graphiti_case('analysis_fails', [('add', 'a1', episode('one')), ('drain',), ('store',)], main='a1',
+                      replies={'extract_nodes.extract_message': [{'reply': {'$raise': 'model down'}}]}, cancel=True),
+        # The copy of the result lists (fix round of P8d, decision 4).
+        graphiti_case('result_lists_are_copies',
+                      [('add', 'a1', episode('one')), ('add_bulk', 'b2', bulk('b2')), ('drain',),
+                       ('final_after_mutation', 'a1'), ('final_after_mutation', 'b2')],
+                      main='a1', replies={**replies, **bulk_replies}, hooks={'before_commit_write': 'keep'}),
+        # Two graphs: each has its own commit order.
+        graphiti_case('two_graphs', [('add', 'a1', episode('one')), ('add', 'h1', {**episode('other'), 'group_id': 'h'}),
+                                     ('drain',), ('store',)], main='h1', replies=replies),
+    ]
+    return out
+
+
 def main() -> int:
     if sys.version_info[:2] != (3, 12):
         raise SystemExit(f'Python 3.12 is needed, and this is {sys.version.split()[0]}')
@@ -674,21 +1302,34 @@ def main() -> int:
                 InMemoryIngestionStateStore=InMemoryIngestionStateStore, EpisodeType=EpisodeType,
                 RawEpisode=RawEpisode, UnitExpiredError=UnitExpiredError, StaleCommitError=StaleCommitError)
     records = record(mods)
+    m = graphiti_setup()
+    graphiti_records = record_graphiti(scheduler_graphiti_cases(), m)
     dump = lambda r: json.dumps(r, ensure_ascii=True, allow_nan=False, separators=(',', ':'))  # noqa: E731
-    text = ('{"python":"' + '.'.join(str(p) for p in sys.version_info[:3]) + '","cases":[\n'
-            + ',\n'.join(dump(r) for r in records) + '\n]}\n')
-    size = len(text.encode('utf-8'))
-    if size > 1_572_864:
-        raise SystemExit(f'The values file would have {size} bytes, above the limit of 1,572,864 (R25).')
+    version = '.'.join(str(p) for p in sys.version_info[:3])
+    text = ('{"python":"' + version + '","cases":[\n' + ',\n'.join(dump(r) for r in records)
+            + '\n],"graphiti_cases":[\n' + ',\n'.join(dump(r) for r in graphiti_records) + '\n]}\n')
+    return write_values([(OUT, text, f'{len(records)} cases and {len(graphiti_records)} graphiti cases')])
+
+
+def write_values(outputs: list) -> int:
+    """Write each values file, or with --check compare each one with the file."""
+    for path, text, counts in outputs:
+        size = len(text.encode('utf-8'))
+        if size > 1_572_864:
+            raise SystemExit(f'{path.name} would have {size} bytes, above the limit of 1,572,864 (R25).')
     if '--check' in sys.argv[1:]:
-        if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
-            print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
+        stale = [path for path, text, _ in outputs if not path.exists() or path.read_text(encoding='utf-8') != text]
+        for path in stale:
+            print(f'{path.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
+        if stale:
             return 1
-        print(f'{OUT.relative_to(ROOT)}: current, {len(records)} cases')
+        for path, _, counts in outputs:
+            print(f'{path.relative_to(ROOT)}: current, {counts}')
         return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding='utf-8')
-    print(f'{OUT.relative_to(ROOT)}: {len(records)} cases, {size} bytes')
+    for path, text, counts in outputs:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding='utf-8')
+        print(f'{path.relative_to(ROOT)}: {counts}, {len(text.encode("utf-8"))} bytes')
     return 0
 
 

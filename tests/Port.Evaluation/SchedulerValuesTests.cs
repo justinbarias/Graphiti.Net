@@ -4,10 +4,9 @@
 // The test runs the steps of each case on the port with the same fakes, and compares the store calls, the calls of the
 // fake analysis, the log lines, and the snapshots, in one ordered list.
 //
-// Paths that wait for layer 9: after the admit lock, add_episode and add_episode_bulk call admit_episode and admit_bulk,
-// and an analysis that returns calls commit_unit and enrich_unit. Each one calls graphiti._resolve_request_scope first,
-// and GraphitiCore is a skeleton until layer 9. The only member of `Graphiti` that the recorded paths read is `tracer`,
-// so the test gives them an object that no constructor made, with a tracer.
+// The cases of the key `cases` give the scheduler an object that no constructor made, with a tracer. The cases of the
+// key `graphiti_cases` (packet P9b) run the paths after the admit lock with a real GraphitiCore (IngestCases of
+// SchedulerSupport.cs).
 namespace Graphiti.Port.Evaluation;
 
 using System.Runtime.CompilerServices;
@@ -43,6 +42,80 @@ public class SchedulerValuesTests
         ["turn_of_a_different_attempt:2"] = """{"k": 2, "attempts": 3, "count": 3, "error": "RuntimeError", "after": []}""",
         ["heartbeat_error_during_the_analysis:4"] = """{"k": 4, "attempts": 5, "count": 5, "error": "RuntimeError", "after": []}""",
     };
+
+    // The cases of the graphiti part (packet P9b): the paths after the admit lock with a real GraphitiCore.
+    private static readonly List<OrderedDictionary<string, object?>> GraphitiCases = IngestCases.Load("scheduler.json", "graphiti_cases");
+
+    // The cancel points of the graphiti part where the port differs from Python by the late cancel of GAPS F33. The key
+    // is the name of the case and k. The value is the kind of IngestCases.CancelDifference. A listed point that agrees
+    // with Python fails the test.
+    private static readonly Dictionary<string, string> GraphitiLateCancel = new(StringComparer.Ordinal)
+    {
+        ["add_episode:7"] = "attempts+1",
+        ["add_episode:8"] = "attempts+1",
+        ["add_episode:15"] = "attempts+1",
+        ["add_episode:19"] = "logs",
+        ["add_episode:21"] = "logs",
+        ["add_episode:22"] = "logs",
+        ["add_episode:23"] = "attempts+1",
+        ["add_episode:33"] = "logs",
+        ["add_episode:34"] = "logs",
+        ["add_episode:35"] = "attempts+1",
+        ["add_episode:43"] = "attempts+1",
+        ["add_episode:47"] = "attempts+2",
+        ["add_episode:49"] = "attempts+1",
+        ["add_episode:50"] = "result",
+        ["add_episode_bulk:8"] = "attempts+1",
+        ["add_episode_bulk:9"] = "attempts+1",
+        ["add_episode_bulk:14"] = "logs",
+        ["add_episode_bulk:18"] = "logs",
+        ["add_episode_bulk:24"] = "logs",
+        ["add_episode_bulk:27"] = "logs",
+        ["add_episode_bulk:29"] = "logs",
+        ["add_episode_bulk:30"] = "logs",
+        ["add_episode_bulk:31"] = "attempts+1",
+        ["add_episode_bulk:41"] = "logs",
+        ["add_episode_bulk:42"] = "logs",
+        ["add_episode_bulk:43"] = "attempts+1",
+        ["add_episode_bulk:51"] = "attempts+1",
+        ["add_episode_bulk:55"] = "attempts+2",
+        ["add_episode_bulk:57"] = "attempts+1",
+        ["add_episode_bulk:58"] = "result",
+        ["analysis_fails:7"] = "attempts+1",
+        ["analysis_fails:8"] = "attempts+1",
+        ["analysis_fails:13"] = "result",
+    };
+
+    public static TheoryData<int> GraphitiCaseIndexes() => IngestCases.Indexes(GraphitiCases.Count);
+
+    public static TheoryData<int, int> GraphitiCancelPoints() => IngestCases.CancelPoints(GraphitiCases);
+
+    [Theory(Timeout = 30000)]
+    [MemberData(nameof(GraphitiCaseIndexes))]
+    public async Task The_port_makes_each_recorded_call_with_the_real_Graphiti(int index) =>
+        await IngestCases.CompareAsync(GraphitiCases[index], TestContext.Current.CancellationToken);
+
+    // The theory that cancels at call k, from the first call after the start of the main call: the fake that makes call
+    // k records it and cancels the main call. The test compares the count of attempts, the end of the main call, and the
+    // counted calls and the log lines after call k (R25).
+    [Theory(Timeout = 30000)]
+    [MemberData(nameof(GraphitiCancelPoints))]
+    public async Task Each_cancel_point_with_the_real_Graphiti_agrees_with_Python(int index, int k)
+    {
+        var (expected, actual) = await IngestCases.CancelPointAsync(GraphitiCases[index], k, TestContext.Current.CancellationToken);
+        var key = $"{(string)Dict(GraphitiCases[index]["in"])["name"]!}:{k}";
+        var kind = IngestCases.CancelDifference(expected, actual);
+        var listed = GraphitiLateCancel.GetValueOrDefault(key, "same");
+        Assert.True(kind == listed, $"{key}: listed as {listed}, but the port is {kind}\n{PyJson.Dumps(expected)}\n{PyJson.Dumps(actual)}");
+    }
+
+    [Fact]
+    public void Each_graphiti_late_cancel_entry_names_a_recorded_cancel_point()
+    {
+        var points = GraphitiCases.SelectMany(c => (Dict(c["out"]).GetValueOrDefault("cancel") as List<object?> ?? [])
+            .Select(p => $"{(string)Dict(c["in"])["name"]!}:{(long)Dict(p)["k"]!}")).ToHashSet(StringComparer.Ordinal);
+        Assert.All(GraphitiLateCancel.Keys, key => Assert.Contains(key, points));
+    }
 
     public static TheoryData<int> CaseIndexes()
     {
