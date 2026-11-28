@@ -19,6 +19,9 @@ internal static class PublicValues
     /// <summary>The default of an <c>attributes</c> property: an empty dictionary.</summary>
     internal static readonly IReadOnlyDictionary<string, object?> EmptyAttributes = ReadOnlyDictionary<string, object?>.Empty;
 
+    /// <summary>Gets the default of <c>Embedding.Dimensions</c>: <c>EMBEDDING_DIM</c>, which defaults to 1024.</summary>
+    internal static long EmbeddingDimensions => Graphiti.Core.Embedder.Client.EmbeddingDim;
+
     /// <summary><c>str(uuid4())</c>, the default of each <c>uuid</c> field.</summary>
     internal static string NewUuid() => Py.Uuid4();
 
@@ -67,7 +70,10 @@ internal static class PublicValues
             $"A value of the type {value.GetType().FullName} has no form in Graphiti. A value is {Kinds}."),
     };
 
-    /// <summary>One ported value of the Python value model as a public value.</summary>
+    /// <summary>
+    /// One ported value of the Python value model as a public value. A typed list or dictionary of ported code, for
+    /// example a <c>List&lt;string&gt;</c> in a prompt context (rule R6), is a list or a dictionary too.
+    /// </summary>
     internal static object? ToPublicValue(object? value) => value switch
     {
         null => null,
@@ -76,7 +82,23 @@ internal static class PublicValues
         OrderedDictionary<string, object?> map => ToPublicDict(map),
         List<object?> list => list.Select(ToPublicValue).ToList().AsReadOnly(),
         PyTuple tuple => tuple.Select(ToPublicValue).ToList().AsReadOnly(),
-        _ => throw new InvalidCastException(
-            $"A value of the Python type '{Py.TypeName(value)}' has no public form. A value is {Kinds}."),
+        byte[] => throw NoPublicForm(value),
+        System.Collections.IDictionary map => ToPublicDict(map),
+        System.Collections.IList list => list.Cast<object?>().Select(ToPublicValue).ToList().AsReadOnly(),
+        _ => throw NoPublicForm(value),
     };
+
+    private static ReadOnlyDictionary<string, object?> ToPublicDict(System.Collections.IDictionary values)
+    {
+        var result = new OrderedDictionary<string, object?>(values.Count);
+        foreach (System.Collections.DictionaryEntry entry in values)
+        {
+            result[entry.Key as string ?? throw NoPublicForm(values)] = ToPublicValue(entry.Value);
+        }
+
+        return new ReadOnlyDictionary<string, object?>(result);
+    }
+
+    private static InvalidCastException NoPublicForm(object value) =>
+        new($"A value of the Python type '{Py.TypeName(value)}' has no public form. A value is {Kinds}.");
 }
