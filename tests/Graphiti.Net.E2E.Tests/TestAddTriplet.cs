@@ -21,7 +21,7 @@
 // extracted entity, and each other call as upstream does. The oracle shows that these seven tests pass on Python with the
 // same two changes (a scratch pytest plugin, port/judge and .upstream are not changed): merges_attributes, updates_summary,
 // with_new_nodes_no_uuid, preserves_existing_attributes, empty_attributes_preserved, and the two edge uuid tests. The
-// four tests of F3 and F4 fail on Python with the changes, so they have Skip with the text of the finding.
+// four tests of F3 and F4 fail on Python with the changes. They assert the result that Python gives (a PORT comment at each).
 //
 // PORT: the upstream tests patch `graphiti_core.graphiti.search` (the result has no edges) and
 // `graphiti_core.graphiti.resolve_extracted_edge` (the result is the edge). A C# module function has no patch (O10). The
@@ -144,6 +144,29 @@ public sealed partial class TestAddTriplet
         return edge;
     }
 
+    /// <summary>The Python result for an unknown node uuid, read back from Neo4j: two new nodes with the user uuids, and the edge between them.</summary>
+    private static async Task AssertStoredAsync(Env env, AddTripletResults result, EntityNode userSource, EntityNode userTarget)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        Assert.Equal(2, result.Nodes.Count);
+        Assert.Equal(userSource.Uuid, result.Nodes[0].Uuid);
+        Assert.Equal(userTarget.Uuid, result.Nodes[1].Uuid);
+        foreach (var (user, name, summary, age) in new[] { (userSource, "Alice", "Alice summary", 30L), (userTarget, "Bob", "Bob summary", 25L) })
+        {
+            var stored = await EntityNode.GetByUuidAsync(env.Driver, user.Uuid, ct);
+            Assert.Equal(name, stored.Name);
+            Assert.True(stored.Labels.ToHashSet().SetEquals(["Entity", "Person"]));
+            Assert.Equal(summary, stored.Summary);
+            Assert.Equal(age, stored.Attributes["age"]);
+        }
+
+        var storedEdge = await EntityEdge.GetByUuidAsync(env.Driver, result.Edges[0].Uuid, cancellationToken: ct);
+        Assert.Equal("KNOWS", storedEdge.Name);
+        Assert.Equal("Alice knows Bob", storedEdge.Fact);
+        Assert.Equal(userSource.Uuid, storedEdge.SourceNodeUuid);
+        Assert.Equal(userTarget.Uuid, storedEdge.TargetNodeUuid);
+    }
+
     private static async Task Guard(Func<Task> body) => await LoopGuard.RunAsync(body, GuardSeconds);
 
     [Fact(Timeout = TimeLimit)]
@@ -213,8 +236,12 @@ public sealed partial class TestAddTriplet
         });
     }
 
-    // F3 of the header: the labels of the stored node ('Entity') stay in the merge on Python too.
-    [Fact(Timeout = TimeLimit, Skip = "Upstream test fails on Python 0.32.0 too (finding F3 of reports/L9-P9f.md): the merged labels hold 'Entity'.")]
+    // PORT: the upstream test asserts that the labels of the stored node are exactly {'Person', 'Employee', 'Manager'}.
+    // That test fails on Python 0.32.0 (finding F3). add_triplet merges the labels of the user node with those of the stored
+    // node, and the stored node has the label 'Entity'. This test asserts the result that Python gives for the same steps. The
+    // oracle (scratch script p9f/measure_triplet.py, Python 0.32.0, same fixtures as above) gave the labels
+    // ['Employee', 'Entity', 'Manager', 'Person'].
+    [Fact(Timeout = TimeLimit)]
     public async Task test_add_triplet_updates_labels()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -241,8 +268,8 @@ public sealed partial class TestAddTriplet
             // Verify labels were updated
             var retrievedSource = await EntityNode.GetByUuidAsync(env.Driver, existingSource.Uuid, ct);
 
-            // Labels should be set to user-provided labels (not merged)
-            Assert.True(retrievedSource.Labels.ToHashSet().SetEquals(["Person", "Employee", "Manager"]));
+            // The labels are merged with the stored labels, so 'Entity' stays (the Python result, not the upstream assertion).
+            Assert.True(retrievedSource.Labels.ToHashSet().SetEquals(["Employee", "Entity", "Manager", "Person"]));
         });
     }
 
@@ -358,7 +385,13 @@ public sealed partial class TestAddTriplet
     }
 
     // F4 of the header: add_triplet resolves a node that is not found as a new node, and raises no error.
-    [Fact(Timeout = TimeLimit, Skip = "Upstream test fails on Python 0.32.0 too (finding F4 of reports/L9-P9f.md): add_triplet raises no ValueError for an unknown node uuid.")]
+    // PORT: the upstream test asserts that add_triplet raises ValueError 'Node with UUID {uuid} not found' for an invalid source uuid. That test
+    // fails on Python 0.32.0 (finding F4): add_triplet raises no error. A node that is not found is resolved as a new node
+    // and saved with the uuid of the user node. This test asserts what Python gave for the same steps (scratch script
+    // p9f/measure_triplet.py, case "F4 source"): no error, two stored nodes (names Alice and Bob, labels Entity and Person,
+    // the summaries and the age attributes of the user nodes, the uuids of the user nodes), and one stored edge KNOWS
+    // 'Alice knows Bob' from the first node to the second node.
+    [Fact(Timeout = TimeLimit)]
     public async Task test_add_triplet_invalid_source_uuid()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -376,13 +409,19 @@ public sealed partial class TestAddTriplet
 
             var edge = Link(env.Group, userSource, userTarget, "KNOWS", "Alice knows Bob", now);
 
-            // Should raise ValueError for invalid source UUID
-            var error = await Assert.ThrowsAsync<ArgumentException>(() => env.Graphiti.AddTripletAsync(userSource, edge, userTarget, cancellationToken: ct));
-            Assert.Contains($"Node with UUID {invalidUuid} not found", error.Message, StringComparison.Ordinal);
+            // Python gives no error (see the PORT comment)
+            var result = await env.Graphiti.AddTripletAsync(userSource, edge, userTarget, cancellationToken: ct);
+            await AssertStoredAsync(env, result, userSource, userTarget);
         });
     }
 
-    [Fact(Timeout = TimeLimit, Skip = "Upstream test fails on Python 0.32.0 too (finding F4 of reports/L9-P9f.md): add_triplet raises no ValueError for an unknown node uuid.")]
+    // PORT: the upstream test asserts that add_triplet raises ValueError 'Node with UUID {uuid} not found' for an invalid target uuid. That test
+    // fails on Python 0.32.0 (finding F4): add_triplet raises no error. A node that is not found is resolved as a new node
+    // and saved with the uuid of the user node. This test asserts what Python gave for the same steps (scratch script
+    // p9f/measure_triplet.py, case "F4 target"): no error, two stored nodes (names Alice and Bob, labels Entity and Person,
+    // the summaries and the age attributes of the user nodes, the uuids of the user nodes), and one stored edge KNOWS
+    // 'Alice knows Bob' from the first node to the second node.
+    [Fact(Timeout = TimeLimit)]
     public async Task test_add_triplet_invalid_target_uuid()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -405,13 +444,19 @@ public sealed partial class TestAddTriplet
 
             var edge = Link(env.Group, userSource, userTarget, "KNOWS", "Alice knows Bob", now);
 
-            // Should raise ValueError for invalid target UUID
-            var error = await Assert.ThrowsAsync<ArgumentException>(() => env.Graphiti.AddTripletAsync(userSource, edge, userTarget, cancellationToken: ct));
-            Assert.Contains($"Node with UUID {invalidUuid} not found", error.Message, StringComparison.Ordinal);
+            // Python gives no error (see the PORT comment)
+            var result = await env.Graphiti.AddTripletAsync(userSource, edge, userTarget, cancellationToken: ct);
+            await AssertStoredAsync(env, result, userSource, userTarget);
         });
     }
 
-    [Fact(Timeout = TimeLimit, Skip = "Upstream test fails on Python 0.32.0 too (finding F4 of reports/L9-P9f.md): add_triplet raises no ValueError for an unknown node uuid.")]
+    // PORT: the upstream test asserts that add_triplet raises ValueError 'Node with UUID {uuid} not found' for source first when both uuids are invalid. That test
+    // fails on Python 0.32.0 (finding F4): add_triplet raises no error. A node that is not found is resolved as a new node
+    // and saved with the uuid of the user node. This test asserts what Python gave for the same steps (scratch script
+    // p9f/measure_triplet.py, case "F4 both"): no error, two stored nodes (names Alice and Bob, labels Entity and Person,
+    // the summaries and the age attributes of the user nodes, the uuids of the user nodes), and one stored edge KNOWS
+    // 'Alice knows Bob' from the first node to the second node.
+    [Fact(Timeout = TimeLimit)]
     public async Task test_add_triplet_invalid_both_uuids()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -431,9 +476,9 @@ public sealed partial class TestAddTriplet
 
             var edge = Link(env.Group, userSource, userTarget, "KNOWS", "Alice knows Bob", now);
 
-            // Should raise ValueError for source UUID first (source is checked before target)
-            var error = await Assert.ThrowsAsync<ArgumentException>(() => env.Graphiti.AddTripletAsync(userSource, edge, userTarget, cancellationToken: ct));
-            Assert.Contains($"Node with UUID {invalidSourceUuid} not found", error.Message, StringComparison.Ordinal);
+            // Python gives no error (see the PORT comment)
+            var result = await env.Graphiti.AddTripletAsync(userSource, edge, userTarget, cancellationToken: ct);
+            await AssertStoredAsync(env, result, userSource, userTarget);
         });
     }
 
