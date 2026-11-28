@@ -14,6 +14,7 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
     private const int FactCount = 10;
     private const int SectionsPerFact = 3;
     private const int SectionCount = 6;
+    private const int FactSections = 4;
     private const int SectionTextLimit = 2000;
 
     private readonly Dictionary<string, ProvisionRef> _sections = Commands.ReadSections(settings)
@@ -25,15 +26,17 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
     /// <param name="query">What to look for, in plain words.</param>
     /// <param name="cancellationToken">The token that cancels the call.</param>
     /// <returns>A JSON text with the facts.</returns>
-    [Description("Search the knowledge graph of the Online Safety Act 2021 (Cth). Returns facts from the Act, each with its validity dates and the section id and chain where the Act states it. The result also has the text of the sections that state these facts.")]
+    [Description("Search the knowledge graph of the Online Safety Act 2021 (Cth). Returns facts from the Act, each with its validity dates and the section id and chain where the Act states it. The result also has the text of the sections that state these facts, and of sections whose own text matches the query.")]
     public async Task<string> SearchLegislationAsync(
         [Description("What to look for, in plain words. For example: 'powers of the eSafety Commissioner to issue a removal notice'.")] string query,
         CancellationToken cancellationToken = default)
     {
-        var edges = await graphiti.SearchAsync(
-            query,
-            new SearchOptions { GroupIds = [settings.GroupId], NumResults = FactCount },
-            cancellationToken);
+        // An advanced search with the recipe of the hybrid search over edges and episodes (full-text and similarity search
+        // for the facts, full-text search for the text of the episodes). A section with no fact can be found by its text.
+        var config = SearchRecipes.CombinedHybridSearchRrf with { NodeConfig = null, CommunityConfig = null, Limit = FactCount };
+        var found = await graphiti.AdvancedSearchAsync(
+            query, config, new AdvancedSearchOptions { GroupIds = [settings.GroupId] }, cancellationToken);
+        var edges = found.Edges;
 
         var facts = new List<object>();
         var episodeOrder = new List<string>();
@@ -59,7 +62,15 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
             });
         }
 
-        var sections = await ReadSectionsAsync(episodeOrder.Take(SectionCount).ToList(), cancellationToken);
+        // The sections: the first episodes of the facts, then the episodes that the search found by their text, then the
+        // other episodes of the facts. No section appears two times. At most 6.
+        var order = episodeOrder.Take(FactSections)
+            .Concat(found.Episodes.Select(e => e.Uuid))
+            .Concat(episodeOrder.Skip(FactSections))
+            .Distinct(StringComparer.Ordinal)
+            .Take(SectionCount)
+            .ToList();
+        var sections = await ReadSectionsAsync(order, cancellationToken);
         return JsonSerializer.Serialize(new { query, count = facts.Count, facts, sections });
     }
 
@@ -83,7 +94,9 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
             var (sectionId, chain) = _sections.TryGetValue(uuid, out var reference)
                 ? (reference.SectionId, reference.Chain)
                 : (episode.Name, episode.SourceDescription);
-            sections.Add(new { section_id = sectionId, chain, text = Cut(episode.Content) });
+            // The first line of the content is the chain, which the result gives in the field chain. The cut counts the rest.
+            var body = episode.Content.Contains('\n', StringComparison.Ordinal) ? episode.Content[(episode.Content.IndexOf('\n', StringComparison.Ordinal) + 1)..] : episode.Content;
+            sections.Add(new { section_id = sectionId, chain, text = Cut(body) });
         }
 
         return sections;

@@ -199,16 +199,42 @@ internal static partial class ActSplitter
         {
             var style = p.Element(W + "pPr")?.Element(W + "pStyle")?.Attribute(W + "val")?.Value ?? string.Empty;
             var text = new StringBuilder();
-            foreach (var node in p.Descendants())
+            foreach (var child in p.Descendants(W + "r").SelectMany(r => r.Elements()))
             {
-                if (node.Name == W + "t")
+                // The children of a run in this file (counted in the .docx): w:t 9,901, w:tab 5,099, w:noBreakHyphen 304,
+                // w:fldChar 912, w:instrText 304, w:lastRenderedPageBreak 14, w:object 2. The file has no w:softHyphen,
+                // w:br, w:cr, w:sym, or w:delText. Each one is decided here.
+                if (child.Name == W + "t")
                 {
-                    text.Append(node.Value);
+                    text.Append(child.Value);
                 }
-                else if (node.Name == W + "tab")
+                else if (child.Name == W + "tab")
                 {
+                    // A tab becomes one space.
                     text.Append(' ');
                 }
+                else if (child.Name == W + "noBreakHyphen")
+                {
+                    // A non-breaking hyphen is a real hyphen of the text: "end-user", "cyber-abuse". Keep it.
+                    text.Append('-');
+                }
+                else if (child.Name == W + "softHyphen")
+                {
+                    // A soft hyphen is only a hint for line breaks. It is not part of the text. The file has none.
+                }
+                else if (child.Name == W + "br" || child.Name == W + "cr")
+                {
+                    // A line break becomes one space. The file has none.
+                    text.Append(' ');
+                }
+                else if (child.Name == W + "sym")
+                {
+                    throw new NotSupportedException("The file has a w:sym symbol, and the splitter does not read it.");
+                }
+
+                // The other children hold no text of the Act: w:rPr (style), w:fldChar and w:instrText (the codes of a
+                // field, for example a page reference in the table of contents), w:lastRenderedPageBreak, and w:object (an
+                // embedded object).
             }
 
             result.Add(new Para(style, Normalize(text.ToString())));

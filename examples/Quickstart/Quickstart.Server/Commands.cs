@@ -28,6 +28,11 @@ internal static class Commands
             $"Divisions: {episodes.Where(e => e.Ref.Division is not null).Select(e => (e.Ref.Part, e.Ref.Division)).Distinct().Count()}. " +
             $"Subdivisions: {episodes.Where(e => e.Ref.Subdivision is not null).Select(e => (e.Ref.Part, e.Ref.Division, e.Ref.Subdivision)).Distinct().Count()}.");
         Console.WriteLine($"Words in all episodes: {episodes.Sum(e => e.WordCount)}.");
+        foreach (var word in new[] { "cyber-abuse", "end-user", "cyberabuse", "enduser" })
+        {
+            Console.WriteLine($"Count of '{word}' in the text of the episodes: {episodes.Sum(e => CountOf(e.Content, word))}.");
+        }
+
         Console.WriteLine();
         Console.WriteLine("The five largest episodes (words):");
         foreach (var e in episodes.OrderByDescending(e => e.WordCount).Take(5))
@@ -48,6 +53,17 @@ internal static class Commands
         }
     }
 
+    private static int CountOf(string text, string word)
+    {
+        var count = 0;
+        for (var i = text.IndexOf(word, StringComparison.OrdinalIgnoreCase); i >= 0; i = text.IndexOf(word, i + word.Length, StringComparison.OrdinalIgnoreCase))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
     /// <summary>Ingests the first sections of the Act into the graph.</summary>
     /// <param name="settings">The settings.</param>
     /// <param name="file">The path of the .docx file.</param>
@@ -57,7 +73,8 @@ internal static class Commands
     /// <returns>A task that ends when the ingestion ends.</returns>
     public static async Task IngestAsync(Settings settings, string file, int? limit, bool resume, int window = DefaultWindow)
     {
-        var all = ActSplitter.Split(file);
+        var fullList = ActSplitter.Split(file);
+        var all = fullList;
         var sectionNumbers = all.Select(e => e.Ref.Section).Distinct().ToList();
         if (limit is { } n)
         {
@@ -68,6 +85,13 @@ internal static class Commands
         await using var provider = BuildProvider(settings, window > 1 ? window : null);
         var graphiti = provider.GetRequiredService<IGraphiti>();
         await graphiti.BuildIndicesAndConstraintsAsync();
+
+        var present = await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId]);
+        if (!resume && present.Count > 0)
+        {
+            throw new QuickstartException(
+                $"The group '{settings.GroupId}' already has {present.Count} episodes. Use --resume to continue, or run the command reset first.");
+        }
 
         var refs = all.Select(e => e.Ref).ToList();
         var existing = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -153,7 +177,7 @@ internal static class Commands
                         edges += result.Edges.Count;
                         var index = refs.FindIndex(r => r.Name == episode.Ref.Name);
                         refs[index] = refs[index] with { EpisodeUuid = result.Episode.Uuid };
-                        WriteSections(settings, refs);
+                        WriteSections(settings, fullList, refs);
                         Console.WriteLine(
                             $"[{done}/{todo.Count}] {episode.Ref.Name}: {result.Nodes.Count} entities, {result.Edges.Count} facts, " +
                             $"{Stopwatch.GetElapsedTime(started).TotalSeconds:F1}s");
@@ -174,7 +198,7 @@ internal static class Commands
 
         await Task.WhenAll(tasks);
         stopwatch.Stop();
-        WriteSections(settings, refs);
+        WriteSections(settings, fullList, refs);
         if (firstError is not null)
         {
             PrintUsage(graphiti);
@@ -201,15 +225,33 @@ internal static class Commands
 
         await using var provider = BuildProvider(settings, null);
         var graphiti = provider.GetRequiredService<IGraphiti>();
-        // The call RemoveEpisodeAsync deletes an episode, and the entities and facts that only this episode made. It
-        // touches no other group. The batch delete of a group (DeleteByGroupIdAsync) is not used here.
-        var episodes = await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId]);
+        // The batch delete of a group (DeleteByGroupIdAsync) fails on Neo4j (GAPS U1). RemoveEpisodeAsync works, but it
+        // asks the model to rebuild the summaries of the entities that stay, and it took about 5 minutes for one episode of
+        // the full graph. So the command deletes each node with DeleteAsync, which also deletes the edges of the node.
+        // It makes no model call and touches only nodes that it read for this group id.
+        var stopwatch = Stopwatch.StartNew();
         var count = 0;
+        var episodes = await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId]);
         foreach (var episode in episodes)
         {
-            await graphiti.RemoveEpisodeAsync(episode.Uuid, settings.GroupId);
+            await graphiti.Nodes.Episode.DeleteAsync(episode);
             count++;
-            Console.WriteLine($"[{count}/{episodes.Count}] removed {episode.Name}");
+        }
+
+        var entityCount = 0;
+        while (true)
+        {
+            var page = await graphiti.Nodes.Entity.GetByGroupIdsAsync([settings.GroupId], 100);
+            if (page.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var entity in page)
+            {
+                await graphiti.Nodes.Entity.DeleteAsync(entity);
+                entityCount++;
+            }
         }
 
         if (File.Exists(settings.SectionsFile))
@@ -217,7 +259,8 @@ internal static class Commands
             File.Delete(settings.SectionsFile);
         }
 
-        Console.WriteLine($"Done. {count} episodes removed.");
+        Console.WriteLine($"Done. {count} episodes and {entityCount} entities removed in {stopwatch.Elapsed:hh\\:mm\\:ss}.");
+        PrintUsage(graphiti);
     }
 
     /// <summary>Reads sections.json.</summary>
@@ -240,10 +283,31 @@ internal static class Commands
         return services.BuildServiceProvider();
     }
 
-    private static void WriteSections(Settings settings, List<ProvisionRef> refs)
+    // The file of the group keeps the record of each episode that an earlier run made. A run with --limit or --resume
+    // changes only the records of the sections that it processed. It never drops another record.
+    private static void WriteSections(Settings settings, IReadOnlyList<ActEpisode> fullList, List<ProvisionRef> processed)
     {
+        var known = ReadSections(settings).ToDictionary(r => r.Name, StringComparer.Ordinal);
+        foreach (var record in processed)
+        {
+            if (record.EpisodeUuid is not null || !known.ContainsKey(record.Name))
+            {
+                known[record.Name] = record;
+            }
+        }
+
+        var ordered = new List<ProvisionRef>();
+        foreach (var episode in fullList)
+        {
+            if (known.Remove(episode.Ref.Name, out var record))
+            {
+                ordered.Add(record);
+            }
+        }
+
+        ordered.AddRange(known.Values);
         Directory.CreateDirectory(settings.DataDirectory);
-        File.WriteAllText(settings.SectionsFile, JsonSerializer.Serialize(refs, JsonOptions));
+        File.WriteAllText(settings.SectionsFile, JsonSerializer.Serialize(ordered, JsonOptions));
     }
 
     private static void PrintUsage(IGraphiti graphiti)

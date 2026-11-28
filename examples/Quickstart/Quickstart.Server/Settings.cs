@@ -18,8 +18,20 @@ internal sealed record Settings(
     /// <summary>Gets the path of the folder for the downloaded Act and for sections.json.</summary>
     public string DataDirectory => Path.Combine(RepositoryRoot, "examples", "Quickstart", "data");
 
-    /// <summary>Gets the path of sections.json.</summary>
-    public string SectionsFile => Path.Combine(DataDirectory, "sections.json");
+    /// <summary>Gets the path of the sections file of this group: one file for each group id.</summary>
+    public string SectionsFile => Path.Combine(DataDirectory, $"sections.{SafeGroupName(GroupId)}.json");
+
+    /// <summary>Shows only the settings that are not secret. The generated text of a record would show the key and the password.</summary>
+    /// <param name="builder">The builder of the text.</param>
+    /// <returns>True.</returns>
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        builder.Append($"Neo4jUri = {Neo4jUri}, ChatModel = {ChatModel}, EmbeddingModel = {EmbeddingModel}, GroupId = {GroupId}");
+        return true;
+    }
+
+    private static string SafeGroupName(string groupId) =>
+        new([.. groupId.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' ? c : '_')]);
 
     /// <summary>Loads the settings. It throws one clear sentence if the OpenAI key is missing.</summary>
     /// <returns>The settings.</returns>

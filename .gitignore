@@ -32,3 +32,6 @@ examples/Quickstart/web/node_modules/
 examples/Quickstart/web/.next/
 examples/Quickstart/web/next-env.d.ts
 examples/Quickstart/web/*.tsbuildinfo
+examples/Quickstart/web/.env.local
+examples/Quickstart/web/AGENTS.md
+examples/Quickstart/web/out/
