@@ -20,7 +20,7 @@ This is the canonical home of the test strategy. It follows
 | Differential judge | Does .NET behave like Python at the pinned commit? | `port/judge/`, `tests/Graphiti.Net.JudgeHost` | 1,999 cases: 1,965 pure and 34 flow. 11 flow scenarios use replies from a real model. |
 | End-to-end | Does a real user flow work against a real graph? | `tests/Graphiti.Net.E2E.Tests` | One environment test. |
 | Property | Does a statement hold for thousands of generated inputs? | `tests/Graphiti.Net.Property.Tests` | 55 tests for `PyCompat`: each helper against the values that Python recorded, and laws that hold for any input. |
-| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Configured in observe mode. Two runs on `PyCompat` on 2026-11-26 each scored 93.22%. The pruning rule is not applied yet (plan 0003, task 5). |
+| Mutation | Does each test catch a bug that no other test catches? | `scripts/mutate.sh`, `stryker-config.json` | Observe mode, on `PyCompat` with its property tests only. The run of 2026-11-28 scored 89.87%. A person starts each run. The pruning rule is not applied yet (plan 0003, task 5). |
 
 ### Differential judge
 
@@ -59,6 +59,8 @@ Use CsCheck. Good properties for this code base:
 ### Mutation
 
 Stryker.NET changes the product code in small ways and runs the tests. A mutant that no test kills shows a gap.
+`scripts/mutate.sh` mutates only `PyCompat` and runs only `tests/Graphiti.Net.Property.Tests`. It starts Stryker in that test project, because a run on the whole solution does not finish (debt T27).
+No push and no pull request starts a mutation run. A person runs the script, or starts the workflow `mutation` on the Actions page of GitHub.
 `disable-bail` is on, so the report lists every test that kills each mutant.
 
 The pruning rule:
@@ -83,7 +85,7 @@ Limits of the list:
 - The result holds only for the code that the run mutated.
 - A test that stops the test host during the coverage capture gives no result for any mutant. Stryker cannot read the coverage of such a test, so it runs the test against each mutant, and each mutant gets the status `RuntimeError`. The instrumented build uses more stack, so the two deep tests of `PyAstTests.cs` run their body on a thread with a large stack (`OnLargeStack`). One other test there holds the default stack, and it does not run in an instrumented build. If a run gives only errors, look for `Failed to capture per-test coverage` in its log. A test that stops the host only for one mutant gives `RuntimeError` for that mutant only.
 
-The gate is in observe mode: `thresholds.break` is 0 and the CI job cannot block a merge.
+The gate is in observe mode: `thresholds.break` is 0, and a mutation run blocks no merge.
 After M1 gives a baseline score, the maintainer sets an enforced threshold (M3 in the [spec](product-specs/spec.md)).
 
 ## Temporary port evaluation tests
@@ -109,4 +111,4 @@ python3 scripts/mutation_survivors.py
 ## Known gaps
 
 - Nobody applied the pruning rule yet. Plan 0003, task 5 does it.
-- Only `PyCompat` has product code, so no mutation score exists for ported code.
+- The mutation run covers `PyCompat` only. No mutation score exists for the ported code (debt T27).
