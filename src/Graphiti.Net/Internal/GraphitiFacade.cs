@@ -24,12 +24,28 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
     /// <summary>The one <see cref="ActivitySource"/> of Graphiti (lead choice L9). A host turns it on with <c>AddSource("Graphiti.Net")</c>.</summary>
     internal static readonly ActivitySource ActivitySource = new("Graphiti.Net");
 
+    /// <summary>The message of options with routes and no model. The validator rejects them first.</summary>
+    internal const string RoutesNeedModelMessage = "Llm.Model must have a value when Llm.Routes holds a route.";
+
+    /// <summary>The message of a sync dispose on the thread of the Graphiti scheduler.</summary>
+    internal const string DisposeOnSchedulerMessage =
+        "Graphiti cannot close with the sync Dispose on the thread of the Graphiti scheduler, because the close waits " +
+        "for work on that thread. Call DisposeAsync.";
+
+    // The facades that are live, in the order of their build. PortServices is process-wide (decision D23), so each
+    // container shares it. PortServices holds the services of the latest live facade, or the defaults with no live
+    // facade. A disposed container then leaves no disposed logger factory in PortServices.
+    private static readonly Lock LiveLock = new();
+    private static readonly List<GraphitiFacade> Live = [];
+
     private readonly Core.GraphitiCore core;
+    private readonly Ambient ambient;
     private int closed;
 
-    internal GraphitiFacade(Core.GraphitiCore core)
+    private GraphitiFacade(Core.GraphitiCore core, Ambient ambient)
     {
         this.core = core;
+        this.ambient = ambient;
     }
 
     /// <summary>Gets the ported instance under the facade.</summary>
@@ -52,10 +68,104 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
         var embedder = CreateEmbedder(services, registration, embedderConfig, options.Embedding.Model)
             ?? throw new InvalidOperationException(GraphitiRegistration.NoEmbeddingGeneratorMessage);
 
-        PortServices.LoggerFactory = services.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
-        PortServices.Time = services.GetService<TimeProvider>() ?? TimeProvider.System;
-        PortServices.ModelFailureClassifier = options.Llm.ClassifyFailure ?? PortServices.DefaultClassifyModelFailure;
+        var ambient = new Ambient(
+            services.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance,
+            services.GetService<TimeProvider>() ?? TimeProvider.System,
+            options.Llm.ClassifyFailure ?? PortServices.DefaultClassifyModelFailure);
+        lock (LiveLock)
+        {
+            ambient.Apply();
+        }
 
+        try
+        {
+            var facade = new GraphitiFacade(Build(services, registration, options, driverFactory, chatClient, embedder), ambient);
+            lock (LiveLock)
+            {
+                Live.Add(facade);
+            }
+
+            return facade;
+        }
+        catch (Exception)
+        {
+            Leave(null);
+            throw;
+        }
+    }
+
+    /// <summary>Calls <c>GraphitiCore.close</c> one time. A second call does nothing.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref closed, 1) == 0)
+        {
+            try
+            {
+                await Asyncio.Run(() => core.CloseAsync(CancellationToken.None)).ConfigureAwait(false);
+            }
+            finally
+            {
+                Leave(this);
+            }
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Calls <c>GraphitiCore.close</c> one time and waits for it. A second call does nothing. A call on the thread of
+    /// the Graphiti scheduler throws <see cref="InvalidOperationException"/>, because the wait would block the close.
+    /// </summary>
+    public void Dispose()
+    {
+        if (Volatile.Read(ref closed) != 0)
+        {
+            return;
+        }
+
+        if (Asyncio.IsOnLoop)
+        {
+            throw new InvalidOperationException(DisposeOnSchedulerMessage);
+        }
+
+        if (Interlocked.Exchange(ref closed, 1) == 0)
+        {
+            try
+            {
+                Asyncio.Run(() => core.CloseAsync(CancellationToken.None)).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                Leave(this);
+            }
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    // Removes a facade from the live list, and gives PortServices the services of the latest live facade, or the
+    // defaults.
+    private static void Leave(GraphitiFacade? facade)
+    {
+        lock (LiveLock)
+        {
+            if (facade is not null)
+            {
+                Live.Remove(facade);
+            }
+
+            (Live.Count > 0 ? Live[^1].ambient : Ambient.Default).Apply();
+        }
+    }
+
+    private static Core.GraphitiCore Build(
+        IServiceProvider services,
+        GraphitiRegistration registration,
+        GraphitiOptions options,
+        Func<IServiceProvider, CoreDriver.GraphDriver> driverFactory,
+        IChatClient chatClient,
+        EmbeddingGeneratorEmbedder embedder)
+    {
         var llm = options.Llm;
         ChatClientLlmClient NewChatAdapter(IChatClient client) => new(
             client,
@@ -99,7 +209,7 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
 
             var routes = llm.Routes.ToDictionary(r => r.Key, r => ToModel(r.Value), StringComparer.Ordinal);
             llmRuntime = new CoreLlm.LLMRuntime(
-                mainTransport.Model(llm.Model!),
+                mainTransport.Model(llm.Model ?? throw new InvalidOperationException(RoutesNeedModelMessage)),
                 routes: PromptRouting.ToPromptRoutes(routes),
                 promptOverrides: PromptRouting.ToPromptOverrides(options.Prompts.Overrides));
             llmClient = null;
@@ -118,12 +228,12 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
         var driver = driverFactory(services);
         try
         {
-            if (concurrentIngestion is not null && options.ConcurrentIngestion!.StateStorePath is { } path)
+            if (concurrentIngestion is not null && options.ConcurrentIngestion is { StateStorePath: { } path })
             {
                 concurrentIngestion.StateStore = new CoreIngestion.SQLiteIngestionStateStore(path);
             }
 
-            return new GraphitiFacade(new Core.GraphitiCore(
+            return new Core.GraphitiCore(
                 llmClient: llmClient,
                 embedder: embedder,
                 crossEncoder: crossEncoder,
@@ -134,44 +244,44 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
                 traceSpanPrefix: options.TraceSpanPrefix,
                 promptLibrary: promptLibrary,
                 llmRuntime: llmRuntime,
-                concurrentIngestion: concurrentIngestion));
+                concurrentIngestion: concurrentIngestion);
         }
         catch (Exception)
         {
-            Asyncio.Run(async () =>
-            {
-                if (concurrentIngestion?.StateStore is { } store)
-                {
-                    await store.CloseAsync(CancellationToken.None);
-                }
-
-                await driver.CloseAsync(CancellationToken.None);
-            }).GetAwaiter().GetResult();
+            CloseAfterFailedBuild(concurrentIngestion?.StateStore, driver);
             throw;
         }
     }
 
-    /// <summary>Calls <c>GraphitiCore.close</c> one time. A second call does nothing.</summary>
-    public async ValueTask DisposeAsync()
+    // A-F6: the cleanup after a failed build. The host gets the first error. A failure of the close is logged and does
+    // not replace it.
+    private static void CloseAfterFailedBuild(CoreIngestion.IngestionStateStore? store, CoreDriver.GraphDriver driver)
     {
-        if (Interlocked.Exchange(ref closed, 1) == 0)
+        try
         {
-            await Asyncio.Run(() => core.CloseAsync(CancellationToken.None)).ConfigureAwait(false);
+            Asyncio.Run(async () =>
+            {
+                try
+                {
+                    if (store is not null)
+                    {
+                        await store.CloseAsync(CancellationToken.None);
+                    }
+                }
+                finally
+                {
+                    await driver.CloseAsync(CancellationToken.None);
+                }
+            }).GetAwaiter().GetResult();
         }
-
-        GC.SuppressFinalize(this);
+        catch (Exception closeError)
+        {
+            CloseAfterFailedBuildFailed(PortServices.Logger(typeof(GraphitiFacade)), closeError);
+        }
     }
 
-    /// <summary>Calls <c>GraphitiCore.close</c> one time and waits for it. A second call does nothing.</summary>
-    public void Dispose()
-    {
-        if (Interlocked.Exchange(ref closed, 1) == 0)
-        {
-            Asyncio.Run(() => core.CloseAsync(CancellationToken.None)).GetAwaiter().GetResult();
-        }
-
-        GC.SuppressFinalize(this);
-    }
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The close after a failed build of Graphiti failed. The host gets the error of the build.")]
+    private static partial void CloseAfterFailedBuildFailed(ILogger logger, Exception error);
 
     private static EmbeddingGeneratorEmbedder? CreateEmbedder(
         IServiceProvider services, GraphitiRegistration registration, CoreEmbedder.EmbedderConfig config, string? model)
@@ -195,5 +305,20 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
         return services.GetService<IEmbeddingGenerator<string, Embedding<double>>>() is { } doubleGenerator
             ? new EmbeddingGeneratorEmbedder(doubleGenerator, config, model)
             : null;
+    }
+
+    // The process-wide services of one facade (decision D23).
+    private sealed record Ambient(
+        ILoggerFactory LoggerFactory, TimeProvider Time, Func<Exception, ModelCallFailure> ModelFailureClassifier)
+    {
+        internal static readonly Ambient Default =
+            new(NullLoggerFactory.Instance, TimeProvider.System, PortServices.DefaultClassifyModelFailure);
+
+        internal void Apply()
+        {
+            PortServices.LoggerFactory = LoggerFactory;
+            PortServices.Time = Time;
+            PortServices.ModelFailureClassifier = ModelFailureClassifier;
+        }
     }
 }

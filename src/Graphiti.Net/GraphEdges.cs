@@ -37,7 +37,10 @@ public sealed record EntityEdge : Edge
     /// <summary>Gets the fact that the edge represents, with the nodes that it connects.</summary>
     public required string Fact { get; init; }
 
-    /// <summary>Gets the embedding of the fact, or null. A read and a save keep each 64-bit value.</summary>
+    /// <summary>
+    /// Gets the embedding of the fact, or null. Neo4j stores 32-bit values, so the first read after a save gives each
+    /// value rounded to 32 bits. A second round trip changes nothing.
+    /// </summary>
     public ReadOnlyMemory<double>? FactEmbedding { get; init; }
 
     /// <summary>Gets the UUIDs of the episodes that reference the edge. The default is an empty list.</summary>

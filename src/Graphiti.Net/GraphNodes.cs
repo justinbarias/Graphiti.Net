@@ -60,7 +60,10 @@ public sealed record EpisodicNode : Node
 /// <summary>An entity of the graph. The public form of upstream's <c>EntityNode</c>.</summary>
 public sealed record EntityNode : Node
 {
-    /// <summary>Gets the embedding of the name, or null. A read and a save keep each 64-bit value.</summary>
+    /// <summary>
+    /// Gets the embedding of the name, or null. Neo4j stores 32-bit values, so the first read after a save gives each
+    /// value rounded to 32 bits. A second round trip changes nothing.
+    /// </summary>
     public ReadOnlyMemory<double>? NameEmbedding { get; init; }
 
     /// <summary>Gets the regional summary of the edges around the node. The default is an empty text.</summary>
@@ -78,7 +81,10 @@ public sealed record EntityNode : Node
 /// <summary>A community of entities. The public form of upstream's <c>CommunityNode</c>.</summary>
 public sealed record CommunityNode : Node
 {
-    /// <summary>Gets the embedding of the name, or null. A read and a save keep each 64-bit value.</summary>
+    /// <summary>
+    /// Gets the embedding of the name, or null. Neo4j stores 32-bit values, so the first read after a save gives each
+    /// value rounded to 32 bits. A second round trip changes nothing.
+    /// </summary>
     public ReadOnlyMemory<double>? NameEmbedding { get; init; }
 
     /// <summary>Gets the summary of the member nodes of the region. The default is an empty text.</summary>
