@@ -374,15 +374,243 @@ public sealed class Neo4jDriverTests : IAsyncLifetime
         await Assert.ThrowsAnyAsync<Exception>(() => Asyncio.Run(() => other.ExecuteQueryAsync("RETURN 1", new(), Ct)));
     }
 
+    // The time of a failure (plan 0004, layer 9, packet P9e). The expected values come from the Python Neo4jDriver
+    // with the neo4j 6.1.0 package against the same database (the oracle, 2026-11-28). OkQuery stores a probe.
+    // LazyQuery fails while the server streams its rows: the answer to its statement is a success, and the failure
+    // comes with the rows, as for the bulk save of utils/bulk_utils.py:349. EagerQuery has no RETURN, so the server
+    // runs it to its end before it answers, and the answer is the failure. Python raises CypherTypeError, a ClientError
+    // with the code below; the .NET driver throws a ClientException with the same code.
+    private const string OkQuery = "CREATE (:DriverProbe {group_id: $g, k: $k})";
+    private const string LazyQuery = "UNWIND $nodes AS node CREATE (n:DriverProbe) SET n = node RETURN n.k AS k";
+    private const string EagerQuery = "CREATE (n:DriverProbe {group_id: $g, k: $k}) SET n.bad = $m";
+    private const string TypeError = "Neo.ClientError.Statement.TypeError";
+
+    // LateQuery gives 499 rows of 2000 characters and then a division by zero, so its failure comes after about 1 MB
+    // of rows, later than the answer to its statement and to the next one.
+    private const string LateQuery = "UNWIND range(1, 500) AS i RETURN i, CASE WHEN i < 500 THEN $pad ELSE toString(1 / (i - 500)) END AS v";
+    private const string ArithmeticError = "Neo.ClientError.Statement.ArithmeticError";
+
+    // Runs one step ("ok1", "lazy2", "eager2") and logs "returned" or the error: the code of a server error, or the
+    // type name of a driver error (Python logs `type(e).__name__` for its TransactionError).
+    private async Task Step(Func<string, OrderedDictionary<string, object?>, Task> run, string step, List<string> log)
+    {
+        var k = long.Parse(step[^1..], System.Globalization.CultureInfo.InvariantCulture);
+        var (query, parameters) = step[..^1] switch
+        {
+            "ok" => (OkQuery, new OrderedDictionary<string, object?> { ["g"] = group, ["k"] = k }),
+            "lazy" => (LazyQuery, new OrderedDictionary<string, object?>
+            {
+                ["nodes"] = new List<object?>
+                {
+                    new OrderedDictionary<string, object?> { ["group_id"] = group, ["k"] = k, ["bad"] = new OrderedDictionary<string, object?> { ["a"] = 1L } },
+                },
+            }),
+            "late" => (LateQuery, new OrderedDictionary<string, object?> { ["pad"] = new string('x', 2000) }),
+            "eager" => (EagerQuery, new OrderedDictionary<string, object?> { ["g"] = group, ["k"] = k, ["m"] = new OrderedDictionary<string, object?> { ["a"] = 1L } }),
+            _ => throw new ArgumentException(step, nameof(step)),
+        };
+        try
+        {
+            await run(query, parameters);
+            log.Add(step + ": returned");
+        }
+        catch (Exception e)
+        {
+            log.Add(step + ": " + ErrorName(e));
+            throw;
+        }
+    }
+
+    private static string ErrorName(Exception e) =>
+        e is Neo4jException { Code: { } code } and not TransactionTerminatedException ? code : e.GetType().Name;
+
+    private async Task<List<object?>> ProbeKeys()
+    {
+        var (records, _, _) = await Asyncio.Run(() => driver.ExecuteQueryAsync(
+            "MATCH (n:DriverProbe {group_id: $g}) RETURN n.k AS k ORDER BY k", new() { ["g"] = group }, Ct));
+        return [.. records.Select(r => r["k"])];
+    }
+
+    // driver.transaction() with the steps as the body. With `keepGoing`, the body catches the error of each step.
+    private async Task<List<string>> TransactionSteps(string[] steps, bool keepGoing = false, bool bodyThrows = false)
+    {
+        var log = new List<string>();
+        try
+        {
+            await Asyncio.Run(() => driver.TransactionAsync(
+                async tx =>
+                {
+                    foreach (var step in steps)
+                    {
+                        try
+                        {
+                            await Step((q, p) => tx.RunAsync(q, p, Ct), step, log);
+                        }
+                        catch (Exception) when (keepGoing)
+                        {
+                        }
+                    }
+
+                    if (bodyThrows)
+                    {
+                        throw new InvalidOperationException("body failed");
+                    }
+                },
+                Ct));
+            log.Add("outcome: returned");
+        }
+        catch (Exception e)
+        {
+            log.Add("outcome: " + ErrorName(e));
+        }
+
+        return log;
+    }
+
+    [Theory]
+    [InlineData("lazy2", TypeError)]
+    [InlineData("late2", ArithmeticError)]
+    public async Task A_failure_that_comes_with_the_rows_raises_at_the_next_run_of_the_transaction(string failing, string code)
+    {
+        // Python: the third run sends its statement and then reads the rest of the second result up to the failure, so
+        // it raises, and the fourth run does not happen. The rollback returns, so transaction() raises the error of the
+        // server. ['ok1: returned', 'lazy2: returned', 'ok3: CypherTypeError', 'outcome: CypherTypeError'], and the
+        // same with ClientError (ArithmeticError) for late2. The graph is [].
+        var log = await TransactionSteps(["ok1", failing, "ok3", "ok4"]);
+
+        Assert.Equal(["ok1: returned", failing + ": returned", "ok3: " + code, "outcome: " + code], log);
+        Assert.Empty(await ProbeKeys());
+    }
+
+    [Fact]
+    public async Task A_statement_that_fails_at_once_raises_at_its_own_run_of_the_transaction()
+    {
+        // Python: ['ok1: returned', 'eager2: CypherTypeError', 'outcome: CypherTypeError'], graph [].
+        var log = await TransactionSteps(["ok1", "eager2", "ok3"]);
+
+        Assert.Equal(["ok1: returned", "eager2: " + TypeError, "outcome: " + TypeError], log);
+        Assert.Empty(await ProbeKeys());
+    }
+
+    [Fact]
+    public async Task A_run_after_the_failure_raises_a_driver_error_and_the_transaction_ends_with_an_error()
+    {
+        // Python: the fourth run raises TransactionError('Transaction failed') with no send, and so does the commit at
+        // the end of the body; the rollback after it returns. ['ok1: returned', 'lazy2: returned',
+        // 'ok3: CypherTypeError', 'ok4: TransactionError', 'outcome: TransactionError'], graph [].
+        // Neo4j.Driver 6.5.1 refuses the fourth run and the commit with TransactionTerminatedException, which carries
+        // the code of the first error. Both are driver errors with no new statement.
+        var log = await TransactionSteps(["ok1", "lazy2", "ok3", "ok4"], keepGoing: true);
+
+        Assert.Equal(
+            ["ok1: returned", "lazy2: returned", "ok3: " + TypeError, "ok4: TransactionTerminatedException", "outcome: TransactionTerminatedException"],
+            log);
+        Assert.Empty(await ProbeKeys());
+    }
+
+    [Fact]
+    public async Task A_failure_that_no_run_read_raises_at_the_rollback_in_place_of_the_error_of_the_body()
+    {
+        // Python: the body raises ValueError after the failing statement, and the rollback reads the failure and
+        // raises it, so transaction() raises CypherTypeError. ['ok1: returned', 'lazy2: returned',
+        // 'outcome: CypherTypeError'], graph [].
+        var log = await TransactionSteps(["ok1", "lazy2"], bodyThrows: true);
+
+        Assert.Equal(["ok1: returned", "lazy2: returned", "outcome: " + TypeError], log);
+        Assert.Empty(await ProbeKeys());
+    }
+
+    [Fact]
+    public async Task A_failure_that_no_run_read_raises_at_the_commit()
+    {
+        // Python: the commit reads the failure and raises it, and then the rollback of transaction() raises
+        // TransactionError('Transaction closed'), which hides it: ['ok1: returned', 'lazy2: returned',
+        // 'outcome: TransactionError'], graph []. The .NET rollback after a failed commit returns, so the error of the
+        // server arrives (GAPS F29, accepted).
+        var log = await TransactionSteps(["ok1", "lazy2"]);
+
+        Assert.Equal(["ok1: returned", "lazy2: returned", "outcome: " + TypeError], log);
+        Assert.Empty(await ProbeKeys());
+    }
+
+    [Theory]
+    [InlineData("ok1,lazy2,ok3,ok4", "ok1: returned|lazy2: returned|ok3: " + TypeError)]
+    [InlineData("ok1,late2,ok3,ok4", "ok1: returned|late2: returned|ok3: " + ArithmeticError)]
+    [InlineData("ok1,eager2,ok3", "ok1: returned|eager2: " + TypeError)]
+    public async Task Execute_write_raises_the_failure_at_the_run_where_Python_raises_it(string steps, string expected)
+    {
+        // Python: session.execute_write(work) with the same steps. A failure with the rows raises at the next run, and
+        // the eager one at its own run; execute_write raises that error of the server, and the graph is [].
+        var log = new List<string>();
+        var error = await Assert.ThrowsAnyAsync<Neo4jException>(() => Asyncio.Run(async () =>
+        {
+            await using var session = driver.Session();
+            await session.ExecuteWriteAsync(
+                async tx =>
+                {
+                    foreach (var step in steps.Split(','))
+                    {
+                        await Step((q, p) => tx.RunAsync(q, p, Ct), step, log);
+                    }
+                },
+                Ct);
+        }));
+
+        Assert.Equal(expected.Split('|'), log);
+        Assert.EndsWith(error.Code!, expected, StringComparison.Ordinal);
+        Assert.Empty(await ProbeKeys());
+    }
+
+    [Theory]
+    [InlineData("ok1,lazy2,ok3,ok4", "ok1: returned|lazy2: returned|ok3: " + TypeError + "|ok4: returned", "1,4")]
+    [InlineData("ok1,late2,ok3,ok4", "ok1: returned|late2: returned|ok3: " + ArithmeticError + "|ok4: returned", "1,4")]
+    [InlineData("ok1,eager2,ok3", "ok1: returned|eager2: " + TypeError + "|ok3: returned", "1,3")]
+    [InlineData("ok1,lazy2", "ok1: returned|lazy2: returned", "1")]
+    public async Task A_session_raises_a_failure_where_Python_raises_it_and_stays_usable(string steps, string expected, string stored)
+    {
+        // Python: driver.session() with session.run for each step, then close. The next run reads the rest of the
+        // earlier result first, so a lazy failure raises there, before its statement is sent: the third probe is not
+        // stored. An eager failure raises at its own run. The session stays usable, and the close drops a failure that
+        // no run read. ['ok1: returned', 'lazy2: returned', 'ok3: CypherTypeError', 'ok4: returned'] with the graph
+        // [1, 4]; ['ok1: returned', 'eager2: CypherTypeError', 'ok3: returned'] with [1, 3];
+        // ['ok1: returned', 'lazy2: returned'] with [1]. Each close returns.
+        var log = new List<string>();
+        await Asyncio.Run(async () =>
+        {
+            var session = driver.Session();
+            foreach (var step in steps.Split(','))
+            {
+                try
+                {
+                    await Step((q, p) => session.RunAsync(q, p, Ct), step, log);
+                }
+                catch (Neo4jException)
+                {
+                }
+            }
+
+            await session.CloseAsync(Ct);
+        });
+
+        Assert.Equal(expected.Split('|'), log);
+        Assert.Equal(stored.Split(',').Select(s => (object?)long.Parse(s, System.Globalization.CultureInfo.InvariantCulture)), await ProbeKeys());
+    }
+
     [Fact]
     public async Task A_database_that_does_not_exist_gives_the_error_of_the_server_for_each_way_to_name_it()
     {
         // Python: execute_query('RETURN 1', database_='no_such_db'), driver.session('no_such_db').execute_write(...),
         // and Neo4jDriver(..., 'no_such_db').transaction() all raise ClientError with this code (the oracle, 2026-11-27).
-        // Python raises the same error for driver.session('no_such_db').run('RETURN 1'). The .NET driver sends the
-        // statement and reports its failure only when the result is read, and Neo4jSession.CloseAsync drops that
-        // pending error as Python does, so a bare run cannot show the database here. A managed transaction can.
+        // Python raises the same error for driver.session('no_such_db').run('RETURN 1'), at the call (the oracle,
+        // 2026-11-28).
         const string code = "Neo.ClientError.Database.DatabaseNotFound";
+
+        var runError = await Assert.ThrowsAnyAsync<Neo4jException>(() => Asyncio.Run(async () =>
+        {
+            await using var session = driver.Session("no_such_db");
+            await session.RunAsync("RETURN 1", new(), Ct);
+        }));
+        Assert.Equal(code, runError.Code);
 
         var queryError = await Assert.ThrowsAnyAsync<Neo4jException>(() => Asyncio.Run(() => driver.ExecuteQueryAsync(
             "RETURN 1", new() { ["database_"] = "no_such_db" }, Ct)));

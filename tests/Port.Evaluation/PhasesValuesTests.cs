@@ -5,8 +5,9 @@
 // in a recording wrapper. The calls, the store calls, and the log lines of each case are one ordered list.
 //
 // admit_episode, admit_bulk, analyze_episode, analyze_bulk, commit_unit, and enrich_unit call a method of `Graphiti`
-// first (graphiti._resolve_request_scope), and GraphitiCore is a skeleton until layer 9. They wait for layer 9, and so do
-// the paths of _build_saga_links that call graphiti._find_saga or graphiti._saga_get_previous_episode_uuid. The other
+// first (graphiti._resolve_request_scope). The key `graphiti_cases` (packet P9b) records them with a real `Graphiti`, and
+// also _admit_heartbeat, _default_wait, and the paths of _build_saga_links that call graphiti._find_saga or
+// graphiti._saga_get_previous_episode_uuid. The test runs them with a real GraphitiCore (IngestCases). The other
 // paths of _build_saga_links, _written_episode, and _save_analysis read no member of `Graphiti` but
 // `store_raw_episode_content`, so the test gives them an object that no constructor made.
 //
@@ -49,6 +50,111 @@ public partial class PhasesValuesTests
         ["groups_bulk_False:3"] = 1,
         ["saga_new:6"] = 1,
     };
+
+    // The cases with a real GraphitiCore (packet P9b of layer 9): admit_episode, admit_bulk, analyze_episode, analyze_bulk,
+    // commit_unit, enrich_unit, and so _admit_heartbeat, _default_wait, _save_analysis, and CommitResult. The runner is
+    // IngestCases of SchedulerSupport.cs, the C# form of the graphiti part of port/tools/record_scheduler.py.
+    private static readonly List<OrderedDictionary<string, object?>> GraphitiCases =
+        List(PhasesValues.Document["graphiti_cases"]).Select(Dict).ToList();
+
+    // The cancel points of the graphiti cases where the port differs from Python by the late cancel of GAPS F33. The key is
+    // the name of the case and k. The value is the kind of IngestCases.CancelDifference. A listed point that agrees with
+    // Python fails the test.
+    private static readonly Dictionary<string, string> GraphitiLateCancel = new(StringComparer.Ordinal)
+    {
+        ["admit_bulk_new:8"] = "attempts+1",
+        ["admit_bulk_new:9"] = "cleanup",
+        ["admit_bulk_write_fails:2"] = "cleanup",
+        ["admit_episode_new:7"] = "attempts+1",
+        ["admit_episode_new:8"] = "cleanup",
+        ["admit_episode_previous_missing:1"] = "cleanup",
+        ["admit_episode_write_fails:3"] = "cleanup",
+        ["analyze_bulk:3"] = "logs",
+        ["analyze_bulk:4"] = "logs",
+        ["analyze_bulk:10"] = "logs",
+        ["analyze_bulk:11"] = "logs",
+        ["analyze_bulk:12"] = "logs",
+        ["analyze_bulk:22"] = "logs",
+        ["analyze_bulk:23"] = "logs",
+        ["analyze_bulk:27"] = "logs",
+        ["analyze_bulk:28"] = "logs",
+        ["analyze_bulk:29"] = "logs",
+        ["analyze_bulk:31"] = "logs",
+        ["analyze_bulk:32"] = "logs",
+        ["analyze_bulk:33"] = "logs",
+        ["analyze_bulk:34"] = "logs",
+        ["analyze_bulk:35"] = "logs",
+        ["analyze_bulk:37"] = "attempts+1",
+        ["analyze_bulk:41"] = "result",
+        ["analyze_bulk_fails:1"] = "failure",
+        ["analyze_episode:5"] = "attempts+1",
+        ["analyze_episode:9"] = "logs",
+        ["analyze_episode:11"] = "logs",
+        ["analyze_episode:12"] = "logs",
+        ["analyze_episode:13"] = "attempts+1",
+        ["analyze_episode:16"] = "result",
+        ["commit_and_enrich:38"] = "attempts+2",
+        ["commit_and_enrich:40"] = "attempts+1",
+        ["commit_and_enrich:41"] = "result",
+        ["commit_apply_fails_each_attempt:23"] = "logs",
+        ["commit_apply_fails_each_attempt:24"] = "logs",
+        ["commit_apply_fails_each_attempt:25"] = "attempts+1",
+        ["commit_apply_fails_each_attempt:29"] = "attempts+1",
+        ["commit_apply_fails_each_attempt:32"] = "attempts+1",
+        ["commit_hook_rejects:23"] = "logs",
+        ["commit_hook_rejects:24"] = "logs",
+        ["commit_hook_rejects:25"] = "cleanup",
+        ["commit_retry_applies_the_stored_final:6"] = "attempts+1",
+        ["commit_retry_applies_the_stored_final:7"] = "result",
+        ["commit_with_a_saga_name:23"] = "logs",
+        ["commit_with_a_saga_name:24"] = "logs",
+        ["commit_with_a_saga_name:25"] = "attempts+1",
+        ["commit_with_a_saga_name:34"] = "attempts+1",
+        ["commit_with_a_saga_name:42"] = "result",
+        ["enrich_write_fails:38"] = "attempts+2",
+        ["enrich_write_fails:39"] = "cleanup",
+    };
+
+    public static TheoryData<int> GraphitiCaseIndexes() => IngestCases.Indexes(GraphitiCases.Count);
+
+    public static TheoryData<int, int> GraphitiCancelPoints() => IngestCases.CancelPoints(GraphitiCases);
+
+    [Theory(Timeout = 30000)]
+    [MemberData(nameof(GraphitiCaseIndexes))]
+    public async Task The_port_makes_each_recorded_call_with_the_real_Graphiti(int index) =>
+        await IngestCases.CompareAsync(GraphitiCases[index], TestContext.Current.CancellationToken);
+
+    // The theory that cancels at call k, from the first call after the start of the main call (R25). The cancel of a case
+    // whose step fails comes in the cleanup of the `except` branch at the call of the failed step.
+    [Theory(Timeout = 30000)]
+    [MemberData(nameof(GraphitiCancelPoints))]
+    public async Task Each_cancel_point_with_the_real_Graphiti_agrees_with_Python(int index, int k)
+    {
+        var (expected, actual) = await IngestCases.CancelPointAsync(GraphitiCases[index], k, TestContext.Current.CancellationToken);
+        var key = $"{(string)Dict(GraphitiCases[index]["in"])["name"]!}:{k}";
+        var kind = IngestCases.CancelDifference(expected, actual);
+        var listed = GraphitiLateCancel.GetValueOrDefault(key, "same");
+        Assert.True(kind == listed, $"{key}: listed as {listed}, but the port is {kind}\n{PyJson.Dumps(expected)}\n{PyJson.Dumps(actual)}");
+    }
+
+    [Fact]
+    public void Each_graphiti_late_cancel_entry_names_a_recorded_cancel_point()
+    {
+        var points = GraphitiCases.SelectMany(c => (Dict(c["out"]).GetValueOrDefault("cancel") as List<object?> ?? [])
+            .Select(p => $"{(string)Dict(c["in"])["name"]!}:{(long)Dict(p)["k"]!}")).ToHashSet(StringComparer.Ordinal);
+        Assert.All(GraphitiLateCancel.Keys, key => Assert.Contains(key, points));
+    }
+
+    // Each function of phases.py that calls a method of `Graphiti` is the main call of a graphiti case.
+    [Fact]
+    public void The_graphiti_cases_reach_each_function_that_needs_the_Graphiti_object()
+    {
+        var ops = GraphitiCases.SelectMany(c => List(Dict(c["in"])["actions"]).Select(a => (string)List(a)[0]!)).ToHashSet(StringComparer.Ordinal);
+        foreach (var op in new[] { "admit", "admit_bulk", "analyze", "analyze_bulk", "commit", "enrich" })
+        {
+            Assert.Contains(op, ops);
+        }
+    }
 
     public static TheoryData<int> SyncCaseIndexes() => Indexes(SyncCases.Count);
 

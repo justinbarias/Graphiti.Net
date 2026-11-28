@@ -18,7 +18,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 6 | `port/search` | Done 2026-11-27. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | Done 2026-11-27. `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
 | 8 | `port/ingestion` | Done 2026-11-28. `ingestion` | 9 | 4,159 | Opus 5.5, medium |
-| 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
+| 9 | `port/graphiti-core`, then `port/public-surface` | In progress. The core is done 2026-11-28: `graphiti` (2,782 lines), the package root, `migrations`, and the flow cases. The public .NET surface is the second pull request. | 3 | 2,787 | Opus 5.5, high |
 
 Layer 0 is the skeleton that the porting skill requires, so every later layer compiles against fixed shapes.
 A skeleton member throws `NotSupportedException` with a `TODO(port)` marker, and the scanner counts the markers down to zero.
@@ -622,3 +622,136 @@ Commands at the tip, after the rebase on `main`:
 - `dotnet test --project tests/Graphiti.Net.E2E.Tests`: 86 tests, 0 failed.
 - The recorders with `--check`: `change_set` 1,365 cases, `state_store` 223, `delta` 373, `graph_reader` 26, `resolution_trace` 17, `phases` 48 and 115 async cases, and `scheduler` 50. Each one is current.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,899 passed, 100 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong. 98 ids left `expected-failures.txt`. The pull request lists the ids.
+
+### Layer 9, the core: graphiti and the flow cases, 2026-11-28
+
+Layer 9 has two pull requests. This section is the first one: the unit `graphiti`, the flow layer of the judge host, and the evidence of `ingestion` that needs the `Graphiti` object. The public .NET surface follows in its own pull request, with end-to-end tests E8 and E9.
+
+| Packet | Work | Review |
+| --- | --- | --- |
+| P9a | `graphiti` (2,782 Python lines, `Core/Graphiti.cs`) | Two Opus 5.5 high reviewers: 3 and 11 findings. 43 of 102 seeded defects passed each test before the fix round. |
+| P9c | The flow layer of the judge host (`tests/Graphiti.Net.JudgeHost/Flow/`) | 5 seeded defects, and each one fails a case. |
+| P9e | The time of a driver error, and the model path of `RawEpisode` in the host | 4 seeded defects. One passed, and its code was removed. |
+| P9b | Recordings of `phases` and `scheduler` with the real `Graphiti` | 14 seeded defects, and each one fails a test. |
+| P9f | Four upstream test files of the `Graphiti` class on Neo4j: 65 cases | 5 seeded defects, and each one fails a test. |
+| P9g | The upstream ingestion tests that build `Graphiti`, on a fake at the driver boundary: 65 cases | 5 seeded defects, and each one fails a test. |
+
+Packets P9b, P9c, P9e, P9f, and P9g had no review by two reviewers. The adversarial pass of the pull request read them.
+
+After the fix round of P9a, each seeded defect of its review fails a test, with five exceptions that a reviewer showed to change nothing.
+
+Differences in the product code, and their fix:
+
+| Finding | Result |
+| --- | --- |
+| A failed `tx.run` raised at the commit, where the Python driver raises it at the next run. `add_nodes_and_edges_bulk_tx` sent one query more than Python (`flow.recorded.custom_types`). | `Neo4jTransaction.RunAsync` and `Neo4jSession.RunAsync` read the keys of the result (rule R9, GAPS F37). The packet measured the Python driver on 11 points first. |
+| The commit span and the report scope of `commit_unit` got a `double` count. A C# conditional with a `long` and a `double` branch gives a `double`. | The `long` branch is cast to `object` (rule R18). |
+| `SUMMARY_REBUILD_BATCH_SIZE` was a `const`, and two upstream tests replace it. | A `PyPatch` value (rule R17). The two tests set it as upstream does. |
+| The reviews of `graphiti` found no difference in the product code. | The fix round changed tests only. |
+
+The flow layer:
+
+- The host runs each of the 34 golden scenarios in a fresh process. The fakes are at the network boundary: an `IChatClient` that gives the recorded replies, an embedding generator, and a recording wrapper of the Neo4j driver.
+- 31 cases passed in each run of the first version of the host. `flow.recorded.custom_types` showed the driver difference above. `flow.recorded.bulk` needed a model factory in the host.
+- `flow.recorded.lifecycle` depends on the order of rows that a query with no `ORDER BY` returns. Pull request 46 changed the judge: step 5 declares `unordered_params`. Debt row T29 names the limit of that declaration.
+- The 34 flow ids left `expected-failures.txt`. 66 pure ids stay.
+
+Which units the flow cases run. The lead measured the lines of each product file that the 34 cases run, with `dotnet-coverage` 18.12.0 from a folder outside the repository:
+
+```bash
+dotnet-coverage collect --server-mode --session-id l9flow -f cobertura -o flow.xml &
+dotnet-coverage instrument --session-id l9flow tests/Graphiti.Net.JudgeHost/bin/Debug/net10.0/Graphiti.Net.dll
+dotnet-coverage instrument --session-id l9flow tests/Graphiti.Net.JudgeHost/bin/Debug/net10.0/Graphiti.Net.Neo4j.dll
+NEO4J_URI=bolt://localhost:7688 python3 -B port/judge/run.py --build dotnet --layer flow
+dotnet-coverage shutdown l9flow
+```
+
+A unit with no pure case moves from `tests_pass` to `reviewed` if the flow cases run a line of its file. The line counts are the lines that the tool instruments, so they differ from the lines of the file.
+
+| Unit | Lines that the flow cases ran | Lines |
+| --- | --- | --- |
+| `graphiti` | 1,482 | 2,038 |
+| `ingestion.phases` | 847 | 1,747 |
+| `ingestion.scheduler` | 169 | 306 |
+| `decorators` | 34 | 52 |
+| `driver.neo4j.operations.community_edge_ops` | 98 | 107 |
+| `driver.neo4j.operations.community_node_ops` | 127 | 139 |
+| `driver.neo4j.operations.entity_edge_ops` | 189 | 201 |
+| `driver.neo4j.operations.entity_node_ops` | 174 | 192 |
+| `driver.neo4j.operations.episode_node_ops` | 210 | 225 |
+| `driver.neo4j.operations.episodic_edge_ops` | 105 | 117 |
+| `driver.neo4j.operations.graph_ops` | 91 | 146 |
+| `driver.neo4j.operations.has_episode_edge_ops` | 91 | 112 |
+| `driver.neo4j.operations.next_episode_edge_ops` | 103 | 112 |
+| `driver.neo4j.operations.saga_node_ops` | 110 | 128 |
+| `driver.neo4j_driver` | 226 | 332 |
+| `embedder.client` | 2 | 4 |
+| `graphiti_types` | 41 | 82 |
+| `ingestion.graph_reader` | 61 | 73 |
+| `ingestion.state_store` | 195 | 326 |
+| `llm_client.client` | 147 | 234 |
+| `llm_client.config` | 15 | 15 |
+| `llm_client.token_tracker` | 18 | 83 |
+| `namespaces.edges` | 179 | 180 |
+| `namespaces.nodes` | 164 | 167 |
+| `search.search` | 912 | 935 |
+| `utils.maintenance.graph_data_operations` | 74 | 121 |
+
+`cross_encoder.client` is an abstract class with no executable line, and the flow cases reach it through `CrossEncoderBridge`. It has the status `reviewed`.
+
+Seven units keep `tests_pass`, because no flow case runs a line of them. Their tests are their only evidence. Four more units keep `tests_pass` for another reason: each one has a pure case that is still listed (`utils.datetime_utils`, `llm_client.prompt_config`, `search.search_config`, and `search.search_utils`).
+
+| Unit | Lines that the flow cases ran | Lines |
+| --- | --- | --- |
+| `cross_encoder.openai_reranker_client` | 0 | 88 |
+| `ingestion.sqlite_state_store` | 0 | 495 |
+| `llm_client.cache` | 0 | 74 |
+| `llm_client.errors` | 0 | 18 |
+| `llm_client.llm_runtime` | 0 | 83 |
+| `llm_client.openai_decisions_client` | 0 | 425 |
+| `llm_client.utils` | 0 | 15 |
+
+The flow host gives the product an `IChatClient`, so the OpenAI clients, the cache, and the reranker of layer 3 are not on its path. The scenarios use the in-memory state store.
+
+What the packets changed in the evidence:
+
+- The recordings of `phases` and `scheduler` run the real `Graphiti` with the real in-memory state store. They cover 624 of 626 lines of the eight functions of `phases`, and 74 of 74 lines of the scheduler paths after the admit lock.
+- The three seeded defects of `phases` that passed each test at the end of layer 8 fail a test now.
+- The ingestion tests keep the fakes of the upstream tests, in four places. `HarnessDriver` is a fake driver. `FakeGraph` derives from the product class `GraphReader` and replaces each read, so the queries of `GraphReader` do not run in these tests (the flow cases run 61 of its 73 lines). `LoggingStore` wraps the state store. `HarnessLlm` replaces `generate_response`, which is above the network call. The mocks of `TestGraphitiMock.cs` and the fake model clients of the `graphiti` tests replace `generate_response` too. Part 3 of `port/RULES.md` allows these forms for a port of an upstream test. Rule 4 of `docs/TESTING.md` names only the network boundary (debt row T31). The oracle ran the upstream ingestion tests on the same driver fake: 98 passed.
+- Four tests of `TestAddTriplet.cs` assert the result of Python 0.32.0, with a `// PORT:` comment. Their upstream assertion fails on Python itself.
+- The lease tests of `TestFailureRules.cs` run on the virtual clock. On the real clock, a stall of 0.3 seconds of the shared scheduler failed them.
+- One cache test of layer 3 measured a wait with a clock that started late. It proves an order now (debt row T30).
+
+Decisions of the lead under D49, for the maintainer at gate 4:
+
+- Two pull requests for layer 9.
+- The status rule of the measurement above, and the seven units that keep `tests_pass`.
+- GAPS F50: a cancel does not stop the wait of a `run` call for its keys.
+- Debt row T31: rule 4 of `docs/TESTING.md` has no clause for the fakes that a port of an upstream test keeps.
+- Rule R9: a `run` call of the Neo4j adapter reads the keys of its result. It adds one wait and no round trip.
+- Seven cancel points have the kind `cleanup`. After a cancel in a cleanup await, the port does not mark the unit failed, and the deadline of the unit releases its position later.
+
+Differences that the lead accepted by name: GAPS F48, F49, U22, and 132 more cancel points of GAPS F33 (48 in `graphiti`, 51 in `phases`, and 33 in `scheduler`).
+
+No `TODO(port)` marker is new in a ported unit. 20 upstream tests keep a `TODO(port): O10` comment: 18 in the ingestion test files and 2 in `TestAddTriplet.cs`. Each one replaces a function of a module with a result, and the queue names the recorded case that covers it.
+
+Commands at the tip of the branch, 2026-11-28, on a Neo4j 5.26.2 with an empty graph:
+
+| Command | Result |
+| --- | --- |
+| `scripts/check.sh --test` | `check: passed`, 19,268 tests, 0 failed |
+| `dotnet test --project tests/Port.Evaluation` | 18,664 tests, 0 failed, 0 skipped |
+| `dotnet test --project tests/Graphiti.Net.E2E.Tests` | 164 tests, 0 failed, 0 skipped |
+| `python3 -B port/judge/run.py --build dotnet` | 1,999 cases, 1,933 passed, 66 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong, `judge: passed` |
+| `record_graphiti.py --check`, `record_phases.py --check`, `record_scheduler.py --check` | Each one is current |
+
+The adversarial pass of the pull request found four minor points and no behavior difference. Each of its nine seeded defects fails a test. The four points are corrected in this section, in the queue, and in GAPS F50 and debt row T31.
+
+What is not checked:
+
+- Two lines of `phases` have no recording: line 820 and line 1810.
+- The flow cases run `Neo4jSession.RunAsync` with its branch for a result with no keys. In `Neo4jTransaction.RunAsync` they do not run that branch, because each transaction statement of the scenarios returns rows. Eight end-to-end tests on Neo4j cover both forms.
+- A cancel does not stop the new wait of a `run` call. `KeysAsync` and `ConsumeAsync` of Neo4j.Driver take no token, so a statement that returns no rows holds its caller until the server ends it. Python stops that wait at a cancel (GAPS F50).
+- After a failed statement, the port throws `TransactionTerminatedException` for the next run, where Python raises `TransactionError` (GAPS F37).
+- No test runs two processes that write to one SQLite file at one time.
+- The mutation run of plan 0003, task 5 is still owed.

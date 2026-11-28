@@ -2334,7 +2334,7 @@ internal static partial class Phases
                 var reportValues = new OrderedDictionary<string, object?>();
                 foreach (var (key, value) in report)
                 {
-                    reportValues[key] = key.EndsWith("_ms", StringComparison.Ordinal) ? value : (long)value;
+                    reportValues[key] = key.EndsWith("_ms", StringComparison.Ordinal) ? value : (object?)(long)value;
                 }
 
                 var attributes = new OrderedDictionary<string, object?> { ["ingest.seq"] = unit.Seq };

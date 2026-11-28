@@ -78,8 +78,8 @@
         "abc"
       ],
       "target": "src/Graphiti.Net/Core/CrossEncoder/Client.cs",
-      "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/CrossEncoderClientTests.cs covers it."
+      "status": "reviewed",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case. Its file has no executable line: the class is abstract. The flow cases of the judge reach it through `CrossEncoderBridge`, and each of the 34 cases passes on the .NET build (2026-11-28). tests/Port.Evaluation/CrossEncoderClientTests.cs covers it."
     },
     {
       "order": 2,
@@ -128,8 +128,8 @@
         "pydantic"
       ],
       "target": "src/Graphiti.Net/Core/Embedder/Client.cs",
-      "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/EmbedderClientTests.cs covers it."
+      "status": "reviewed",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 2 of the 4 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/EmbedderClientTests.cs covers it."
     },
     {
       "order": 5,
@@ -609,7 +609,7 @@
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/Cache.cs",
       "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. The cache sets a busy timeout of 5 seconds on its connection. tests/Port.Evaluation/LlmClientCacheTests.cs ports the upstream tests and compares the rows that port/tools/record_cache_reranker.py recorded."
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 74 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. The cache sets a busy timeout of 5 seconds on its connection. tests/Port.Evaluation/LlmClientCacheTests.cs ports the upstream tests and compares the rows that port/tools/record_cache_reranker.py recorded."
     },
     {
       "order": 29,
@@ -623,8 +623,8 @@
         "enum"
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/Config.cs",
-      "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientBaseValuesTests.cs compares the recorded values of port/tools/record_llm_client_base.py."
+      "status": "reviewed",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 15 of the 15 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/LlmClientBaseValuesTests.cs compares the recorded values of port/tools/record_llm_client_base.py."
     },
     {
       "order": 30,
@@ -637,7 +637,7 @@
       "external": [],
       "target": "src/Graphiti.Net/LlmClientErrors.cs",
       "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. The exception classes are public and stay at the root of the package (rule R4). tests/Port.Evaluation/LlmClientErrorsTests.cs ports the upstream tests."
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 18 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. The exception classes are public and stay at the root of the package (rule R4). tests/Port.Evaluation/LlmClientErrorsTests.cs ports the upstream tests."
     },
     {
       "order": 31,
@@ -652,8 +652,8 @@
         "threading"
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/TokenTracker.cs",
-      "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientTokenTrackerTests.cs ports the upstream tests, and LlmClientBaseValuesTests.cs compares the recorded values."
+      "status": "reviewed",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 18 of the 83 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/LlmClientTokenTrackerTests.cs ports the upstream tests, and LlmClientBaseValuesTests.cs compares the recorded values."
     },
     {
       "order": 32,
@@ -735,8 +735,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/Client.cs",
-      "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientClientValuesTests.cs compares the recorded calls of port/tools/record_llm_client.py, with the cache path of generate_response. Rule R5: decision D48 keeps the provider text in the span status of the model call."
+      "status": "reviewed",
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 147 of the 234 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/LlmClientClientValuesTests.cs compares the recorded calls of port/tools/record_llm_client.py, with the cache path of generate_response. Rule R5: decision D48 keeps the provider text in the span status of the model call."
     },
     {
       "order": 36,
@@ -1075,7 +1075,7 @@
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/LlmRuntime.cs",
       "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientRuntimeValuesTests.cs compares the 553 recorded cases of port/tools/record_llm_runtime.py, and LlmClientRuntimeTests.cs ports the upstream tests. Two tests wait for jev_client, and tests/test_graphiti_configurable_prompts.py waits for layer 9."
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 83 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. tests/Port.Evaluation/LlmClientRuntimeValuesTests.cs compares the 553 recorded cases of port/tools/record_llm_runtime.py, and LlmClientRuntimeTests.cs ports the upstream tests. Two tests wait for jev_client, and tests/test_graphiti_configurable_prompts.py waits for layer 9."
     },
     {
       "order": 52,
@@ -1149,7 +1149,7 @@
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/OpenaiDecisionsClient.cs",
       "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientDecisionValuesTests.cs compares the recorded calls of port/tools/record_decisions_client.py, and LlmClientDecisionClientTests.cs ports the upstream tests. Two tests wait for jev_client. GAPS F34, F35, and F36 name what stays different."
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 425 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. tests/Port.Evaluation/LlmClientDecisionValuesTests.cs compares the recorded calls of port/tools/record_decisions_client.py, and LlmClientDecisionClientTests.cs ports the upstream tests. Two tests wait for jev_client. GAPS F34, F35, and F36 name what stays different."
     },
     {
       "order": 55,
@@ -1212,7 +1212,7 @@
       ],
       "target": "src/Graphiti.Net/Core/CrossEncoder/OpenaiRerankerClient.cs",
       "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/CrossEncoderRerankerTests.cs compares the recorded calls of port/tools/record_cache_reranker.py. Rule R5: decision D48 keeps the provider text in the error log line."
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 88 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. tests/Port.Evaluation/CrossEncoderRerankerTests.cs compares the recorded calls of port/tools/record_cache_reranker.py. Rule R5: decision D48 keeps the provider text in the error log line."
     },
     {
       "order": 58,
@@ -1314,8 +1314,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Decorators.cs",
-      "status": "tests_pass",
-      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/DecoratorsValuesTests.cs compares the 432 recorded cases of port/tools/record_handle_multiple_group_ids.py."
+      "status": "reviewed",
+      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 34 of the 52 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/DecoratorsValuesTests.cs compares the 432 recorded cases of port/tools/record_handle_multiple_group_ids.py."
     },
     {
       "order": 63,
@@ -1338,8 +1338,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/CommunityEdgeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 98 of the 107 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 64,
@@ -1381,8 +1381,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/CommunityNodeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 127 of the 139 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 66,
@@ -1405,8 +1405,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EntityEdgeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_between_nodes and get_by_node_uuid, and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 189 of the 201 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_between_nodes and get_by_node_uuid, and compares the result with Python."
     },
     {
       "order": 67,
@@ -1429,8 +1429,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EntityNodeOps.cs",
-      "status": "tests_pass",
-      "notes": "Pilot unit (plan 0003, task 6), reviewed twice. It has no pure judge case, and its 3 flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEntityNodeOperationsTests.cs compares 267 recorded cases (port/tools/record_entity_node_ops.py) for each of its 10 methods. Layer 5 added save, save_bulk, get_by_uuid, get_by_uuids, and get_by_group_ids. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Pilot unit (plan 0003, task 6), reviewed twice. It has no pure judge case. The 34 flow cases of the judge ran 174 of the 192 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEntityNodeOperationsTests.cs compares 267 recorded cases (port/tools/record_entity_node_ops.py) for each of its 10 methods. Layer 5 added save, save_bulk, get_by_uuid, get_by_uuids, and get_by_group_ids. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 68,
@@ -1454,8 +1454,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EpisodeNodeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_by_entity_node_uuid and retrieve_episodes, and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 210 of the 225 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j except get_by_entity_node_uuid and retrieve_episodes, and compares the result with Python."
     },
     {
       "order": 69,
@@ -1478,8 +1478,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/EpisodicEdgeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 105 of the 117 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 70,
@@ -1520,8 +1520,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/GraphOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jGraphOperationsTests.cs compares the recorded calls of port/tools/record_graph_ops.py, with the largest count of calls in flight. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs builds the indexes two times on Neo4j."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 91 of the 146 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jGraphOperationsTests.cs compares the recorded calls of port/tools/record_graph_ops.py, with the largest count of calls in flight. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs builds the indexes two times on Neo4j."
     },
     {
       "order": 72,
@@ -1543,8 +1543,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/HasEpisodeEdgeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 91 of the 112 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 73,
@@ -1566,8 +1566,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/NextEpisodeEdgeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 103 of the 112 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEdgeOperationsTests.cs compares the recorded calls of port/tools/record_neo4j_edge_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 74,
@@ -1590,8 +1590,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net.Neo4j/Operations/SagaNodeOps.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 110 of the 128 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/Neo4jEpisodeCommunitySagaNodeOperationsTests.cs compares the recorded calls of port/tools/record_episode_community_saga_node_ops.py. tests/Graphiti.Net.E2E.Tests/GraphTypesOnNeo4jTests.cs runs each method on Neo4j and compares the result with Python."
     },
     {
       "order": 75,
@@ -1666,8 +1666,8 @@
         "typing_extensions"
       ],
       "target": "src/Graphiti.Net.Neo4j/Neo4jDriver.cs",
-      "status": "tests_pass",
-      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. The tests of tests/Graphiti.Net.E2E.Tests run the driver on Neo4j and against fakes of the Neo4j.Driver package (rule R25). port/tools/record_neo4j_driver.py records the index queries. GAPS F28 and F29 name what stays different."
+      "status": "reviewed",
+      "notes": "Layer 5. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 226 of the 332 lines of its file on 2026-11-28, and each case passes on the .NET build. The tests of tests/Graphiti.Net.E2E.Tests run the driver on Neo4j and against fakes of the Neo4j.Driver package (rule R25). port/tools/record_neo4j_driver.py records the index queries. GAPS F28 and F29 name what stays different."
     },
     {
       "order": 77,
@@ -1709,8 +1709,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/GraphitiTypes.cs",
-      "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. No test reaches complete_prompt, generate_prompt_response, and the runtime and library routes of resolve_prompt_messages: they stop at skeleton members. Layers 3 and 4 add those tests."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 41 of the 82 lines of its file on 2026-11-28, and each case passes on the .NET build. They run `generate_prompt_response` and `resolve_prompt_messages`, and no flow case runs `complete_prompt`. tests/Port.Evaluation/LlmClientRuntimeTests.cs, tests/Port.Evaluation/PromptsLibTests.cs, and tests/Graphiti.Net.E2E.Tests/TestGraphitiConfigurablePrompts.cs call `complete_prompt`."
     },
     {
       "order": 79,
@@ -1753,8 +1753,8 @@
         "time"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/StateStore.cs",
-      "status": "tests_pass",
-      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. It has no pure judge case, so it waits for the flow cases of layer 9. 101 recorded sequences run on the in-memory store, on SQLite with a file, and on SQLite in memory. `test_second_process_on_one_file` uses a second store object in one process, where upstream starts a child process. R5: no log call."
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. It has no pure judge case. The 34 flow cases of the judge ran 195 of the 326 lines of its file on 2026-11-28, and each case passes on the .NET build. 101 recorded sequences run on the in-memory store, on SQLite with a file, and on SQLite in memory. `test_second_process_on_one_file` uses a second store object in one process, where upstream starts a child process. R5: no log call."
     },
     {
       "order": 81,
@@ -1909,8 +1909,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/Search/Search.cs",
-      "status": "tests_pass",
-      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/SearchValuesTests.cs compares the 172 recorded cases of port/tools/record_search.py and its grid of 153 cancel points. tests/Port.Evaluation/TestEdgeCrossEncoderRrfShortlist.cs ports the two upstream tests of the cross-encoder shortlist. tests/Graphiti.Net.E2E.Tests/SearchRecipesOnNeo4jTests.cs runs each of the 16 recipes on Neo4j and compares the ranked results with Python. GAPS F33 names what stays different for a late cancel."
+      "status": "reviewed",
+      "notes": "Layer 6. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 912 of the 935 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/SearchValuesTests.cs compares the 172 recorded cases of port/tools/record_search.py and its grid of 153 cancel points. tests/Port.Evaluation/TestEdgeCrossEncoderRrfShortlist.cs ports the two upstream tests of the cross-encoder shortlist. tests/Graphiti.Net.E2E.Tests/SearchRecipesOnNeo4jTests.cs runs each of the 16 recipes on Neo4j and compares the ranked results with Python. GAPS F33 names what stays different for a late cancel."
     },
     {
       "order": 87,
@@ -2030,8 +2030,8 @@
       ],
       "external": [],
       "target": "src/Graphiti.Net/Core/Ingestion/GraphReader.cs",
-      "status": "tests_pass",
-      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8b. It has no pure judge case, so it waits for the flow cases of layer 9. GAPS U21: `episodes_by_uuids` and `edges_by_uuids` read with no group filter, as in Python. GAPS F33: one cancel point is in the `LateCancel` list. The packet also records `ResolutionTrace` in 17 cases and ports the 7 tests of `test_resolution_trace.py`, which closes the trace paths of layer 7. R5: no log call."
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8b. It has no pure judge case. The 34 flow cases of the judge ran 61 of the 73 lines of its file on 2026-11-28, and each case passes on the .NET build. GAPS U21: `episodes_by_uuids` and `edges_by_uuids` read with no group filter, as in Python. GAPS F33: one cancel point is in the `LateCancel` list. The packet also records `ResolutionTrace` in 17 cases and ports the 7 tests of `test_resolution_trace.py`, which closes the trace paths of layer 7. R5: no log call."
     },
     {
       "order": 92,
@@ -2084,8 +2084,8 @@
         "typing_extensions"
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs",
-      "status": "tests_pass",
-      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. It has no pure case, so it waits for the flow cases of layer 9. The recording holds each query of `clear_data` and `retrieve_episodes`."
+      "status": "reviewed",
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. It has no pure judge case. The 34 flow cases of the judge ran 74 of the 121 lines of its file on 2026-11-28, and each case passes on the .NET build. The recording holds each query of `clear_data` and `retrieve_episodes`."
     },
     {
       "order": 94,
@@ -2145,8 +2145,8 @@
       ],
       "external": [],
       "target": "src/Graphiti.Net/Core/Namespaces/Edges.cs",
-      "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. Layer 5 added each edge namespace to the recording of namespaces.nodes (port/tools/record_namespaces.py, 643 cases)."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 179 of the 180 lines of its file on 2026-11-28, and each case passes on the .NET build. Layer 5 added each edge namespace to the recording of namespaces.nodes (port/tools/record_namespaces.py, 643 cases)."
     },
     {
       "order": 96,
@@ -2169,8 +2169,8 @@
         "datetime"
       ],
       "target": "src/Graphiti.Net/Core/Namespaces/Nodes.cs",
-      "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. Layer 5 added each namespace to the recording: tests/Port.Evaluation/NamespacesTests.cs compares 643 recorded cases of port/tools/record_namespaces.py for the 75 public methods of the 9 namespace classes of namespaces.nodes and namespaces.edges, on the Neo4j operations classes."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 164 of the 167 lines of its file on 2026-11-28, and each case passes on the .NET build. Layer 5 added each namespace to the recording: tests/Port.Evaluation/NamespacesTests.cs compares 643 recorded cases of port/tools/record_namespaces.py for the 75 public methods of the 9 namespace classes of namespaces.nodes and namespaces.edges, on the Neo4j operations classes."
     },
     {
       "order": 97,
@@ -2331,8 +2331,8 @@
         "uuid"
       ],
       "target": "src/Graphiti.Net/Core/Graphiti.cs",
-      "status": "todo",
-      "notes": ""
+      "status": "reviewed",
+      "notes": "Layer 9 of plan 0004, packet P9a. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 1,482 of the 2,038 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/GraphitiValuesTests.cs compares the 44 sync cases and the 179 async cases of port/tools/record_graphiti.py, with 180 cancel points in 9 cases. Ports of upstream tests: TestRequestScopeConcurrency.cs, TestSagaRefetchEpisodeUuids.cs, and TestSagaSummaryBudget.cs in tests/Port.Evaluation, and TestGraphitiMock.cs, TestAddTriplet.cs, TestEpisodeGroupIsolation.cs, and TestGraphitiConfigurablePrompts.cs on Neo4j in tests/Graphiti.Net.E2E.Tests (packet P9f, 65 cases). Four tests of TestAddTriplet.cs assert the result of Python 0.32.0, because the upstream assertion is stale, and two keep a `TODO(port): O10` comment. `Graphiti(uri=...)` with no driver and no clients throws, where Python builds default objects (rule R1, decisions D3 and D28). The telemetry of `__init__` is not ported (decision D9). GAPS F33: 48 cancel points are in the `LateCancel` list. GAPS F48: `search_` with `config=None` runs the default recipe. GAPS F49: a record value of another type throws in a typed read. GAPS U22: the saga read drops five fields, as in Python. `SAGA_SUMMARY_MAX_EPISODE_CHARS`, `SAGA_SUMMARY_MAX_PROMPT_BYTES`, and `SUMMARY_REBUILD_BATCH_SIZE` are `PyPatch` values (rule R17). R5: 7 lines at Information level and 1 at Error level. No line holds episode text or a secret. The error line passes its exception, as `logger.exception` does."
     },
     {
       "order": 103,
@@ -2372,8 +2372,8 @@
         "uuid"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/Phases.cs",
-      "status": "tests_pass",
-      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8c. It has no pure judge case, so it waits for the flow cases of layer 9. R5: the error line of a failed attribute extraction (`phases.py:1734`) passes its exception, which can hold a value of the model reply, as in Python. The stored fail reason is the .NET type name (decision D50). GAPS F33: 10 cancel points are in the `LateCancel` list. Eight functions and `CommitResult` have no recording, because each one needs the `Graphiti` object: `admit_episode`, `admit_bulk`, `analyze_episode`, `analyze_bulk`, `commit_unit`, `enrich_unit`, `_admit_heartbeat`, and `_default_wait`. Packet P9b of layer 9 records them, and it ports the upstream tests that build `Graphiti`: `test_commit_repair.py`, `test_concurrent_identity_properties.py`, and the tests that the headers of `TestFailureRules.cs`, `TestUpdateQueries.cs`, and `IngestionFixtures.cs` name. Three seeded defects pass each test until then: the type of a span attribute of `commit_unit`, the token of its cleanup call, and the sleep of `DefaultWait`. `test_falkordb_write_gets_the_limit_as_query_timeout` is not ported (decision D10)."
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8c. It has no pure judge case. R5: the error line of a failed attribute extraction (`phases.py:1734`) passes its exception, which can hold a value of the model reply, as in Python. The stored fail reason is the .NET type name (decision D50). GAPS F33: 10 cancel points are in the `LateCancel` list. Packet P9b of layer 9 recorded the eight functions that need the `Graphiti` object, and `CommitResult`: 39 cases with the real `Graphiti`, and 173 cancel points in 16 of them. They run 624 of the 626 lines of those functions. Not reached: line 820 (the chain of two UUID maps in the bulk path) and line 1810 (`_hydrate_nodes` embeds a node only after a failed attribute extraction). The recording found one difference: the commit span got a `double` count through a conditional with a `long` and a `double` branch (rule R18). GAPS F33: 51 more cancel points are in the list `GraphitiLateCancel`, with the kinds `cleanup` (7) and `failure` (1). Packet P9g ported the upstream tests that build `Graphiti` on a fake at the driver boundary: TestCommitRepair.cs (35 cases), TestFailureRules.cs (25), TestUpdateQueries.cs, and TestConcurrentIdentityProperties.cs. 18 upstream tests keep a `TODO(port): O10` comment, each with the recorded case that covers it: 7 in TestCommitRepair.cs, 7 in TestFailureRules.cs, 3 in TestConcurrentIdentityProperties.cs, and 1 in TestAnalyzeBulk.cs. Each one replaces a function of the module with a result. The lease tests run on the virtual clock (`VirtualLoop` of IngestionFixtures.cs). The 34 flow cases of the judge ran 847 of the 1,747 lines of its file on 2026-11-28, and each case passes on the .NET build. `test_falkordb_write_gets_the_limit_as_query_timeout` is not ported (decision D10)."
     },
     {
       "order": 104,
@@ -2402,8 +2402,8 @@
         "uuid"
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/Scheduler.cs",
-      "status": "tests_pass",
-      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8d. It has no pure judge case, so it waits for the flow cases of layer 9. `asyncio.Semaphore` and `asyncio.Lock` are `AsyncSemaphore` and `AsyncLock` (decision D53). R5: the heartbeat warning (`scheduler.py:105`) passes a store exception, with the sequence number and the group id. GAPS F33: 7 cancel points are in the `LateCancel` list. Four upstream tests keep a `TODO(port): O10` comment in `TestScheduler.cs`, each with the recorded cases that cover it in part: `test_window_limits_the_units_and_sequence_order_is_call_order`, `test_window_of_one_runs_one_unit_at_a_time`, `test_failed_unit_releases_its_slot_and_its_position`, and `test_heartbeat_renews_the_deadline_of_a_slow_unit`. Five more tests build `Graphiti`. The paths after the admit lock have no recording: the commit turn, the order of commits, the apply retry, a successful call, and the error exit of `add_episode`. Packet P9b of layer 9 does both."
+      "status": "reviewed",
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8d. It has no pure judge case. `asyncio.Semaphore` and `asyncio.Lock` are `AsyncSemaphore` and `AsyncLock` (decision D53). R5: the heartbeat warning (`scheduler.py:105`) passes a store exception, with the sequence number and the group id. GAPS F33: 7 cancel points are in the `LateCancel` list. Four upstream tests keep a `TODO(port): O10` comment in `TestScheduler.cs`, each with the recorded cases that cover it in part: `test_window_limits_the_units_and_sequence_order_is_call_order`, `test_window_of_one_runs_one_unit_at_a_time`, `test_failed_unit_releases_its_slot_and_its_position`, and `test_heartbeat_renews_the_deadline_of_a_slow_unit`. Packet P9b of layer 9 recorded the paths after the admit lock with the real `Graphiti`: 13 cases, and 228 cancel points in 5 of them. They run 74 of the 74 lines of those paths. It ported the five upstream tests that build `Graphiti`. `test_serial_ingestion_does_not_import_the_ingestion_package` has no C# form (rule R19). GAPS F33: 33 more cancel points are in the list `GraphitiLateCancel`. The 34 flow cases of the judge ran 169 of the 306 lines of its file on 2026-11-28, and each case passes on the .NET build."
     },
     {
       "order": 105,
@@ -3851,7 +3851,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Ingestion/SqliteStateStore.cs",
       "status": "tests_pass",
-      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. It has no pure judge case, so it waits for the flow cases of layer 9. It shares the recording and the tests of `state_store`. Each SQL statement keeps its `group_id` filter. A test reads the busy timeout and the journal mode as pragma values. No test runs two processes that write at one time. R5: no log call."
+      "notes": "Layer 8 of plan 0004. Two reviews and one fix round. Packet P8a. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 495 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. It shares the recording and the tests of `state_store`. Each SQL statement keeps its `group_id` filter. A test reads the busy timeout and the journal mode as pragma values. No test runs two processes that write at one time. R5: no log call."
     },
     {
       "order": 166,
@@ -4041,7 +4041,7 @@
       ],
       "target": "src/Graphiti.Net/Core/LlmClient/Utils.cs",
       "status": "tests_pass",
-      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and its flow cases wait for plan 0004, layer 9. tests/Port.Evaluation/LlmClientBaseValuesTests.cs compares the recorded values. No test compares the time text of the debug line, because Py.TimeSeconds reads the system clock."
+      "notes": "Layer 3. Two reviews and one fix round. It has no pure judge case, and no flow case of the judge runs a line of its file (0 of 15 lines, measured on 2026-11-28). The tests that this row names are its only evidence, so it keeps the status `tests_pass` for gate 4. tests/Port.Evaluation/LlmClientBaseValuesTests.cs compares the recorded values. No test compares the time text of the debug line, because Py.TimeSeconds reads the system clock."
     },
     {
       "order": 174,

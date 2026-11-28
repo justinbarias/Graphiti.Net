@@ -53,12 +53,11 @@ an entry that the cancellation stops) and the events after call k.
 _save_analysis reads no member of `graphiti`, so the case passes None (the test passes an object that no constructor
 made), and a span that records its attributes with their Python type names.
 
-Paths that wait for layer 9, because they call a method of `Graphiti` (graphiti._resolve_request_scope and the others)
-and GraphitiCore is a skeleton: admit_episode, admit_bulk, analyze_episode, analyze_bulk, commit_unit, enrich_unit,
-and the paths of _build_saga_links that call graphiti._find_saga or
-graphiti._saga_get_previous_episode_uuid. _admit_heartbeat is not recorded: its only effect is a heartbeat after
-lease_seconds / 3 of real time. An apply on FalkorDB is not recorded: the bulk save of FalkorDB is a list of queries, and
-the port of utils/bulk_utils.py throws NotSupportedException there (R24).
+The functions that call a method of `Graphiti` (admit_episode, admit_bulk, analyze_episode, analyze_bulk,
+commit_unit, enrich_unit, _admit_heartbeat, _default_wait, and the paths of _build_saga_links that call
+graphiti._find_saga or graphiti._saga_get_previous_episode_uuid) are recorded with a real `Graphiti` by the graphiti
+part of record_scheduler.py (packet P9b). Their cases are in the key `graphiti_cases` (phases_graphiti_cases).
+An apply on FalkorDB is not recorded: the bulk save of FalkorDB is a list of queries, and the port of utils/bulk_utils.py throws NotSupportedException there (R24).
 
 It writes tests/Port.Evaluation/values/phases.json. --check writes nothing and exits 1 if the file differs from what
 the run would write. The tool needs Python 3.12 and the pinned upstream in the folder of the variable GRAPHITI_UPSTREAM,
@@ -1343,6 +1342,191 @@ def record_async(mods) -> list[dict]:
     return out
 
 
+def phases_graphiti_cases() -> list[dict]:
+    """The functions of phases.py that call a method of `Graphiti`, with a real `Graphiti` (packet P9b).
+
+    The runner is the graphiti part of record_scheduler.py. Each case names its main call. Each `except` branch and each
+    cleanup has a case where a step fails, and the cancel at call k of such a case cancels the caller in the cleanup.
+    """
+    import record_graphiti as rg
+    import record_scheduler as rs
+
+    from graphiti_core.ingestion.phases import _episode_uuid
+
+    case = rs.graphiti_case
+    t1 = rg.dt(rg.T1)
+    replies = {'extract_nodes.extract_message': [{'reply': rg.entities('Alice', 'Bob')}],
+               'extract_edges.edge': [{'reply': rg.facts(('Alice', 'Bob', 'KNOWS', 'Alice knows Bob'))}],
+               'extract_nodes.extract_summaries_batch': [{'reply': rg.summaries(('Alice', 'Alice met Bob.'))}]}
+    bulk_replies = {'extract_nodes_and_edges.extract_message': [
+        {'needle': 'one', 'reply': rg.combined(['Alice', 'Bob'], [('Alice', 'Bob', 'KNOWS', 'Alice knows Bob')])},
+        {'needle': 'two', 'reply': rg.combined(['Bob', 'Carol'], [('Bob', 'Carol', 'MET', 'Bob met Carol')])}]}
+    nodes_get = [['MATCH (n:Entity) WHERE n.uuid IN $uuids', [rg.node_row('n-alice', 'Alice', summary='old')]]]
+    episode_u1 = _episode_uuid('g', 'u1')
+    episode_u1_1 = _episode_uuid('g', 'u1', 1)
+
+    def admit(**more):
+        return {'unit_id': 'u1', 'group_id': 'g', 'name': 'one', 'episode_body': 'Alice met Bob at Acme.',
+                'source_description': 'chat', 'reference_time': t1, **more}
+
+    def bulk(*raws):
+        return {'unit_id': 'u1', 'group_id': 'g', 'bulk_episodes': list(raws)}
+
+    raws = [rg.raw('b-one', 'one: Alice knows Bob.', rg.T1), rg.raw('b-two', 'two: Bob met Carol.', rg.T2)]
+    unit = {'unit_id': 'u1', 'seq': 1, 'created_at': t1,
+            'episodes': [rg.episode('ep-u1', rg.T1, 'Alice met Bob.', source='message')],
+            'previous_episodes': [[rg.episode('prev1', rg.T0, 'earlier talk')]]}
+    bulk_unit = {'unit_id': 'u1', 'seq': 1, 'created_at': t1, 'bulk': True,
+                 'episodes': [rg.episode('ep-one', rg.T1, 'one: Alice knows Bob.'),
+                              rg.episode('ep-two', rg.T2, 'two: Bob met Carol.')],
+                 'previous_episodes': [[], []]}
+    one = [['admit', 'u1'], ['unit', 'unit', unit]]
+    two = [['admit', 'u0'], ['admit', 'u1'], ['unit', 'unit', {**unit, 'seq': 2}]]
+    many = [['admit', 'u1'], ['unit', 'unit', bulk_unit]]
+
+    def full(name, setup=one, analyze=None, commit=None, enrich=True, main='c', before=(), bulk_unit=False, **extra):
+        kind = 'analyze_bulk' if bulk_unit else 'analyze'
+        actions = [(kind, 'cs', 'unit', dict(analyze or {})), ('drain',), *before,
+                   ('commit', 'c', 'unit', 'cs', dict(commit or {})), ('drain',)]
+        if enrich:
+            actions += [('enrich', 'e', 'unit', 'c', {}), ('drain',)]
+        return case(name, actions + [('store',)], setup=[list(s) for s in setup], main=main, **extra)
+
+    out = [
+        # admit_episode, and so _begin_admit, _admit_heartbeat, _written_episodes, and _fail_admission.
+        case('admit_episode_new', [('admit', 'a', admit()), ('drain',), ('store',)], main='a', cancel=True),
+        case('admit_episode_written', [('admit', 'a', admit()), ('drain',), ('store',)], main='a',
+             rows=[[rg.EPISODES_GET, [rg.episode(episode_u1, rg.T0, 'stored')], {'uuids': [episode_u1]}]]),
+        case('admit_episode_own_uuid', [('admit', 'a', admit(uuid='ep-own')), ('drain',), ('store',)], main='a',
+             rows=[[rg.EPISODE_GET, [rg.episode('ep-own', rg.T1, 'stored body')]]]),
+        case('admit_episode_previous_uuids', [('admit', 'a', admit(previous_episode_uuids=['prev1', 'prev2'])),
+                                              ('drain',), ('store',)], main='a',
+             rows=[[rg.EPISODES_GET, [rg.episode('prev1', rg.T0), rg.episode('prev2', rg.T0)],
+                    {'uuids': ['prev1', 'prev2']}]]),
+        case('admit_episode_previous_missing', [('admit', 'a', admit(previous_episode_uuids=['gone'])), ('drain',),
+                                                ('store',)], main='a', cancel=True),
+        case('admit_episode_write_fails', [('admit', 'a', admit()), ('drain',), ('store',)], main='a',
+             fail={'execute_write': 1}, cancel=True),
+        case('admit_episode_in_progress', [('admit', 'a', admit()), ('drain',), ('store',)], main='a',
+             setup=[['begin_admit', 'u1']]),
+        # _begin_admit waits while an earlier unit holds the admit lease: _default_wait sleeps on the loop clock.
+        case('admit_episode_waits_for_the_admit_lease',
+             [('admit', 'a', admit()), ('drain',), ('store',), ('clock', 61.0), ('loop', 50.0), ('drain',), ('store',)],
+             main='a', setup=[['begin_admit', 'u0']]),
+        # The heartbeat of the admission: a renewal, a store error (the warning), and the end of the admission.
+        case('admit_episode_heartbeat',
+             [('admit', 'a', admit()), ('drain',), ('loop', 40.0), ('drain',), ('loop', 40.0), ('drain',),
+              ('loop', 20.0), ('drain',), ('store',)],
+             config={'lease_seconds': 120.0}, main='a', store_hold={'end_admit': [1]}, store_fail={'heartbeat': [2]}),
+        # The heartbeat finds the unit expired, and end_admit raises the error.
+        case('admit_episode_heartbeat_expired',
+             [('admit', 'a', admit()), ('drain',), ('clock', 200.0), ('loop', 40.0), ('drain',), ('loop', 60.0),
+              ('drain',), ('store',)],
+             config={'lease_seconds': 120.0}, main='a', store_hold={'end_admit': [1]}),
+        case('admit_episode_cancel_in_the_heartbeat',
+             [('admit', 'a', admit()), ('drain',), ('loop', 40.0), ('drain',), ('cancel', 'a'), ('drain',), ('store',)],
+             config={'lease_seconds': 120.0}, main='a', store_hold={'end_admit': [1]}),
+        # admit_bulk.
+        case('admit_bulk_new', [('admit_bulk', 'a', bulk(*raws)), ('drain',), ('store',)], main='a', cancel=True),
+        case('admit_bulk_written_and_uuid',
+             [('admit_bulk', 'a', bulk(rg.raw('b-own', 'ignored', rg.T0, uuid='ep-own'), raws[1])), ('drain',),
+              ('store',)], main='a',
+             rows=[[rg.EPISODE_GET, [rg.episode('ep-own', rg.T0, 'stored body')]],
+                   [rg.EPISODES_GET, [rg.episode(episode_u1_1, rg.T2, 'stored')], {'uuids': [episode_u1_1]}]]),
+        case('admit_bulk_write_fails', [('admit_bulk', 'a', bulk(*raws)), ('drain',), ('store',)], main='a',
+             fail={'execute_write': 1}, cancel=True),
+        case('admit_bulk_in_progress', [('admit_bulk', 'a', bulk(*raws)), ('drain',), ('store',)], main='a',
+             setup=[['begin_admit', 'u1']]),
+        # analyze_episode and analyze_bulk, and so _save_analysis.
+        case('analyze_episode', [('analyze', 'cs', 'unit', {}), ('drain',), ('store',)], setup=one,
+             main='cs', replies=replies, cancel=True),
+        case('analyze_episode_identity',
+             [('analyze', 'cs', 'unit', {'entity_types': ['Person'], 'identity_properties': {'Person': ['email']},
+                                         'custom_extraction_instructions': 'Be brief.'}), ('drain',), ('store',)],
+             setup=one, main='cs',
+             replies={'extract_nodes.extract_message': [{'reply': {'extracted_entities': [
+                 {'name': 'Alice', 'entity_type_id': 1}]}}],
+                 'extract_nodes.extract_attributes': [{'reply': {'role': None, 'email': 'a@x.org'}}]}),
+        case('analyze_episode_fails', [('analyze', 'cs', 'unit', {}), ('drain',), ('store',)], setup=one, main='cs',
+             replies={'extract_nodes.extract_message': [{'reply': {'$raise': 'model down'}}]}, cancel=True),
+        case('analyze_episode_stale', [('analyze', 'cs', 'unit', {}), ('drain',), ('store',)],
+             setup=one + [['analyzed', 1, 'u1']], main='cs', replies=replies),
+        case('analyze_bulk', [('analyze_bulk', 'cs', 'unit', {}), ('drain',), ('store',)], setup=many, main='cs',
+             replies=bulk_replies, cancel=True),
+        # One episode: with two, the order of the failed extraction and the cancel in the other one is the order of two
+        # gathered calls, which is not a contract (GAPS G19).
+        case('analyze_bulk_fails', [('analyze_bulk', 'cs', 'unit', {'use_combined_extraction': False}), ('drain',),
+                                    ('store',)],
+             setup=[['admit', 'u1'], ['unit', 'unit', {**bulk_unit, 'episodes': bulk_unit['episodes'][:1],
+                                                       'previous_episodes': [[]]}]], main='cs',
+             replies={'extract_nodes.extract_text': [{'reply': {'$raise': 'model down'}}]}, cancel=True),
+        case('analyze_bulk_stale', [('analyze_bulk', 'cs', 'unit', {}), ('drain',), ('store',)],
+             setup=many + [['analyzed', 1, 'u1']], main='cs', replies=bulk_replies),
+        # commit_unit and enrich_unit.
+        # The cancel points start at enrich_unit. A cancel point in commit_unit of this case would end the commit, and
+        # the enrichment would not start in Python, where the late cancel of GAPS F33 lets the port go on.
+        full('commit_and_enrich', replies=replies, rows=nodes_get, cancel=True, main='e',
+             hooks={'before_commit_write': 'keep', 'before_enrichment_write': 'keep'}),
+        full('commit_with_a_saga_name', commit={'saga': {'name': 'Trip'}}, replies=replies, enrich=False, cancel=True,
+             rows=[[rg.SAGA_PREVIOUS, [{'uuid': 'prev1'}]]]),
+        full('commit_bulk_with_a_saga_name', setup=many, bulk_unit=True, commit={'saga': {'name': 'Trip'}},
+             replies=bulk_replies, enrich=False, rows=[[rg.SAGA_FIND, [rg.saga(first='old1', last='old2')]]]),
+        # The earlier unit holds the turn. commit_unit renews its own deadline and waits, until that unit fails.
+        case('commit_waits_for_the_turn',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',), ('store',),
+              ('fail_unit', 1, 'analysis'), ('loop', 50.0), ('drain',), ('store',)],
+             setup=two, main='c', replies=replies),
+        # Step C1: an earlier attempt of the unit stored its final change set, and its turn ended.
+        case('commit_retry_applies_the_stored_final',
+             [('commit', 'c', 'unit', 'cs', {}), ('drain',), ('store',)],
+             setup=[['admit', 'u1'], ['final', 1, 'u1'], ['advance', 61.0], ['unit', 'unit', unit],
+                    ['change_set', 'cs', 1, 'u1']], main='c', cancel=True),
+        full('commit_fails_before_the_final', replies=replies, enrich=False, store_fail={'load_delta': [1]},
+             cancel=True),
+        full('commit_hook_rejects', replies=replies, enrich=False, hooks={'before_commit_write': 'reject'},
+             cancel=True),
+        full('commit_apply_fails_once', replies=replies, enrich=False, before=[('arm', 'execute_write', 1)]),
+        full('commit_apply_fails_each_attempt', replies=replies, enrich=False, config={'max_apply_attempts': 2},
+             before=[('arm', 'execute_write', 2)], cancel=True),
+        # _default_wait with a poll interval above the limit of Task.Delay: the caller cancels the wait.
+        case('commit_waits_with_a_long_poll_interval',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',),
+              ('loop', 100.0), ('drain',), ('cancel', 'c'), ('drain',), ('store',)],
+             config={'poll_interval_seconds': 1e9}, setup=two, main='c', replies=replies),
+        case('enrich_write_fails',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',),
+              ('arm', 'execute_write', 1), ('enrich', 'e', 'unit', 'c', {}), ('drain',), ('store',)],
+             setup=one, main='e', replies=replies, rows=nodes_get, cancel=True),
+        full('enrich_hook_drops_the_nodes', replies=replies, rows=nodes_get, main='e',
+             hooks={'before_enrichment_write': 'drop'}),
+        # The statements that the cases above do not reach (sys.settrace): the recovery of an earlier unit in the turn
+        # loop, a lease that expires in the apply, a read node with no embedding, and a release that fails.
+        case('commit_recovers_an_earlier_unit',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',), ('store',)],
+             setup=[['admit', 'u0'], ['final', 1, 'u0'], ['advance', 61.0], ['admit', 'u1'],
+                    ['unit', 'unit', {**unit, 'seq': 2}]], main='c', replies=replies),
+        case('commit_lease_expires_in_the_apply',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',),
+              ('loop', 100.0), ('drain',), ('store',)],
+             setup=one, main='c', replies=replies, store_hold={'heartbeat': [1]}),
+        full('enrich_node_with_no_embedding', replies=replies, main='e',
+             rows=[['MATCH (n:Entity) WHERE n.uuid IN $uuids', [rg.node('n-alice', 'Alice', summary='old')]]]),
+        case('enrich_release_fails',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',),
+              ('arm', 'execute_write', 1), ('enrich', 'e', 'unit', 'c', {}), ('drain',), ('store',)],
+             setup=one, main='e', replies=replies, rows=nodes_get, store_fail={'finish_enrich': [1]}),
+        # enrich_unit waits while an earlier unit holds the enrichment of a node.
+        case('enrich_waits_for_an_earlier_unit',
+             [('analyze', 'cs', 'unit', {}), ('drain',), ('commit', 'c', 'unit', 'cs', {}), ('drain',),
+              ('enrich', 'e', 'unit', 'c', {}), ('drain',), ('store',), ('finish_enrich', 1, ['n-alice']),
+              ('loop', 50.0), ('drain',), ('store',)],
+             setup=[['committed', 1, 'u0', ['n-alice']], ['admit', 'u1'], ['unit', 'unit', {**unit, 'seq': 2}]],
+             main='e', replies=replies,
+             rows=[[rg.NODE_SEARCH, [rg.node_row('n-alice', 'Alice')]], *nodes_get]),
+    ]
+    return out
+
+
 def main() -> int:
     if sys.version_info[:2] != (3, 12):
         raise SystemExit(f'Python 3.12 is needed, and this is {sys.version.split()[0]}')
@@ -1407,26 +1591,21 @@ def main() -> int:
         sync.append({'in': case, 'out': out})
     async_cases = record_async(mods)
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import record_scheduler as rs
+
+    m = rs.graphiti_setup()
+    graphiti_cases = rs.record_graphiti(phases_graphiti_cases(), m)
     constants = {'REPORT_KEYS': list(phases.REPORT_KEYS)}
     dump = lambda r: json.dumps(r, ensure_ascii=True, allow_nan=False, separators=(',', ':'))  # noqa: E731
     text = (
         '{"python":"' + '.'.join(str(p) for p in sys.version_info[:3]) + '","fixed_now":"' + FIXED_NOW.isoformat()
         + '","constants":' + dump(constants) + ',"cases":[\n' + ',\n'.join(dump(r) for r in sync)
-        + '\n],"async_cases":[\n' + ',\n'.join(dump(r) for r in async_cases) + '\n]}\n'
+        + '\n],"async_cases":[\n' + ',\n'.join(dump(r) for r in async_cases)
+        + '\n],"graphiti_cases":[\n' + ',\n'.join(dump(r) for r in graphiti_cases) + '\n]}\n'
     )
-    size = len(text.encode('utf-8'))
-    if size > 1_572_864:
-        raise SystemExit(f'The values file would have {size} bytes, above the limit of 1,572,864 (R25).')
-    if '--check' in sys.argv[1:]:
-        if not OUT.exists() or OUT.read_text(encoding='utf-8') != text:
-            print(f'{OUT.relative_to(ROOT)} is not current. Run this tool with no flag.', file=sys.stderr)
-            return 1
-        print(f'{OUT.relative_to(ROOT)}: current, {len(sync)} cases and {len(async_cases)} async cases')
-        return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding='utf-8')
-    print(f'{OUT.relative_to(ROOT)}: {len(sync)} cases and {len(async_cases)} async cases, {size} bytes')
-    return 0
+    return rs.write_values([(OUT, text, f'{len(sync)} cases, {len(async_cases)} async cases, and '
+                                        f'{len(graphiti_cases)} graphiti cases')])
 
 
 if __name__ == '__main__':

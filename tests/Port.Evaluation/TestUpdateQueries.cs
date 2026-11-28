@@ -1,30 +1,29 @@
-// Ported from tests/ingestion/test_update_queries.py (port/RULES.md, R25). Packet P8c of plan 0004, layer 8. The code
-// under test of these three tests is graphiti_core/utils/bulk_utils.py.
+// Ported from tests/ingestion/test_update_queries.py (port/RULES.md, R25). Packet P8c of plan 0004, layer 8, and packet
+// P9g of layer 9. The code under test is graphiti_core/utils/bulk_utils.py, and graphiti_core/ingestion/phases.py for the
+// three admission tests.
 //
 // Ported elsewhere: test_edge_update_query_has_no_merge and test_node_update_query_has_no_merge
 // (TestUpdateQueriesQueryBuilders.cs), and test_neo4j_write_gets_the_limit_as_transaction_timeout (TestBulkUtils.cs).
 // Not ported: test_falkordb_write_gets_the_limit_as_query_timeout needs FalkorDriverSession, and the FalkorDB driver is
 // out of the MVP (decision D10).
-// Waits for layer 9: test_admission_rejects_an_interface_with_no_update_operation (episode, bulk),
-// test_admission_names_each_operation_that_an_interface_does_not_have, and
-// test_admission_accepts_an_interface_with_each_operation call admit_episode or admit_bulk, which call
-// graphiti._resolve_request_scope first. The sync cases of _check_driver in values/phases.json cover the error text of
-// each interface (none, partial, all, one missing).
 namespace Graphiti.Port.Evaluation;
 
 using Graphiti.Core;
 using Graphiti.Core.Driver;
+using Graphiti.Core.Ingestion;
 using Graphiti.Core.Utils;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.IngestionFixtures;
 
 public class TestUpdateQueries
 {
-    /// <summary>An interface that has the bulk saves of today and the two update operations.</summary>
-    private sealed record FullInterface : GraphOperationsInterface
-    {
-        internal List<(string, List<string>)> Calls { get; } = [];
+    // `GROUP`. The record Group of the in-memory store has the same name.
+    private const string Group = IngestionFixtures.Group;
 
+    /// <summary>An interface that has the bulk saves of today and no update operation.</summary>
+    private record SaveOnlyInterface : GraphOperationsInterface
+    {
         internal override Task EpisodicNodeSaveBulkAsync(Type? cls, GraphDriver driver, Transaction transaction, List<OrderedDictionary<string, object?>> nodes, long batchSize = 100, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
@@ -36,6 +35,12 @@ public class TestUpdateQueries
 
         internal override Task EdgeSaveBulkAsync(Type? cls, GraphDriver driver, Transaction transaction, List<OrderedDictionary<string, object?>> edges, long batchSize = 100, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+    }
+
+    /// <summary>An interface that has the bulk saves of today and the two update operations.</summary>
+    private sealed record FullInterface : SaveOnlyInterface
+    {
+        internal List<(string, List<string>)> Calls { get; } = [];
 
         internal override Task NodeUpdateBulkAsync(Type? cls, GraphDriver driver, Transaction transaction, List<OrderedDictionary<string, object?>> nodes, long batchSize = 100, CancellationToken cancellationToken = default)
         {
@@ -50,7 +55,7 @@ public class TestUpdateQueries
         }
     }
 
-    // A session whose write sleeps for five seconds, as SlowSession of upstream does.
+    // A session whose write sleeps for five seconds, as SlowSession of upstream does (`asyncio.sleep(5)`).
     private sealed class SlowSession : GraphDriverSession
     {
         internal int Closed { get; private set; }
@@ -67,10 +72,10 @@ public class TestUpdateQueries
         }
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
-            Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            Asyncio.SleepAsync(5, PortServices.Time, cancellationToken);
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
-            Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            Asyncio.SleepAsync(5, PortServices.Time, cancellationToken);
     }
 
     private sealed class SlowDriver(SlowSession session) : GraphDriver
@@ -109,15 +114,94 @@ public class TestUpdateQueries
         Assert.Single(run.Events.Select(PhasesValues.Dict), e => (string)e["kind"]! == "close");
     }
 
+    // PORT: the limit of 0.05 seconds and the sleep of the session run on the virtual clock (VirtualLoop in
+    // IngestionFixtures.cs), so a busy scheduler thread in a parallel run does not change which one ends first.
     [Fact(Timeout = 10000)]
     public async Task test_write_is_cancelled_at_the_limit_on_a_driver_with_no_server_limit()
     {
         var session = new SlowSession();
         var driver = new SlowDriver(session) { Provider = GraphProvider.Neptune };
 
-        await Assert.ThrowsAsync<TimeoutException>(() => LoopGuard.RunAsync(
-            () => BulkUtils.ExecuteWriteWithTimeoutAsync(driver, 0.05, (tx, token) => Task.CompletedTask, TestContext.Current.CancellationToken)));
+        await VirtualLoop.RunAsync(async _ =>
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => BulkUtils.ExecuteWriteWithTimeoutAsync(driver, 0.05, (tx, token) => Task.CompletedTask, TestContext.Current.CancellationToken)))
+            .WaitAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, session.Closed);
+    }
+
+    // PORT: `GraphOperationsInterface()`. The class is abstract in the port, so the test makes a subclass that overrides
+    // no operation.
+    private sealed record EmptyInterface : GraphOperationsInterface;
+
+    private static (Harness H, Func<Task<AdmittedUnit>> Admission) AdmitWithInterface(GraphOperationsInterface @interface, bool bulk)
+    {
+        var h = new Harness();
+        h.Driver.GraphOperationsInterface = @interface;
+        if (bulk)
+        {
+            return (h, () => Phases.AdmitBulkAsync(
+                h.Graphiti,
+                h.Store,
+                h.Config,
+                unitId: "u1",
+                groupId: Group,
+                bulkEpisodes:
+                [
+                    new RawEpisode { Name = "episode", Content = "content", SourceDescription = "test", Source = EpisodeType.Text, ReferenceTime = T0 },
+                ],
+                cancellationToken: TestContext.Current.CancellationToken));
+        }
+
+        return (h, () => Phases.AdmitEpisodeAsync(
+            h.Graphiti,
+            h.Store,
+            h.Config,
+            unitId: "u1",
+            groupId: Group,
+            name: "episode",
+            episodeBody: "content",
+            sourceDescription: "test",
+            referenceTime: T0,
+            cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task test_admission_rejects_an_interface_with_no_update_operation(bool bulk)
+    {
+        var (h, admission) = AdmitWithInterface(new SaveOnlyInterface(), bulk);
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => LoopGuard.RunAsync(admission).WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Matches("edge_update_bulk, node_update_bulk", error.Message);
+
+        // The error is before the admission: no unit and no graph write.
+        Assert.Empty(h.Store.Groups);
+        Assert.Empty(h.Graph.Log);
+        Assert.Empty(h.Graph.Episodes);
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task test_admission_names_each_operation_that_an_interface_does_not_have()
+    {
+        var (_, admission) = AdmitWithInterface(new EmptyInterface(), false);
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => LoopGuard.RunAsync(admission).WaitAsync(TestContext.Current.CancellationToken));
+
+        foreach (var name in new[] { "edge_save_bulk", "edge_update_bulk", "episodic_edge_save_bulk", "episodic_node_save_bulk", "node_save_bulk", "node_update_bulk" })
+        {
+            Assert.Contains(name, error.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task test_admission_accepts_an_interface_with_each_operation()
+    {
+        var (_, admission) = AdmitWithInterface(new FullInterface(), false);
+
+        var unit = await LoopGuard.RunAsync(admission).WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, unit.Seq);
     }
 
     [Fact(Timeout = 5000)]

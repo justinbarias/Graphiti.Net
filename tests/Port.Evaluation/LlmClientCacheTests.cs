@@ -176,17 +176,21 @@ public sealed class TestLLMCache : IDisposable
                 start.ExecuteNonQuery();
             }
 
+            // The proof is an order, not a measured time: the holder sets `releasing` before it commits, and the call can
+            // return only after that commit. A measured wait failed on a busy machine, where the test thread stalled
+            // between the start of the holder task and the start of the clock.
+            var releasing = 0;
             var release = Task.Run(
                 async () =>
                 {
                     await Task.Delay(300, TestContext.Current.CancellationToken);
                     using var commit = holder.CreateCommand();
                     commit.CommandText = "COMMIT";
+                    Volatile.Write(ref releasing, 1);
                     commit.ExecuteNonQuery();
                 },
                 TestContext.Current.CancellationToken);
 
-            var watch = System.Diagnostics.Stopwatch.StartNew();
             if (begin == "BEGIN IMMEDIATE")
             {
                 cache.Set("k2", Dict(("v", 2L)));
@@ -196,9 +200,8 @@ public sealed class TestLLMCache : IDisposable
                 AssertSame(Dict(("v", 1L)), cache.Get("k"));
             }
 
-            watch.Stop();
+            Assert.True(Volatile.Read(ref releasing) == 1, $"{begin}: the call returned before the holder released the lock");
             await release;
-            Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(200), $"{begin}: returned after {watch.Elapsed}");
         }
 
         AssertSame(Dict(("v", 2L)), cache.Get("k2"));
