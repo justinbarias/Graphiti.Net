@@ -7,7 +7,8 @@ using Graphiti;
 
 /// <summary>
 /// The tool of the agent: the graph search of Graphiti.Net over the group of the example. For each fact it returns the
-/// fact text, the validity dates, and the section id and the chain of the episodes that hold the fact.
+/// fact text, the two entities and the name of the relation, the validity dates, and the section id and the chain of the
+/// episodes that hold the fact.
 /// </summary>
 internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
 {
@@ -37,6 +38,7 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
         var found = await graphiti.AdvancedSearchAsync(
             query, config, new AdvancedSearchOptions { GroupIds = [settings.GroupId] }, cancellationToken);
         var edges = found.Edges;
+        var entities = await ReadEntitiesAsync(edges, cancellationToken);
 
         var facts = new List<object>();
         var episodeOrder = new List<string>();
@@ -53,8 +55,13 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
                 sources.Add(await DescribeAsync(uuid, cancellationToken));
             }
 
+            // The graph of the page needs the two entities of each fact and the name of the relation.
             facts.Add(new
             {
+                uuid = edge.Uuid,
+                name = edge.Name,
+                source = Entity(entities, edge.SourceNodeUuid),
+                target = Entity(entities, edge.TargetNodeUuid),
                 fact = edge.Fact,
                 valid_at = Date(edge.ValidAt),
                 invalid_at = Date(edge.InvalidAt),
@@ -73,6 +80,20 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
         var sections = await ReadSectionsAsync(order, cancellationToken);
         return JsonSerializer.Serialize(new { query, count = facts.Count, facts, sections });
     }
+
+    // One read of the graph for the entities at the two ends of the facts.
+    private async Task<Dictionary<string, EntityNode>> ReadEntitiesAsync(IReadOnlyList<EntityEdge> edges, CancellationToken cancellationToken)
+    {
+        var uuids = edges.SelectMany(e => new[] { e.SourceNodeUuid, e.TargetNodeUuid }).Distinct(StringComparer.Ordinal).ToList();
+        return uuids.Count == 0
+            ? new Dictionary<string, EntityNode>(StringComparer.Ordinal)
+            : (await graphiti.Nodes.Entity.GetByUuidsAsync(uuids, cancellationToken)).ToDictionary(n => n.Uuid, StringComparer.Ordinal);
+    }
+
+    private static object Entity(Dictionary<string, EntityNode> entities, string uuid) =>
+        entities.TryGetValue(uuid, out var node)
+            ? new { uuid, name = node.Name, labels = node.Labels.Where(l => l != "Entity").ToList() }
+            : new { uuid, name = "unknown", labels = new List<string>() };
 
     // The graph stores the content of each episode, so the text of a section is read from the graph.
     private async Task<List<object>> ReadSectionsAsync(List<string> uuids, CancellationToken cancellationToken)

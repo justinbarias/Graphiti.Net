@@ -1,0 +1,98 @@
+{
+  "title": "Choose the visual world of the quickstart page",
+  "question": "The roll assigned Working Timetable. Keep it, take the alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned", "kind": "assigned", "label": "Working Timetable", "kicker": "THE ROLL",
+      "lineage": "Railway working timetables and their graphic train charts",
+      "thesis": "Each fact is a service on a timetable: it runs from a date, between two stops, on the line of the section that states it.",
+      "palette": ["#f2f5f3", "#1b2757", "#d8432a", "#0f7f7a", "#c98a00", "#6a3fb0"],
+      "materials": ["thin rules", "tabular numerals", "one line colour for each source section"],
+      "viewport": "A deep blue rail on the left holds the conversation and each tool call. The rest of the screen is the result of the selected tool call: the graph of entities and facts at full size, a validity ruler under it, then the fact table and the section texts.",
+      "risk": "Nearly all facts start on 23 July 2021 and have no end date, so the validity ruler shows many equal lines for this Act.",
+      "raised": [
+        {"from": "rw-timetable-slide-rack", "raise": "The fact table uses one type size. Weight, case and rules carry the rank."},
+        {"from": "wayfinding-cartography-signage-terminal-yellow-wayfinding", "raise": "Each colour has one job. A line colour means one source section and nothing else."},
+        {"from": "brand-identity-canon-saville-catalog-sleeve", "raise": "Point at a section colour, and the page shows only the facts of that section in the graph, the table and the ruler."},
+        {"from": "ikeda-datamatics", "raise": "Data at full density: no field of the result is hidden, and no grey filler stands in for it."}
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html"
+    },
+    {
+      "id": "model-pick", "kind": "pick", "label": "Notation Sheet", "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Software specification diagrams: entity boxes, labelled arrows, yellow notes",
+      "thesis": "The result is drawn in the diagram notation that a developer already reads in every design document.",
+      "palette": ["#ffffff", "#15171a", "#ffe98a", "#1f5fd0"],
+      "materials": ["1px black strokes", "boxed entities", "note-yellow source labels"],
+      "viewport": "A white sheet. The conversation is a narrow column on the left. The graph fills the right side as a diagram of boxes and labelled arrows, and each arrow has a yellow note with its dates and its section.",
+      "risk": "This is the familiar choice. It can look like the output of any diagram tool.",
+      "html": ".impeccable/mocks/decision/model-pick.html"
+    },
+    {
+      "id": "c-slide-rack", "kind": "challenger", "catalogId": "rw-timetable-slide-rack", "label": "Timetable Slide Rack", "verdict": "declined",
+      "lineage": "A pocket airline timetable on a light table",
+      "thesis": "One type size on raked glass slides over a goldenrod bed.",
+      "palette": ["#e0a526", "#3b4654", "#f4efe0", "#d8432a", "#1f6b47"], "materials": ["tinted glass", "goldenrod stock"],
+      "viewport": "A raked rack of slides, one for each tool call.",
+      "case": "The 11 degree rake makes a table of facts and dates harder to read.", "risk": "Decoration over data.",
+      "kept": "One type size in the data table."
+    },
+    {
+      "id": "c-acetate", "kind": "challenger", "catalogId": "rw-manual-acetate-tab-board", "label": "Manual with Acetate Leaves", "verdict": "declined",
+      "lineage": "A boxed-software reference manual",
+      "thesis": "One strong hue for each division, with the text on clear leaves above it.",
+      "palette": ["#e2731c", "#f2c40f", "#3f9b3a", "#127c84", "#2440a8"], "materials": ["milk acetate", "divider board"],
+      "viewport": "A tab rail down the edge, one tab for each tool call.",
+      "case": "It is a reading layout. The graph has no natural place on a leaf.", "risk": "Reads as a document, not a tool.",
+      "kept": "A state change is a short step, with no slow fade."
+    },
+    {
+      "id": "c-airport", "kind": "challenger", "catalogId": "wayfinding-cartography-signage-terminal-yellow-wayfinding", "label": "Terminal Yellow Wayfinding", "verdict": "declined",
+      "lineage": "An international airport sign system",
+      "thesis": "Yellow bands with black type that name only the next choice.",
+      "palette": ["#ffd200", "#111111", "#ffffff"], "materials": ["enamel panels", "pictograms"],
+      "viewport": "Sign bands over the conversation.",
+      "case": "Signs show one choice at a time. The page must show a whole graph at one time.", "risk": "Too little data on the screen.",
+      "kept": "One colour, one job."
+    },
+    {
+      "id": "c-ikeda", "kind": "challenger", "catalogId": "ikeda-datamatics", "label": "Datamatics Field", "verdict": "declined",
+      "lineage": "Black and white data installations",
+      "thesis": "Dense barcode columns and monospace numbers in pure black and white.",
+      "palette": ["#000000", "#ffffff"], "materials": ["hairline bars", "monospace numerics"],
+      "viewport": "A field of bars with the graph inside.",
+      "case": "You excluded the dark console look and decoration that hides the data.", "risk": "Strobe and density over legibility.",
+      "kept": "Full data density."
+    },
+    {
+      "id": "c-jcard", "kind": "challenger", "catalogId": "vernacular-ephemera-cassette-j-card", "label": "Cassette J-card", "verdict": "declined",
+      "lineage": "A hand-lettered mixtape inlay",
+      "thesis": "Ballpoint track lists with running times.",
+      "palette": ["#1f3fa6", "#ffffff", "#8a8a8a", "#d21f2b"], "materials": ["lined inlay stock", "ballpoint"],
+      "viewport": "Side A and side B lists.",
+      "case": "Handwriting does not fit a result of a library that must be read exactly.", "risk": "Novelty.",
+      "kept": "Times aligned to the right edge."
+    },
+    {
+      "id": "c-saville", "kind": "challenger", "catalogId": "brand-identity-canon-saville-catalog-sleeve", "label": "Catalog Sleeve", "verdict": "declined",
+      "lineage": "A record label catalog identity",
+      "thesis": "White line plots on matte black, with colour blocks in place of words.",
+      "palette": ["#0b0b0c", "#ffffff", "#e23a2e", "#2b6cd4"], "materials": ["matte black", "hairline plot"],
+      "viewport": "One plot on a black field.",
+      "case": "It hides labels behind a code, and it is a dark look that you excluded.", "risk": "The reader must decode the page.",
+      "kept": "Pointing at a colour shows its meaning."
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code"},
+  "canon": true,
+  "canonCard": {
+    "kind": "canon", "label": "The category standard",
+    "thesis": "A centered chat column with tool result cards inline and a force-directed graph of coloured circles.",
+    "palette": ["#ffffff", "#111827", "#2563eb"], "materials": ["rounded cards", "soft shadows"],
+    "viewport": "A chat in the center. Each tool call is a card in the message list with a small graph inside.",
+    "risk": "You said that a generic AI chat look would feel wrong.",
+    "html": ".impeccable/mocks/decision/canon.html"
+  },
+  "steer": true
+}
