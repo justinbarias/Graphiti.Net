@@ -3,7 +3,8 @@ namespace Graphiti;
 /// <summary>
 /// Graphiti, the temporal context graph: the public form of upstream's class <c>Graphiti</c> (decision D24). Resolve it
 /// from the container after <c>AddGraphiti</c>. The container owns the one instance and closes it, so this interface has
-/// no dispose member.
+/// no dispose member. A host must not change a collection that it passed to a call before the task of the call
+/// completes, because the facade reads the arguments on its scheduler.
 /// </summary>
 /// <remarks>
 /// A call works from any thread and with any <see cref="SynchronizationContext"/>. The task that it returns completes off

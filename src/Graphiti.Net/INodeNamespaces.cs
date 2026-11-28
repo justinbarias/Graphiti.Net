@@ -5,7 +5,8 @@ namespace Graphiti;
 /// without the <c>tx</c> parameter. A method that changes its argument upstream returns the changed record. The methods
 /// reproduce upstream defects: the batched deletes and the saga save fail as upstream fails (GAPS U1, U2). A call applies
 /// no group filter beyond what upstream applies, so a host with many tenants makes sure that each UUID belongs to its
-/// tenant.
+/// tenant. A host must not change a collection that it passed to a call before the task of the call completes, because
+/// the facade reads the arguments on its scheduler.
 /// </summary>
 public interface INodeNamespaces
 {

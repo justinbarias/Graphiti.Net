@@ -129,11 +129,14 @@ public sealed class GraphitiModelOptionsTests
     {
         var ct = TestContext.Current.CancellationToken;
         var values = new ConcurrentDictionary<string, object?>();
+        var tried = new ConcurrentDictionary<string, object?>();
         await using var scope = new GraphitiScope(GraphitiArgumentsTests.Typed, o => o.Prompts.Overrides["extract_edges.edge"] = context =>
         {
             foreach (var key in context.Values.Keys)
             {
                 values[key] = context.Values[key];
+                Assert.True(context.Values.TryGetValue(key, out var value));
+                tried[key] = value;
             }
 
             return Mark("EDGE")(context);
@@ -152,13 +155,21 @@ public sealed class GraphitiModelOptionsTests
             },
             ct);
 
+        Assert.Contains("\nEDGE extract_edges.edge", Assert.Single(scope.Chat.Calls, c => c.Prompt == "extract_edges.edge").User, StringComparison.Ordinal);
+
+        // The indexer and TryGetValue give the same public form.
+        AssertPublicForm(values);
+        AssertPublicForm(tried);
+    }
+
+    private static void AssertPublicForm(ConcurrentDictionary<string, object?> values)
+    {
         // edge_operations.py builds fact_type_signatures as a list of (source, target) tuples. A tuple reads as a list.
         var edgeTypes = Assert.IsAssignableFrom<IReadOnlyList<object?>>(values["edge_types"]);
         var workType = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(Assert.Single(edgeTypes));
         Assert.Equal("WorksAt", workType["fact_type_name"]);
         var signature = Assert.IsAssignableFrom<IReadOnlyList<object?>>(Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<object?>>(workType["fact_type_signatures"])));
         Assert.Equal(["Person", "Entity"], signature);
-        Assert.Contains("\nEDGE extract_edges.edge", Assert.Single(scope.Chat.Calls, c => c.Prompt == "extract_edges.edge").User, StringComparison.Ordinal);
         Assert.Equal(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), Assert.IsType<DateTimeOffset>(values["reference_time"]));
         var nodes = Assert.IsAssignableFrom<IReadOnlyList<object?>>(values["nodes"]);
         Assert.Equal(

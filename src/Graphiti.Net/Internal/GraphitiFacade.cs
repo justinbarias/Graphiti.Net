@@ -33,8 +33,11 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
         "for work on that thread. Call DisposeAsync.";
 
     // The facades that are live, in the order of their build. PortServices is process-wide (decision D23), so each
-    // container shares it. PortServices holds the services of the latest live facade, or the defaults with no live
-    // facade. A disposed container then leaves no disposed logger factory in PortServices.
+    // container shares it. A first resolution applies the services of its facade before the build, because the build
+    // reads them. It applies them again in the lock section that adds the facade to the live list, because a dispose
+    // during the build applies the services of another facade. After that, PortServices holds the services of the
+    // latest live facade, or the defaults with no live facade. A disposed container then leaves no disposed logger
+    // factory in PortServices.
     private static readonly Lock LiveLock = new();
     private static readonly List<GraphitiFacade> Live = [];
 
@@ -82,7 +85,9 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
             var facade = new GraphitiFacade(Build(services, registration, options, driverFactory, chatClient, embedder), ambient);
             lock (LiveLock)
             {
+                // F2: a Leave of another facade during the build applied the services of that facade or the defaults.
                 Live.Add(facade);
+                ambient.Apply();
             }
 
             return facade;
@@ -254,29 +259,50 @@ internal sealed partial class GraphitiFacade : IAsyncDisposable, IDisposable
     }
 
     // A-F6: the cleanup after a failed build. The host gets the first error. A failure of the close is logged and does
-    // not replace it.
+    // not replace it. The logger is the one of the failed build, read before the close starts.
     private static void CloseAfterFailedBuild(CoreIngestion.IngestionStateStore? store, CoreDriver.GraphDriver driver)
     {
+        var logger = PortServices.Logger(typeof(GraphitiFacade));
+        var closing = Asyncio.Run(async () =>
+        {
+            try
+            {
+                if (store is not null)
+                {
+                    await store.CloseAsync(CancellationToken.None);
+                }
+            }
+            finally
+            {
+                await driver.CloseAsync(CancellationToken.None);
+            }
+        });
+
+        // F8: on the thread of the Graphiti scheduler, a wait blocks the close that it waits for, as in the sync Dispose.
+        // The close then runs after the first resolution returns, and a continuation logs its failure.
+        if (Asyncio.IsOnLoop)
+        {
+            _ = closing.ContinueWith(
+                done =>
+                {
+                    if (done.Exception is { } failure)
+                    {
+                        CloseAfterFailedBuildFailed(logger, failure.InnerExceptions.Count == 1 ? failure.InnerExceptions[0] : failure);
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            return;
+        }
+
         try
         {
-            Asyncio.Run(async () =>
-            {
-                try
-                {
-                    if (store is not null)
-                    {
-                        await store.CloseAsync(CancellationToken.None);
-                    }
-                }
-                finally
-                {
-                    await driver.CloseAsync(CancellationToken.None);
-                }
-            }).GetAwaiter().GetResult();
+            closing.GetAwaiter().GetResult();
         }
         catch (Exception closeError)
         {
-            CloseAfterFailedBuildFailed(PortServices.Logger(typeof(GraphitiFacade)), closeError);
+            CloseAfterFailedBuildFailed(logger, closeError);
         }
     }
 

@@ -28,8 +28,45 @@ internal sealed class ScriptedChatClient(Func<string, string, string?> script) :
     /// <summary>Gets each thread and synchronization context that a call ran on.</summary>
     internal ConcurrentQueue<(bool OnScheduler, SynchronizationContext? Context)> Places { get; } = new();
 
+    /// <summary>
+    /// Gets or sets the time that each call waits before it returns. Zero returns at once. With a wait, the calls in
+    /// flight at the same time are counted in <see cref="MaxInFlight"/>.
+    /// </summary>
+    internal TimeSpan Delay { get; set; }
+
+    /// <summary>Gets the largest number of chat calls that were in flight at the same time, with a <see cref="Delay"/>.</summary>
+    internal int MaxInFlight => Volatile.Read(ref maxInFlight);
+
+    private int inFlight;
+    private int maxInFlight;
+
     public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        Delay == TimeSpan.Zero ? Task.FromResult(Respond(messages, options, cancellationToken)) : DelayedAsync(messages, options, cancellationToken);
+
+    private async Task<ChatResponse> DelayedAsync(IEnumerable<ChatMessage> messages, ChatOptions? options, CancellationToken cancellationToken)
+    {
+        var now = Interlocked.Increment(ref inFlight);
+        try
+        {
+            int seen;
+            do
+            {
+                seen = Volatile.Read(ref maxInFlight);
+            }
+            while (now > seen && Interlocked.CompareExchange(ref maxInFlight, now, seen) != seen);
+
+            var response = Respond(messages, options, cancellationToken);
+            await Task.Delay(Delay, cancellationToken);
+            return response;
+        }
+        finally
+        {
+            Interlocked.Decrement(ref inFlight);
+        }
+    }
+
+    private ChatResponse Respond(IEnumerable<ChatMessage> messages, ChatOptions? options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Places.Enqueue((Graphiti.PyCompat.Asyncio.IsOnLoop, SynchronizationContext.Current));
@@ -38,7 +75,7 @@ internal sealed class ScriptedChatClient(Func<string, string, string?> script) :
         {
             Reranks.Enqueue((user, options));
             var reply = Rerank?.Invoke(user) ?? throw new InvalidOperationException("The script has no rerank reply.");
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, reply));
         }
 
         var prompt = GraphitiModelCall.Current?.PromptName
@@ -46,10 +83,10 @@ internal sealed class ScriptedChatClient(Func<string, string, string?> script) :
         Calls.Enqueue((prompt, options?.ModelId, user, options, GraphitiModelCall.Current?.ModelSize));
         var text = script(prompt, user)
             ?? throw new InvalidOperationException($"The script has no reply for the prompt {prompt}.");
-        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text))
+        return new ChatResponse(new ChatMessage(ChatRole.Assistant, text))
         {
             Usage = new UsageDetails { InputTokenCount = 10, OutputTokenCount = 4 },
-        });
+        };
     }
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -70,6 +107,9 @@ internal sealed class HashEmbeddingGenerator(int dimensions = 1024) : IEmbedding
 
     /// <summary>Gets or sets an action that runs at each call, after the call is counted and before the token check.</summary>
     internal Action? OnCall { get; set; }
+
+    /// <summary>Gets the options of each call.</summary>
+    internal ConcurrentQueue<EmbeddingGenerationOptions?> Options { get; } = new();
 
     internal static float[] Vector(string text, int dimensions)
     {
@@ -93,6 +133,7 @@ internal sealed class HashEmbeddingGenerator(int dimensions = 1024) : IEmbedding
     {
         // The call counts before the token check, so that a call that starts with a canceled token is seen.
         Interlocked.Increment(ref Calls);
+        Options.Enqueue(options);
         OnCall?.Invoke();
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(

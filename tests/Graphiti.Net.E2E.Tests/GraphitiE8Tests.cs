@@ -71,7 +71,7 @@ public sealed class GraphitiE8Tests
 
     private static string FactOf(int i) => $"Ana met Bo Corp on day {i + 1}.";
 
-    private static async Task<List<string>> UnitStatusesAsync(string path, string group)
+    internal static async Task<List<string>> UnitStatusesAsync(string path, string group)
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         await connection.OpenAsync();

@@ -117,10 +117,13 @@ public sealed class GraphitiCallErrorTests
     }
 
     /// <summary>A listener on the source Graphiti.Net that keeps each span that stops, or no listener.</summary>
-    private sealed class SpanListener : IDisposable
+    internal sealed class SpanListener : IDisposable
     {
         private readonly ActivityListener? listener;
         private readonly ConcurrentQueue<Activity> stopped = new();
+
+        /// <summary>Gets the name of each span that stopped.</summary>
+        internal IReadOnlyList<string> Names => [.. stopped.Select(a => a.DisplayName)];
 
         private SpanListener(bool listen)
         {

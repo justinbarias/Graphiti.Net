@@ -4,7 +4,8 @@ namespace Graphiti;
 /// The edge namespaces of upstream's <c>graphiti.edges</c>. Each method has the parameters and the defaults of upstream,
 /// without the <c>tx</c> parameter. A method that changes its argument upstream returns the changed record. A call
 /// applies no group filter beyond what upstream applies, so a host with many tenants makes sure that each UUID belongs
-/// to its tenant.
+/// to its tenant. A host must not change a collection that it passed to a call before the task of the call completes,
+/// because the facade reads the arguments on its scheduler.
 /// </summary>
 public interface IEdgeNamespaces
 {
