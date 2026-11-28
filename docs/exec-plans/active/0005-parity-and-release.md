@@ -23,7 +23,7 @@ The maintainer asked for this form on 2026-11-28:
 - An agent of Microsoft Agent Framework answers questions. The graph search of Graphiti.Net is a tool of the agent.
 - An AG-UI HTTP server exposes the agent.
 - A CopilotKit page is the chat front end, and it talks to the server over AG-UI.
-- The example uses a recent OpenAI model. The maintainer named `gpt-6.1-luna`. The quickstart makes sure that the account has the model before the first run, and the model name is a setting of the example.
+- The example uses the OpenAI model `gpt-6-luna`. The maintainer first named `gpt-6.1-luna`. The account has no model with that name, and the maintainer chose `gpt-6-luna` on 2026-11-28. The model name is a setting of the example.
 
 These libraries are dependencies of the example only. The two packages of the product do not reference them.
 
