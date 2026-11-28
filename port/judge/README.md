@@ -205,7 +205,8 @@ The .NET host answers `JudgeTypeRejected` if a C# parameter cannot hold an argum
 If the golden result is `TypeError` or `AttributeError`, the case passes, because Python refused the same argument for its type.
 If the golden result is another error or a value, the case fails, unless its id is in `accepted-differences.txt`.
 The maintainer accepts such a difference by name, and only then does the id enter that file (decision D55).
-A case in that file fails if the host gives any answer other than `JudgeTypeRejected`, and the runner also fails for an id there that no case has.
+A case in that file fails if the host gives any answer other than `JudgeTypeRejected`, and the runner also fails for an id there that no case has, and for an id that is in both lists.
+A line of the file that starts with `#`, with or without spaces before it, is a comment.
 
 ## Cases mined from upstream pytest files
 

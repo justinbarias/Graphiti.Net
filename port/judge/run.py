@@ -491,7 +491,7 @@ def _accepted_differences() -> set[str]:
     """
     if not ACCEPTED_DIFFERENCES.exists():
         return set()
-    return {l.strip() for l in ACCEPTED_DIFFERENCES.read_text().split("\n") if l.strip() and not l.startswith("#")}
+    return {l.strip() for l in ACCEPTED_DIFFERENCES.read_text().split("\n") if l.strip() and not l.strip().startswith("#")}
 
 
 def _errors_in(result: object) -> list[str]:
@@ -652,13 +652,13 @@ def main() -> int:
                 print(f"judge: review {entry['id']}: {', '.join(found)}")
         return 1 if refused else 0
 
-    if args.list_failures:
-        print("\n".join(sorted(failed)))
-        return 0
-
     unknown = sorted(accepted - {c["id"] for c in cases}) if not partial else []
     for case_id in unknown:
         failed[case_id] = ["the id is in accepted-differences.txt, and no case has this id."]
+
+    if args.list_failures:
+        print("\n".join(sorted(failed)))
+        return 0
 
     minimum = int(COUNT_FILE.read_text().strip()) if COUNT_FILE.exists() else 0
     print(f"judge: build={args.build} cases={len(cases)} passed={len(cases) - len(failed)} failed={len(failed)}")
@@ -679,6 +679,12 @@ def main() -> int:
         expected = set()
         if EXPECTED_FAILURES.exists():
             expected = {l.strip() for l in EXPECTED_FAILURES.read_text().split("\n") if l.strip() and not l.startswith("#")}
+        # An id can be in one list only. In both lists, a case that is not bound would count as expected.
+        both = sorted(expected & accepted)
+        for case_id in both:
+            print(f"FAIL {case_id} is in expected-failures.txt and in accepted-differences.txt. Keep it in one list only.", file=sys.stderr)
+        if both:
+            status = 1
         if partial:
             expected &= {c["id"] for c in cases}
         surprise = sorted(set(failed) - expected)
