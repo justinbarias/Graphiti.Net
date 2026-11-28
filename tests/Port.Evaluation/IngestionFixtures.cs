@@ -135,13 +135,39 @@ internal static class IngestionFixtures
 // hold that thread for longer than a lease, so a heartbeat comes too late. Here the body runs as a task on VirtualTime
 // (PortServices.Time) and the FakeClock of the store (`clock`). After each pass of 100 yields, the runner moves the two
 // clocks by `step` seconds. A wait of real time on the scheduler thus moves no clock.
+// The clocks do not move while a tracked call runs off the scheduler. LoggingStore tracks each call of its inner
+// store, because the SQLite store runs each call on the thread pool. A body on this runner starts no other work on the
+// thread pool: the clocks do not wait for it, and it cancels with Cancel() and not with CancelAsync() (R25).
 internal static class VirtualLoop
 {
+    // The calls of the body that can end off the scheduler. Only the scheduler thread reads and changes the list.
+    private static readonly AsyncLocal<List<Task>?> Tracked = new();
+
+    /// <summary>Makes the clocks of the runner wait for a call that ends off the scheduler.</summary>
+    internal static Task<T> Track<T>(Task<T> call)
+    {
+        Track((Task)call);
+        return call;
+    }
+
+    /// <inheritdoc cref="Track{T}(Task{T})"/>
+    internal static Task Track(Task call)
+    {
+        if (!call.IsCompleted)
+        {
+            Tracked.Value?.Add(call);
+        }
+
+        return call;
+    }
+
     internal static Task RunAsync(Func<FakeClock, Task> body, double step = 0.01, double limit = 60.0) =>
         LoopGuard.RunAsync(async () =>
         {
             var time = new VirtualTime();
             var clock = new FakeClock();
+            var tracked = new List<Task>();
+            Tracked.Value = tracked;
             using (PortServices.Use(time: time))
             {
                 var task = Asyncio.CreateTask(_ => body(clock), out _);
@@ -156,6 +182,15 @@ internal static class VirtualLoop
                     if (task.IsCompleted)
                     {
                         break;
+                    }
+
+                    // A tracked call runs off the scheduler. The clocks wait for it, and the limit of LoopGuard ends
+                    // a call that never returns.
+                    tracked.RemoveAll(call => call.IsCompleted);
+                    if (tracked.Count > 0)
+                    {
+                        await Task.WhenAny(tracked);
+                        continue;
                     }
 
                     Assert.True(moved < limit, $"the body did not end in {limit} seconds of the virtual clock");
@@ -565,20 +600,20 @@ internal sealed class LoggingStore(FakeGraph graph, Func<double>? clock = null, 
     {
         BeginAdmitCount++;
         return BeginAdmit is null
-            ? Inner.BeginAdmitAsync(groupId, unitId, ttl, cancellationToken)
-            : BeginAdmit(() => Inner.BeginAdmitAsync(groupId, unitId, ttl, cancellationToken), groupId, unitId, ttl);
+            ? VirtualLoop.Track(Inner.BeginAdmitAsync(groupId, unitId, ttl, cancellationToken))
+            : BeginAdmit(() => VirtualLoop.Track(Inner.BeginAdmitAsync(groupId, unitId, ttl, cancellationToken)), groupId, unitId, ttl);
     }
 
     internal override Task EndAdmitAsync(string groupId, long seq, CancellationToken cancellationToken = default) =>
-        Check("end_admit") ?? Inner.EndAdmitAsync(groupId, seq, cancellationToken);
+        Check("end_admit") ?? VirtualLoop.Track(Inner.EndAdmitAsync(groupId, seq, cancellationToken));
 
     internal override Task<AnalysisStart> StartAnalysisAsync(string groupId, long seq, CancellationToken cancellationToken = default) =>
         Forbidden.Contains("start_analysis")
             ? Task.FromException<AnalysisStart>(new Xunit.Sdk.XunitException("start_analysis was called"))
-            : Inner.StartAnalysisAsync(groupId, seq, cancellationToken);
+            : VirtualLoop.Track(Inner.StartAnalysisAsync(groupId, seq, cancellationToken));
 
     internal override Task SaveChangeSetAsync(string groupId, long seq, byte[] payload, CancellationToken cancellationToken = default) =>
-        Check("save_change_set") ?? Inner.SaveChangeSetAsync(groupId, seq, payload, cancellationToken);
+        Check("save_change_set") ?? VirtualLoop.Track(Inner.SaveChangeSetAsync(groupId, seq, payload, cancellationToken));
 
     internal override Task HeartbeatAsync(string groupId, long seq, double ttl, long? fence = null, CancellationToken cancellationToken = default)
     {
@@ -587,38 +622,38 @@ internal sealed class LoggingStore(FakeGraph graph, Func<double>? clock = null, 
             return Task.FromException(HeartbeatError);
         }
 
-        return Check("heartbeat") ?? Inner.HeartbeatAsync(groupId, seq, ttl, fence, cancellationToken);
+        return Check("heartbeat") ?? VirtualLoop.Track(Inner.HeartbeatAsync(groupId, seq, ttl, fence, cancellationToken));
     }
 
     internal override Task<BeginCommitResult> BeginCommitAsync(string groupId, long seq, double ttl, CancellationToken cancellationToken = default) =>
-        Inner.BeginCommitAsync(groupId, seq, ttl, cancellationToken);
+        VirtualLoop.Track(Inner.BeginCommitAsync(groupId, seq, ttl, cancellationToken));
 
     internal override Task<List<DeltaUnit>> LoadDeltaAsync(string groupId, long afterSeq, long beforeSeq, double since, CancellationToken cancellationToken = default) =>
-        Inner.LoadDeltaAsync(groupId, afterSeq, beforeSeq, since, cancellationToken);
+        VirtualLoop.Track(Inner.LoadDeltaAsync(groupId, afterSeq, beforeSeq, since, cancellationToken));
 
     internal override Task SaveFinalAsync(string groupId, long seq, long fence, byte[] payload, CancellationToken cancellationToken = default)
     {
         graph.Log.Add("store:save_final");
         BeforeSaveFinal?.Invoke();
-        return Inner.SaveFinalAsync(groupId, seq, fence, payload, cancellationToken);
+        return VirtualLoop.Track(Inner.SaveFinalAsync(groupId, seq, fence, payload, cancellationToken));
     }
 
     internal override Task FinishCommitAsync(string groupId, long seq, long fence, List<string> nodeUuids, double retainSeconds, CancellationToken cancellationToken = default)
     {
         graph.Log.Add("store:finish_commit");
-        return Inner.FinishCommitAsync(groupId, seq, fence, nodeUuids, retainSeconds, cancellationToken);
+        return VirtualLoop.Track(Inner.FinishCommitAsync(groupId, seq, fence, nodeUuids, retainSeconds, cancellationToken));
     }
 
     internal override Task FailAsync(string groupId, long seq, string reason, long? fence = null, CancellationToken cancellationToken = default) =>
-        Check("fail") ?? Inner.FailAsync(groupId, seq, reason, fence, cancellationToken);
+        Check("fail") ?? VirtualLoop.Track(Inner.FailAsync(groupId, seq, reason, fence, cancellationToken));
 
     internal override Task<List<string>> ReadyEnrichAsync(string groupId, long seq, CancellationToken cancellationToken = default) =>
-        Inner.ReadyEnrichAsync(groupId, seq, cancellationToken);
+        VirtualLoop.Track(Inner.ReadyEnrichAsync(groupId, seq, cancellationToken));
 
     internal override Task FinishEnrichAsync(string groupId, long seq, List<string> nodeUuids, CancellationToken cancellationToken = default) =>
-        Inner.FinishEnrichAsync(groupId, seq, nodeUuids, cancellationToken);
+        VirtualLoop.Track(Inner.FinishEnrichAsync(groupId, seq, nodeUuids, cancellationToken));
 
-    internal override Task CloseAsync(CancellationToken cancellationToken = default) => Inner.CloseAsync(cancellationToken);
+    internal override Task CloseAsync(CancellationToken cancellationToken = default) => VirtualLoop.Track(Inner.CloseAsync(cancellationToken));
 
     // A replaced method raises AssertionError at its await (R4 has no row: Xunit.Sdk.XunitException, as HarnessLlm).
     private Task? Check(string method) =>
