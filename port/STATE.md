@@ -159,7 +159,7 @@ For the maintainer, from the pilot and the start of plan 0004:
 2. Decision D43: accept or reject the order of the pair chunks of `generate_covering_chunks` for a chunk size of 0 or 1. Needed at gate 4.
 3. About 250 upstream test sites replace a module-level function or a method. RULES.md, open item O10. Needed before layer 7.
 4. Apply `port/patches/judge-readme-units.patch`, which names the `Units/` folder in the judge README. [patches/README.md](patches/README.md) gives the steps.
-5. The scanner of the porting skill reports each `NotImplementedException`. Rule R4 requires that type where Python raises `NotImplementedError`. Accept those sites by name at gate 4.
+5. The scanner of the porting skill reports each `NotImplementedException`. Rule R4 requires that type where Python raises `NotImplementedError`. Accept those sites by name at gate 4. The names are the 186 `stub` lines of `port/tools/scan_port_allow.txt`, which the lead wrote so that the gate passes until then (decision D54, and plan 0005, task 3).
 6. Two pilot worktrees hold an untracked `.upstream` symbolic link that an implementer made for a recorder: `.claude/worktrees/agent-a6354ed2b2d3e0ca4` and `.claude/worktrees/agent-a289034ea91cceca3`. A delete command of one implementer was denied, and the lead did not delete the links.
 
 Decided on 2026-11-25: D17 (the base LLM path), D18 (label order is noise), D19 (seven judge design changes). The maintainer closed gate 2 on 2026-11-25 after the final results.

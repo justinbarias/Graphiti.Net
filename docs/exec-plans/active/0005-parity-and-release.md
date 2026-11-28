@@ -86,3 +86,62 @@ The 45 ids that stay are the cases of open item O4 in `port/RULES.md`. In each o
 | `text` | 16 |
 
 The evidence of task 2 in the plan table says that `expected-failures.txt` is empty. It is not empty, and it holds these 45 ids until the maintainer decides at gate 4.
+
+### Task 3, the scanner and the merge checks, 2026-11-28
+
+`port/tools/scan_port.py` started as a copy of the scanner of the port skill. `scripts/check.sh` runs it on `src/` after the format step, so each local gate and the CI job `check` run it. It keeps the six checks and the options of the skill's scanner, and it differs in five ways:
+
+- It has two more options: `--allow FILE` and `--write-allow`.
+- It reads the text of each file from left to right. So it knows each comment, each string of each kind, the depth of the braces, and the type and the member that hold a line. The skill's scanner reads each line alone.
+- It finds the null-forgiving `!` operator after a name, a closing parenthesis, or a closing square bracket, when no `=` follows, and inside the holes of an interpolated string. The skill's scanner finds it only before five characters.
+- It finds three more forms that switch a warning off: `# pragma` with a space, `#nullable disable`, and each attribute whose name ends with `SuppressMessage`.
+- A file that it cannot read to its end gives the finding `scanner lost its place`: a comment or a string with no end, or braces that do not match. No allow file can accept that finding.
+
+| Finding of the scanner on `src/` | Lines | State |
+| --- | --- | --- |
+| `stub` | 186 | In the allow file. 115 lines throw `NotImplementedException` where upstream raises `NotImplementedError`. 71 lines catch it where upstream catches `NotImplementedError`. |
+| `port TODO` | 14 | In the allow file. 7 `TODO(port)` markers of 2 lines each. `port/STATE.md` lists them under "Blocked units". |
+| `null-forgiving operator` | 0 | The first run of the wider pattern found one use in `Graphiti.cs`. Pull request 60 removed it. |
+| `dynamic type`, `warning switched off`, `calls Python` | 0 | Nothing to accept, and the allow file cannot hold these labels. |
+
+The evidence of task 3 in the plan table is "No finding". That is not the state: with no allow file the scanner reports 200 findings. The gate passes because `port/tools/scan_port_allow.txt` names each of them.
+
+The allow file is a decision of the lead (D54), and it is not the acceptance of the maintainer. Item 5 of "Decisions for the maintainer" in `port/STATE.md` says that the maintainer accepts the stub sites by name at gate 4, and the `TODO(port)` markers wait for the same gate. The allow file is that list of names: 200 lines, one for each finding. Each line has a path, a label, a count, the member that holds the line, and the text of the line. The member is the name of the type and the first line of the declaration. Until gate 4 the file keeps the gate green and stops a new shortcut.
+
+What fails the scan: a finding that the file does not name, a count that differs, a line of the file that the scan does not find, two lines of the file for one key, and a line of the file with a label other than `stub` and `port TODO`.
+
+The scanner is not weaker than the skill's scanner on this code. On `src/` both report the same 200 lines. On `tests/` the skill's scanner reports 1,388 lines and this one reports 1,603: each line of the first is a line of the second, and the 215 more lines are uses of the `!` operator.
+
+Seeds, each one undone, each with exit code 1:
+
+- A `dynamic` field, a `!` operator, a new `TODO(port)` line, and a `#pragma warning disable` in `Helpers.cs`.
+- One stub replaced by another exception, with a new stub in a new member: a method of `Nodes.cs`, a method with a tuple in its return type, and a property.
+- A `throw new NotImplementedException()` added to a `catch` line that the file names.
+- A `catch (NotImplementedException)` moved from `SaveAsync` of one class to a member of another class in `Edges.cs`.
+- A `TODO(port)` comment moved to the end of `SearchUtils.cs`.
+- The operator in the hole of an interpolated string, after a space before a dot, and after a string that holds `//`.
+- The operator after a verbatim string that ends with a quote, after a verbatim string of two lines that holds `/*`, after two raw strings on one line, in the hole of a raw string, and next to a character literal that holds a quote.
+- A line with three shortcuts after the raw strings of `Eval.cs`, where the first form of the reader lost its place.
+- A verbatim string with no end: the finding `scanner lost its place`.
+
+The words `Done!` in a string, in a line comment, and in a block comment gave no finding.
+
+Limits of the scan, which a reviewer still covers:
+
+- The scanner reads text and not syntax. It finds the member of a line from the braces and from the first line of each declaration.
+- It does not see a line that moves inside its member, or a new line with the same text as a line that leaves the same member.
+- It does not see the operator after a space, unless a dot and a name follow. It does not read the directives of the preprocessor, so it reads code in a branch that is off.
+- It does not see `<NoWarn>` in a project file, a severity in `.editorconfig`, an exception of another type that stands for unported code, or an empty method body.
+- `--exclude /bin/` and `--exclude /obj/` also skip a source folder with one of those names. `src/` has none.
+- The check `calls Python` matches the text `"python"` in each string, as in the skill's scanner. `src/` has no such line.
+- It scans `src/` only. The plan names that folder. The example and the test projects are not scanned.
+
+The CI job `check` ran the judge for each pull request before this task, because `scripts/check.sh --test` runs it. Two facts about the judge in the gate:
+
+- The judge call of `scripts/check.sh` now has `--verbose`. A case that fails and is not listed, or that is listed and bound and wrong, then prints 20 difference lines, where it printed 3 (debt T32).
+- The count of judge cases cannot go down: the judge fails if it runs fewer cases than `port/judge/count.txt` says. This check existed before.
+
+Three Opus 5.5 high review rounds read this task with the task to refute it: 9 findings, then 5, then 4. Each finding about the scanner is resolved in its code or named in the limits above. After round 3 the reader of the scanner changed one more time, and the comparison with the skill's scanner and the seeds above are its evidence.
+
+One thing is not done. The branch `main` has no protection rule on GitHub, so GitHub does not require the job `check` for a merge. The lead merges only after the job passes. A protection rule is a repository setting, which the maintainer decides.
+

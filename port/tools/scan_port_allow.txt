@@ -1,0 +1,210 @@
+# The findings of port/tools/scan_port.py that the port accepts for now. scripts/check.sh reads this file.
+# Each line has a path, a label, a count, the member that holds the line, and the text of the line, with tabs between them.
+# The member is the name of the type, a colon, and the first line of the declaration of the member.
+# The scan fails for a finding that is not here, for a count that differs, and for a line here that it does not find.
+#
+# The lead wrote this list on 2026-11-28 (plan 0005, task 3, decision D54). The maintainer accepts or rejects each line
+# at gate 4 (port/STATE.md, "Decisions for the maintainer", item 5, and "Blocked units").
+# stub: each line ports upstream code. 115 lines throw NotImplementedException where upstream raises
+# NotImplementedError, and 71 lines catch it where upstream catches NotImplementedError.
+# port TODO: 14 lines at 7 TODO(port) markers of the Neptune and FalkorDB paths that decision D10 leaves out.
+src/Graphiti.Net/Core/Driver/Driver.cs	stub	1	GraphDriver: internal virtual string BuildFulltextQuery(string query, List<string>? groupIds = null, long maxQueryLength = 128)	throw new NotImplementedException("build_fulltext_query not implemented for " + Py.Str(Provider));
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeUpdateBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeDeleteByGroupIdAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<EntityNode> NodeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityNode>> NodeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityNode>> NodeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityNode>> NodeGetByNamesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityNode>> NodeGetByAttributeValuesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NodeLoadEmbeddingsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<OrderedDictionary<string, List<double>>> NodeLoadEmbeddingsBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicNodeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicNodeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicNodeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicEdgeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicNodeDeleteByGroupIdAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicNodeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<EpisodicNode> EpisodicNodeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EpisodicNode>> EpisodicNodeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EpisodicNode>> EpisodicNodeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EpisodicNode>> RetrieveEpisodesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityNodeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityNodeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityNodeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityNodeDeleteByGroupIdAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityNodeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<CommunityNode> CommunityNodeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<CommunityNode>> CommunityNodeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<CommunityNode>> CommunityNodeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task SagaNodeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task SagaNodeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task SagaNodeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task SagaNodeDeleteByGroupIdAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task SagaNodeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<SagaNode> SagaNodeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<SagaNode>> SagaNodeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<SagaNode>> SagaNodeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<string?> SagaGetPreviousEpisodeUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<(string Content, PyDateTime? ValidAt, PyDateTime CreatedAt)>> SagaGetEpisodeContentsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EdgeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EdgeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EdgeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EdgeUpdateBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EdgeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<EntityEdge> EdgeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityEdge>> EdgeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityEdge>> EdgeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EdgeLoadEmbeddingsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<OrderedDictionary<string, List<double>>> EdgeLoadEmbeddingsBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicEdgeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicEdgeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task EpisodicEdgeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<EpisodicEdge> EpisodicEdgeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EpisodicEdge>> EpisodicEdgeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EpisodicEdge>> EpisodicEdgeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityEdgeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityEdgeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityEdgeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<CommunityEdge> CommunityEdgeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<CommunityEdge>> CommunityEdgeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<CommunityEdge>> CommunityEdgeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task HasEpisodeEdgeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task HasEpisodeEdgeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task HasEpisodeEdgeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task HasEpisodeEdgeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<HasEpisodeEdge> HasEpisodeEdgeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<HasEpisodeEdge>> HasEpisodeEdgeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<HasEpisodeEdge>> HasEpisodeEdgeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NextEpisodeEdgeSaveAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NextEpisodeEdgeDeleteAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NextEpisodeEdgeSaveBulkAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task NextEpisodeEdgeDeleteByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<NextEpisodeEdge> NextEpisodeEdgeGetByUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<NextEpisodeEdge>> NextEpisodeEdgeGetByUuidsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<NextEpisodeEdge>> NextEpisodeEdgeGetByGroupIdsAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityNode>> GetMentionedNodesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<CommunityNode>> GetCommunitiesByNodesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task ClearDataAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<List<EntityNode>>> GetCommunityClustersAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task RemoveCommunitiesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<(CommunityNode?, bool)> DetermineEntityCommunityAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EpisodicNode>> EpisodicNodeGetByEntityNodeUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task CommunityNodeLoadNameEmbeddingAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityEdge>> EdgeGetBetweenNodesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	1	GraphOperationsInterface: internal virtual Task<List<EntityEdge>> EdgeGetByNodeUuidAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EntityEdge>> EdgeFulltextSearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EntityEdge>> EdgeSimilaritySearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EntityNode>> NodeFulltextSearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EntityNode>> NodeSimilaritySearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EpisodicNode>> EpisodeFulltextSearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EntityEdge>> EdgeBfsSearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<EntityNode>> NodeBfsSearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<CommunityNode>> CommunityFulltextSearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<List<CommunityNode>> CommunitySimilaritySearchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<OrderedDictionary<string, List<double>>> GetEmbeddingsForCommunitiesAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<(List<string>, List<double>)> NodeDistanceRerankerAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual Task<(List<string>, List<double>)> EpisodeMentionsRerankerAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual object? BuildNodeSearchFilters(SearchFilters searchFilters)	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	1	SearchInterface: internal virtual object? BuildEdgeSearchFilters(SearchFilters searchFilters)	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Edges.cs	stub	1	Edge: internal virtual async Task DeleteAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	Edge: internal static async Task DeleteByUuidsAsync(GraphDriver driver, List<string> uuids, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EpisodicEdge: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EpisodicEdge: internal static async Task<EpisodicEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EpisodicEdge: internal static async Task<List<EpisodicEdge>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EpisodicEdge: internal static async Task<List<EpisodicEdge>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal async Task LoadFactEmbeddingAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal static async Task<EntityEdge> GetByUuidAsync(	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal static async Task<List<EntityEdge>> GetBetweenNodesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal static async Task<List<EntityEdge>> GetByUuidsAsync(	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal static async Task<List<EntityEdge>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	EntityEdge: internal static async Task<List<EntityEdge>> GetByNodeUuidAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	CommunityEdge: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	CommunityEdge: internal static async Task<CommunityEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	CommunityEdge: internal static async Task<List<CommunityEdge>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	CommunityEdge: internal static async Task<List<CommunityEdge>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	HasEpisodeEdge: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	HasEpisodeEdge: internal override async Task DeleteAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	HasEpisodeEdge: internal static async Task<HasEpisodeEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	HasEpisodeEdge: internal static async Task<List<HasEpisodeEdge>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	HasEpisodeEdge: internal static async Task<List<HasEpisodeEdge>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	NextEpisodeEdge: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	NextEpisodeEdge: internal override async Task DeleteAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	NextEpisodeEdge: internal static async Task<NextEpisodeEdge> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	NextEpisodeEdge: internal static async Task<List<NextEpisodeEdge>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Edges.cs	stub	1	NextEpisodeEdge: internal static async Task<List<NextEpisodeEdge>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Embedder/Client.cs	stub	1	EmbedderClient: internal virtual Task<List<List<double>>> CreateBatchAsync(	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Graphiti.cs	stub	1	GraphitiCore: internal async Task<string?> SagaGetPreviousEpisodeUuidAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Graphiti.cs	stub	1	GraphitiCore: internal async Task<List<(string, PyDateTime?, PyDateTime)>?> SagaGetEpisodeContentsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Graphiti.cs	stub	1	GraphitiCore: private async Task<List<EpisodicNode>> RetrieveEpisodesCoreAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/LlmClient/OpenaiDecisionsClient.cs	stub	1	OpenAIDecisionsClient: internal override Task<OrderedDictionary<string, object?>> PrivateGenerateResponseAsync(	throw new NotImplementedException("OpenAIDecisionsClient requires a dedupe prompt_name through LLMRuntime");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace: internal EntityEdgeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " ");	internal EntityEdgeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " does not implement entity_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace: internal EpisodicEdgeNamespace Episodic => episodic ?? throw new NotImplementedException(driverName + " ");	internal EpisodicEdgeNamespace Episodic => episodic ?? throw new NotImplementedException(driverName + " does not implement episodic_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace: internal CommunityEdgeNamespace Community => community ?? throw new NotImplementedException(driverName + " ");	internal CommunityEdgeNamespace Community => community ?? throw new NotImplementedException(driverName + " does not implement community_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace: internal HasEpisodeEdgeNamespace HasEpisode => hasEpisode ?? throw new NotImplementedException(driverName + " ");	internal HasEpisodeEdgeNamespace HasEpisode => hasEpisode ?? throw new NotImplementedException(driverName + " does not implement has_episode_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	1	EdgeNamespace: internal NextEpisodeEdgeNamespace NextEpisode => nextEpisode ?? throw new NotImplementedException(driverName + " ");	internal NextEpisodeEdgeNamespace NextEpisode => nextEpisode ?? throw new NotImplementedException(driverName + " does not implement next_episode_edge_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace: internal EntityNodeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " ");	internal EntityNodeNamespace Entity => entity ?? throw new NotImplementedException(driverName + " does not implement entity_node_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace: internal EpisodeNodeNamespace Episode => episode ?? throw new NotImplementedException(driverName + " ");	internal EpisodeNodeNamespace Episode => episode ?? throw new NotImplementedException(driverName + " does not implement episode_node_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace: internal CommunityNodeNamespace Community => community ?? throw new NotImplementedException(driverName + " ");	internal CommunityNodeNamespace Community => community ?? throw new NotImplementedException(driverName + " does not implement community_node_ops");
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	1	NodeNamespace: internal SagaNodeNamespace Saga => saga ?? throw new NotImplementedException(driverName + " ");	internal SagaNodeNamespace Saga => saga ?? throw new NotImplementedException(driverName + " does not implement saga_node_ops");
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EpisodeTypeExtensions: internal static EpisodeType FromStr(object? episodeType)	throw new NotImplementedException(string.Empty);
+src/Graphiti.Net/Core/Nodes.cs	stub	1	Node: internal virtual async Task DeleteAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	Node: internal static async Task DeleteByGroupIdAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	Node: internal static async Task DeleteByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EpisodicNode: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EpisodicNode: internal static async Task<EpisodicNode> GetByUuidAsync(	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EpisodicNode: internal static async Task<List<EpisodicNode>> GetByUuidsAsync(	catch (NotImplementedException) when (!returned)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EpisodicNode: internal static async Task<List<EpisodicNode>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EpisodicNode: internal static async Task<List<EpisodicNode>> GetByEntityNodeUuidAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal async Task LoadNameEmbeddingAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal static async Task<EntityNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal static async Task<List<EntityNode>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal static async Task<List<EntityNode>> GetByNamesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal static async Task<List<EntityNode>> GetByAttributeValuesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal static async Task<List<EntityNode>> GetByAttributeValuesAsync(	throw new NotImplementedException("Attribute lookup is not supported for " + Py.Str(Py.EnumValue(driver.Provider)));
+src/Graphiti.Net/Core/Nodes.cs	stub	1	EntityNode: internal static async Task<List<EntityNode>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	CommunityNode: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	port TODO	1	CommunityNode: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	// TODO(port): no rule for driver.save_to_aoss. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Nodes.cs	port TODO	1	CommunityNode: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	throw new NotSupportedException("TODO(port): no rule for driver.save_to_aoss");
+src/Graphiti.Net/Core/Nodes.cs	stub	1	CommunityNode: internal async Task LoadNameEmbeddingAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	CommunityNode: internal static async Task<CommunityNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	CommunityNode: internal static async Task<List<CommunityNode>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	CommunityNode: internal static async Task<List<CommunityNode>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	SagaNode: internal override async Task SaveAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	SagaNode: internal override async Task DeleteAsync(GraphDriver driver, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	SagaNode: internal static async Task<SagaNode> GetByUuidAsync(GraphDriver driver, string uuid, CancellationToken cancellationToken = default)	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	SagaNode: internal static async Task<List<SagaNode>> GetByUuidsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Nodes.cs	stub	1	SagaNode: internal static async Task<List<SagaNode>> GetByGroupIdsAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<List<EntityNode>> GetMentionedNodesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<List<CommunityNode>> GetCommunitiesByNodesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<EntityEdge>> EdgeFulltextSearchAsync(	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<EntityEdge>> EdgeFulltextSearchAsync(	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<List<EntityEdge>> EdgeBfsSearchAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<EntityNode>> NodeFulltextSearchAsync(	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<EntityNode>> NodeFulltextSearchAsync(	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<List<EntityNode>> NodeBfsSearchAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<EpisodicNode>> EpisodeFulltextSearchAsync(	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<EpisodicNode>> EpisodeFulltextSearchAsync(	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<List<CommunityNode>> CommunityFulltextSearchAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<CommunityNode>> CommunityFulltextSearchAsync(	// TODO(port): no rule for driver.run_aoss_query. Only the Neptune driver has the method, and GraphDriver has no member for it (D10).
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	1	SearchUtils: internal static async Task<List<CommunityNode>> CommunityFulltextSearchAsync(	throw new NotSupportedException("TODO(port): no rule for driver.run_aoss_query");
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<List<CommunityNode>> CommunitySimilaritySearchAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<(List<string>, List<double>)> NodeDistanceRerankerAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<(List<string>, List<double>)> EpisodeMentionsRerankerAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	1	SearchUtils: internal static async Task<OrderedDictionary<string, List<double>>> GetEmbeddingsForCommunitiesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	BulkUtils: internal static async Task UpdateEntityNodesTxAsync(	// TODO(port): no rule for a list of queries in tx.run. On FalkorDB and Neptune the query builder returns a
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	BulkUtils: internal static async Task UpdateEntityNodesTxAsync(	throw new NotSupportedException("TODO(port): no rule for a list of queries in tx.run");
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	BulkUtils: internal static async Task AddNodesAndEdgesBulkTxAsync(	// TODO(port): no rule for a list of queries in tx.run. On FalkorDB and Neptune the query builder returns
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	1	BulkUtils: internal static async Task AddNodesAndEdgesBulkTxAsync(	throw new NotSupportedException("TODO(port): no rule for a list of queries in tx.run");
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	1	CommunityOperations: internal static async Task<List<List<EntityNode>>> GetCommunityClustersAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	1	CommunityOperations: internal static async Task RemoveCommunitiesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	1	CommunityOperations: internal static async Task<(CommunityNode?, bool)> DetermineEntityCommunityAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs	stub	1	GraphDataOperations: internal static async Task ClearDataAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs	stub	1	GraphDataOperations: internal static async Task<List<EpisodicNode>> RetrieveEpisodesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs	stub	1	NodeOperations: internal static async Task<List<List<EntityNode>>> CollectIdentityPropertyCandidateNodesAsync(	catch (NotImplementedException)
+src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs	stub	1	NodeOperations: internal static async Task<List<List<double>>> EmbedQueriesAsync(	catch (NotImplementedException)
