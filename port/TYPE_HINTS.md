@@ -103,7 +103,7 @@ For a nested function, read the source: pyright cannot reveal it from outside.
 | `episode_fulltext_search` | `graphiti_core/search/search_utils.py:797` | parameters limit | `(driver: GraphDriver, query: str, _search_filter: SearchFilters, group_ids: list[str] \| None = None, limit: int = RELEVANT_SCHEMA_LIMIT) -> CoroutineType[Any, Any, list[EpisodicNode]]` |
 | `community_fulltext_search` | `graphiti_core/search/search_utils.py:888` | parameters limit | `(driver: GraphDriver, query: str, group_ids: list[str] \| None = None, limit: int = RELEVANT_SCHEMA_LIMIT) -> CoroutineType[Any, Any, list[CommunityNode]]` |
 | `community_similarity_search` | `graphiti_core/search/search_utils.py:980` | parameters limit, min_score | `(driver: GraphDriver, search_vector: list[float], group_ids: list[str] \| None = None, limit: int = RELEVANT_SCHEMA_LIMIT, min_score: float = DEFAULT_MIN_SCORE) -> CoroutineType[Any, Any, list[CommunityNode]]` |
-| `rrf` | `graphiti_core/search/search_utils.py:1551` | parameters rank_const | `(results: list[list[str]], rank_const: int = 1, min_score: float = 0) -> tuple[list[str], list[float]]` |
+| `rrf` | `graphiti_core/search/search_utils.py:1551` | parameters rank_const | `(results: list[list[str]], rank_const: float = 1, min_score: float = 0) -> tuple[list[str], list[float]]` |
 | `wrapper` | `graphiti_core/decorators.py:41` | parameters args, kwargs, return | `Nested function. Read the source.` |
 | `execute_for_group` | `graphiti_core/decorators.py:76` | return | `Nested function. Read the source.` |
 | `Neo4jDriver.build_indices_and_constraints` | `graphiti_core/driver/neo4j_driver.py:215` | return | `(self: Neo4jDriver, delete_existing: bool = False) -> CoroutineType[Any, Any, None]` |

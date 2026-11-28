@@ -190,8 +190,8 @@
         "datetime"
       ],
       "target": "src/Graphiti.Net/Core/Utils/DatetimeUtils.cs",
-      "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. 2 covering cases stay listed. pure.datetime.ensure_utc.wrong_type_date_only passes the class datetime:date, which the host codec does not resolve (open item O4)."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. No covering case is listed. pure.datetime.ensure_utc.wrong_type_date_only passes since plan 0005, task 2: the judge host registers the class datetime:date."
     },
     {
       "order": 9,
@@ -505,7 +505,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Helpers.cs",
       "status": "reviewed",
-      "notes": "Layer 1. Two reviews and one fix round. 16 covering cases stay listed (open item O4): 13 answer JudgeTypeRejected, and 3 answer JudgeNotBound. Two of the 3 need the descriptor of a custom type. pure.datetime.parse_db_date.neo4j_datetime_naive needs the decoder of neo4j.time:DateTime, which comes with the Neo4j conversion of layer 5. The numpy sum is PyNumpy.AddReduce."
+      "notes": "Layer 1. Two reviews and one fix round. 12 covering cases stay listed (open item O4), each with the answer JudgeTypeRejected. Four cases pass since plan 0005, task 2: pure.datetime.parse_db_date.neo4j_datetime_naive, pure.text.validate_group_ids.contains_none, and the two cases of validate_excluded_entity_types with a custom type. pure.datetime.parse_db_date.neo4j_datetime_naive needs the decoder of neo4j.time:DateTime, which comes with the Neo4j conversion of layer 5. The numpy sum is PyNumpy.AddReduce."
     },
     {
       "order": 24,
@@ -538,7 +538,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Models/Nodes/NodeDbQueries.cs",
       "status": "reviewed",
-      "notes": "Layer 1. Two reviews and one fix round. 5 covering cases stay listed with the answer JudgeTypeRejected (open item O4)."
+      "notes": "Layer 1. Two reviews and one fix round. 2 covering cases stay listed with the answer JudgeTypeRejected (open item O4). The three cases that pass a label list to get_entity_node_save_query pass since plan 0005, task 2."
     },
     {
       "order": 26,
@@ -1273,7 +1273,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Search/SearchUtils.cs",
       "status": "tests_pass",
-      "notes": "Layer 6. Two reviews and one fix round. Two covering cases stay listed: pure.ranking.rrf.inner_not_list_string and pure.ranking.rrf.rank_const_fraction (open item O4). tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune. Two tests of tests/test_neptune_search_isolation.py call those Neptune branches, so they have no port (rule R24)."
+      "notes": "Layer 6. Two reviews and one fix round. One covering case stays listed: pure.ranking.rrf.inner_not_list_string (open item O4). pure.ranking.rrf.rank_const_fraction passes since plan 0005, task 2: rank_const is a double. tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune. Two tests of tests/test_neptune_search_isolation.py call those Neptune branches, so they have no port (rule R24)."
     },
     {
       "order": 61,
@@ -1797,7 +1797,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/DedupHelpers.cs",
       "status": "reviewed",
-      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. `_cached_shingles` is a `PyLruCache` whose field is internal for the test. Two covering cases stay listed under open item O4: `pure.dedupe.lsh_bands.strings` and `.tuple_input`. The recorder binds the name `set` to an insertion-ordered class and marks each case that depends on the hash seed."
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7a. `_cached_shingles` is a `PyLruCache` whose field is internal for the test. Four covering cases stay listed under open item O4: `pure.dedupe.hash_shingle.seed_str`, `pure.dedupe.lsh_bands.strings`, `pure.dedupe.minhash_signature.none`, and `pure.dedupe.name_entropy.wrong_type_none`. `pure.dedupe.lsh_bands.tuple_input` passes since plan 0005, task 2. The recorder binds the name `set` to an insertion-ordered class and marks each case that depends on the hash seed."
     },
     {
       "order": 83,
@@ -2273,7 +2273,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/OntologyUtils/EntityTypesUtils.cs",
       "status": "reviewed",
-      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. Its cases that pass a built-in model class (ExtractedEntities or EntityNode) as a custom type stay listed under open item O4: the descriptor of such a model needs a field kind. Two wrong-type cases of validate_identity_properties stay listed too."
+      "notes": "Layer 2. Two reviews with the layer 1 packets and one fix round. It reads EntityNode.ModelFields. Its eight cases that pass the built-in model class ExtractedEntities as a custom type pass since plan 0005, task 2. Two wrong-type cases of validate_identity_properties stay listed under open item O4."
     },
     {
       "order": 102,
@@ -2332,7 +2332,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Graphiti.cs",
       "status": "reviewed",
-      "notes": "Layer 9 of plan 0004, packet P9a. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 1,482 of the 2,038 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/GraphitiValuesTests.cs compares the 44 sync cases and the 179 async cases of port/tools/record_graphiti.py, with 180 cancel points in 9 cases. Ports of upstream tests: TestRequestScopeConcurrency.cs, TestSagaRefetchEpisodeUuids.cs, and TestSagaSummaryBudget.cs in tests/Port.Evaluation, and TestGraphitiMock.cs, TestAddTriplet.cs, TestEpisodeGroupIsolation.cs, and TestGraphitiConfigurablePrompts.cs on Neo4j in tests/Graphiti.Net.E2E.Tests (packet P9f, 65 cases). Four tests of TestAddTriplet.cs assert the result of Python 0.32.0, because the upstream assertion is stale, and two keep a `TODO(port): O10` comment. `Graphiti(uri=...)` with no driver and no clients throws, where Python builds default objects (rule R1, decisions D3 and D28). The telemetry of `__init__` is not ported (decision D9). GAPS F33: 48 cancel points are in the `LateCancel` list. GAPS F48: `search_` with `config=None` runs the default recipe. GAPS F49: a record value of another type throws in a typed read. GAPS U22: the saga read drops five fields, as in Python. `SAGA_SUMMARY_MAX_EPISODE_CHARS`, `SAGA_SUMMARY_MAX_PROMPT_BYTES`, and `SUMMARY_REBUILD_BATCH_SIZE` are `PyPatch` values (rule R17). R5: 7 lines at Information level and 1 at Error level. No line holds episode text or a secret. The error line passes its exception, as `logger.exception` does."
+      "notes": "Layer 9 of plan 0004, packet P9a. Two reviews and one fix round. Three pure schema cases cover its result records, and they pass since plan 0005, task 2. No other pure case covers it. The 34 flow cases of the judge ran 1,482 of the 2,038 lines of its file on 2026-11-28, and each case passes on the .NET build. tests/Port.Evaluation/GraphitiValuesTests.cs compares the 44 sync cases and the 179 async cases of port/tools/record_graphiti.py, with 180 cancel points in 9 cases. Ports of upstream tests: TestRequestScopeConcurrency.cs, TestSagaRefetchEpisodeUuids.cs, and TestSagaSummaryBudget.cs in tests/Port.Evaluation, and TestGraphitiMock.cs, TestAddTriplet.cs, TestEpisodeGroupIsolation.cs, and TestGraphitiConfigurablePrompts.cs on Neo4j in tests/Graphiti.Net.E2E.Tests (packet P9f, 65 cases). Four tests of TestAddTriplet.cs assert the result of Python 0.32.0, because the upstream assertion is stale, and two keep a `TODO(port): O10` comment. `Graphiti(uri=...)` with no driver and no clients throws, where Python builds default objects (rule R1, decisions D3 and D28). The telemetry of `__init__` is not ported (decision D9). GAPS F33: 48 cancel points are in the `LateCancel` list. GAPS F48: `search_` with `config=None` runs the default recipe. GAPS F49: a record value of another type throws in a typed read. GAPS U22: the saga read drops five fields, as in Python. `SAGA_SUMMARY_MAX_EPISODE_CHARS`, `SAGA_SUMMARY_MAX_PROMPT_BYTES`, and `SUMMARY_REBUILD_BATCH_SIZE` are `PyPatch` values (rule R17). R5: 7 lines at Information level and 1 at Error level. No line holds episode text or a secret. The error line passes its exception, as `logger.exception` does."
     },
     {
       "order": 103,
