@@ -1,0 +1,31 @@
+name: mutation
+
+# A manual run only: "Run workflow" on the Actions page, or `gh workflow run mutation`.
+# No push and no pull request starts it. Observe mode: the run reports the score and blocks nothing.
+# docs/TESTING.md says how to read the report.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-24.04
+    # The run of 2026-11-28 on a 14-core machine took 35 minutes and 8.4 CPU hours. No CI run is measured yet (debt T27).
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Setup
+        run: scripts/setup-env.sh
+      - name: Mutation run
+        run: scripts/mutate.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stryker-report
+          path: StrykerOutput/**/reports/
+          if-no-files-found: ignore
