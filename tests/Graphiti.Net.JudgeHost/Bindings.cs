@@ -52,12 +52,8 @@ internal static class Bindings
     /// <summary>Gets the binding of each judge function name.</summary>
     internal static Dictionary<string, Func<JudgeArguments, ValueTask<JsonNode?>>> Pure => Table.Pure;
 
-    /// <summary>Runs a flow scenario. Not bound until the facade is ported (plan 0004, layer 9).</summary>
-    public static ValueTask<JsonNode> RunFlowAsync(JsonElement scenario)
-    {
-        _ = scenario;
-        return ValueTask.FromResult<JsonNode>(new JsonObject { ["host_error"] = NotBound });
-    }
+    /// <summary>Runs a flow scenario with the flow layer in <c>Flow/</c>.</summary>
+    public static ValueTask<JsonNode> RunFlowAsync(JsonElement scenario) => Flow.FlowRunner.RunAsync(scenario);
 
     /// <summary>
     /// Builds the table: the two judge functions, then <c>Register</c> of each unit class in name order.
