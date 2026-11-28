@@ -12,7 +12,7 @@ python3 port/judge/run.py --build python            # every case must pass
 ```
 
 ```bash
-python3 port/judge/run.py --build dotnet            # the failing set must equal expected-failures.txt
+python3 port/judge/run.py --build dotnet            # the failing set must equal expected-failures.txt and stale-after-pin.txt together
 ```
 
 ```bash
@@ -44,6 +44,7 @@ Requirements:
 | `count.txt` | The lowest allowed case count. |
 | `expected-failures.txt` | The .NET cases that still fail. Empty since gate 4. |
 | `accepted-differences.txt` | The cases that the maintainer accepted by name at gate 4 (decision D55). Each one must answer `JudgeTypeRejected`. |
+| `stale-after-pin.txt` | The .NET cases that a pin move made wrong. Empty outside a sync. Each line is `<case id> <unit> <target version>`. The runner reads the first word only. |
 | `host-python/` | The Python host. |
 
 The .NET host is `tests/Graphiti.Net.JudgeHost`. It is outside this folder because each ported unit adds a binding to it.
@@ -208,6 +209,10 @@ The maintainer accepts such a difference by name, and only then does the id ente
 A case in that file fails if the host gives any answer other than `JudgeTypeRejected`, and the runner also fails for an id there that no case has, and for an id that is in both lists.
 A line of the file that starts with `#`, with or without spaces before it, is a comment.
 
+A case in `stale-after-pin.txt` can be bound and give a wrong result, from a pin move until its unit is ported again (port/UPSTREAM.md).
+If such a case passes, the runner fails until its line is removed. The runner also fails for an id there that no case has, and for an id that is also in one of the other two lists.
+A case there cannot answer `JudgeTypeRejected`: a port cannot change that answer, so the maintainer decides the case by name (decision D55).
+
 ## Cases mined from upstream pytest files
 
 | Upstream pytest file | Case file | Cases |
@@ -241,3 +246,5 @@ If all of these hold, you can add cases without a new gate:
 - `count.txt` goes up.
 
 Write what was added and why in `port/DECISIONS.md`. Any other change needs the maintainer.
+
+A pin move is the one case where golden output changes for an old case. In a pin pull request, the lead records all golden files again from the new pinned source (port/UPSTREAM.md, step 1). A case or `count.txt` changes in that pull request only through a patch that the maintainer applied on its branch.
