@@ -331,7 +331,11 @@ public class TestFailureRules
                 };
                 var task = Asyncio.CreateTask(token => AdmitTaskAsync(h, "task-1", token), out var cancel);
                 await started.Task;
-                await cancel.CancelAsync();
+
+                // PORT: `task.cancel()` is Cancel() and not CancelAsync(). Cancel() runs the callbacks of the token at
+                // once on the scheduler thread. CancelAsync() runs them on the thread pool, and the virtual clock does
+                // not wait for the thread pool: on a busy machine the sleep of 0.05 seconds ended before the cancel (R25).
+                cancel.Cancel();
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
                 h.Store.BeginAdmit = null;
 
@@ -439,7 +443,9 @@ public class TestFailureRules
 
             var commit2 = Asyncio.CreateTask(token => h.CommitAsync(unit2, changeSet2, cancellationToken: token), out var cancel);
             await Asyncio.SleepAsync(0.02, PortServices.Time, Token);
-            await cancel.CancelAsync();
+
+            // PORT: `commit_2.cancel()` is Cancel() and not CancelAsync(), as in the test of the admit lease above (R25).
+            cancel.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => commit2);
 
             Assert.Equal(StateStore.StatusFailed, Status(h, unit2.Seq));

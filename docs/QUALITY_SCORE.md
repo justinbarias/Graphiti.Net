@@ -20,10 +20,10 @@ Evidence by area. A cell says what was run and when. "Not verified" means that n
 | Public surface design | The maintainer's approval, after 16 questions with options | Approved, with decisions D24 to D36. No code follows it yet. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-26 |
 | Adversarial review of the public surface design | One Opus 5.5 subagent, high effort | 14 important findings and 18 smaller ones. All 14 fixed or decided, 3 smaller ones left as open questions. No second review. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-26 |
 | Property tests | `scripts/check.sh --test` | 55 tests pass for the PyCompat scalar and text helpers, against 4.7 MB of values that Python 3.12.13 recorded. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-25 |
-| Mutation score | `scripts/mutate.sh`, then `python3 scripts/mutation_survivors.py` | `PyCompat`, two runs: 93.22% each. 59 mutants survived and 3 had no coverage. The script listed 13 and then 14 of 56 tests. No test is deleted yet. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-26 |
+| Mutation score | `scripts/mutate.sh`, then `python3 scripts/mutation_survivors.py` | `PyCompat` with 445 property tests: 89.87%. 5,924 mutants killed, 546 survived, 165 had no coverage, and 385 ended in a timeout on a busy machine. The script listed 224 of 445 tests. No test is deleted: the rule needs a second run on a quiet machine. Two runs on 2026-11-26, with fewer helpers, each scored 93.22%. See [plan 0003](exec-plans/active/0003-rulebook-and-pilot.md). | 2026-11-28 |
 | Devcontainer | None | Not verified. Debt T1. | |
 | Claude cloud session | None | Not verified. Debt T2. | |
-| CI | `.github/workflows/ci.yml` on GitHub, push to `main` | `check` and `mutation` jobs passed | 2026-11-25 |
+| CI | `.github/workflows/ci.yml` on GitHub, push to `main` and each pull request | The job `check` passed for pull request 55. The workflow `mutation` starts only by hand, and no run of it is measured yet. | 2026-11-28 |
 | Product code | None | No ported code. 0 of 114 MVP units done. | |
 
 Open gaps are in the [debt tracker](exec-plans/tech-debt-tracker.md).
