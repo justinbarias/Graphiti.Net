@@ -13,6 +13,9 @@ All four environments run `scripts/setup-env.sh` and use `docker-compose.yml` fo
 | Claude cloud session | The SessionStart hook in `.claude/settings.json` runs `scripts/session-start.sh`. | No. Debt T2. |
 | CI | `.github/workflows/ci.yml` runs `scripts/setup-env.sh`, then `scripts/check.sh --test`. | Yes, 2026-11-25, on a push to `main`. |
 
+A second workflow, `.github/workflows/upstream-release.yml`, is not one of the four environments. It runs `port/tools/upstream_diff.py --list` one time each week, with no setup script and no database.
+[port/UPSTREAM.md](../port/UPSTREAM.md) gives its purpose. It did not run on GitHub: its shell steps ran on a local machine on 2026-11-28.
+
 ## Claude cloud sessions
 
 Facts from the [cloud environment documentation](https://code.claude.com/docs/en/cloud-environments), read 2026-11-24:

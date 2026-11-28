@@ -166,7 +166,10 @@ Each run was `run.py --build dotnet --layer pure`, except where the row says mor
 
 ## The weekly job
 
-The job goes in its own pull request, because it is CI configuration. It is the next pull request of this stack.
+The job is `.github/workflows/upstream-release.yml`. It goes in its own pull request, because it is CI configuration.
+`actionlint` and `shellcheck` report nothing. The two shell steps ran on a local machine on 2026-11-28 with a new clone of upstream.
+The first step wrote `newer=1` and `target=v0.32.1`. With a cache folder that cannot be made, the tool ended with exit code 2, and the step failed with no output value.
+The issue search ran against the repository and found no open issue. The two `gh` commands that write an issue did not run.
 
 The tool ends with exit code 2 for each error, also for a Python exception. Exit code 1 means only that a release after the pin exists.
 
@@ -185,6 +188,7 @@ The tool ends with exit code 2 for each error, also for a Python exception. Exit
 - The rules of the tool for class C and class D were tested on the tool's own repository and on one real minor move. No reviewer compared its output with a hand classification.
 - One adversarial review ran (the next section). No second review ran on the fixes.
 - The runner patch ran on the pure layer only. No run used the flow layer or the full case set.
+- The workflow did not run on GitHub. The schedule, the permissions, and the two `gh` commands that write an issue are not tested.
 
 ## Adversarial review
 

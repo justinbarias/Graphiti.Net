@@ -1,0 +1,88 @@
+name: upstream-release
+
+# Compares the upstream release tags with port/UPSTREAM_PIN one time each week.
+# port/UPSTREAM.md, section "Weekly check". The job changes no file and starts no sync.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-release
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    env:
+      ISSUE_TITLE: Upstream release after the pin
+    defaults:
+      run:
+        # bash with -eo pipefail: a failed command before a pipe must fail the step.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List the releases after the pin
+        id: list
+        run: |
+          # Exit code 0: the pin is at the latest release. 1: a newer release exists. Other: an error.
+          code=0
+          python3 -B port/tools/upstream_diff.py --list --exit-code > list.txt || code=$?
+          cat list.txt
+          if [ "$code" -gt 1 ]; then
+            echo "upstream_diff.py failed with exit code $code" >&2
+            exit "$code"
+          fi
+          target="$(sed -n 's/^target of the next sync: \(v[0-9][0-9.]*\) .*/\1/p' list.txt)"
+          if [ "$code" -eq 1 ] && [ -z "$target" ]; then
+            echo "exit code 1, but the list names no target" >&2
+            exit 2
+          fi
+          echo "newer=$code" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Report the diff for the target
+        if: steps.list.outputs.newer == '1'
+        env:
+          TARGET: ${{ steps.list.outputs.target }}
+        run: python3 -B port/tools/upstream_diff.py --no-fetch "$TARGET" | tee report.txt
+
+      - name: Open or update the issue
+        if: steps.list.outputs.newer == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET: ${{ steps.list.outputs.target }}
+        run: |
+          {
+            echo "The weekly job found an upstream release after the pin. The runbook is \`port/UPSTREAM.md\`."
+            echo "The job replaces this text one time each week. It changes no file and starts no sync."
+            echo
+            echo "Releases after the pin:"
+            echo
+            echo '```text'
+            cat list.txt
+            echo '```'
+            echo
+            echo "Diff report for $TARGET:"
+            echo
+            echo '```text'
+            cat report.txt
+            echo '```'
+          } > body.md
+          number="$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number,title \
+            --jq "map(select(.title == \"$ISSUE_TITLE\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file body.md
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file body.md
+          fi
