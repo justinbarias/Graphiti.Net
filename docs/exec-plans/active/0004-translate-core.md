@@ -17,7 +17,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 5 | `port/neo4j` | Done 2026-11-27. `driver.neo4j`, `driver.neo4j_driver` | 14 | 3,032 | Sonnet 5.5, high. Opus 5.5 medium for `search_ops`. |
 | 6 | `port/search` | Done 2026-11-27. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | Done 2026-11-27. `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
-| 8 | `port/ingestion` | In progress. `ingestion` | 9 | 4,159 | Opus 5.5, medium |
+| 8 | `port/ingestion` | Done 2026-11-28. `ingestion` | 9 | 4,159 | Opus 5.5, medium |
 | 9 | `port/facade` | `graphiti` (2,782 lines), the package root, `migrations`, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
 
 Layer 0 is the skeleton that the porting skill requires, so every later layer compiles against fixed shapes.
@@ -55,7 +55,7 @@ Each subagent start needs the maintainer's approval first.
 | --- | --- |
 | 5 | Done 2026-11-27. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
 | 6 | Done 2026-11-27. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
-| 8 | Ingest episodes in parallel into one group, and find no lost update. |
+| 8 | Ingest episodes in parallel into one group, and find no lost update. This test moved to layer 9, because it needs the `Graphiti` object. |
 | 9 | `AddEpisodeAsync`, then `SearchAsync`. A contradicting episode closes the old fact's validity window and deletes nothing. |
 
 After layers 5, 7, and 9, run `scripts/mutate.sh` and apply the pruning rule.
@@ -551,3 +551,64 @@ Commands at the tip, after the rebase on `main`:
 - `dotnet test --project tests/Port.Evaluation`: 16,607 tests, 0 failed. `dotnet test --project tests/Graphiti.Net.E2E.Tests`: 86 tests, 0 failed.
 - `python3 -B port/judge/run.py --build dotnet`: 1,999 cases, 1,801 passed, 198 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong.
 - `scan_port.py src --allow-todo`: 384 `TODO(port)` markers in 147 files. The other 183 findings are `NotImplementedException` sites that rules R4 and R24 give.
+
+### Layer 8, ingestion, 2026-11-28
+
+Four packets ported the 8 modules of `ingestion`. The ninth unit of the row is the package module, which needs no file. Two Opus 5.5 high reviewers read each packet, and one implementer did each fix round.
+
+| Packet | Modules | Review |
+| --- | --- | --- |
+| P8a | `change_set`, `state_store`, `sqlite_state_store`, `config` | 6 and 8 findings. 18 of 63 seeded defects passed each test before the fix round. |
+| P8b | `delta`, `graph_reader`, and the recording of `ResolutionTrace` | 5 and 10 findings. 17 of 78 seeded defects passed. |
+| P8c | `phases` | 4 and 10 findings. 24 of 61 seeded defects passed. |
+| P8d | `scheduler` | 3 and 9 findings. 10 of 60 seeded defects passed. |
+
+Each seeded defect that passed fails a test now, with two kinds of exception: a seed that a reviewer showed to change nothing, and the three seeds of `phases` in the list at the end of this section.
+
+Differences in the product code that the reviews found, and their fix:
+
+| Finding | Result |
+| --- | --- |
+| `merge_edge_attributes` used the identity test, where Python uses a plain `==`. A `nan` value differed. | `PyValueEquality.PlainEqual` (rule R6). |
+| `ChangeSet.from_bytes` returned a change set for bytes with a cut check value, where Python raises `zlib.error`. | `PyZlib.Decompress`, an inflate in `PyCompat` (decision D51). |
+| `top_matches` used a stable sort. `np.argsort` is not stable for 17 or more items. | `PyNumpy.ArgSort`, the generic sort of numpy 2.4.1 (decision D53, GAPS F47). |
+| `asyncio.sleep` has no upper limit, and `Task.Delay` throws above about 49.7 days. | `Asyncio.SleepAsync` at each site, also in `OpenaiDecisionsClient` of layer 3 (rule R8). |
+| The apply loop of `phases` overflowed at the largest attempt count. | The loop compares before it adds. |
+| The commit span and the report scope got a `double` count, where Python gives an `int`. | Each count is a `long` (rule R18). |
+| A cleanup call in `except BaseException` did not take the token of the caller after an error that is not a cancel. | The cleanup token form of rule R8, at seven sites of `phases` and `scheduler`. |
+| `SemaphoreSlim` wakes a waiter through the thread pool. Two callers got their sequence numbers in the wrong order in 518 of 2,000 rounds. | `AsyncSemaphore` and `AsyncLock`, ports of the CPython classes (decision D53). The same measurement gives 0 of 2,000. |
+| The result of `add_episode` shared its lists with the change set. | Each list is copied (rule R7). No test reaches the site before layer 9. |
+
+What the reviews changed in the evidence:
+
+- A fake cancels with `Cancel()`, never with `CancelAsync()`. The second form ran callbacks on the thread pool, and tests of layers 2, 5, 7, and 8 failed in some runs (rule R25).
+- A wrapper of a real object, for example the state store, records the token of each call. Five store calls got no token, and each test passed.
+- A test of module state, for example the digest cache of `delta`, runs in one turn of the scheduler.
+- The recording of the scheduler has no wait for a recorded state. A wake-up has a fixed place in the order of the loop, so each drain ends when the state is stable.
+- The cancel at call k compares the log events after the cancel, and the token of the call that made each store call.
+
+The new semaphore changed three older tests. Seven cancel points of `search`, `edge_operations`, and `combined_extraction` now agree with Python, and they left the `LateCancel` lists. The sections of layers 6 and 7 above give the counts of their day, and GAPS F33 gives the present counts.
+
+Decisions of the lead under D49, for the maintainer at gate 4:
+
+- D51: `PyZlib.Decompress` is an inflate of its own in `PyCompat`.
+- D53: `AsyncSemaphore`, `AsyncLock`, and `PyNumpy.ArgSort` are ports of library source in `PyCompat`.
+- `AcquireAsync` throws for a token that is canceled at the call, also with a free slot. Python takes the free slot and raises at the next suspension (rule R8).
+- The order of work changed. The paths that need the `Graphiti` object, and end-to-end test E8, moved to layer 9.
+
+Differences that the lead accepted by name: GAPS F39, F40, F47, U21, and 18 more cancel points of GAPS F33 (1 in `graph_reader`, 10 in `phases`, and 7 in `scheduler`).
+
+No `TODO(port)` marker is new in a ported unit. Four upstream tests of the scheduler keep a `TODO(port): O10` comment, and the queue names them.
+
+Evidence that waits for layer 9:
+
+- Eight functions and `CommitResult` of `phases` have no recording: `admit_episode`, `admit_bulk`, `analyze_episode`, `analyze_bulk`, `commit_unit`, `enrich_unit`, `_admit_heartbeat`, and `_default_wait`. Each one calls a method of the `Graphiti` object first.
+- The paths of `scheduler` after the admit lock have no recording: the commit turn, the order of commits, the apply retry, a successful call, and the error exit.
+- Three seeded defects of `phases` pass each test: the type of a span attribute of `commit_unit`, the token of its cleanup call, and the sleep of `DefaultWait`.
+- The upstream tests that build `Graphiti` are not ported: `test_commit_repair.py`, `test_concurrent_identity_properties.py`, five tests of `test_scheduler.py`, and parts of three more files. The queue notes name them.
+- The five units with no pure case keep the status `tests_pass`. One flow case of the judge, `flow.recorded.concurrent`, runs these paths, and it passes on the layer 9 branch.
+- No test runs two processes that write to one SQLite file at one time.
+- `tests/ingestion/test_concurrent_ingestion_falkordblite_int.py` needs FalkorDB, which is out of the MVP (decision D10).
+- Nobody ran the oracle on x86, where numpy can sort equal scores in another order (GAPS F47).
+
+The mutation run of plan 0003, task 5 did not run after layer 7: the machine stopped under its load. It is still owed.
