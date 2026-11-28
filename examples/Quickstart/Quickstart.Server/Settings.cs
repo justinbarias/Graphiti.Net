@@ -13,6 +13,8 @@ internal sealed record Settings(
     string ChatModel,
     string EmbeddingModel,
     string GroupId,
+    DateOnly BillAssentDate,
+    bool BillAssentIsPlaceholder,
     string RepositoryRoot)
 {
     /// <summary>Gets the path of the folder for the downloaded Act and for sections.json.</summary>
@@ -39,11 +41,7 @@ internal sealed record Settings(
     {
         var root = FindRepositoryRoot();
         var file = ReadEnvFile(Path.Combine(root, ".env"));
-
-        string Get(string name, string fallback) =>
-            Environment.GetEnvironmentVariable(name) is { Length: > 0 } value ? value
-            : file.TryGetValue(name, out var fromFile) && fromFile.Length > 0 ? fromFile
-            : fallback;
+        string Get(string name, string fallback) => Read(file, name, fallback);
 
         var key = Get("OPENAI_API_KEY", string.Empty);
         if (key.Length == 0)
@@ -60,7 +58,38 @@ internal sealed record Settings(
             Get("QUICKSTART_CHAT_MODEL", "gpt-6-luna"),
             Get("QUICKSTART_EMBEDDING_MODEL", "text-embedding-3-small"),
             Get("QUICKSTART_GROUP_ID", "online-safety-act-2021"),
+            ParseDate(BillAssentVariable, Get(BillAssentVariable, BillAssentPlaceholder)),
+            Get(BillAssentVariable, string.Empty).Length == 0,
             root);
+    }
+
+    /// <summary>Loads only the day of the Royal Assent of the Bill. The command split needs no key and no database.</summary>
+    /// <returns>The day.</returns>
+    public static DateOnly LoadBillAssentDate() =>
+        ParseDate(BillAssentVariable, Read(ReadEnvFile(Path.Combine(FindRepositoryRoot(), ".env")), BillAssentVariable, BillAssentPlaceholder));
+
+    private const string BillAssentVariable = "QUICKSTART_BILL_ASSENT_DATE";
+
+    private static string Read(Dictionary<string, string> file, string name, string fallback) =>
+        Environment.GetEnvironmentVariable(name) is { Length: > 0 } value ? value
+        : file.TryGetValue(name, out var fromFile) && fromFile.Length > 0 ? fromFile
+        : fallback;
+
+    /// <summary>
+    /// The placeholder for the day of the Royal Assent of the Digital Duty of Care Bill 2026. Both Houses passed the
+    /// Bill on this day, and the Bill had no assent when this example was written. Set the real day with the variable
+    /// QUICKSTART_BILL_ASSENT_DATE.
+    /// </summary>
+    public const string BillAssentPlaceholder = "2026-11-25";
+
+    private static DateOnly ParseDate(string name, string value)
+    {
+        if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
+        {
+            throw new QuickstartException($"The variable {name} is not a date of the form 2026-11-25.");
+        }
+
+        return date;
     }
 
     private static string FindRepositoryRoot()

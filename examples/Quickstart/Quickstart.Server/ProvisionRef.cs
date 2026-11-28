@@ -24,20 +24,35 @@ internal sealed record ProvisionRef(
     string Name,
     string? EpisodeUuid)
 {
+    /// <summary>
+    /// Gets the id that an answer cites, if it is not the plain section id. An episode of a Bill sets it, for example
+    /// "Online Safety Act 2021 s 26 (inserted by the Digital Duty of Care Bill 2026, Sch 2 item 8)".
+    /// </summary>
+    public string? CitationId { get; init; }
+
+    /// <summary>Gets the chain of an episode of a Bill, which starts at the Bill and its Schedule, or null.</summary>
+    public string? ChainText { get; init; }
+
+    /// <summary>Gets the Schedule number and the item number of an episode of a Bill, for example "2:13", or null.</summary>
+    public string? Item { get; init; }
+
     /// <summary>Gets the section id, for example "Online Safety Act 2021 s 36".</summary>
-    public string SectionId => $"{ActShortName(Act)} s {Section}";
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string SectionId => CitationId ?? $"{ActShortName(Act)} s {Section}";
 
     /// <summary>
     /// Gets the chain in one line, with the label of each level: Act, Chapter, Part, Division, Subdivision, Section. A
     /// level that does not exist is left out.
     /// </summary>
-    public string Chain => string.Join(" > ", Levels());
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Chain => ChainText ?? string.Join(" > ", Levels());
 
     /// <summary>
     /// Gets the topic of the section: the heading text of the Part, the Division, and the Subdivision, without the label
     /// of each level. For example "Cyber-abuse material targeted at an Australian adult". It says what the section is
     /// about, and it holds no number.
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public string Topic => string.Join(", ", new[] { Part, Division, Subdivision }.Where(l => l is not null).Select(l => Title(l!)));
 
     private static string ActShortName(string act)

@@ -519,7 +519,12 @@ pre {
   font-size: 0.8rem;
 }
 
+.ruler {
+  --ruler-columns: minmax(190px, 34%) minmax(0, 1fr) 176px;
+}
+
 .ruler ul {
+  position: relative;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -527,30 +532,66 @@ pre {
 }
 
 .ruler-axis,
-.ruler button {
+.ruler button,
+.ruler-now {
   display: grid;
-  grid-template-columns: minmax(120px, 22%) minmax(0, 1fr) 190px;
+  grid-template-columns: var(--ruler-columns);
   align-items: center;
   gap: 0 16px;
   width: 100%;
 }
 
 .ruler-axis {
-  padding-bottom: 2px;
+  align-items: end;
+  padding-bottom: 3px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
+/* The labels of the axis sit at their dates. A label near the right end hangs to the left of its date. */
 .ruler-axis .axis {
+  position: relative;
+  height: 2.9em;
+  font-family: var(--mono);
   font-weight: 400;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   text-transform: none;
+  color: var(--ink-2);
+}
+
+.ruler-axis .axis span {
+  position: absolute;
+  bottom: 0;
+  padding-left: 5px;
+  border-left: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+.ruler-axis .axis span[data-end="true"] {
+  padding: 0 5px 0 0;
+  border-left: 0;
+  border-right: 1px solid var(--rule);
+  translate: -100% 0;
+}
+
+/* The label of today has the upper row of the axis, so a date label never sits on it. */
+.ruler-axis .axis span[data-now="true"] {
+  top: 0;
+  bottom: auto;
+  border-color: var(--ink);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .ruler button {
-  padding: 2px 0;
+  padding: 5px 0;
   border: 0;
+  border-bottom: 1px solid var(--rule);
   background: none;
   color: var(--ink);
   font: inherit;
@@ -563,16 +604,89 @@ pre {
   background: var(--sheet);
 }
 
+/* The name of a row: the two entities of the fact, and the relation under them. */
+.ruler-fact,
+.ruler-when {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.ruler-ends,
 .ruler-name {
   overflow: hidden;
-  font-weight: 600;
-  letter-spacing: 0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.ruler-ends {
+  font-weight: 600;
+}
+
+.ruler-ends i {
+  color: var(--ink-2);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.ruler-name,
+.ruler-state {
+  color: var(--ink-2);
+  font-size: 0.92em;
+  letter-spacing: 0.02em;
+}
+
 .ruler li {
   transition: opacity var(--step);
+}
+
+/* The line of today runs through each row. It sits over the rows and takes no pointer. */
+.ruler-now {
+  position: absolute;
+  inset: 0;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.ruler-now span {
+  grid-column: 2;
+  position: relative;
+}
+
+.ruler-now i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--ink);
+}
+
+/* The shapes of a line, in words. */
+.ruler-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 8px 0 0;
+  color: var(--ink-2);
+}
+
+.ruler-note > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.ruler-note .track {
+  flex: none;
+  width: 34px;
+}
+
+.ruler-note .bar[data-end="none"]::after {
+  display: none;
+}
+
+.ruler-note .bar {
+  --c: var(--ink-2);
 }
 
 /* The key: one button for each section colour. */
@@ -658,7 +772,7 @@ pre {
 }
 
 .facts th:nth-child(1) {
-  width: 120px;
+  width: 168px;
 }
 
 .facts th:nth-child(2),
@@ -690,9 +804,23 @@ pre {
   background: var(--sheet);
 }
 
+/* The label of a source can be long: a section and a change of the Bill. It wraps inside its column. */
 .facts .line {
-  white-space: nowrap;
   font-weight: 700;
+}
+
+.source small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 0.92em;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.key .source small,
+.sections summary .source small {
+  display: inline;
+  margin-left: 0.4em;
 }
 
 .facts .line i {
@@ -752,10 +880,12 @@ pre {
 
 .bar {
   position: absolute;
-  top: 5px;
-  height: 4px;
+  top: 4px;
+  height: 6px;
   min-width: 6px;
-  background: var(--c);
+  /* The part before today is solid. The part after today is hollow: it has not happened yet. */
+  background: linear-gradient(to right, var(--c) 0 var(--past, 100%), var(--ground) var(--past, 100%) 100%);
+  box-shadow: inset 0 0 0 1.5px var(--c);
 }
 
 /* The start of a fact is a stop. */
@@ -763,9 +893,9 @@ pre {
   content: "";
   position: absolute;
   left: -1px;
-  top: -4px;
-  width: 8px;
-  height: 8px;
+  top: -2px;
+  width: 10px;
+  height: 10px;
   border: 2px solid var(--c);
   border-radius: 50%;
   background: var(--ground);
@@ -775,24 +905,29 @@ pre {
   display: none;
 }
 
-/* A fact with no end date runs past today. A fact with an end date stops at a bar. */
+/* A fact with an end date stops at a bar. A fact with no end date runs to the edge and ends with an arrow. */
 .bar::after {
   content: "";
   position: absolute;
   right: 0;
   top: -4px;
-  height: 12px;
+  height: 14px;
   border-right: 3px solid var(--c);
+}
+
+/* The arrow of an open line ends at the edge of the track. */
+.bar[data-open="true"] {
+  margin-right: 9px;
 }
 
 .bar[data-open="true"]::after {
   top: -3px;
   right: -1px;
   height: 0;
-  border: 5px solid transparent;
+  border: 6px solid transparent;
   border-right: 0;
-  border-left: 8px solid var(--c);
-  translate: 8px 0;
+  border-left: 9px solid var(--c);
+  translate: 9px 0;
 }
 
 /* The section texts. */
@@ -934,13 +1069,26 @@ pre {
     font-size: 1.4rem;
   }
 
-  .ruler-axis,
-  .ruler button {
-    grid-template-columns: minmax(0, 38%) minmax(0, 1fr);
+  .ruler {
+    --ruler-columns: minmax(0, 42%) minmax(0, 1fr);
   }
 
+  /* The narrow axis has room for the label of today and for the first date only. */
+  .ruler-axis .axis span:nth-child(n + 3) {
+    display: none;
+  }
+
+  /* The name of a fact can take two lines in the narrow ruler. */
+  .ruler-ends {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+
+  /* The narrow ruler has no date column. The fact table below has the dates. */
   .ruler-axis > :last-child,
-  .ruler button .date {
+  .ruler button .ruler-when {
     display: none;
   }
 
@@ -1118,6 +1266,22 @@ pre {
 .rail [data-testid="copilot-send-button"]:disabled {
   background: var(--rail-3);
   color: var(--rail-ink-2);
+}
+
+/*
+ * CopilotKit puts the input over the bottom of the message list, and the block has no background of its own. So a
+ * message that scrolls behind it showed through, around the input and under the note. The block gets the colour of the
+ * rail, and a short fade above it, so a message goes out of view before it meets the input.
+ */
+.rail [data-testid="copilot-input-overlay"] > div {
+  background: var(--rail);
+}
+
+.rail [data-testid="copilot-input-overlay"] > div::before {
+  content: "";
+  position: absolute;
+  inset: -44px 0 100% 0;
+  background: linear-gradient(to bottom, transparent, var(--rail));
 }
 
 /* The page takes no file, so the button that adds one is not shown. */

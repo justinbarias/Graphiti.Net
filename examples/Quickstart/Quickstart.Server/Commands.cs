@@ -19,8 +19,16 @@ internal static class Commands
 
     /// <summary>Splits the Act and prints the count, the five largest episodes, and three samples. It calls no model.</summary>
     /// <param name="file">The path of the .docx file.</param>
-    public static void Split(string file)
+    /// <param name="bill">The path of the .docx file of the Bill, or null. With a Bill, the command prints the split of the Bill.</param>
+    /// <param name="assent">The day of the Royal Assent of the Bill.</param>
+    public static void Split(string file, string? bill = null, DateOnly assent = default)
     {
+        if (bill is not null)
+        {
+            SplitBill(file, bill, assent);
+            return;
+        }
+
         var episodes = ActSplitter.Split(file);
         var sections = episodes.Select(e => e.Ref.Section).Distinct().Count();
         Console.WriteLine($"Episodes: {episodes.Count}. Sections: {sections}.");
@@ -46,10 +54,56 @@ internal static class Commands
             var e = episodes[index];
             Console.WriteLine($"--- Sample {index + 1}. Name: {e.Ref.Name}");
             Console.WriteLine($"SourceDescription: {e.SourceDescription}");
-            Console.WriteLine($"ReferenceTime: {ActSplitter.AssentDate:O}");
+            Console.WriteLine($"ReferenceTime: {e.ReferenceTime:O}");
             Console.WriteLine("Content:");
             Console.WriteLine(e.Content);
             Console.WriteLine();
+        }
+    }
+
+    private static void SplitBill(string file, string bill, DateOnly assent)
+    {
+        var split = BillSplitter.Split(bill, ActSplitter.Split(file), assent);
+        var episodes = split.Episodes;
+        Console.WriteLine($"Episodes of the Bill: {episodes.Count}. Items left out: {split.Skipped.Count}.");
+        foreach (var kind in new[] { "inserted by", "repealed by", "amended by" })
+        {
+            Console.WriteLine($"  {kind,-12} {episodes.Count(e => e.Ref.Name.Contains($"({kind} ", StringComparison.Ordinal))}");
+        }
+
+        Console.WriteLine($"  {"other",-12} {episodes.Count(e => !e.Ref.Name.Contains(" by the ", StringComparison.Ordinal))}");
+        foreach (var group in episodes.GroupBy(e => e.ReferenceTime).OrderBy(g => g.Key))
+        {
+            Console.WriteLine($"Reference time {group.Key:yyyy-MM-dd}: {group.Count()} episodes.");
+        }
+
+        Console.WriteLine($"Words in all episodes: {episodes.Sum(e => e.WordCount)}.");
+        Console.WriteLine();
+        Console.WriteLine("The episodes (item, words, name):");
+        foreach (var e in episodes)
+        {
+            Console.WriteLine($"  {e.Ref.Item,-7} {e.WordCount,5}  {e.Ref.Name}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("The items that are left out:");
+        foreach (var line in split.Skipped)
+        {
+            Console.WriteLine($"  {line}");
+        }
+
+        Console.WriteLine();
+        foreach (var kind in new[] { "(inserted by", "(repealed by", "(amended by" })
+        {
+            if (episodes.FirstOrDefault(e => e.Ref.Name.Contains(kind, StringComparison.Ordinal)) is { } e)
+            {
+                Console.WriteLine($"--- Sample. Name: {e.Ref.Name}");
+                Console.WriteLine($"SourceDescription: {e.SourceDescription}");
+                Console.WriteLine($"ReferenceTime: {e.ReferenceTime:O}");
+                Console.WriteLine("Content:");
+                Console.WriteLine(e.Content.Length > 1200 ? e.Content[..1200] + " ..." : e.Content);
+                Console.WriteLine();
+            }
         }
     }
 
@@ -71,12 +125,29 @@ internal static class Commands
     /// <param name="resume">True to skip each section whose episode exists in the group.</param>
     /// <param name="window">The count of episodes that Graphiti works on at the same time. 0 or 1 gives serial ingestion.</param>
     /// <param name="sections">The section numbers to ingest, or null for all.</param>
+    /// <param name="bill">The path of the .docx file of a Bill that amends the Act, or null.</param>
+    /// <param name="items">The items of the Bill to ingest, each as Schedule:item, or null for all.</param>
     /// <returns>A task that ends when the ingestion ends.</returns>
     public static async Task IngestAsync(
-        Settings settings, string file, int? limit, bool resume, int window = DefaultWindow, IReadOnlyList<string>? sections = null)
+        Settings settings, string file, int? limit, bool resume, int window = DefaultWindow, IReadOnlyList<string>? sections = null,
+        string? bill = null, IReadOnlyList<string>? items = null)
     {
-        var fullList = ActSplitter.Split(file);
+        // With a Bill, the command ingests the episodes of the Bill only. The Act gives the heading and the text of each
+        // provision that the Bill changes.
+        var fullList = bill is null
+            ? ActSplitter.Split(file)
+            : BillSplitter.Split(bill, ActSplitter.Split(file), settings.BillAssentDate).Episodes;
         var all = fullList;
+        if (items is not null)
+        {
+            if (items.FirstOrDefault(i => !all.Any(e => e.Ref.Item == i)) is { } none)
+            {
+                throw new QuickstartException($"The Bill has no episode for the item '{none}'. Give an item as Schedule:item, for example 2:13.");
+            }
+
+            all = [.. all.Where(e => items.Contains(e.Ref.Item, StringComparer.Ordinal))];
+        }
+
         var sectionNumbers = all.Select(e => e.Ref.Section).Distinct().ToList();
         if (sections is not null)
         {
@@ -90,8 +161,9 @@ internal static class Commands
 
         if (limit is { } n)
         {
+            // For the Act, the limit counts sections. For a Bill, it counts episodes.
             var keep = all.Select(e => e.Ref.Section).Distinct().Take(n).ToHashSet(StringComparer.Ordinal);
-            all = [.. all.Where(e => keep.Contains(e.Ref.Section))];
+            all = bill is null ? [.. all.Where(e => keep.Contains(e.Ref.Section))] : [.. all.Take(n)];
         }
 
         await using var provider = BuildProvider(settings, window > 1 ? window : null);
@@ -99,7 +171,7 @@ internal static class Commands
         await graphiti.BuildIndicesAndConstraintsAsync();
 
         var present = await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId]);
-        if (!resume && present.Count > 0)
+        if (!resume && bill is null && present.Count > 0)
         {
             throw new QuickstartException(
                 $"The group '{settings.GroupId}' already has {present.Count} episodes. Use --resume to continue, or run the command reset first.");
@@ -108,7 +180,7 @@ internal static class Commands
         var refs = all.Select(e => e.Ref).ToList();
         var existing = new Dictionary<string, string>(StringComparer.Ordinal);
         var unfinished = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (resume)
+        if (resume || bill is not null)
         {
             // Graphiti saves an episode when it starts the work, so an episode in the graph can be unfinished. A
             // finished episode has a record with its uuid in the sections file, which the command writes only after the
@@ -131,8 +203,11 @@ internal static class Commands
             }
         }
 
-        var todo = all.Where(e => !existing.ContainsKey(e.Ref.Name)).ToList();
-        Console.WriteLine($"Episodes to ingest: {todo.Count} of {all.Count} ({existing.Count} finished in the graph, {unfinished.Count} unfinished). Window: {Math.Max(window, 1)}.");
+        // A repeal goes to no model. The step after the model episodes ends the facts of each repealed section.
+        var repeals = all.Where(e => e.RepealedSection is not null).ToList();
+        var todo = all.Where(e => e.RepealedSection is null && !existing.ContainsKey(e.Ref.Name)).ToList();
+        var total = todo.Count + repeals.Count;
+        Console.WriteLine($"Episodes to ingest: {todo.Count} of {all.Count - repeals.Count} ({all.Count(e => e.RepealedSection is null && existing.ContainsKey(e.Ref.Name))} finished in the graph, {unfinished.Count} unfinished). Repeals to apply: {repeals.Count}. Window: {Math.Max(window, 1)}.");
         for (var i = 0; i < refs.Count; i++)
         {
             if (existing.TryGetValue(refs[i].Name, out var uuid))
@@ -172,7 +247,7 @@ internal static class Commands
                             Name = episode.Ref.Name,
                             Content = episode.Content,
                             SourceDescription = episode.SourceDescription,
-                            ReferenceTime = ActSplitter.AssentDate,
+                            ReferenceTime = episode.ReferenceTime,
                             Source = EpisodeType.Text,
                             Uuid = unfinished.GetValueOrDefault(episode.Ref.Name),
                         },
@@ -195,7 +270,7 @@ internal static class Commands
                         refs[index] = refs[index] with { EpisodeUuid = result.Episode.Uuid };
                         WriteSections(settings, fullList, refs);
                         Console.WriteLine(
-                            $"[{done}/{todo.Count}] {episode.Ref.Name}: {result.Nodes.Count} entities, {result.Edges.Count} facts, " +
+                            $"[{done}/{total}] {episode.Ref.Name}: {result.Nodes.Count} entities, {result.Edges.Count} facts, " +
                             $"{Stopwatch.GetElapsedTime(started).TotalSeconds:F1}s");
                     }
                 }
@@ -221,10 +296,121 @@ internal static class Commands
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(firstError);
         }
 
+        var ended = repeals.Count > 0 ? await ApplyRepealsAsync(graphiti, settings, fullList, refs, repeals, done, total) : 0;
+        stopwatch.Stop();
         Console.WriteLine();
         Console.WriteLine($"Episodes ingested: {done}. Entities returned: {nodes}. Facts returned: {edges}.");
+        if (repeals.Count > 0)
+        {
+            Console.WriteLine($"Repeals applied: {repeals.Count}. Facts ended: {ended}.");
+        }
+
         Console.WriteLine($"Time: {stopwatch.Elapsed:hh\\:mm\\:ss}.");
         PrintUsage(graphiti);
+    }
+
+    // Applies the repeals of a Bill with no call to the chat model. Each fact that ends costs one call to the embedding
+    // model, because the save of a fact embeds its text again. A repeal is a fact about the text: the section stops being law
+    // on a date. So the command does not ask a model which facts end. It saves one episode for each repealed section, as
+    // the source of the change, and it ends each fact whose source episodes are all repealed: InvalidAt becomes the day
+    // of the repeal. A fact that another section also states stays open. The step can run two times: it skips a fact
+    // that has an end date.
+    private static async Task<int> ApplyRepealsAsync(
+        IGraphiti graphiti, Settings settings, IReadOnlyList<ActEpisode> fullList, List<ProvisionRef> refs,
+        List<ActEpisode> repeals, int done, int total)
+    {
+        var episodes = (await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId])).ToList();
+        var byName = episodes.GroupBy(e => e.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+        // The source episodes that each repeal ends: the episodes of the section that are older than the repeal. They
+        // are the episode of the Act, and each episode of a Bill that changed the section before the repeal.
+        var endedSources = new Dictionary<string, (DateTimeOffset Date, string RepealUuid)>(StringComparer.Ordinal);
+        var sourcesOf = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        // A fact can have sources in two repealed sections. So the step also reads each repeal that an earlier run applied,
+        // and not only the repeals of this run.
+        var selected = repeals.Select(r => r.Ref.Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var repeal in fullList.Where(e => e.RepealedSection is not null))
+        {
+            if (!selected.Contains(repeal.Ref.Name) && !byName.ContainsKey(repeal.Ref.Name))
+            {
+                continue;
+            }
+
+            if (!byName.TryGetValue(repeal.Ref.Name, out var node))
+            {
+                node = await graphiti.Nodes.Episode.SaveAsync(new EpisodicNode
+                {
+                    Name = repeal.Ref.Name,
+                    GroupId = settings.GroupId,
+                    Source = EpisodeType.Text,
+                    SourceDescription = repeal.SourceDescription,
+                    Content = repeal.Content,
+                    ValidAt = repeal.ReferenceTime,
+                });
+                byName[node.Name] = node;
+            }
+
+            if (refs.FindIndex(r => r.Name == repeal.Ref.Name) is var index and >= 0)
+            {
+                refs[index] = refs[index] with { EpisodeUuid = node.Uuid };
+            }
+
+            var prefix = $"{ActSplitter.ActShortName} s {repeal.RepealedSection}";
+            var sources = episodes
+                .Where(e => (e.Name == prefix || e.Name.StartsWith(prefix + " (", StringComparison.Ordinal))
+                    && !e.Name.Contains("(repealed by", StringComparison.Ordinal) && e.ValidAt < repeal.ReferenceTime)
+                .Select(e => e.Uuid).ToList();
+            sourcesOf[repeal.Ref.Name] = sources;
+            foreach (var uuid in sources)
+            {
+                endedSources[uuid] = (repeal.ReferenceTime, node.Uuid);
+            }
+        }
+
+        var repealUuids = endedSources.Values.Select(s => s.RepealUuid).ToHashSet(StringComparer.Ordinal);
+        var facts = await graphiti.Edges.Entity.GetByGroupIdsAsync([settings.GroupId]);
+        var endedBy = repeals.ToDictionary(r => r.Ref.Name, _ => 0, StringComparer.Ordinal);
+        var now = DateTimeOffset.UtcNow;
+        var count = 0;
+        foreach (var fact in facts)
+        {
+            // A source that is a repeal episode is not a statement of the fact, so it does not count.
+            var stated = fact.Episodes.Where(u => !repealUuids.Contains(u)).ToList();
+            if (stated.Count == 0 || !stated.All(endedSources.ContainsKey))
+            {
+                continue;
+            }
+
+            // The fact ends when its last source ends. A fact that has this end date or an earlier one stays as it is.
+            var last = stated.Select(u => endedSources[u]).MaxBy(s => s.Date);
+            if (fact.InvalidAt is { } end && end <= last.Date)
+            {
+                continue;
+            }
+
+            await graphiti.Edges.Entity.SaveAsync(fact with
+            {
+                InvalidAt = last.Date,
+                ExpiredAt = now,
+                Episodes = [.. fact.Episodes, .. stated.Select(u => endedSources[u].RepealUuid).Distinct(StringComparer.Ordinal).Where(u => !fact.Episodes.Contains(u))],
+            });
+            count++;
+            var name = byName.Values.First(e => e.Uuid == last.RepealUuid).Name;
+            if (endedBy.TryGetValue(name, out var soFar))
+            {
+                endedBy[name] = soFar + 1;
+            }
+        }
+
+        foreach (var repeal in repeals)
+        {
+            done++;
+            Console.WriteLine(
+                $"[{done}/{total}] {repeal.Ref.Name}: repeal, {sourcesOf[repeal.Ref.Name].Count} source episodes, {endedBy[repeal.Ref.Name]} facts ended");
+        }
+
+        WriteSections(settings, fullList, refs);
+        return count;
     }
 
     /// <summary>Deletes the data of the group of the example, and nothing else. It asks for the word yes.</summary>

@@ -10,7 +10,10 @@ using System.Xml.Linq;
 /// <param name="Content">The content of the episode: the topic line, the heading of the section, and the text. It has no chain and no section number.</param>
 /// <param name="SourceDescription">The chain in one line, for the field of the same name.</param>
 /// <param name="WordCount">The number of words of the text of the section, without the heading.</param>
-internal sealed record ActEpisode(ProvisionRef Ref, string Content, string SourceDescription, int WordCount);
+/// <param name="ReferenceTime">The day from which the text is law: the reference time of the episode.</param>
+/// <param name="RepealedSection">For an episode of a Bill that repeals a section of the Act: the number of that section. Null for each other episode.</param>
+internal sealed record ActEpisode(
+    ProvisionRef Ref, string Content, string SourceDescription, int WordCount, DateTimeOffset ReferenceTime, string? RepealedSection = null);
 
 /// <summary>
 /// Reads the Word file of the Act and splits it into episodes. A section is the unit. The definitions section is too
@@ -32,7 +35,7 @@ internal static partial class ActSplitter
 
     private static readonly XNamespace W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
-    private sealed record Para(string Style, string Text);
+    internal sealed record Para(string Style, string Text);
 
     /// <summary>Reads a Word file and returns its episodes in the order of the Act.</summary>
     /// <param name="path">The path of the .docx file.</param>
@@ -144,11 +147,14 @@ internal static partial class ActSplitter
             text.Append("Topic: ").Append(reference.Topic).Append('\n');
             text.Append(heading).Append("\n\n");
             text.Append(string.Join('\n', groups[i].Select(p => p.Text)));
-            yield return new ActEpisode(reference, text.ToString(), reference.Chain, groups[i].Sum(p => WordCount(p.Text)));
+            yield return new ActEpisode(reference, text.ToString(), reference.Chain, groups[i].Sum(p => WordCount(p.Text)), AssentDate);
         }
     }
 
-    private static string SectionIdOf(string number) => $"Online Safety Act 2021 s {number}";
+    /// <summary>The name of the Act without the jurisdiction. A section id starts with it.</summary>
+    public const string ActShortName = "Online Safety Act 2021";
+
+    private static string SectionIdOf(string number) => $"{ActShortName} s {number}";
 
     /// <summary>
     /// Cuts a section at the paragraphs of the style Definition. The lead paragraphs before the first definition
@@ -191,7 +197,7 @@ internal static partial class ActSplitter
 
     private static int WordCount(string text) => text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 
-    private static List<Para> ReadParagraphs(string path)
+    internal static List<Para> ReadParagraphs(string path)
     {
         using var archive = ZipFile.OpenRead(path);
         var entry = archive.GetEntry("word/document.xml")
