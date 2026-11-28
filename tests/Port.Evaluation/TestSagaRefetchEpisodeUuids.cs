@@ -87,6 +87,11 @@ public class TestSagaRefetchEpisodeUuids
 
         // PORT: `assert saga.save is not None` holds for each SagaNode, because `save` is a method. The port reads the
         // save in its place: the find query and the save query are the two awaits of execute_query.
+        // The Python test takes another path. Its AsyncMock driver has a `graph_operations_interface` that is true, so
+        // SagaNode.save saves through the mocked operations interface, and Python awaits execute_query one time (the
+        // find query). The fake driver of this test has no operations interface, so the save is a query. The value 2
+        // is the one that the recorded Python case `saga_absent` of values/graphiti.json gives for a driver with no
+        // operations interface: the find query and the save query.
         Assert.Equal(2, driver.ExecuteQueryAwaits);
     }
 }

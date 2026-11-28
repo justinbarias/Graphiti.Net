@@ -20,7 +20,9 @@ get_nodes_and_edges_by_episode, add_triplet, and remove_episode. The fakes:
 
 - The graph driver derives from GraphDriver. execute_query records the query (its SHA-256, its length in code points,
   and its first 80 characters with the white space joined), the parameter keys in order, and each parameter value. It
-  answers with the rows of the first entry of the case table `rows` whose needle is in the query. The session records
+  answers with the rows of the first entry of the case table `rows` whose needle is in the query and whose parameter
+  values (an optional third item) the call has. Each event of the driver, the session, and the transaction holds the
+  database of its driver, so a test sees the driver that a call used. The session records
   execute_write (with the `timeout` of unit_of_work), run, and close, and the transaction records each run with its
   parameters. clone records the database and gives a new fake driver for it. The case can give the driver a graph
   operations interface (`ops`) that answers retrieve_episodes, saga_get_previous_episode_uuid, and
@@ -47,8 +49,9 @@ node_operations and combined_extraction, have the orders that the recorders of l
 gets its placeholder too. An error text of pydantic loses `input_value`, `input_type`, and the link (R25).
 
 The cancel scenarios: for each case with `cancel`, the recorder runs the case again for each fake call k. The fake that
-makes call k records it and then cancels the main task. The recorder keeps the count of attempts and the events after
-call k.
+makes call k records it and then cancels the main task. The recorder keeps the count of attempts, and the counted
+calls and the log lines after call k. The last call of a case is a cancel point too. A log line keeps the fields of its
+`extra`.
 
 Paths that wait for packet P9b, because they enter ConcurrentIngestor (ingestion/scheduler.py is a skeleton in this
 packet): _get_concurrent_ingestor, the call of ConcurrentIngestor.add_episode at the end of add_episode, and the call of
@@ -285,6 +288,8 @@ def sync_cases() -> list[dict]:
         ([['', None, T0], ['x', T2, T1]], 1),
         ([], 5),
         ([['a' * 5, T0, T1], ['b' * 5, None, T2]], None),
+        # Review P9a (decision 7): the default budget, with a text exactly on it.
+        ([['a' * 100_000, None, T0]], None),
     ):
         case = {'fn': 'select_saga_summary_episodes', 'data': [[c, dt(v), dt(cr)] for c, v, cr in data]}
         if max_chars is not None:
@@ -446,23 +451,29 @@ class Run:
         provider_value = m['GraphProvider'](self.case.get('provider', 'neo4j'))
 
         class FakeTx:
+            def __init__(self, db):
+                self._database = db
+
             async def run(self, query, **kwargs):
-                await enter('tx_run', {'query': query_view(query), 'keys': list(kwargs),
-                                       'values': encode(list(kwargs.values()))})
+                await enter('tx_run', {'database': self._database, 'query': query_view(query),
+                                       'keys': list(kwargs), 'values': encode(list(kwargs.values()))})
 
         class FakeSession(GraphDriverSession):
             provider = provider_value
+
+            def __init__(self, db):
+                self._database = db
 
             async def __aexit__(self, exc_type, exc, tb):
                 pass
 
             async def run(self, query, **kwargs):
-                await enter('session_run', {'query': query_view(query), 'keys': list(kwargs),
-                                            'values': encode(list(kwargs.values()))})
+                await enter('session_run', {'database': self._database, 'query': query_view(query),
+                                            'keys': list(kwargs), 'values': encode(list(kwargs.values()))})
 
             async def execute_write(self, func, *args, **kwargs):
-                await enter('execute_write', {'timeout': getattr(func, 'timeout', None)})
-                return await func(FakeTx(), *args, **kwargs)
+                await enter('execute_write', {'database': self._database, 'timeout': getattr(func, 'timeout', None)})
+                return await func(FakeTx(self._database), *args, **kwargs)
 
             async def close(self):
                 await enter('session_close', {}, counted=False)
@@ -475,18 +486,21 @@ class Run:
                 self.graph_operations_interface = run.make_ops()
 
             async def execute_query(self, cypher_query_, **kwargs):
-                await enter('query', {'query': query_view(cypher_query_), 'keys': list(kwargs),
-                                      'values': encode(list(kwargs.values()))})
+                await enter('query', {'database': self._database, 'query': query_view(cypher_query_),
+                                      'keys': list(kwargs), 'values': encode(list(kwargs.values()))})
                 # The needle is found in the query with its white space joined.
                 normalized = ' '.join(cypher_query_.split())
-                for needle, rows in run.case.get('rows', []):
-                    if needle in normalized:
+                # A third item of an entry gives parameter values that the call must have too.
+                for entry in run.case.get('rows', []):
+                    needle, rows = entry[0], entry[1]
+                    wanted = entry[2] if len(entry) > 2 else {}
+                    if needle in normalized and all(kwargs.get(k) == v for k, v in wanted.items()):
                         return decode(copy.deepcopy(rows)), None, None
                 return [], None, None
 
             def session(self, database=None):
-                events.append({'kind': 'session'})
-                return FakeSession()
+                events.append({'kind': 'session', 'database': self._database})
+                return FakeSession(self._database)
 
             async def close(self):
                 await enter('driver_close', {'database': self._database})
@@ -794,6 +808,43 @@ def nodes_reply_cases() -> list[dict]:
     add('llm_fails', {'group_id': 'g'},
         replies={'extract_nodes.extract_message': [{'reply': {'$raise': 'model down'}}]})
     add('save_fails', {'group_id': 'g'}, fail={'execute_write': 1})
+    # Review P9a (decision 6): the valid_at of the new fact is not the reference time, so the old edge gets it as its
+    # invalid_at.
+    add('contradiction_later_fact', {'group_id': 'g'},
+        rows=[[ENTITY_GET, []], [NODE_SEARCH, [node_row('n-alice', 'Alice'), node_row('n-bob', 'Bob')]],
+              [EDGE_SEARCH, [stored_edge]]],
+        replies={'extract_nodes.extract_message': [{'reply': entities('Alice', 'Bob')}],
+                 'extract_edges.edge': [{'reply': facts(('Alice', 'Bob', 'WORKS_AT', 'Alice left Acme'))}],
+                 'dedupe_edges.resolve_edge': [{'reply': edge_reply(contradicted=[0])}],
+                 'extract_edges.extract_timestamps': [{'reply': {'valid_at': '2026-01-15T00:00:00Z',
+                                                                 'invalid_at': None}}]})
+    # Review P9a (decision 8): extraction gives Bob, resolution maps Bob to the stored node Robert, and an edge names
+    # Robert. The materialized Robert matches the resolved node by its name.
+    robert = [[NODE_SEARCH, [node_row('n-robert', 'Robert')]]]
+    bob_is_robert = {'reply': resolutions((0, 'Bob', 0))}
+    add('materialized_name_of_resolved', {'group_id': 'g'}, rows=robert,
+        replies={'extract_nodes.extract_message': [{'reply': entities('Bob')}],
+                 'dedupe_nodes.nodes': [bob_is_robert],
+                 'extract_edges.edge': [{'reply': facts(('Robert', 'Robert', 'IS', 'Robert is Robert'),
+                                                         ('Bob', 'Robert', 'KNOWS', 'Bob knows Robert'))}]})
+    # The materialized Bobby resolves to the stored Robert, whose uuid the resolved nodes already hold.
+    add('materialized_resolves_to_known', {'group_id': 'g'}, rows=robert,
+        replies={'extract_nodes.extract_message': [{'reply': entities('Bob')}],
+                 'dedupe_nodes.nodes': [bob_is_robert, {'reply': resolutions((0, 'Bobby', 0))}],
+                 'extract_edges.edge': [{'reply': facts(('Bob', 'Bobby', 'KNOWS', 'Bob knows Bobby'))}]})
+    # An edge names an endpoint whose name is the uuid of a resolved node. The materialized node is not that node: its
+    # uuid is new, so it goes through resolution. A materialized node with a known uuid (graphiti.py:1024) cannot
+    # happen, because extract_edges gives each one a new uuid4.
+    add('materialized_name_is_known_uuid', {'group_id': 'g'}, rows=robert,
+        replies={'extract_nodes.extract_message': [{'reply': entities('Bob')}],
+                 'dedupe_nodes.nodes': [bob_is_robert],
+                 'extract_edges.edge': [{'reply': facts(('Bob', 'n-robert', 'KNOWS', 'Bob knows n-robert'))}]})
+    # Review P9a (decision 1): a group that is not the default database, with a saga.
+    add('saga_name_other_database', {'group_id': 'tenant', 'saga': {'name': 'Trip'}},
+        rows=[[SAGA_PREVIOUS, [{'uuid': 'old9'}]]],
+        replies={'extract_nodes.extract_message': [{'reply': entities('Alice')}]})
+    add('saga_node_other_database', {'group_id': 'tenant', 'saga': {'node': saga(group_id='tenant')}},
+        rows=[[SAGA_GET, [saga(group_id='tenant')]]])
     add('concurrent_update_communities', {'group_id': 'g', 'update_communities': True},
         init={'concurrent_ingestion': {}})
     add('concurrent_saga_other_group', {'group_id': 'g', 'saga': {'node': saga(group_id='h')}},
@@ -840,18 +891,56 @@ def bulk_cases() -> list[dict]:
     bulk('with_uuid', [raw('b1', 'ignored', T1, uuid='ep-own'), raw('b2', 'New one.', T2)], {'group_id': 'g'},
          rows=[[EPISODE_GET, [episode('ep-own', T1, 'stored body')]]])
     bulk('with_uuid_missing', [raw('b1', 'ignored', T1, uuid='ep-gone')], {'group_id': 'g'})
+    # Review P9a (decision 4): each episode has an edge, so the combined extraction keeps its nodes.
     bulk('custom_types_identity', [raw('b1', 'Alice joined Acme.'), raw('b2', 'Alice left Acme.', T1)],
          {'group_id': 'g', 'entity_types': ['Person', 'Company'], 'excluded_entity_types': ['Company'],
           'identity_properties': {'Person': ['email']}, 'edge_type_map': [[['Person', 'Company'], ['Works']]],
           'edge_types': ['Works']},
          replies={'extract_nodes_and_edges.extract_message': [
-             {'needle': 'joined', 'reply': {'extracted_entities': [{'name': 'Alice', 'entity_type_id': 1}],
-                                            'edges': []}},
-             {'needle': 'left', 'reply': {'extracted_entities': [{'name': 'Alice', 'entity_type_id': 1}],
-                                          'edges': []}}],
+             {'needle': 'joined', 'reply': {
+                 'extracted_entities': [{'name': 'Alice', 'entity_type_id': 1}, {'name': 'Bob', 'entity_type_id': 0}],
+                 'edges': [{'source_entity_name': 'Alice', 'target_entity_name': 'Bob', 'relation_type': 'KNOWS',
+                            'fact': 'Alice knows Bob', 'valid_at': None, 'invalid_at': None,
+                            'episode_indices': [0]}]}},
+             {'needle': 'left', 'reply': {
+                 'extracted_entities': [{'name': 'Alice', 'entity_type_id': 1}, {'name': 'Bob', 'entity_type_id': 0}],
+                 'edges': [{'source_entity_name': 'Alice', 'target_entity_name': 'Bob', 'relation_type': 'MET',
+                            'fact': 'Alice met Bob', 'valid_at': None, 'invalid_at': None,
+                            'episode_indices': [0]}]}}],
              'extract_nodes.extract_attributes': [{'reply': {'role': None, 'email': 'a@x.org'}},
                                                   {'reply': {'role': None, 'email': 'a@x.org'}},
                                                   {'reply': {'role': 'cto', 'email': 'a@x.org'}}]})
+    # Review P9a (decision 9): two episodes resolve to one stored edge. The second episode has two facts that both
+    # resolve to it, so the resolved edges hold its uuid two times for that episode, and entity_edges holds it once.
+    stored = edge_row('e-old', 'n-alice', 'n-bob', 'Alice knows Bob', episodes=['old-ep'])
+    to_stored = {'needle': 'Alice knows Bob', 'reply': edge_reply(duplicates=[0])}
+    bulk('two_episodes_one_stored_edge', [raw('b1', 'Alice met Bob.', T1), raw('b2', 'Alice saw Bob.', T2)],
+         {'group_id': 'g'},
+         rows=[[NODE_SEARCH, [node_row('n-alice', 'Alice'), node_row('n-bob', 'Bob')]], [EDGE_SEARCH, [stored]]],
+         replies={'extract_nodes_and_edges.extract_message': [
+             {'needle': 'met', 'reply': combined(['Alice', 'Bob'], [('Alice', 'Bob', 'MET', 'Alice met Bob')])},
+             {'needle': 'saw', 'reply': combined(['Alice', 'Bob'], [('Alice', 'Bob', 'SAW', 'Alice saw Bob'),
+                                                                    ('Alice', 'Bob', 'GREETED', 'Alice greeted Bob')])}],
+             'dedupe_edges.resolve_edge': [to_stored, to_stored, to_stored]})
+    # Review P9a (decision 7): a contradiction in the bulk path (S48, S74).
+    bulk('contradiction', [raw('b1', 'Alice left Acme.', T1)], {'group_id': 'g'},
+         rows=[[NODE_SEARCH, [node_row('n-alice', 'Alice'), node_row('n-bob', 'Bob')]],
+               [EDGE_SEARCH, [edge_row('e-old', 'n-alice', 'n-bob', 'Alice works at Acme', valid_at=T0,
+                                       episodes=['prev1'])]]],
+         replies={'extract_nodes_and_edges.extract_message': [
+             {'reply': combined(['Alice', 'Bob'], [('Alice', 'Bob', 'WORKS_AT', 'Alice left Acme')])}],
+             'dedupe_edges.resolve_edge': [{'reply': edge_reply(contradicted=[0])}],
+             'extract_edges.extract_timestamps_batch': [{'reply': {'timestamps': [
+                 {'index': 0, 'valid_at': '2026-01-15T00:00:00Z', 'invalid_at': None}]}}]})
+    # The saga chain follows valid_at, not the order of the input (S70).
+    bulk('saga_out_of_order', [raw('b1', 'Day three.', T3), raw('b2', 'Day one.', T1), raw('b3', 'Day two.', T2)],
+         {'group_id': 'g', 'saga': {'name': 'Trip'}})
+    # Review P9a (decision 1): a group that is not the default database, with a saga.
+    bulk('saga_name_other_database', [raw('b1', 'Day one.', T1)], {'group_id': 'tenant', 'saga': {'name': 'Trip'}},
+         rows=[[SAGA_PREVIOUS, [{'uuid': 'old9'}]]])
+    bulk('saga_node_other_database', [raw('b1', 'Day one.', T1)],
+         {'group_id': 'tenant', 'saga': {'node': saga(group_id='tenant')}},
+         rows=[[SAGA_GET, [saga(group_id='tenant')]]])
     bulk('empty', [], {'group_id': 'g'})
     bulk('default_group', [raw('b1', 'Hi.')], {})
     bulk('llm_fails', [raw('b1', 'Hi.')], {'group_id': 'g'},
@@ -999,6 +1088,76 @@ def other_cases() -> list[dict]:
         {'fn': 'get_nodes_and_edges_by_episode', 'name': 'by_episode_group_missing',
          'args': {'episode_uuids': ['prev1'], 'group_id': 'g'}},
     ]
+    # Review P9a (decisions 1 and 7).
+    two_nodes = [node_row('n1', 'Alice', summary='Alice works.'), node_row('n2', 'Bob', summary='Bob works.')]
+    cases += [
+        {'fn': 'retrieve_episodes', 'name': 'retrieve_ops_source',
+         'args': {'reference_time': dt(T1), 'group_ids': ['g'], 'source': 'message'},
+         'ops': {'retrieve_episodes': ep_rows[:1]}},
+        {'fn': '_get_or_create_saga', 'name': 'saga_existing_driver',
+         'args': {'saga_name': 'my-saga', 'group_id': 'g1', 'driver': 'other'},
+         'rows': [[SAGA_FIND, [{'uuid': 'saga-1', 'name': 'my-saga', 'group_id': 'g1',
+                                'created_at': '2026-08-13T00:00:00+00:00', 'first_episode_uuid': 'ep-1',
+                                'last_episode_uuid': 'ep-2'}]]]},
+        {'fn': '_extract_and_resolve_nodes', 'name': 'extract_resolve_identity_and_plain',
+         'args': {'episode': episode('ep1', content='Alice met Bob.'), 'previous_episodes': [],
+                  'entity_types': ['Person', 'Company'], 'excluded_entity_types': None,
+                  'identity_properties': {'Person': ['email']}},
+         'replies': {'extract_nodes.extract_text': [{'reply': {'extracted_entities': [
+             {'name': 'Alice', 'entity_type_id': 1}, {'name': 'Acme', 'entity_type_id': 2}]}}],
+             'extract_nodes.extract_attributes': [{'reply': {'role': None, 'email': 'a@x.org'}},
+                                                  {'reply': {'role': None, 'email': 'b@x.org'}}]}},
+        {'fn': '_resolve_nodes_and_edges_bulk', 'name': 'resolve_bulk_no_hydrate_identity',
+         'args': {'nodes_by_episode': {'ep1': [node('n1', 'Alice', labels=['Entity', 'Person'],
+                                                    attributes={'email': 'a@x.org'})],
+                                       'ep2': [node('n1', 'Alice', labels=['Entity', 'Person'],
+                                                    attributes={'email': 'a@x.org'}), node('n2', 'Bob')]},
+                  'edges_by_episode': {'ep1': [], 'ep2': []},
+                  'episode_context': [[episode('ep1'), []], [episode('ep2', T1), [episode('ep1')]]],
+                  'entity_types': ['Person'], 'edge_types': None,
+                  'edge_type_map': [[['Entity', 'Entity'], []]], 'episodes': [episode('ep1'), episode('ep2', T1)],
+                  'identity_properties': {'Person': ['email']}, 'hydrate': False}},
+        {'fn': '_resolve_nodes_and_edges_bulk', 'name': 'resolve_bulk_shared_edge',
+         'args': {'nodes_by_episode': {'ep1': [node('n1', 'Alice'), node('n2', 'Bob')], 'ep2': [node('n1', 'Alice')]},
+                  'edges_by_episode': {
+                      'ep1': [edge('e1', 'n1', 'n2', 'Alice knows Bob', [0.0, 1.0, 0.0], episodes=['ep1'])],
+                      'ep2': [edge('e1', 'n1', 'n2', 'Alice knows Bob', [0.0, 1.0, 0.0], episodes=['ep2']),
+                              edge('e2', 'n1', 'n2', 'Alice likes Bob', [1.0, 1.0, 0.0], episodes=['ep2'])]},
+                  'episode_context': [[episode('ep1'), []], [episode('ep2', T1), [episode('ep1')]]],
+                  'entity_types': None, 'edge_types': None,
+                  'edge_type_map': [[['Entity', 'Entity'], []]], 'episodes': [episode('ep1'), episode('ep2', T1)],
+                  'identity_properties': None, 'hydrate': False}},
+        {'fn': '_resolve_nodes_and_edges_bulk', 'name': 'resolve_bulk_contradiction',
+         'rows': [[EDGE_SEARCH, [edge_row('e-old', 'n1', 'n2', 'Alice works at Acme', valid_at=T0)]]],
+         'replies': {'dedupe_edges.resolve_edge': [{'reply': edge_reply(contradicted=[0])}]},
+         'args': {'nodes_by_episode': {'ep1': [node('n1', 'Alice'), node('n2', 'Bob')]},
+                  'edges_by_episode': {'ep1': [edge('e1', 'n1', 'n2', 'Alice left Acme', [0.0, 1.0, 0.0],
+                                                    episodes=['ep1'], valid_at=T1)]},
+                  'episode_context': [[episode('ep1', T1), []]],
+                  'entity_types': None, 'edge_types': None,
+                  'edge_type_map': [[['Entity', 'Entity'], []]], 'episodes': [episode('ep1', T1)],
+                  'identity_properties': None, 'hydrate': False}},
+        {'fn': 'build_communities', 'name': 'communities_built', 'args': {'group_ids': ['g'], 'driver': 'other'},
+         'rows': [['MATCH (n:Entity) WHERE n.group_id IN $group_ids', two_nodes],
+                  ['WITH count(e) AS count', [{'uuid': 'n2', 'count': 1}]],
+                  ['MATCH (n:Entity) WHERE n.uuid IN $uuids', two_nodes]]},
+        {'fn': '_search', 'name': 'private_search_center',
+         'args': {'query': 'Alice', 'config': 'EDGE_HYBRID_SEARCH_NODE_DISTANCE', 'group_ids': ['g'],
+                  'center_node_uuid': 'n1'},
+         'rows': [['UNWIND $node_uuids AS node_uuid', [{'uuid': 'n2', 'score': 1}]],
+                  [EDGE_SEARCH, [edge_row('e1', 'n1', 'n2', 'Alice knows Bob'),
+                                 edge_row('e2', 'n2', 'n3', 'Bob knows Carol')]]]},
+        {'fn': 'get_nodes_and_edges_by_episode', 'name': 'by_episode_third_group',
+         'args': {'episode_uuids': ['prev1', 'prev2']},
+         'rows': [[EPISODES_GET, ep_rows], [EDGES_GET, [edge_row('e1', 'n1', 'n2', 'f1'),
+                                                        edge_row('e9', 'n1', 'n2', 'f9', group_id='x')]],
+                  [MENTIONS, [node_row('n1', 'Alice')]]]},
+        {'fn': 'get_nodes_and_edges_by_episode', 'name': 'by_episode_other_database',
+         'args': {'episode_uuids': ['prev1'], 'group_id': 'tenant'},
+         'rows': [[EPISODES_GET, [episode('prev1', T0, 'earlier talk', group_id='tenant', entity_edges=['e1'])]],
+                  [EDGES_GET, [edge_row('e1', 'n1', 'n2', 'f1', group_id='tenant')]],
+                  [MENTIONS, [node_row('n1', 'Alice', group_id='tenant')]]]},
+    ]
     return cases
 
 
@@ -1045,11 +1204,30 @@ def triplet_cases() -> list[dict]:
     triplet('identity_properties', node('n-alice', 'Alice', labels=['Entity', 'Person'],
                                         attributes={'email': 'a@x.org'}), fact, bob,
             {'identity_properties': {'Person': ['email']}})
+    # Review P9a (decisions 2 and 7). The search gives an edge of another group between the two nodes: Python drops it.
+    later = edge('e-new', 'n-alice', 'n-bob', 'Alice no longer manages Bob', valid_at=T2, name='MANAGES')
+    triplet('foreign_candidate', node('n-alice', 'Alice'), later, bob,
+            rows=[[EDGE_GET, []], [EDGE_SEARCH, [edge_row('e-h', 'n-alice', 'n-bob', 'Alice manages Bob', group_id='h',
+                                                          valid_at=T0)]]],
+            replies={'dedupe_edges.resolve_edge': [{'reply': edge_reply(contradicted=[0])}]})
+    # The stored target node is in another group (graphiti.py:2544). The stored source is in the group.
+    triplet('stored_target_other_group', alice, fact, bob,
+            rows=[[ENTITY_GET, [node_row('n-alice', 'Alice')], {'uuid': 'n-alice'}],
+                  [ENTITY_GET, [node_row('n-bob', 'Bob', group_id='h')], {'uuid': 'n-bob'}]])
+    # The stored target gets the attributes and the summary of the input target (graphiti.py:2553, 2559).
+    triplet('stored_target_merged', alice, fact,
+            node('n-bob', 'Bob', summary='Bob summary', attributes={'team': 'core'}, labels=['Entity', 'Engineer']),
+            rows=[[ENTITY_GET, [node_row('n-bob', 'Bob', summary='old', attributes={'level': 'senior'})],
+                   {'uuid': 'n-bob'}]])
+    # A stored edge with the same source and another target (graphiti.py:2584).
+    triplet('existing_edge_other_target', alice, fact, bob,
+            rows=[[EDGE_GET, [edge_row('e-new', 'n-alice', 'n-carol', 'Alice manages Carol')]]])
     return cases
 
 
 def remove_cases() -> list[dict]:
     target = episode('ep-del', T1, 'deleted talk', entity_edges=['e1', 'e2', 'e3'])
+    mentioning = 'MATCH (e:Episodic)-[r:MENTIONS]->(n:Entity {uuid: $entity_node_uuid})'
     rows = [
         [EPISODE_GET, [target]],
         [EDGES_GET, [edge_row('e1', 'n1', 'n2', 'only here', episodes=['ep-del']),
@@ -1060,20 +1238,42 @@ def remove_cases() -> list[dict]:
                     node_row('n3', 'Zed', group_id='h')]],
         ['RETURN e.fact_embedding', [{'fact_embedding': [0.0, 1.0, 0.0]}]],
         ['RETURN n.name_embedding', [{'name_embedding': [1.0, 0.0, 0.0]}]],
-        ['MATCH (e:Episodic)-[r:MENTIONS]->(n:Entity {uuid: $entity_node_uuid})',
-         [episode('ep-keep', T0, 'kept talk'), target, episode('ep-h', T2, group_id='h')]],
+        [mentioning, [episode('ep-keep', T0, 'kept talk'), target, episode('ep-h', T2, group_id='h')]],
     ]
+    # Review P9a (decision 3): each node has two episodes, so it survives and its summary is rebuilt. The rows of the
+    # mentioning episodes come before the rows of MENTIONS, whose needle is in both queries.
+    survive = [rows[0], rows[1], [EPISODE_COUNT, [{'episode_count': 2}]], rows[6], rows[3], rows[4], rows[5]]
+    many = [episode(f'ep-{i:02d}', T0 + timedelta(hours=i), f'talk {i}') for i in range(11)]
     return [
         {'fn': 'remove_episode', 'name': 'remove_with_group', 'args': {'episode_uuid': 'ep-del', 'group_id': 'g'},
          'rows': rows, 'cancel': True},
         {'fn': 'remove_episode', 'name': 'remove_no_group', 'args': {'episode_uuid': 'ep-del'}, 'rows': rows,
          'init': {'max_coroutines': 1}},
+        {'fn': 'remove_episode', 'name': 'remove_survivors', 'args': {'episode_uuid': 'ep-del', 'group_id': 'g'},
+         'rows': survive, 'replies': {'extract_nodes.extract_entity_summaries_from_episodes': [
+             {'needle': 'Alice', 'reply': summaries(('Alice', 'Alice again.'))}]}},
         {'fn': 'remove_episode', 'name': 'remove_summary_fails', 'args': {'episode_uuid': 'ep-del', 'group_id': 'g'},
-         'rows': rows, 'replies': {'extract_nodes.extract_summaries_batch': [{'reply': {'$raise': 'model down'}}]}},
+         'rows': survive, 'init': {'max_coroutines': 1},
+         'replies': {'extract_nodes.extract_entity_summaries_from_episodes': [{'reply': {'$raise': 'model down'}}]}},
+        {'fn': 'remove_episode', 'name': 'remove_eleven_episodes', 'args': {'episode_uuid': 'ep-del', 'group_id': 'g'},
+         'rows': [rows[0], rows[1], [EPISODE_COUNT, [{'episode_count': 2}]], [mentioning, many + [target]],
+                  [MENTIONS, [node_row('n1', 'Alice', summary='old')]], rows[4], rows[5]]},
         {'fn': 'remove_episode', 'name': 'remove_counts_not_one', 'args': {'episode_uuid': 'ep-del'},
          'rows': [rows[0], rows[1], [EPISODE_COUNT, [{'episode_count': 2}, {'episode_count': 1.0}]]] + rows[3:]},
+        {'fn': 'remove_episode', 'name': 'remove_other_database',
+         'args': {'episode_uuid': 'ep-del', 'group_id': 'tenant'},
+         'rows': [[EPISODE_GET, [episode('ep-del', T1, 'deleted talk', group_id='tenant', entity_edges=['e1'])]],
+                  [EDGES_GET, [edge_row('e1', 'n1', 'n2', 'only here', group_id='tenant', episodes=['ep-del'])]],
+                  [EPISODE_COUNT, [{'episode_count': 1}]],
+                  [MENTIONS, [node_row('n1', 'Alice', group_id='tenant')]]]},
         {'fn': 'remove_episode', 'name': 'remove_missing', 'args': {'episode_uuid': 'gone', 'group_id': 'g'}},
     ]
+
+
+# The prompt bytes of summarize_saga (graphiti.py:834) for the three episodes of the cases (the episodes `three` and an
+# empty summary), and for one episode of 400 ASCII characters. check_budgets proves them at each run.
+PROMPT_BYTES_THREE = 3979
+PROMPT_BYTES_ASCII = 4249
 
 
 def saga_summary_cases() -> list[dict]:
@@ -1122,6 +1322,21 @@ def saga_summary_cases() -> list[dict]:
     summarize('routed_library', saga(), [['x' * 4000, dt(T0), dt(T1)] for _ in range(5)],
               patch={'SAGA_SUMMARY_MAX_PROMPT_BYTES': 25000}, init={'prompt_library': 'padded'})
     summarize('llm_fails', saga(), three, replies={'summarize_sagas.summarize_saga': [{'reply': {'$raise': 'down'}}]})
+    # Review P9a (decision 5).
+    summarize('ops_since', saga(summary='Old.', last_summarized_at=T0, last_valid_at=T0), three)
+    for name, budget in (('ops_prompt_on_budget', PROMPT_BYTES_THREE), ('ops_prompt_over_budget',
+                                                                        PROMPT_BYTES_THREE - 1)):
+        summarize(name, saga(), three, patch={'SAGA_SUMMARY_MAX_PROMPT_BYTES': budget})
+    summarize('ops_prompt_cap_ascii', saga(), [['x' * 400, dt(T0), dt(T1)]],
+              patch={'SAGA_SUMMARY_MAX_PROMPT_BYTES': PROMPT_BYTES_ASCII - 5})
+    for name, size in (('summary_on_limit', 4000), ('summary_over_limit', 4001)):
+        summarize(name, saga(), three, replies={'summarize_sagas.summarize_saga': [{'reply': {'summary': 'y' * size}}]})
+    for name, size in (('existing_on_limit', 4000), ('existing_over_limit', 4001)):
+        summarize(name, saga(summary='z' * size), three)
+    summarize('watermark_advances', saga(last_summarized_at=T0, last_valid_at=T0),
+              [['new', dt(T1), dt(T2)]], rows=[])
+    summarize('no_valid_at', saga(last_summarized_at=T0, last_valid_at=T1),
+              [['first', None, dt(T2)], ['second', None, dt(T3)]])
     for case in cases:
         if case['rows'][0][1] == [None]:
             case['rows'] = case['rows'][1:]
@@ -1231,11 +1446,16 @@ async def run_case(case: dict, m):
     fn = case['fn']
     for name, value in case.get('patch', {}).items():
         setattr(g, name, value)
+    # search writes num_results into a shared recipe (upstream defect U8). Each case starts with the limits of the
+    # module, as the C# test gives them back after each case.
+    from graphiti_core.search import search_config_recipes as recipes
+    limits = (recipes.EDGE_HYBRID_SEARCH_RRF.limit, recipes.EDGE_HYBRID_SEARCH_NODE_DISTANCE.limit)
     try:
         return await run_method(fn, a, case, run, graphiti, m)
     finally:
         for name, value in m['constants'].items():
             setattr(g, name, value)
+        recipes.EDGE_HYBRID_SEARCH_RRF.limit, recipes.EDGE_HYBRID_SEARCH_NODE_DISTANCE.limit = limits
 
 
 async def run_method(fn, a, case, run, graphiti, m):
@@ -1406,8 +1626,22 @@ def run_one(case: dict, m, cancel_at: int) -> dict:
     return output
 
 
+# The events that are not a counted fake call. The events after call k keep the log lines (R25).
 COUNTED_SKIP = ('log', 'session', 'session_close', 'span', 'span_attrs', 'span_status', 'span_exception', 'span_end',
                 'clone')
+AFTER_SKIP = tuple(kind for kind in COUNTED_SKIP if kind != 'log')
+
+
+def events_after(items: list[dict], k: int) -> list[dict]:
+    """The counted calls and the log lines after counted call k."""
+    seen = 0
+    after = []
+    for item in items:
+        if seen > k and item['kind'] not in AFTER_SKIP:
+            after.append(item)
+        if item['kind'] not in COUNTED_SKIP:
+            seen += 1
+    return after
 
 
 def record_async(m) -> list[dict]:
@@ -1417,15 +1651,24 @@ def record_async(m) -> list[dict]:
         output = run_one(case, m, -1)
         if case.get('cancel'):
             cancels = []
-            for k in range(output['count'] - 1):
+            for k in range(output['count']):
                 cancelled = run_one(case, m, k)
-                counted = [e for e in cancelled['events'] if e['kind'] not in COUNTED_SKIP]
                 cancels.append({'k': k, 'attempts': cancelled['attempts'], 'count': cancelled['count'],
                                 'error': cancelled.get('error', {}).get('type'),
-                                'after': placeholders(counted[k + 1:], {})})
+                                'after': placeholders(events_after(cancelled['events'], k), {})})
             output['cancel'] = cancels
         out.append({'in': case, 'out': placeholders(output, {})})
+    check_budgets({r['in']['name']: r['out'] for r in out if r['in']['fn'] == 'summarize_saga'})
     return out
+
+
+def check_budgets(outputs: dict) -> None:
+    """The prompt of three episodes fits a budget of PROMPT_BYTES_THREE bytes, and not one byte less. The ASCII episode
+    loses the 5 bytes that its budget lacks."""
+    on, over = outputs['ops_prompt_on_budget']['ok']['saga'], outputs['ops_prompt_over_budget']['ok']['saga']
+    ascii_saga = outputs['ops_prompt_cap_ascii']['ok']['saga']
+    if on['private'] != [3, 3, 0, 120] or over['private'][1] != 2 or ascii_saga['private'][3] != 395:
+        raise SystemExit(f'The prompt budgets are wrong: {on["private"]}, {over["private"]}, {ascii_saga["private"]}')
 
 
 def main() -> int:
@@ -1454,9 +1697,16 @@ def main() -> int:
     from graphiti_core.tracer import Tracer
     from graphiti_core.utils.bulk_utils import RawEpisode
 
+    # The attributes that each LogRecord has. Each other attribute came from `extra` (R25).
+    standard = set(vars(logging.LogRecord('n', logging.INFO, 'p', 1, 'm', None, None))) | {'message', 'asctime'}
+
     class Capture(logging.Handler):
         def emit(self, record):
-            events.append({'kind': 'log', 'level': record.levelname, 'message': record.getMessage()})
+            item = {'kind': 'log', 'level': record.levelname, 'message': record.getMessage()}
+            extra = {k: encode(v) for k, v in vars(record).items() if k not in standard}
+            if extra:
+                item['extra'] = extra
+            events.append(item)
 
     root = logging.getLogger('graphiti_core')
     root.setLevel(logging.DEBUG)

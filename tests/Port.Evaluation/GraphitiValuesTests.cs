@@ -37,23 +37,60 @@ public class GraphitiValuesTests
     private static readonly List<OrderedDictionary<string, object?>> AsyncCases =
         List(GraphitiValues.Document["async_cases"]).Select(Dict).ToList();
 
-    // The cancel points where the port makes more attempts than Python: the late cancel of GAPS F33. The key is the
-    // function, the name of the case, and k, and the value is the count of the extra attempts. A listed point that
-    // agrees with Python fails the test.
-    private static readonly Dictionary<string, long> LateCancel = new(StringComparer.Ordinal)
+    // The cancel points where the port differs from Python by the late cancel of GAPS F33. The key is the function, the
+    // name of the case, and k. The value is the kind of the difference (CancelDifference). A listed point that agrees
+    // with Python fails the test.
+    private static readonly Dictionary<string, string> LateCancel = new(StringComparer.Ordinal)
     {
-        ["add_episode:entities_and_edges:5"] = 1,
-        ["add_episode:entities_and_edges:13"] = 1,
-        ["add_episode:contradiction:5"] = 1,
-        ["add_episode:contradiction:15"] = 1,
-        ["add_episode_bulk:one:18"] = 1,
-        ["add_episode_bulk:one:26"] = 2,
-        ["add_episode_bulk:several:6"] = 1,
-        ["add_episode_bulk:several:32"] = 1,
-        ["add_episode_bulk:several:33"] = 2,
-        ["add_triplet:new_nodes:6"] = 1,
-        ["add_triplet:new_nodes:10"] = 1,
-        ["add_triplet:new_nodes:15"] = 1,
+        ["add_episode:contradiction:5"] = "attempts+1",
+        ["add_episode:contradiction:9"] = "logs",
+        ["add_episode:contradiction:11"] = "logs",
+        ["add_episode:contradiction:13"] = "logs",
+        ["add_episode:contradiction:15"] = "attempts+1",
+        ["add_episode:contradiction:21"] = "result",
+        ["add_episode:entities_and_edges:5"] = "attempts+1",
+        ["add_episode:entities_and_edges:9"] = "logs",
+        ["add_episode:entities_and_edges:11"] = "logs",
+        ["add_episode:entities_and_edges:12"] = "logs",
+        ["add_episode:entities_and_edges:13"] = "attempts+1",
+        ["add_episode:entities_and_edges:19"] = "result",
+        ["add_episode:no_entity:7"] = "result",
+        ["add_episode_bulk:one:7"] = "logs",
+        ["add_episode_bulk:one:11"] = "logs",
+        ["add_episode_bulk:one:17"] = "logs",
+        ["add_episode_bulk:one:18"] = "attempts+1",
+        ["add_episode_bulk:one:22"] = "logs",
+        ["add_episode_bulk:one:24"] = "logs",
+        ["add_episode_bulk:one:25"] = "logs",
+        ["add_episode_bulk:one:26"] = "attempts+2",
+        ["add_episode_bulk:one:31"] = "result",
+        ["add_episode_bulk:several:6"] = "attempts+1",
+        ["add_episode_bulk:several:10"] = "logs",
+        ["add_episode_bulk:several:11"] = "logs",
+        ["add_episode_bulk:several:18"] = "logs",
+        ["add_episode_bulk:several:19"] = "logs",
+        ["add_episode_bulk:several:20"] = "logs",
+        ["add_episode_bulk:several:30"] = "logs",
+        ["add_episode_bulk:several:31"] = "logs",
+        ["add_episode_bulk:several:32"] = "attempts+1",
+        ["add_episode_bulk:several:33"] = "attempts+2",
+        ["add_episode_bulk:several:39"] = "logs",
+        ["add_episode_bulk:several:40"] = "logs",
+        ["add_episode_bulk:several:41"] = "logs",
+        ["add_episode_bulk:several:43"] = "logs",
+        ["add_episode_bulk:several:44"] = "logs",
+        ["add_episode_bulk:several:45"] = "logs",
+        ["add_episode_bulk:several:46"] = "logs",
+        ["add_episode_bulk:several:47"] = "logs",
+        ["add_episode_bulk:several:54"] = "result",
+        ["add_triplet:new_nodes:6"] = "attempts+1",
+        ["add_triplet:new_nodes:10"] = "attempts+1",
+        ["add_triplet:new_nodes:13"] = "logs",
+        ["add_triplet:new_nodes:15"] = "attempts+1",
+        ["add_triplet:new_nodes:23"] = "result",
+        ["remove_episode:remove_with_group:11"] = "result",
+        ["search:search_default:2"] = "result",
+        ["summarize_saga:query_first:3"] = "result",
     };
 
     public static TheoryData<int> SyncCaseIndexes() => Indexes(SyncCases.Count);
@@ -184,8 +221,9 @@ public class GraphitiValuesTests
         }
     }
 
-    // The theory that cancels at call k: the fake that makes call k records it and cancels the token source. Python ran
-    // the same cancel. The test compares the count of attempts, the error, and the fake calls after call k.
+    // The theory that cancels at call k, the last call included: the fake that makes call k records it and cancels the
+    // token source. Python ran the same cancel. The test compares the count of attempts, the error, and the counted calls
+    // and the log lines after call k.
     [Theory(Timeout = 10000)]
     [MemberData(nameof(CancelPoints))]
     public async Task Each_later_awaited_call_gets_the_token_and_no_call_follows_a_cancel(int index, int k)
@@ -194,26 +232,80 @@ public class GraphitiValuesTests
         var expected = Dict(List(Dict(AsyncCases[index]["out"])["cancel"]).Select(Dict).Single(p => (long)p["k"]! == k));
         using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var (run, output) = await RunAsync(input, source, k);
-        var counted = List(output["events"]).Select(Dict)
-            .Where(e => (string)e["kind"]! is not ("log" or "session" or "session_close" or "span" or "span_attrs" or "span_status" or "span_exception" or "span_end" or "clone"))
-            .Select(e => (object?)e)
-            .ToList();
+
+        // The events of the run before placeholders: the recorder numbers the new uuids of the events after k alone.
         var actual = new OrderedDictionary<string, object?>
         {
             ["k"] = (long)k,
             ["attempts"] = (long)run.Attempts,
             ["count"] = (long)run.Count,
             ["error"] = output.GetValueOrDefault("error") is OrderedDictionary<string, object?> error ? error["type"] : null,
-            ["after"] = Placeholders(counted.Skip(k + 1).ToList(), []),
+            ["after"] = Placeholders(EventsAfter(run.Events, k), []),
         };
         var key = $"{(string)input["fn"]!}:{(string)input["name"]!}:{k}";
-        if (LateCancel.TryGetValue(key, out var extra))
+        var kind = CancelDifference(expected, actual);
+        var listed = LateCancel.GetValueOrDefault(key, "same");
+        Assert.True(kind == listed, $"{key}: listed as {listed}, but the port is {kind}\n{PyJson.Dumps(expected)}\n{PyJson.Dumps(actual)}");
+    }
+
+    // Each entry of LateCancel names a recorded cancel point.
+    [Fact]
+    public void Each_late_cancel_entry_names_a_recorded_cancel_point()
+    {
+        var points = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in AsyncCases.Select(Dict))
         {
-            Assert.Equal((long)expected["attempts"]! + extra, actual["attempts"]);
-            actual["attempts"] = expected["attempts"];
+            var input = Dict(item["in"]);
+            foreach (var point in Dict(item["out"]).GetValueOrDefault("cancel") as List<object?> ?? [])
+            {
+                points.Add($"{(string)input["fn"]!}:{(string)input["name"]!}:{(long)Dict(point)["k"]!}");
+            }
         }
 
-        Assert.True(PyJson.Dumps(expected) == PyJson.Dumps(actual), key + "\n" + PyJson.Dumps(expected) + "\n" + PyJson.Dumps(actual));
+        Assert.All(LateCancel.Keys, key => Assert.Contains(key, points));
+    }
+
+    // The kind of the difference at a cancel point. "same": the port equals Python. Each other kind is the late cancel
+    // of GAPS F33, where the events of Python after call k are a part of the events of the port, in their order, and the
+    // count of counted calls is the same. "result": the cancel came at the last call, and the port returns where Python
+    // raises CancelledError. "logs": the port writes more log lines. "attempts+N": the port makes N more attempts.
+    // "other": any other difference, which no entry can name.
+    private static string CancelDifference(OrderedDictionary<string, object?> expected, OrderedDictionary<string, object?> actual)
+    {
+        if (PyJson.Dumps(expected) == PyJson.Dumps(actual))
+        {
+            return "same";
+        }
+
+        var expectedAfter = List(expected["after"]).Select(x => PyJson.Dumps(x)).ToList();
+        var actualAfter = List(actual["after"]).Select(x => PyJson.Dumps(x)).ToList();
+        var next = 0;
+        var extraKinds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (item, i) in actualAfter.Select((x, i) => (x, i)))
+        {
+            if (next < expectedAfter.Count && item == expectedAfter[next])
+            {
+                next++;
+            }
+            else
+            {
+                extraKinds.Add((string)Dict(List(actual["after"])[i])["kind"]!);
+            }
+        }
+
+        if (next != expectedAfter.Count || !Equals(expected["count"], actual["count"]))
+        {
+            return "other";
+        }
+
+        var extraAttempts = (long)actual["attempts"]! - (long)expected["attempts"]!;
+        if (Equals(expected["error"], actual["error"]))
+        {
+            return extraAttempts > 0 ? $"attempts+{extraAttempts}"
+                : extraAttempts == 0 && extraKinds.SetEquals(["log"]) ? "logs" : "other";
+        }
+
+        return expected["error"] is "CancelledError" && actual["error"] is null && extraAttempts == 0 ? "result" : "other";
     }
 
     // A test with no Python original: each async method with a canceled token throws OperationCanceledException (R8)
@@ -228,6 +320,29 @@ public class GraphitiValuesTests
         var (run, output) = await RunAsync(input, source, -1);
         Assert.Equal("CancelledError", Dict(output["error"])["type"]);
         Assert.Equal(0, run.Count);
+    }
+
+    // `events_after` of the recorder: the counted calls and the log lines after counted call k.
+    private static List<object?> EventsAfter(List<object?> events, int k)
+    {
+        var seen = 0;
+        var after = new List<object?>();
+        foreach (var item in events.Select(Dict))
+        {
+            var kind = (string)item["kind"]!;
+            var counted = kind is not ("log" or "session" or "session_close" or "span" or "span_attrs" or "span_status" or "span_exception" or "span_end" or "clone");
+            if (seen > k && (counted || kind == "log"))
+            {
+                after.Add(item);
+            }
+
+            if (counted)
+            {
+                seen++;
+            }
+        }
+
+        return after;
     }
 
     private static TheoryData<int> Indexes(int count)
@@ -666,7 +781,8 @@ public class GraphitiValuesTests
                     }
 
                     var result = fn == "_search"
-                        ? await graphiti.PrivateSearchAsync(query, config!, groupIds, searchFilter: filter, cancellationToken: token)
+                        ? await graphiti.PrivateSearchAsync(
+                            query, config!, groupIds, (string?)a.GetValueOrDefault("center_node_uuid"), searchFilter: filter, cancellationToken: token)
                         : await graphiti.AdvancedSearchAsync(
                             query,
                             config,

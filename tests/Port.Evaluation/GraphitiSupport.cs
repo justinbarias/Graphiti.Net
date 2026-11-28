@@ -4,6 +4,7 @@
 // Each fake yields once and then records its call (R25).
 namespace Graphiti.Port.Evaluation;
 
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -253,6 +254,7 @@ internal static partial class GraphitiValues
     {
         "EDGE_HYBRID_SEARCH_RRF" => SearchConfigRecipes.EdgeHybridSearchRrf,
         "NODE_HYBRID_SEARCH_RRF" => SearchConfigRecipes.NodeHybridSearchRrf,
+        "EDGE_HYBRID_SEARCH_NODE_DISTANCE" => SearchConfigRecipes.EdgeHybridSearchNodeDistance,
         _ => throw new InvalidOperationException("unknown recipe " + name),
     };
 
@@ -277,28 +279,46 @@ internal static partial class GraphitiValues
     }
 }
 
-/// <summary>A logger factory that adds each log line, with its Python level name and its time masked, to the events.</summary>
+/// <summary>
+/// A logger factory that adds each log line, with its Python level name and its time masked, to the events. The values of
+/// the open scopes of a line are the `extra` fields of Python (R25, `extra={...}` becomes a scope).
+/// </summary>
 internal sealed class GraphitiLogCapture(List<object?> events) : ILoggerFactory, ILoggerProvider
 {
+    private readonly List<object?> events = events;
+
+    private readonly AsyncLocal<ImmutableStack<object>> scopes = new();
+
     public void AddProvider(ILoggerProvider provider)
     {
     }
 
-    public ILogger CreateLogger(string categoryName) => new Logger(events);
+    public ILogger CreateLogger(string categoryName) => new Logger(this);
 
     public void Dispose()
     {
     }
 
-    private sealed class Logger(List<object?> events) : ILogger
+    private sealed class Scope(GraphitiLogCapture owner, ImmutableStack<object> before) : IDisposable
+    {
+        public void Dispose() => owner.scopes.Value = before;
+    }
+
+    private sealed class Logger(GraphitiLogCapture owner) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
+            where TState : notnull
+        {
+            var before = owner.scopes.Value ?? ImmutableStack<object>.Empty;
+            owner.scopes.Value = before.Push(state);
+            return new Scope(owner, before);
+        }
 
         public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            events.Add(new OrderedDictionary<string, object?>
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            var item = new OrderedDictionary<string, object?>
             {
                 ["kind"] = "log",
                 ["level"] = logLevel switch
@@ -310,7 +330,28 @@ internal sealed class GraphitiLogCapture(List<object?> events) : ILoggerFactory,
                     _ => logLevel.ToString().ToUpperInvariant(),
                 },
                 ["message"] = GraphitiValues.MaskMs(formatter(state, exception)),
-            });
+            };
+            var extra = new OrderedDictionary<string, object?>();
+            foreach (var scope in (owner.scopes.Value ?? ImmutableStack<object>.Empty).Reverse())
+            {
+                if (scope is not System.Collections.IDictionary values)
+                {
+                    throw new InvalidOperationException("a log scope that is not a dictionary: " + scope);
+                }
+
+                foreach (System.Collections.DictionaryEntry entry in values)
+                {
+                    extra[(string)entry.Key] = GraphitiValues.Encode(entry.Value);
+                }
+            }
+
+            if (extra.Count > 0)
+            {
+                item["extra"] = extra;
+            }
+
+            owner.events.Add(item);
+        }
     }
 }
 
@@ -599,13 +640,14 @@ internal sealed class GraphitiRun
         }
     }
 
-    internal sealed class FakeTx(GraphitiRun run) : Transaction
+    internal sealed class FakeTx(GraphitiRun run, string database) : Transaction
     {
         internal override Task RunAsync(string query, OrderedDictionary<string, object?> parameters, CancellationToken cancellationToken = default) =>
             run.EnterAsync(
                 "tx_run",
                 new()
                 {
+                    ["database"] = database,
                     ["query"] = GraphitiValues.QueryView(query),
                     ["keys"] = parameters.Keys.Select(x => (object?)x).ToList(),
                     ["values"] = GraphitiValues.Encode(parameters.Values.ToList()),
@@ -613,7 +655,7 @@ internal sealed class GraphitiRun
                 cancellationToken);
     }
 
-    internal sealed class FakeSession(GraphitiRun run) : GraphDriverSession
+    internal sealed class FakeSession(GraphitiRun run, string database) : GraphDriverSession
     {
         public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -622,6 +664,7 @@ internal sealed class GraphitiRun
                 "session_run",
                 new()
                 {
+                    ["database"] = database,
                     ["query"] = GraphitiValues.QueryView(query),
                     ["keys"] = parameters.Keys.Select(x => (object?)x).ToList(),
                     ["values"] = GraphitiValues.Encode(parameters.Values.ToList()),
@@ -640,8 +683,8 @@ internal sealed class GraphitiRun
 
         private async Task ExecuteWriteAsync(Func<Transaction, Task> func, double? timeout, CancellationToken cancellationToken)
         {
-            await run.EnterAsync("execute_write", new() { ["timeout"] = timeout }, cancellationToken);
-            await func(new FakeTx(run));
+            await run.EnterAsync("execute_write", new() { ["database"] = database, ["timeout"] = timeout }, cancellationToken);
+            await func(new FakeTx(run, database));
         }
     }
 
@@ -737,18 +780,22 @@ internal sealed class GraphitiRun
                 "query",
                 new()
                 {
+                    ["database"] = Database,
                     ["query"] = GraphitiValues.QueryView(cypherQuery),
                     ["keys"] = parameters.Keys.Select(x => (object?)x).ToList(),
                     ["values"] = GraphitiValues.Encode(parameters.Values.ToList()),
                 },
                 cancellationToken);
 
-            // The needle is found in the query with its white space joined.
+            // The needle is found in the query with its white space joined. A third item of an entry gives parameter
+            // values that the call must have too.
             var normalized = GraphitiValues.Normalize(cypherQuery);
             foreach (var entry in run.Input.GetValueOrDefault("rows") as List<object?> ?? [])
             {
                 var row = List(entry);
-                if (normalized.Contains((string)row[0]!, StringComparison.Ordinal))
+                var wanted = row.Count > 2 ? Dict(row[2]) : new OrderedDictionary<string, object?>();
+                if (normalized.Contains((string)row[0]!, StringComparison.Ordinal)
+                    && wanted.All(w => PyJson.Dumps(GraphitiValues.Encode(parameters.GetValueOrDefault(w.Key))) == PyJson.Dumps(w.Value)))
                 {
                     return ([.. List(row[1]).Select(r => DecodeDict(Dict(r)))], null, null);
                 }
@@ -759,8 +806,8 @@ internal sealed class GraphitiRun
 
         internal override GraphDriverSession Session(string? database = null)
         {
-            run.Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "session" });
-            return new FakeSession(run);
+            run.Events.Add(new OrderedDictionary<string, object?> { ["kind"] = "session", ["database"] = Database });
+            return new FakeSession(run, Database);
         }
 
         internal override Task CloseAsync(CancellationToken cancellationToken = default) =>
