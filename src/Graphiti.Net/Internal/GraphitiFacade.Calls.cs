@@ -1,6 +1,8 @@
 namespace Graphiti.Internal;
 
+using System.Runtime.ExceptionServices;
 using Graphiti.PyCompat;
+using Core = Graphiti.Core;
 using CoreLlm = Graphiti.Core.LlmClient;
 
 /// <summary>
@@ -178,19 +180,54 @@ internal sealed partial class GraphitiFacade : IGraphiti
 
     /// <summary>
     /// Runs <paramref name="call"/> on the scheduler and awaits it with <c>ConfigureAwait(false)</c>. A canceled token
-    /// throws before the call starts.
+    /// throws before the call starts. The host gets the error of the call where a span wrapped it.
     /// </summary>
     internal static async Task<T> RunAsync<T>(Func<Task<T>> call, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return await Asyncio.Run(call).ConfigureAwait(false);
+        try
+        {
+            return await Asyncio.Run(call).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException wrap) when (IsSpanWrap(wrap))
+        {
+            ExceptionDispatchInfo.Capture(ErrorOfTheCall(wrap)).Throw();
+            throw;
+        }
     }
 
     /// <inheritdoc cref="RunAsync{T}(Func{Task{T}}, CancellationToken)"/>
     internal static async Task RunAsync(Func<Task> call, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await Asyncio.Run(call).ConfigureAwait(false);
+        try
+        {
+            await Asyncio.Run(call).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException wrap) when (IsSpanWrap(wrap))
+        {
+            ExceptionDispatchInfo.Capture(ErrorOfTheCall(wrap)).Throw();
+            throw;
+        }
+    }
+
+    // PORT: upstream defect U19. With an OpenTelemetry tracer, an error in the body of a span leaves the span as
+    // "generator didn't stop after throw()", with the error of the body as the inner exception, and the ported tracer
+    // keeps that (decision D45). The facade always passes a tracer (lead choice L9), so each error in a span would reach
+    // the host in that form. The table "Public exception" of the public surface design names the error of the call, as
+    // the no-op tracer of upstream gives it. The facade follows the inner exceptions of each nested wrap to that error.
+    private static bool IsSpanWrap(Exception error) =>
+        error is InvalidOperationException { Message: Core.OpenTelemetryTracer.GeneratorDidNotStopAfterThrow, InnerException: not null };
+
+    private static Exception ErrorOfTheCall(Exception wrap)
+    {
+        var error = wrap;
+        while (IsSpanWrap(error))
+        {
+            error = error.InnerException!;
+        }
+
+        return error;
     }
 }
 

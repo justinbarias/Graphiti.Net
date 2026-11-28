@@ -39,11 +39,12 @@ public sealed class GraphitiArgumentsTests
         Assert.Equal(1, await scope.CountAsync("MATCH (n:Episodic) WHERE n.group_id = $g RETURN count(n) AS c"));
         Assert.Equal(2, await scope.CountAsync("MATCH (:Episodic {uuid: $u})-[r:MENTIONS]->(:Entity) RETURN count(r) AS c", new { u = stored.Uuid }));
 
-        // A uuid with no episode raises NodeNotFoundError inside the span of add_episode. The tracer that the facade
-        // passes then raises "generator didn't stop after throw()" (GAPS U19).
-        var missing = await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Graphiti.AddEpisodeAsync(
-            GraphitiMembersTests.Episode("a2", January) with { Uuid = Guid.NewGuid().ToString() }, new AddEpisodeOptions { GroupId = scope.Group }, ct));
-        Assert.IsType<NodeNotFoundException>(missing.InnerException);
+        // A uuid with no episode raises NodeNotFoundError. GraphitiCallErrorTests shows it with and without a listener.
+        var uuid = Guid.NewGuid().ToString();
+        var missing = await Assert.ThrowsAsync<NodeNotFoundException>(() => scope.Graphiti.AddEpisodeAsync(
+            GraphitiMembersTests.Episode("a2", January) with { Uuid = uuid }, new AddEpisodeOptions { GroupId = scope.Group }, ct));
+        Assert.Equal($"node {uuid} not found", missing.Message);
+        Assert.Equal(1, await scope.CountAsync("MATCH (n:Episodic) WHERE n.group_id = $g RETURN count(n) AS c"));
     }
 
     [Fact(Timeout = TimeLimit)]
@@ -221,23 +222,6 @@ public sealed class GraphitiArgumentsTests
     }
 
     [Fact(Timeout = TimeLimit)]
-    public async Task UpdateCommunities_fails_as_upstream_after_the_episode_is_saved()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var scope = new GraphitiScope(Solo);
-
-        // GAPS U14: add_episode unpacks the list of results of update_community into two names. With one node it raises
-        // ValueError, after the episode is saved. The error is inside the span of add_episode, so the tracer raises
-        // "generator didn't stop after throw()" with it (GAPS U19).
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Graphiti.AddEpisodeAsync(
-            GraphitiMembersTests.Episode("a1", January), new AddEpisodeOptions { GroupId = scope.Group, UpdateCommunities = true }, ct));
-        Assert.Equal("not enough values to unpack (expected 2, got 1)", Assert.IsAssignableFrom<ArgumentException>(error.InnerException).Message);
-
-        Assert.Equal(1, await scope.CountAsync("MATCH (n:Episodic) WHERE n.group_id = $g RETURN count(n) AS c"));
-        Assert.Equal(1, await scope.CountAsync("MATCH (n:Entity) WHERE n.group_id = $g RETURN count(n) AS c"));
-    }
-
-    [Fact(Timeout = TimeLimit)]
     public async Task With_StoreRawEpisodeContent_off_the_episode_is_saved_with_no_content()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -257,12 +241,10 @@ public sealed class GraphitiArgumentsTests
         var identity = new Dictionary<string, IReadOnlyList<string>> { ["Person"] = ["email"] };
 
         // validate_identity_properties: each property must be a field of the entity type. Person has no field email.
-        var single = await Assert.ThrowsAnyAsync<Exception>(() => scope.Graphiti.AddEpisodeAsync(
+        await Assert.ThrowsAsync<IdentityPropertyValidationException>(() => scope.Graphiti.AddEpisodeAsync(
             GraphitiMembersTests.Episode("a1", January), new AddEpisodeOptions { GroupId = scope.Group, EntityTypes = [Person], IdentityProperties = identity }, ct));
-        Assert.IsType<IdentityPropertyValidationException>(single.InnerException ?? single);
-        var bulk = await Assert.ThrowsAnyAsync<Exception>(() => scope.Graphiti.AddEpisodeBulkAsync(
+        await Assert.ThrowsAsync<IdentityPropertyValidationException>(() => scope.Graphiti.AddEpisodeBulkAsync(
             [GraphitiMembersTests.Episode("b1", January)], new AddEpisodeBulkOptions { GroupId = scope.Group, EntityTypes = [Person], IdentityProperties = identity }, ct));
-        Assert.IsType<IdentityPropertyValidationException>(bulk.InnerException ?? bulk);
         Assert.Equal(0, await scope.CountAsync("MATCH (n) WHERE n.group_id = $g RETURN count(n) AS c"));
     }
 

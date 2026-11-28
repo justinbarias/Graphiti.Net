@@ -235,6 +235,10 @@ internal sealed class OpenTelemetryTracer : Tracer
         this.spanPrefix = PyText.RStrip(spanPrefix, ".");
     }
 
+    /// <summary>The message of the error of upstream defect U19, as <c>contextlib</c> gives it.</summary>
+    // PORT: internal, because the facade reads it to give a host the error of the body (decision D45).
+    internal const string GeneratorDidNotStopAfterThrow = "generator didn't stop after throw()";
+
     /// <summary>Start a new OpenTelemetry span with the configured prefix.</summary>
     // PORT: upstream defect U19. The generator wraps its yield in `try` and `except Exception`, and yields a second time
     // there. If the body raises, `contextlib` raises RuntimeError: generator didn't stop after throw(), with the
@@ -299,7 +303,7 @@ internal sealed class OpenTelemetryTracer : Tracer
             // PORT: upstream defect U19. A second yield after the end of the body.
             throw bodyError is null
                 ? new InvalidOperationException("generator didn't stop")
-                : new InvalidOperationException("generator didn't stop after throw()", bodyError);
+                : new InvalidOperationException(GeneratorDidNotStopAfterThrow, bodyError);
         }
 
         return result;

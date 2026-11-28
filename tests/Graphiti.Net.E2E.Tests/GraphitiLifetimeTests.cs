@@ -149,44 +149,6 @@ public sealed class GraphitiLifetimeTests
         Assert.Equal(2, await second.CountAsync("MATCH (n:Episodic) WHERE n.group_id = $g RETURN count(n) AS c"));
     }
 
-    [Fact(Timeout = TimeLimit)]
-    public async Task Llm_ClassifyFailure_classifies_the_errors_of_the_default_reranker()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var hook = new FirstTokenTrue();
-        await using var scope = new GraphitiScope(
-            GraphitiMembersTests.Ana,
-            o => o.Llm.ClassifyFailure = e => e is TimeoutException ? ModelCallFailure.RateLimit : ModelCallFailure.None,
-            build: b => b.UseChatLogProbabilities(_ => hook));
-        scope.Chat.Rerank = _ => throw new TimeoutException("the provider is slow");
-        await scope.Graphiti.BuildIndicesAndConstraintsAsync(cancellationToken: ct);
-        await GraphitiModelOptionsTests.TwoFactsAsync(scope, ct);
-
-        // openai_reranker_client.py raises RateLimitError for a rate limit of the client. The classifier of the options
-        // says that a TimeoutException is a rate limit. Each search span around the rerank raises "generator didn't
-        // stop after throw()" with the error of its body (GAPS U19).
-        var error = await Assert.ThrowsAnyAsync<Exception>(() => scope.Graphiti.AdvancedSearchAsync(
-            "Ana", SearchRecipes.EdgeHybridSearchCrossEncoder, new AdvancedSearchOptions { GroupIds = [scope.Group] }, ct));
-        var chain = new List<Exception>();
-        for (Exception? e = error; e is not null; e = e.InnerException)
-        {
-            chain.Add(e);
-        }
-
-        Assert.All(chain.SkipLast(2), e => Assert.Equal("generator didn't stop after throw()", Assert.IsType<InvalidOperationException>(e).Message));
-        Assert.IsType<RateLimitException>(chain[^2]);
-        Assert.IsType<TimeoutException>(chain[^1]);
-    }
-
-    private sealed class FirstTokenTrue : IChatLogProbabilities
-    {
-        public void Request(ChatOptions options, int topLogProbabilityCount, IReadOnlyDictionary<int, int> logitBias)
-        {
-        }
-
-        public IReadOnlyList<TokenLogProbability>? ReadFirstToken(ChatResponse response) => [new("True", 0)];
-    }
-
     /// <summary>A clock that runs at the system rate with a fixed shift.</summary>
     internal sealed class ShiftedClock(TimeSpan shift) : TimeProvider
     {

@@ -36,7 +36,9 @@ public sealed record SearchFilters
     /// <summary>Gets the target node UUIDs that restrict the edge results, or null.</summary>
     public IReadOnlyList<string>? EdgeTargetNodeUuids { get; init; }
 
-    /// <summary>Gets the property filters, or null.</summary>
+    /// <summary>
+    /// Gets the property filters, or null. Upstream 0.32.0 reads this field nowhere, so it has no effect on a search.
+    /// </summary>
     public IReadOnlyList<PropertyFilter>? PropertyFilters { get; init; }
 }
 

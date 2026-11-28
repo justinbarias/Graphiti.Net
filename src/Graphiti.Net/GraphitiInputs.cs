@@ -21,7 +21,10 @@ public sealed record EpisodeInput
     /// <summary>Gets the type of the episode. The default is <see cref="EpisodeType.Message"/>.</summary>
     public EpisodeType Source { get; init; } = EpisodeType.Message;
 
-    /// <summary>Gets the UUID of the episode, or null for a new random UUID.</summary>
+    /// <summary>
+    /// Gets the UUID of the episode, or null for a new random UUID. With a UUID, the call processes the stored episode
+    /// of that UUID and saves no second episode.
+    /// </summary>
     public string? Uuid { get; init; }
 }
 
@@ -42,7 +45,8 @@ public sealed record AddEpisodeOptions
 
     /// <summary>
     /// Gets the names of the entity types to exclude from the graph, or null. The list can hold <c>Entity</c> to
-    /// exclude the default entity type.
+    /// exclude the default entity type. An excluded entity that an extracted edge names is saved as a plain
+    /// <c>Entity</c>.
     /// </summary>
     public IReadOnlyList<string>? ExcludedEntityTypes { get; init; }
 
