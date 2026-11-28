@@ -10,9 +10,10 @@ port-python-to-dotnet skill. It keeps the six checks and the options of the
 skill's scanner, and it differs in three ways:
 
 - It has two more options, --allow and --write-allow.
-- It reads each file with its state: a block comment, a raw string of more
-  than one line, the depth of the braces, and the type and the member that
-  hold a line. The skill's scanner reads each line alone.
+- It reads the text of each file from left to right, so it knows each
+  comment, each string of each kind, the depth of the braces, and the type
+  and the member that hold a line. The skill's scanner reads each line
+  alone, with one pattern for a string and one for a comment.
 - It finds the null-forgiving operator after a name, a closing parenthesis,
   or a closing square bracket, when no = follows, and inside the holes of
   an interpolated string. The skill's scanner finds it only before five
@@ -45,11 +46,15 @@ no port of upstream code needs it.
 --write-allow prints such a file for the present findings of those two
 labels.
 
+A file that the scanner cannot read to its end gives the finding "scanner
+lost its place": a comment or a string with no end, or braces that do not
+match. No allow file can accept it.
+
 Limits. The scanner reads text and not syntax. It does not see a line
 that moves inside its member, or a new line with the same text as a line
 that leaves the same member. It does not see the operator after a space
-unless a dot and a name follow. A verbatim string of more than one line
-is read as code.
+unless a dot and a name follow. It does not read the directives of the
+preprocessor, so code in a branch that is off is read as code.
 """
 
 from __future__ import annotations
@@ -63,7 +68,7 @@ CHECKS: list[tuple[str, re.Pattern[str]]] = [
     ("port TODO", re.compile(r"TODO\(port\)")),
     ("stub", re.compile(r"\bNotImplementedException\b")),
     ("dynamic type", re.compile(r"\bdynamic\b(?!\s*\()")),
-    ("warning switched off", re.compile(r"#pragma\s+warning\s+disable|\[SuppressMessage")),
+    ("warning switched off", re.compile(r"#\s*pragma\s+warning\s+disable|#\s*nullable\s+disable|SuppressMessage\s*\(")),
     ("null-forgiving operator", re.compile(r"(?<=[\w\)\]])!(?!=)|[\w\)\]]\s+!\.(?=[A-Za-z_])")),
     ("calls Python", re.compile(r"Process.*[\"']python|[\"']python3?[\"']|FileName\s*=\s*[\"'](uv|python)")),
 ]
@@ -73,84 +78,170 @@ RAW_LINE_CHECKS = {"port TODO"}
 # The labels that a port of upstream code can need. Only these can be in an allow file.
 ALLOWABLE = {"stub", "port TODO"}
 
-CHAR = re.compile(r"'(?:\\.|[^'\\])'")
-VERBATIM = re.compile(r'\$?@\$?"(?:""|[^"])*"')
-STRING = re.compile(r'(\$?)"((?:\\.|[^"\\])*)"')
-HOLE = re.compile(r"\{([^{}]+)\}")
-RAW_QUOTES = re.compile(r'"{3,}')
+CHAR = re.compile(r"'(?:\\(?:u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|x[0-9a-fA-F]{1,4}|.)|[^'\\\n])'")
+STRING_START = re.compile(r'(\$*)(@?)(\$*)("+)')
 TYPE = re.compile(
     r"^\s*(?:(?:public|internal|private|protected|static|sealed|abstract|partial|readonly|ref|unsafe|file|new)\s+)*"
     r"(?:class|record(?:\s+(?:class|struct))?|struct|interface)\s+([A-Za-z_]\w*)"
 )
+# A file that the scanner cannot read to its end. The allow file cannot hold this label.
+LOST = "scanner lost its place"
 
 
 def key_text(line: str) -> str:
     return " ".join(line.split())
 
 
-def _string(match: re.Match[str]) -> str:
-    # The holes of an interpolated string are code, so they stay.
-    if not match.group(1):
-        return '""'
-    return '"" ' + " ".join(HOLE.findall(match.group(2).replace("{{", "").replace("}}", "")))
+class Lexer:
+    """Reads the text of one file from left to right, and gives two copies with the same lines.
+
+    `bare` holds the code: each comment and the text of each string is blank, and the code in the holes of an
+    interpolated string stays. `quoted` holds the code and the strings: only each comment is blank.
+    """
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.bare: list[str] = []
+        self.quoted: list[str] = []
+        self.problem = ""
+        self._code(0, hole=False)
+
+    def _put(self, chunk: str, in_bare: bool, in_quoted: bool) -> None:
+        for char in chunk:
+            if char == "\n":
+                self.bare.append(char)
+                self.quoted.append(char)
+            else:
+                self.bare.append(char if in_bare else " ")
+                self.quoted.append(char if in_quoted else " ")
+
+    def _code(self, i: int, hole: bool) -> int:
+        """Reads code from `i`. In a hole it stops at the brace that closes the hole, and returns its index."""
+        text = self.text
+        depth = 0
+        while i < len(text):
+            char = text[i]
+            if hole and char == "}" and depth == 0:
+                return i
+            if text.startswith("//", i):
+                end = text.find("\n", i)
+                end = len(text) if end < 0 else end
+                self._put(text[i:end], False, False)
+                i = end
+            elif text.startswith("/*", i):
+                end = text.find("*/", i + 2)
+                if end < 0:
+                    self.problem = "a block comment has no end"
+                    end = len(text) - 2
+                self._put(text[i:end + 2], False, False)
+                i = end + 2
+            elif char == "'" and CHAR.match(text, i):
+                literal = CHAR.match(text, i).group(0)
+                self._put("'", True, True)
+                self._put(literal[1:-1], False, True)
+                self._put("'", True, True)
+                i += len(literal)
+            elif char in '$@"' and STRING_START.match(text, i):
+                i = self._string(STRING_START.match(text, i))
+            else:
+                if hole and char == "{":
+                    depth += 1
+                elif hole and char == "}":
+                    depth -= 1
+                self._put(char, True, True)
+                i += 1
+        if hole:
+            self.problem = "the hole of an interpolated string has no end"
+        return i
+
+    def _string(self, start: re.Match[str]) -> int:
+        text = self.text
+        dollars = len(start.group(1)) + len(start.group(3))
+        verbatim = bool(start.group(2))
+        quotes = len(start.group(4))
+        if not verbatim and quotes >= 3:
+            return self._raw(start, dollars, quotes)
+        self._put(text[start.start():start.start(4)], False, True)
+        self._put('"', True, True)
+        i = start.start(4) + 1
+        if not verbatim and quotes == 2:
+            self._put('"', True, True)
+            return i + 1
+        while i < len(text):
+            char = text[i]
+            if verbatim and text.startswith('""', i):
+                self._put('""', False, True)
+                i += 2
+            elif not verbatim and char == "\\":
+                self._put(text[i:i + 2], False, True)
+                i += 2
+            elif char == '"':
+                self._put('"', True, True)
+                return i + 1
+            elif not verbatim and char == "\n":
+                # A normal string ends on its line. The compiler reports the error.
+                return i
+            elif dollars and text.startswith("{{", i):
+                self._put("{{", False, True)
+                i += 2
+            elif dollars and text.startswith("}}", i):
+                self._put("}}", False, True)
+                i += 2
+            elif dollars and char == "{":
+                self._put("{", False, True)
+                i = self._code(i + 1, hole=True)
+                self._put(text[i:i + 1], False, True)
+                i += 1
+            else:
+                self._put(char, False, True)
+                i += 1
+        self.problem = "a string has no end"
+        return i
+
+    def _raw(self, start: re.Match[str], dollars: int, quotes: int) -> int:
+        text = self.text
+        self._put(text[start.start():start.start(4)], False, True)
+        self._put('""', True, True)
+        self._put(text[start.start(4) + 2:start.end()], False, True)
+        close = re.compile('"{%d,}' % quotes).search(text, start.end())
+        if close is None:
+            self.problem = "a raw string has no end"
+            self._put(text[start.end():], False, True)
+            return len(text)
+        opener = "{" * dollars
+        i = start.end()
+        while i < close.start():
+            if dollars and text.startswith(opener, i) and not text.startswith(opener + "{", i):
+                self._put(opener, False, True)
+                i = self._code(i + dollars, hole=True)
+                closer = min(i + dollars, close.start())
+                self._put(text[i:closer], False, True)
+                i = closer
+            else:
+                self._put(text[i], False, True)
+                i += 1
+        self._put(text[close.start():close.end()], False, True)
+        return close.end()
+
+    def lines(self) -> tuple[list[str], list[str]]:
+        return "".join(self.bare).split("\n"), "".join(self.quoted).split("\n")
 
 
-class Reader:
-    """Gives the code of each line with no comment and no string text, and the member that holds the line."""
+class Members:
+    """Follows the braces of the code, and names the type and the member that hold each line."""
 
     def __init__(self) -> None:
-        self.in_block = False
-        self.in_raw = False
         self.depth = 0
         self.types: list[tuple[str, int]] = []
         self.pending: tuple[str, int] | None = None
         self.header = ""
         self.boundary = True
 
-    def code(self, line: str) -> tuple[str, str]:
-        """Returns the line with its line comment and the line with no comment and no string text."""
-        if self.in_raw:
-            if RAW_QUOTES.search(line):
-                self.in_raw = False
-            return "", ""
-        text = line
-        if self.in_block:
-            end = text.find("*/")
-            if end < 0:
-                return "", ""
-            text = " " * (end + 2) + text[end + 2:]
-            self.in_block = False
-        if len(RAW_QUOTES.findall(text)) % 2 == 1:
-            self.in_raw = True
-            text = text[: RAW_QUOTES.search(text).start()] + '""'
-        text = CHAR.sub("' '", text)
-        text = VERBATIM.sub('""', text)
-        bare = STRING.sub(_string, text)
-        with_strings = text
-        while True:
-            start = bare.find("/*")
-            if start < 0:
-                break
-            end = bare.find("*/", start + 2)
-            if end < 0:
-                self.in_block = True
-                bare = bare[:start]
-                break
-            bare = bare[:start] + " " + bare[end + 2:]
-        comment = bare.find("//")
-        if comment >= 0:
-            bare = bare[:comment]
-        # For the check that looks at string text, cut the line comment only if it starts outside each string.
-        marker = STRING.sub(lambda m: "#" * len(m.group(0)), text).find("//")
-        if marker >= 0:
-            with_strings = with_strings[:marker]
-        return with_strings, bare
-
     def member(self, bare: str) -> str:
-        """Moves the state over one line of code and returns the member that holds the line."""
+        """Moves over one line of code and returns the member that holds the line."""
         before = self.depth
         body = self.types[-1][1] if self.types else None
-        significant = bare.strip() and not bare.strip().startswith("[")
+        significant = bare.strip() and not bare.strip().startswith(("[", "#"))
         declared = TYPE.match(bare)
         if body is not None and before == body and significant and self.boundary and not declared:
             self.header = key_text(bare)
@@ -179,19 +270,27 @@ class Reader:
 
 def scan(path: Path) -> list[tuple[int, str, str, str]]:
     hits = []
-    reader = Reader()
-    for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
-        with_strings, bare = reader.code(line)
-        member = reader.member(bare)
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lexer = Lexer(text)
+    bare_lines, quoted_lines = lexer.lines()
+    members = Members()
+    for number, line in enumerate(text.split("\n"), start=1):
+        bare = bare_lines[number - 1]
+        member = members.member(bare)
         for label, pattern in CHECKS:
             if label in RAW_LINE_CHECKS:
                 target = line
             elif label == "calls Python":
-                target = with_strings
+                target = quoted_lines[number - 1]
             else:
                 target = bare
             if pattern.search(target):
                 hits.append((number, label, line.strip(), member))
+    problem = lexer.problem
+    if not problem and (members.depth != 0 or members.types):
+        problem = "the braces do not match at the end of the file"
+    if problem:
+        hits.append((len(bare_lines), LOST, problem, "-"))
     return hits
 
 
