@@ -1,39 +1,1115 @@
+/* The page of the quickstart. The file .impeccable/surfaces/app-page-tsx.md and DESIGN.md describe the design. */
+
 :root {
-  color-scheme: light dark;
-  --max: 860px;
+  color-scheme: light;
+  --ground: #f2f5f3;
+  --sheet: #fbfcfb;
+  --ink: #141a33;
+  --ink-2: #454c66;
+  --rule: #c5cdc9;
+  --rail: #1b2757;
+  --rail-2: #2a3875;
+  --rail-3: #34448a;
+  --rail-rule: #5d6bb0;
+  --rail-ink: #eef0fa;
+  --rail-ink-2: #bcc4e4;
+  /* One colour for each section that states a fact. A colour has no other job. */
+  --line-0: #d8432a;
+  --line-1: #0f7f7a;
+  --line-2: #c98a00;
+  --line-3: #6a3fb0;
+  --line-4: #2f8a3c;
+  --line-5: #c2378f;
+  --line-6: #7a5230;
+  --line-7: #3d6fd6;
+  --line-8: #5b6470;
+  --line-9: #8f9412;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* A state change is a short step, not a fade. */
+  --step: 90ms steps(2, end);
 }
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  line-height: 1.5;
-}
-
-main {
-  max-width: var(--max);
-  margin: 0 auto;
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
+* {
   box-sizing: border-box;
 }
 
-h1 {
-  margin: 0 0 4px;
-  font-size: 1.5rem;
+html,
+body {
+  margin: 0;
+  height: 100%;
 }
 
-header p {
-  margin: 0 0 16px;
-  font-size: 0.9rem;
-  opacity: 0.75;
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.5 var(--sans);
+  accent-color: var(--rail);
+}
+
+::selection {
+  background: var(--rail);
+  color: var(--rail-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+  font-size: 0.87em;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  height: 100dvh;
+}
+
+/* The rail: the conversation and each tool call. */
+
+.rail {
+  background: var(--rail);
+  color: var(--rail-ink);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  scrollbar-color: var(--rail-rule) var(--rail);
+}
+
+.rail ::selection {
+  background: var(--rail-ink);
+  color: var(--rail);
+}
+
+.rail header {
+  padding: 24px 24px 12px;
+}
+
+.rail h1 {
+  margin: 0 0 6px;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.rail header p,
+.rail footer {
+  margin: 0;
+  font-size: 0.87rem;
+  color: var(--rail-ink-2);
+}
+
+.rail footer {
+  padding: 8px 24px 14px;
+}
+
+.rail a {
+  color: var(--rail-ink);
+  text-underline-offset: 3px;
 }
 
 .chat {
   flex: 1;
   min-height: 0;
-  border: 1px solid rgba(128, 128, 128, 0.35);
-  border-radius: 12px;
+}
+
+/* The colours of CopilotKit, set to the colours of the rail. */
+.rail [data-copilotkit] {
+  --background: var(--rail);
+  --foreground: var(--rail-ink);
+  --card: var(--rail-2);
+  --card-foreground: var(--rail-ink);
+  --popover: var(--rail-2);
+  --popover-foreground: var(--rail-ink);
+  --primary: var(--rail-ink);
+  --primary-foreground: var(--rail);
+  --secondary: var(--rail-2);
+  --secondary-foreground: var(--rail-ink);
+  --muted: var(--rail-2);
+  --muted-foreground: var(--rail-ink-2);
+  --accent: var(--rail-2);
+  --accent-foreground: var(--rail-ink);
+  --border: var(--rail-rule);
+  --input: var(--rail-rule);
+  --ring: var(--rail-ink);
+  font-family: var(--sans);
+}
+
+/* A tool call in the conversation. It has the shape of a message of the agent, not of a form field: a stop of the
+   line, then the name and the query. */
+.call {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  margin: 6px 0;
+  padding: 10px 14px 10px 38px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--rail-2);
+  color: var(--rail-ink);
+  font: inherit;
+  font-size: 0.87rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--step), color var(--step);
+}
+
+.call::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 13px;
+  width: 12px;
+  height: 12px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+}
+
+.call[data-status="running"]::before {
+  animation: tick 0.8s steps(2, end) infinite;
+}
+
+.call:hover {
+  background: var(--rail-3);
+}
+
+.call[aria-pressed="true"] {
+  background: var(--ground);
+  color: var(--ink);
+}
+
+.call[aria-pressed="true"]::before {
+  background: var(--ink);
+}
+
+.call:focus-visible {
+  outline-color: var(--rail-ink);
+}
+
+.call-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.call-state {
+  font-family: var(--sans);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes tick {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.call-query {
+  overflow-wrap: anywhere;
+}
+
+/* The result area. */
+
+.result {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 24px 32px 48px;
+  scrollbar-color: var(--rule) var(--ground);
+}
+
+.result:focus {
+  outline: none;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 24px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.head h2,
+.empty h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.head p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--ink-2);
+}
+
+.result h3 {
+  margin: 36px 0 8px;
+  font-size: 1.05rem;
+}
+
+.note {
+  max-width: 65ch;
+}
+
+.events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+
+.events li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.events li::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.events li[data-state="done"]::before {
+  background: var(--ink);
+}
+
+.events li[data-state="now"]::before {
+  animation: tick 0.8s steps(2, end) infinite;
+}
+
+.events li[data-state="done"] code {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The graph. */
+
+.graph {
+  margin-top: 12px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+}
+
+.graph.waiting {
+  height: 470px;
+  background: repeating-linear-gradient(90deg, var(--sheet) 0 59px, var(--rule) 59px 60px);
+}
+
+.graph svg {
+  display: block;
+}
+
+.edge {
+  cursor: pointer;
+  outline: none;
+}
+
+.edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+}
+
+.edge-line {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.edge[data-ended="true"] .edge-line {
+  stroke-dasharray: 10 7;
+}
+
+.edge-arrow {
+  fill: none;
+  stroke: var(--sheet);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.edge-label {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.02em;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--sheet);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.edge-date {
+  font: 400 10.5px var(--mono);
+  letter-spacing: 0;
+  fill: var(--ink-2);
+}
+
+/* A narrow graph has no room for the label of each fact. It shows the label of the fact that the reader points at. */
+.graph[data-narrow="true"] .edge-label {
+  display: none;
+}
+
+.graph[data-narrow="true"] .edge[data-focus="true"] .edge-label {
+  display: block;
+}
+
+.edge:focus-visible .edge-line,
+.edge[aria-pressed="true"] .edge-line {
+  stroke-width: 7;
+}
+
+.node circle {
+  fill: var(--sheet);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.node text {
+  font: 600 13px var(--sans);
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--sheet);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.edge,
+.node,
+.facts tbody,
+.sections details,
+.key button {
+  transition: opacity var(--step);
+}
+
+[data-dim="true"] {
+  opacity: 0.16;
+}
+
+.key button[data-dim="true"],
+.sections details[data-dim="true"] {
+  opacity: 0.45;
+}
+
+/* On a wide graph with many facts, the date of a fact shows only for the fact that the reader points at. The ruler
+   under the graph has the dates of each fact. */
+.graph[data-crowded="true"] .edge-date {
+  display: none;
+}
+
+.graph[data-crowded="true"] .edge[data-focus="true"] .edge-date {
+  display: inline;
+}
+
+/* The tool calls of the conversation. */
+
+.calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.calls button {
+  padding: 3px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: none;
+  color: var(--ink);
+  font: 600 0.87rem var(--sans);
+  cursor: pointer;
+}
+
+.calls button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+/* The fact that the reader points at. */
+
+.detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+  min-height: 3.4em;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-top: 0;
+  background: var(--sheet);
+  font-size: 0.87rem;
+}
+
+.detail[data-empty="true"] {
+  color: var(--ink-2);
+}
+
+.detail i {
+  align-self: center;
+  width: 20px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--c);
+}
+
+.detail-text {
+  flex-basis: 100%;
+  color: var(--ink-2);
+}
+
+.date {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The validity ruler. */
+
+.ruler {
+  margin-top: 12px;
+  font-size: 0.8rem;
+}
+
+.ruler ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ink);
+}
+
+.ruler-axis,
+.ruler button {
+  display: grid;
+  grid-template-columns: minmax(120px, 22%) minmax(0, 1fr) 190px;
+  align-items: center;
+  gap: 0 16px;
+  width: 100%;
+}
+
+.ruler-axis {
+  padding-bottom: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ruler-axis .axis {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ruler button {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ruler button:hover,
+.ruler button[aria-pressed="true"] {
+  background: var(--sheet);
+}
+
+.ruler-name {
   overflow: hidden;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ruler li {
+  transition: opacity var(--step);
+}
+
+/* The key: one button for each section colour. */
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.key button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--sheet);
+  color: var(--ink);
+  font: 600 0.87rem var(--sans);
+  cursor: pointer;
+}
+
+.key button:hover,
+.key button[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+
+.key button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+.key i,
+.facts .line i,
+.sections summary i {
+  flex: none;
+  display: inline-block;
+  width: 20px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--c);
+}
+
+.key span {
+  font-weight: 400;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.key button[aria-pressed="true"] span {
+  color: inherit;
+}
+
+/* The fact table: one type size. Weight, case, and rules carry the rank. */
+
+.scroll {
+  overflow-x: auto;
+}
+
+.facts {
+  width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.facts th {
+  padding: 5px 16px 5px 0;
+  border-bottom: 2px solid var(--ink);
+  text-align: left;
+  text-transform: uppercase;
+  font-size: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.facts th:nth-child(1) {
+  width: 120px;
+}
+
+.facts th:nth-child(2),
+.facts th:nth-child(4) {
+  width: 24%;
+}
+
+.facts th:nth-child(3) {
+  width: auto;
+}
+
+.facts th:nth-child(5),
+.facts th:nth-child(6) {
+  width: 112px;
+}
+
+.facts td {
+  overflow-wrap: break-word;
+  padding: 7px 16px 0 0;
+  vertical-align: top;
+}
+
+.facts tbody {
+  border-bottom: 1px solid var(--rule);
+}
+
+.facts tbody:hover,
+.facts tbody[data-pinned="true"] {
+  background: var(--sheet);
+}
+
+.facts .line {
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.facts .line i {
+  margin-right: 7px;
+  vertical-align: middle;
+}
+
+.facts .date {
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.facts button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+
+.facts button[aria-pressed="true"] {
+  text-decoration-color: var(--ink);
+}
+
+.facts .sentence td {
+  padding: 2px 10px 8px 0;
+  color: var(--ink-2);
+  max-width: 75ch;
+}
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+}
+
+.track {
+  position: relative;
+  display: block;
+  height: 14px;
+}
+
+.track b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+}
+
+.bar {
+  position: absolute;
+  top: 5px;
+  height: 4px;
+  min-width: 6px;
+  background: var(--c);
+}
+
+/* The start of a fact is a stop. */
+.bar::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--c);
+  border-radius: 50%;
+  background: var(--ground);
+}
+
+.bar[data-nostart="true"]::before {
+  display: none;
+}
+
+/* A fact with no end date runs past today. A fact with an end date stops at a bar. */
+.bar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -4px;
+  height: 12px;
+  border-right: 3px solid var(--c);
+}
+
+.bar[data-open="true"]::after {
+  top: -3px;
+  right: -1px;
+  height: 0;
+  border: 5px solid transparent;
+  border-right: 0;
+  border-left: 8px solid var(--c);
+  translate: 8px 0;
+}
+
+/* The section texts. */
+
+.sections details {
+  border-top: 1px solid var(--rule);
+}
+
+.sections details:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.sections summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 9px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sections summary::-webkit-details-marker {
+  display: none;
+}
+
+.sections summary::after {
+  content: "Show";
+  margin-left: auto;
+  font-size: 0.87rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sections details[open] summary::after {
+  content: "Hide";
+}
+
+.sections summary i {
+  align-self: center;
+}
+
+.sections summary i[data-plain="true"] {
+  background: none;
+  border: 1px solid var(--ink-2);
+}
+
+.sections summary span,
+.sections summary em {
+  font-size: 0.87rem;
+  color: var(--ink-2);
+}
+
+.sections p {
+  margin: 0 0 16px;
+  max-width: 72ch;
+  white-space: pre-wrap;
+}
+
+.raw {
+  margin-top: 36px;
+  font-size: 0.87rem;
+}
+
+.raw summary {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.raw pre,
+.rawtext {
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Before the first question. */
+
+.empty {
+  max-width: 62ch;
+  padding-top: 8vh;
+}
+
+.empty p {
+  margin: 12px 0 24px;
+}
+
+.empty dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 0;
+  padding-top: 16px;
+  border-top: 2px solid var(--ink);
+}
+
+.empty dd {
+  margin: 0;
+}
+
+.empty svg {
+  display: block;
+}
+
+.empty .stop {
+  fill: var(--sheet);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.empty .run {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+@media (max-width: 899px) {
+  .shell {
+    display: block;
+    height: auto;
+  }
+
+  .rail {
+    height: 88dvh;
+  }
+
+  .result {
+    overflow: visible;
+    padding: 20px 16px 40px;
+  }
+
+  .head h2,
+  .empty h2 {
+    font-size: 1.4rem;
+  }
+
+  .ruler-axis,
+  .ruler button {
+    grid-template-columns: minmax(0, 38%) minmax(0, 1fr);
+  }
+
+  .ruler-axis > :last-child,
+  .ruler button .date {
+    display: none;
+  }
+
+  /* The fact table becomes one block for each fact. */
+  .facts {
+    display: block;
+    min-width: 0;
+  }
+
+  .facts thead {
+    display: none;
+  }
+
+  .facts tbody {
+    display: block;
+    padding: 10px 0;
+  }
+
+  .facts tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+  }
+
+  .facts td {
+    padding: 0;
+  }
+
+  .facts tr:first-child td:nth-child(2)::after,
+  .facts tr:first-child td:nth-child(3)::after {
+    content: " →";
+    font-weight: 400;
+  }
+
+  .facts td:nth-child(5)::before {
+    content: "valid from ";
+    font-family: var(--sans);
+  }
+
+  .facts td:nth-child(6)::before {
+    content: "invalid from ";
+    font-family: var(--sans);
+  }
+
+  .facts .sentence td:first-child {
+    display: none;
+  }
+
+  .facts .sentence td {
+    padding: 2px 0 0;
+  }
+
+  .empty {
+    padding-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call::before,
+  .events li::before {
+    animation: none !important;
+  }
+}
+
+/* The chat of CopilotKit inside the rail. The shapes are soft, as in a conversation: the input is a capsule, the send
+   button is a stop of the line, and the example questions are open rows with a rule between them. */
+
+.rail [data-testid="copilot-welcome-screen"] {
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0 24px 8px;
+}
+
+.rail [data-testid="copilot-welcome-screen"] h1 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-align: left;
+  text-wrap: balance;
+}
+
+.rail div:has(> [data-testid="copilot-suggestions"]) {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.rail [data-testid="copilot-suggestions"] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.rail [data-testid="copilot-suggestion"] {
+  position: relative;
+  height: auto;
+  padding: 11px 26px 11px 2px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--rail-rule) 55%, transparent);
+  border-radius: 0;
+  background: none;
+  color: var(--rail-ink);
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+  font-size: 0.87rem;
+  line-height: 1.4;
+  transition: padding var(--step), color var(--step);
+}
+
+.rail [data-testid="copilot-suggestion"]:first-child {
+  border-top: 0;
+}
+
+.rail [data-testid="copilot-suggestion"] * {
+  white-space: normal;
+}
+
+/* The arrow at the end of an example question: it asks the question. */
+.rail [data-testid="copilot-suggestion"]::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid var(--rail-ink-2);
+  border-right: 2px solid var(--rail-ink-2);
+  rotate: 45deg;
+  translate: 0 -50%;
+}
+
+.rail [data-testid="copilot-suggestion"]:hover {
+  padding-left: 8px;
+  background: none;
+}
+
+.rail [data-testid="copilot-suggestion"]:hover::after {
+  border-color: var(--rail-ink);
+}
+
+.rail [data-testid="copilot-chat-input"] {
+  background: var(--rail-2);
+  border: 1px solid transparent;
+  border-radius: 26px;
+  box-shadow: none;
+}
+
+.rail [data-testid="copilot-chat-input"]:focus-within {
+  border-color: var(--rail-ink-2);
+}
+
+.rail [data-testid="copilot-chat-textarea"] {
+  padding-left: 8px;
+}
+
+.rail [data-testid="copilot-chat-textarea"]::placeholder {
+  color: var(--rail-ink-2);
+}
+
+.rail [data-testid="copilot-send-button"] {
+  background: var(--rail-ink);
+  color: var(--rail);
+  border-radius: 50%;
+}
+
+.rail [data-testid="copilot-send-button"]:disabled {
+  background: var(--rail-3);
+  color: var(--rail-ink-2);
+}
+
+/* The page takes no file, so the button that adds one is not shown. */
+.rail [data-testid="copilot-add-menu-button"] {
+  display: none;
+}
+
+/* The question of the reader: a soft shape at the right, with one tight corner at the side of the speaker. */
+.rail [data-testid="copilot-user-message"] > div:first-child {
+  border-radius: 18px 18px 4px 18px;
+  background: var(--rail-3);
+}
+
+/* On the first screen the input lines up with the title and the example questions. */
+.rail [data-testid="copilot-welcome-screen"] div:has(> [data-testid="copilot-chat-input"]) {
+  padding-inline: 0;
 }

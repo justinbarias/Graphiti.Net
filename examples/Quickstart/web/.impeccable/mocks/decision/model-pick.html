@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Notation Sheet</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{width:1440px;height:900px;overflow:hidden;font:15px/1.45 system-ui,sans-serif;background:#fff;color:#15171a;display:grid;grid-template-columns:380px 1fr}
+.col{border-right:1px solid #15171a;padding:28px 24px;display:flex;flex-direction:column;gap:16px}
+.col h1{font-size:24px;line-height:1.15}
+.q{border:1px solid #15171a;padding:10px 12px}
+.call{border:1px dashed #15171a;padding:10px 12px;font:13px ui-monospace,monospace}
+.call.sel{border:2px solid #1f5fd0;color:#1f5fd0}
+.ask{margin-top:auto;border:1px solid #15171a;padding:12px;color:#5b6068}
+main{padding:28px 36px}
+main h2{font-size:26px;margin-bottom:6px}
+main p{font-size:14px;color:#3d4148;margin-bottom:10px}
+svg text{font:600 14px system-ui,sans-serif}
+svg .l{font:12px ui-monospace,monospace;font-weight:400}
+</style></head><body>
+<aside class="col">
+  <h1>Ask the Online Safety Act 2021</h1>
+  <div class="q">What is a social media service under the Act?</div>
+  <div class="call">search_legislation("definition of social media service") → 10 facts</div>
+  <div class="call sel">search_legislation("section 13 primary purpose") → 10 facts</div>
+  <p>A social media service is an electronic service whose sole or primary purpose is online social interaction between two or more end-users (s 13).</p>
+  <div class="ask">Ask about the Act</div>
+</aside>
+<main>
+  <h2>Result of the search: 10 facts between 9 entities</h2>
+  <p>Each arrow is a fact. Each note gives its dates and the section that states it.</p>
+  <svg viewBox="0 0 1000 760" width="100%" height="760">
+    <defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0 0L10 4L0 8z"/></marker></defs>
+    <g fill="none" stroke="#15171a" stroke-width="1.5" marker-end="url(#a)"><path d="M250 120H400"/><path d="M620 120H780"/><path d="M510 150V330"/><path d="M620 360H780"/><path d="M130 150V330"/><path d="M890 150V330" stroke-dasharray="6 5"/></g>
+    <g fill="#fff" stroke="#15171a" stroke-width="1.5"><rect x="30" y="90" width="220" height="60"/><rect x="400" y="90" width="220" height="60"/><rect x="780" y="90" width="200" height="60"/><rect x="400" y="330" width="220" height="60"/><rect x="780" y="330" width="200" height="60"/><rect x="30" y="330" width="220" height="60"/></g>
+    <text x="50" y="126">Online Safety Act 2021</text><text x="424" y="126">social media service</text><text x="846" y="126">end-user</text><text x="438" y="366">electronic service</text><text x="850" y="366">material</text><text x="100" y="366">Section 13</text>
+    <text class="l" x="282" y="110">INCLUDES</text><text class="l" x="640" y="110">LETS_INTERACT</text><text class="l" x="520" y="240">IS_A</text><text class="l" x="900" y="240">POSTS</text>
+    <g fill="#ffe98a" stroke="#15171a"><rect x="610" y="170" width="200" height="54"/><rect x="530" y="254" width="200" height="54"/><rect x="760" y="430" width="220" height="54"/></g>
+    <text class="l" x="620" y="192">from 2021-07-23</text><text class="l" x="620" y="212">s 13 Social media service</text>
+    <text class="l" x="540" y="276">from 2021-07-23</text><text class="l" x="540" y="296">s 5 Definitions</text>
+    <text class="l" x="770" y="452">2021-07-23 to 2024-01-10</text><text class="l" x="770" y="472">s 12 When material is removed</text>
+    <path d="M30 560H980" stroke="#15171a"/>
+    <text x="30" y="596">s 13 Social media service</text>
+    <text class="l" x="30" y="624">(1) For the purposes of this Act, social media service means an electronic service that satisfies the following conditions:</text>
+    <text class="l" x="30" y="646">(a) the sole or primary purpose of the service is to enable online social interaction between 2 or more end-users;</text>
+  </svg>
+</main>
+</body></html>

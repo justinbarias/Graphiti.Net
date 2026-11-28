@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-28T08:01:38.048018Z",
+  "title": "Design System: Graphiti.Net Quickstart",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground"
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Sheet"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule"
+      },
+      "rail": {
+        "role": "primary",
+        "displayName": "Rail"
+      },
+      "rail-2": {
+        "role": "primary",
+        "displayName": "Rail 2"
+      },
+      "rail-rule": {
+        "role": "primary",
+        "displayName": "Rail rule"
+      },
+      "rail-ink": {
+        "role": "primary",
+        "displayName": "Rail ink"
+      },
+      "rail-ink-2": {
+        "role": "primary",
+        "displayName": "Rail ink 2"
+      },
+      "line-0": {
+        "role": "source-section",
+        "displayName": "Vermilion"
+      },
+      "line-1": {
+        "role": "source-section",
+        "displayName": "Teal"
+      },
+      "line-2": {
+        "role": "source-section",
+        "displayName": "Ochre"
+      },
+      "line-3": {
+        "role": "source-section",
+        "displayName": "Violet"
+      },
+      "line-4": {
+        "role": "source-section",
+        "displayName": "Green"
+      },
+      "line-5": {
+        "role": "source-section",
+        "displayName": "Magenta"
+      },
+      "line-6": {
+        "role": "source-section",
+        "displayName": "Brown"
+      },
+      "line-7": {
+        "role": "source-section",
+        "displayName": "Blue"
+      },
+      "line-8": {
+        "role": "source-section",
+        "displayName": "Slate"
+      },
+      "line-9": {
+        "role": "source-section",
+        "displayName": "Olive"
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Body",
+        "purpose": "General interface text."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "The table and compact controls."
+      },
+      "graph-date": {
+        "displayName": "Graph date",
+        "purpose": "Dates beneath relation labels."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "step",
+        "value": "90ms steps(2, end)",
+        "purpose": "Tool row color changes and shared focus opacity."
+      },
+      {
+        "name": "tick",
+        "value": "0.8s steps(2, end) infinite",
+        "purpose": "The next event and running call indicator. Opacity is 0.2 at 50%."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "(prefers-reduced-motion: reduce)",
+        "purpose": "Disable event and call indicator animations. Keep step transitions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-page",
+        "value": "(max-width: 899px)"
+      },
+      {
+        "name": "narrow-graph",
+        "value": "container width < 700px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Rail and question input",
+      "kind": "input",
+      "refersTo": "rail",
+      "description": "The conversation surface, question input, and attribution.",
+      "html": "<div class=\"ds-preview\"><aside class=\"ds-rail\"><header><h1>Ask the Online Safety Act 2021</h1><p>An agent answers from a temporal graph of the Act.</p></header><div class=\"ds-chat\"><div data-testid=\"copilot-welcome-screen\"><h1>Ask about the Act</h1><div><div data-testid=\"copilot-suggestions\"><button data-testid=\"copilot-suggestion\">What is a social media service?</button><button data-testid=\"copilot-suggestion\">What duties apply to providers?</button></div></div><div><div data-testid=\"copilot-chat-input\"><textarea data-testid=\"copilot-chat-textarea\" aria-label=\"Question\" placeholder=\"Ask about the Act\"></textarea><button data-testid=\"copilot-send-button\" type=\"button\" aria-label=\"Send question\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M12 19V5m-7 7 7-7 7 7\"/></svg></button></div></div></div><div data-testid=\"copilot-user-message\"><div>What is a social media service?</div></div></div><footer>Text of the Act: Federal Register of Legislation, <a href=\"https://creativecommons.org/licenses/by/4.0/\">CC BY 4.0</a>.</footer></aside></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-rail {background: var(--rail);\n  color: var(--rail-ink);\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  scrollbar-color: var(--rail-rule) var(--rail);}\n.ds-rail ::selection {background: var(--rail-ink);\n  color: var(--rail);}\n.ds-rail header {padding: 24px 24px 12px;}\n.ds-rail h1 {margin: 0 0 6px;\n  font-size: 1.6rem;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  text-wrap: balance;}\n.ds-rail header p, .ds-rail footer {margin: 0;\n  font-size: 0.87rem;\n  color: var(--rail-ink-2);}\n.ds-rail footer {padding: 8px 24px 14px;}\n.ds-rail a {color: var(--rail-ink);\n  text-underline-offset: 3px;}\n.ds-chat {flex: 1;\n  min-height: 0;}\n.ds-rail [data-copilotkit] {--background: var(--rail);\n  --foreground: var(--rail-ink);\n  --card: var(--rail-2);\n  --card-foreground: var(--rail-ink);\n  --popover: var(--rail-2);\n  --popover-foreground: var(--rail-ink);\n  --primary: var(--rail-ink);\n  --primary-foreground: var(--rail);\n  --secondary: var(--rail-2);\n  --secondary-foreground: var(--rail-ink);\n  --muted: var(--rail-2);\n  --muted-foreground: var(--rail-ink-2);\n  --accent: var(--rail-2);\n  --accent-foreground: var(--rail-ink);\n  --border: var(--rail-rule);\n  --input: var(--rail-rule);\n  --ring: var(--rail-ink);\n  font-family: var(--sans);}\n@media (max-width: 899px) {.ds-rail {height: 88dvh;}}\n.ds-rail [data-testid=\"copilot-welcome-screen\"] {\n  align-items: stretch;\n  justify-content: flex-end;\n  padding: 0 24px 8px;\n}\n\n.ds-rail [data-testid=\"copilot-welcome-screen\"] h1 {\n  margin: 0 0 16px;\n  font-size: 1.15rem;\n  font-weight: 600;\n  line-height: 1.3;\n  letter-spacing: 0;\n  text-align: left;\n  text-wrap: balance;\n}\n\n.ds-rail div:has(> [data-testid=\"copilot-suggestions\"]) {\n  width: 100%;\n  margin-top: 18px;\n}\n\n.ds-rail [data-testid=\"copilot-suggestions\"] {\n  flex-direction: column;\n  flex-wrap: nowrap;\n  align-items: stretch;\n  gap: 0;\n  width: 100%;\n  margin: 0;\n  padding: 0;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"] {\n  position: relative;\n  height: auto;\n  padding: 11px 26px 11px 2px;\n  border: 0;\n  border-top: 1px solid color-mix(in srgb, var(--rail-rule) 55%, transparent);\n  border-radius: 0;\n  background: none;\n  color: var(--rail-ink);\n  white-space: normal;\n  text-align: left;\n  justify-content: flex-start;\n  font-size: 0.87rem;\n  line-height: 1.4;\n  transition: padding var(--step), color var(--step);\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"]:first-child {\n  border-top: 0;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"] * {\n  white-space: normal;\n}\n\n\n.ds-rail [data-testid=\"copilot-suggestion\"]::after {\n  content: \"\";\n  position: absolute;\n  right: 6px;\n  top: 50%;\n  width: 7px;\n  height: 7px;\n  border-top: 2px solid var(--rail-ink-2);\n  border-right: 2px solid var(--rail-ink-2);\n  rotate: 45deg;\n  translate: 0 -50%;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"]:hover {\n  padding-left: 8px;\n  background: none;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"]:hover::after {\n  border-color: var(--rail-ink);\n}\n\n.ds-rail [data-testid=\"copilot-chat-input\"] {\n  background: var(--rail-2);\n  border: 1px solid transparent;\n  border-radius: 26px;\n  box-shadow: none;\n}\n\n.ds-rail [data-testid=\"copilot-chat-input\"]:focus-within {\n  border-color: var(--rail-ink-2);\n}\n\n.ds-rail [data-testid=\"copilot-chat-textarea\"] {\n  padding-left: 8px;\n}\n\n.ds-rail [data-testid=\"copilot-chat-textarea\"]::placeholder {\n  color: var(--rail-ink-2);\n}\n\n.ds-rail [data-testid=\"copilot-send-button\"] {\n  background: var(--rail-ink);\n  color: var(--rail);\n  border-radius: 50%;\n}\n\n.ds-rail [data-testid=\"copilot-send-button\"]:disabled {\n  background: var(--rail-3);\n  color: var(--rail-ink-2);\n}\n\n\n.ds-rail [data-testid=\"copilot-add-menu-button\"] {\n  display: none;\n}\n\n\n.ds-rail [data-testid=\"copilot-user-message\"] > div:first-child {\n  border-radius: 18px 18px 4px 18px;\n  background: var(--rail-3);\n}\n\n\n.ds-rail [data-testid=\"copilot-welcome-screen\"] div:has(> [data-testid=\"copilot-chat-input\"]) {\n  padding-inline: 0;\n}\n\n.ds-rail [data-testid=\"copilot-welcome-screen\"], .ds-rail [data-testid=\"copilot-suggestions\"] {display:flex;flex-direction:column;}\n.ds-rail [data-testid=\"copilot-chat-input\"] {display:flex;align-items:center;padding:8px;}\n.ds-rail textarea {flex:1;min-width:0;background:none;border:0;color:inherit;font:inherit;resize:none;}\n.ds-rail [data-testid=\"copilot-send-button\"] {display:grid;place-items:center;width:36px;height:36px;border:0;}\n.ds-rail [data-testid=\"copilot-user-message\"] {display:flex;justify-content:flex-end;padding:16px 24px;}\n.ds-rail [data-testid=\"copilot-user-message\"] > div:first-child {padding:10px 14px;}"
+    },
+    {
+      "name": "Tool call row",
+      "kind": "button",
+      "refersTo": "tool-call-row",
+      "description": "A selectable call with a query and progress text.",
+      "html": "<div class=\"ds-preview\"><div class=\"ds-rail\"><button type=\"button\" class=\"ds-call\" data-status=\"running\" aria-pressed=\"false\"><span class=\"ds-call-name\">search_legislation<span class=\"ds-call-state\">The search runs</span></span><span class=\"ds-call-query\">What is a social media service under the Act?</span></button><button type=\"button\" class=\"ds-call\" data-status=\"complete\" aria-pressed=\"true\"><span class=\"ds-call-name\">search_legislation<span class=\"ds-call-state\">Result received</span></span><span class=\"ds-call-query\">Selected search</span></button></div></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-rail {background: var(--rail);\n  color: var(--rail-ink);\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  scrollbar-color: var(--rail-rule) var(--rail);}\n.ds-rail ::selection {background: var(--rail-ink);\n  color: var(--rail);}\n.ds-rail header {padding: 24px 24px 12px;}\n.ds-rail h1 {margin: 0 0 6px;\n  font-size: 1.6rem;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  text-wrap: balance;}\n.ds-rail header p, .ds-rail footer {margin: 0;\n  font-size: 0.87rem;\n  color: var(--rail-ink-2);}\n.ds-rail footer {padding: 8px 24px 14px;}\n.ds-rail a {color: var(--rail-ink);\n  text-underline-offset: 3px;}\n.ds-rail [data-copilotkit] {--background: var(--rail);\n  --foreground: var(--rail-ink);\n  --card: var(--rail-2);\n  --card-foreground: var(--rail-ink);\n  --popover: var(--rail-2);\n  --popover-foreground: var(--rail-ink);\n  --primary: var(--rail-ink);\n  --primary-foreground: var(--rail);\n  --secondary: var(--rail-2);\n  --secondary-foreground: var(--rail-ink);\n  --muted: var(--rail-2);\n  --muted-foreground: var(--rail-ink-2);\n  --accent: var(--rail-2);\n  --accent-foreground: var(--rail-ink);\n  --border: var(--rail-rule);\n  --input: var(--rail-rule);\n  --ring: var(--rail-ink);\n  font-family: var(--sans);}\n.ds-call {\n  position: relative;\n  display: grid;\n  gap: 2px;\n  width: 100%;\n  margin: 6px 0;\n  padding: 10px 14px 10px 38px;\n  border: 0;\n  border-radius: 16px;\n  background: var(--rail-2);\n  color: var(--rail-ink);\n  font: inherit;\n  font-size: 0.87rem;\n  text-align: left;\n  cursor: pointer;\n  transition: background var(--step), color var(--step);\n}\n\n.ds-call::before {\n  content: \"\";\n  position: absolute;\n  left: 14px;\n  top: 13px;\n  width: 12px;\n  height: 12px;\n  border: 3px solid currentColor;\n  border-radius: 50%;\n}\n\n.ds-call[data-status=\"running\"]::before {\n  animation: tick 0.8s steps(2, end) infinite;\n}\n\n.ds-call:hover {\n  background: var(--rail-3);\n}\n\n.ds-call[aria-pressed=\"true\"] {\n  background: var(--ground);\n  color: var(--ink);\n}\n\n.ds-call[aria-pressed=\"true\"]::before {\n  background: var(--ink);\n}\n\n.ds-call:focus-visible {\n  outline-color: var(--rail-ink);\n}\n\n.ds-call-name {\n  display: flex;\n  justify-content: space-between;\n  gap: 12px;\n  font-family: var(--mono);\n  font-weight: 600;\n  font-size: 0.8rem;\n}\n\n.ds-call-state {\n  font-family: var(--sans);\n  font-weight: 400;\n  font-variant-numeric: tabular-nums;\n}\n\n@keyframes tick {\n  50% {\n    opacity: 0.2;\n  }\n}\n\n.ds-call-query {\n  overflow-wrap: anywhere;\n}\n\n@media (max-width: 899px) {.ds-rail {height: 88dvh;}}\n@media (prefers-reduced-motion: reduce) {.ds-call::before {animation: none !important;}}\n.ds-rail [data-testid=\"copilot-welcome-screen\"] {\n  align-items: stretch;\n  justify-content: flex-end;\n  padding: 0 24px 8px;\n}\n\n.ds-rail [data-testid=\"copilot-welcome-screen\"] h1 {\n  margin: 0 0 16px;\n  font-size: 1.15rem;\n  font-weight: 600;\n  line-height: 1.3;\n  letter-spacing: 0;\n  text-align: left;\n  text-wrap: balance;\n}\n\n.ds-rail div:has(> [data-testid=\"copilot-suggestions\"]) {\n  width: 100%;\n  margin-top: 18px;\n}\n\n.ds-rail [data-testid=\"copilot-suggestions\"] {\n  flex-direction: column;\n  flex-wrap: nowrap;\n  align-items: stretch;\n  gap: 0;\n  width: 100%;\n  margin: 0;\n  padding: 0;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"] {\n  position: relative;\n  height: auto;\n  padding: 11px 26px 11px 2px;\n  border: 0;\n  border-top: 1px solid color-mix(in srgb, var(--rail-rule) 55%, transparent);\n  border-radius: 0;\n  background: none;\n  color: var(--rail-ink);\n  white-space: normal;\n  text-align: left;\n  justify-content: flex-start;\n  font-size: 0.87rem;\n  line-height: 1.4;\n  transition: padding var(--step), color var(--step);\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"]:first-child {\n  border-top: 0;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"] * {\n  white-space: normal;\n}\n\n\n.ds-rail [data-testid=\"copilot-suggestion\"]::after {\n  content: \"\";\n  position: absolute;\n  right: 6px;\n  top: 50%;\n  width: 7px;\n  height: 7px;\n  border-top: 2px solid var(--rail-ink-2);\n  border-right: 2px solid var(--rail-ink-2);\n  rotate: 45deg;\n  translate: 0 -50%;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"]:hover {\n  padding-left: 8px;\n  background: none;\n}\n\n.ds-rail [data-testid=\"copilot-suggestion\"]:hover::after {\n  border-color: var(--rail-ink);\n}\n\n.ds-rail [data-testid=\"copilot-chat-input\"] {\n  background: var(--rail-2);\n  border: 1px solid transparent;\n  border-radius: 26px;\n  box-shadow: none;\n}\n\n.ds-rail [data-testid=\"copilot-chat-input\"]:focus-within {\n  border-color: var(--rail-ink-2);\n}\n\n.ds-rail [data-testid=\"copilot-chat-textarea\"] {\n  padding-left: 8px;\n}\n\n.ds-rail [data-testid=\"copilot-chat-textarea\"]::placeholder {\n  color: var(--rail-ink-2);\n}\n\n.ds-rail [data-testid=\"copilot-send-button\"] {\n  background: var(--rail-ink);\n  color: var(--rail);\n  border-radius: 50%;\n}\n\n.ds-rail [data-testid=\"copilot-send-button\"]:disabled {\n  background: var(--rail-3);\n  color: var(--rail-ink-2);\n}\n\n\n.ds-rail [data-testid=\"copilot-add-menu-button\"] {\n  display: none;\n}\n\n\n.ds-rail [data-testid=\"copilot-user-message\"] > div:first-child {\n  border-radius: 18px 18px 4px 18px;\n  background: var(--rail-3);\n}\n\n\n.ds-rail [data-testid=\"copilot-welcome-screen\"] div:has(> [data-testid=\"copilot-chat-input\"]) {\n  padding-inline: 0;\n}\n"
+    },
+    {
+      "name": "Event list",
+      "kind": "custom",
+      "refersTo": "event-list",
+      "description": "Received, next, and pending events use text and circular markers.",
+      "html": "<div class=\"ds-preview\"><ol class=\"ds-events\" aria-label=\"AG-UI events of this tool call\"><li data-state=\"done\"><code>TOOL_CALL_START</code><span>received</span></li><li data-state=\"now\"><code>TOOL_CALL_ARGS</code><span>next</span></li><li data-state=\"wait\"><code>TOOL_CALL_END</code><span>not yet</span></li><li data-state=\"wait\"><code>TOOL_CALL_RESULT</code><span>not yet</span></li></ol></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n@keyframes tick {50% {\n    opacity: 0.2;\n  }}\n.ds-events {display: flex;\n  flex-wrap: wrap;\n  gap: 4px 20px;\n  margin: 10px 0 0;\n  padding: 0;\n  list-style: none;\n  font-size: 0.8rem;\n  color: var(--ink-2);}\n.ds-events li {display: flex;\n  align-items: center;\n  gap: 6px;}\n.ds-events li::before {content: \"\";\n  width: 9px;\n  height: 9px;\n  border: 2px solid var(--ink);\n  border-radius: 50%;}\n.ds-events li[data-state=\"done\"]::before {background: var(--ink);}\n.ds-events li[data-state=\"now\"]::before {animation: tick 0.8s steps(2, end) infinite;}\n.ds-events li[data-state=\"done\"] code {color: var(--ink);\n  font-weight: 600;}\n@media (prefers-reduced-motion: reduce) {.ds-events li::before {animation: none !important;}}\n.ds-events code {font-family:var(--mono);font-size:0.87em;}"
+    },
+    {
+      "name": "Call buttons",
+      "kind": "nav",
+      "refersTo": "call-button",
+      "description": "Numbered buttons select a tool call.",
+      "html": "<div class=\"ds-preview\"><nav class=\"ds-calls\" aria-label=\"Tool calls of this conversation\"><button type=\"button\" aria-pressed=\"true\">Search 1</button><button type=\"button\" aria-pressed=\"false\">Search 2</button></nav></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-calls {display: flex;\n  flex-wrap: wrap;\n  gap: 6px;\n  margin-bottom: 14px;}\n.ds-calls button {padding: 3px 12px;\n  border: 1px solid var(--ink);\n  border-radius: 3px;\n  background: none;\n  color: var(--ink);\n  font: 600 0.87rem var(--sans);\n  cursor: pointer;}\n.ds-calls button[aria-pressed=\"true\"] {background: var(--ink);\n  color: var(--ground);}"
+    },
+    {
+      "name": "Graph",
+      "kind": "custom",
+      "refersTo": "graph",
+      "description": "Source-colored edges connect neutral entity stops.",
+      "html": "<div class=\"ds-preview\"><div class=\"ds-graph\" style=\"height:470px\" data-narrow=\"false\" data-crowded=\"false\"><svg width=\"100%\" height=\"470\" viewBox=\"0 0 420 470\" role=\"group\" aria-label=\"Illustrative graph geometry\"><g class=\"ds-edge\" tabindex=\"0\" role=\"button\" aria-label=\"Illustrative fact between two entities\" aria-pressed=\"false\" style=\"--c:var(--line-0)\"><path class=\"ds-edge-hit\" d=\"M60 100H360\"/><path class=\"ds-edge-line\" d=\"M60 100H360\"/><path class=\"ds-edge-arrow\" d=\"M-6 -6 L5 0 L-6 6\" transform=\"translate(210 100)\"/><text class=\"ds-edge-label\" x=\"210\" y=\"68\" text-anchor=\"middle\">RELATION<tspan class=\"ds-edge-date\" x=\"210\" dy=\"1.25em\">2021-07-23 →</tspan></text></g><g class=\"ds-node\"><circle cx=\"60\" cy=\"100\" r=\"8\"/><text x=\"60\" y=\"130\" text-anchor=\"middle\">Source</text></g><g class=\"ds-node\"><circle cx=\"360\" cy=\"100\" r=\"8\"/><text x=\"360\" y=\"130\" text-anchor=\"middle\">Target</text></g></svg></div></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-graph {margin-top: 12px;\n  background: var(--sheet);\n  border: 1px solid var(--rule);}\n.ds-graph svg {display: block;}\n.ds-edge {cursor: pointer;\n  outline: none;}\n.ds-edge-hit {fill: none;\n  stroke: transparent;\n  stroke-width: 18;}\n.ds-edge-line {fill: none;\n  stroke: var(--c);\n  stroke-width: 4;\n  stroke-linecap: round;}\n.ds-edge[data-ended=\"true\"] .ds-edge-line {stroke-dasharray: 10 7;}\n.ds-edge-arrow {fill: none;\n  stroke: var(--sheet);\n  stroke-width: 2;\n  stroke-linecap: round;\n  stroke-linejoin: round;}\n.ds-edge-label {font: 600 11px var(--sans);\n  letter-spacing: 0.02em;\n  fill: var(--ink);\n  paint-order: stroke;\n  stroke: var(--sheet);\n  stroke-width: 4px;\n  stroke-linejoin: round;}\n.ds-edge-date {font: 400 10.5px var(--mono);\n  letter-spacing: 0;\n  fill: var(--ink-2);}\n.ds-graph[data-narrow=\"true\"] .ds-edge-label {display: none;}\n.ds-graph[data-narrow=\"true\"] .ds-edge[data-focus=\"true\"] .ds-edge-label {display: block;}\n.ds-edge:focus-visible .ds-edge-line, .ds-edge[aria-pressed=\"true\"] .ds-edge-line {stroke-width: 7;}\n.ds-node circle {fill: var(--sheet);\n  stroke: var(--ink);\n  stroke-width: 3;}\n.ds-node text {font: 600 13px var(--sans);\n  fill: var(--ink);\n  paint-order: stroke;\n  stroke: var(--sheet);\n  stroke-width: 4px;\n  stroke-linejoin: round;}\n.ds-edge, .ds-node {transition: opacity var(--step);}\n.ds-graph[data-crowded=\"true\"] .ds-edge-date {display: none;}\n.ds-graph[data-crowded=\"true\"] .ds-edge[data-focus=\"true\"] .ds-edge-date {display: inline;}"
+    },
+    {
+      "name": "Fact detail",
+      "kind": "custom",
+      "refersTo": "fact-detail",
+      "description": "The focused fact shows its entities, dates, sources, and sentence.",
+      "html": "<div class=\"ds-preview\"><p class=\"ds-detail\" aria-live=\"polite\" style=\"--c:var(--line-0)\"><i aria-hidden=\"true\"></i><strong>Source → RELATION → Target</strong><span class=\"ds-date\">2021-07-23 →</span><span>Stated in source section</span><span class=\"ds-detail-text\">The full fact sentence appears here.</span></p></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-detail {display: flex;\n  flex-wrap: wrap;\n  align-items: baseline;\n  gap: 2px 14px;\n  min-height: 3.4em;\n  margin: 0;\n  padding: 8px 12px;\n  border: 1px solid var(--rule);\n  border-top: 0;\n  background: var(--sheet);\n  font-size: 0.87rem;}\n.ds-detail[data-empty=\"true\"] {color: var(--ink-2);}\n.ds-detail i {align-self: center;\n  width: 20px;\n  height: 5px;\n  border-radius: 2px;\n  background: var(--c);}\n.ds-detail-text {flex-basis: 100%;\n  color: var(--ink-2);}\n.ds-date {font-family: var(--mono);\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;}"
+    },
+    {
+      "name": "Validity ruler",
+      "kind": "custom",
+      "refersTo": "validity-ruler",
+      "description": "A shared time axis shows each fact interval.",
+      "html": "<div class=\"ds-preview\"><div class=\"ds-ruler\"><div class=\"ds-ruler-axis\"><span>Validity</span><span class=\"ds-axis\"><span>2021-07-23</span><span>today</span></span><span></span></div><ul><li style=\"--c:var(--line-0)\"><button type=\"button\" aria-pressed=\"true\"><span class=\"ds-ruler-name\">RELATION</span><span class=\"ds-track\" aria-hidden=\"true\"><b style=\"left:50%\"></b><span class=\"ds-bar\" data-open=\"true\" data-nostart=\"false\" style=\"left:0;right:0\"></span></span><span class=\"ds-date\">2021-07-23 →</span></button></li></ul></div></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-date {font-family: var(--mono);\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;}\n.ds-ruler {margin-top: 12px;\n  font-size: 0.8rem;}\n.ds-ruler ul {margin: 0;\n  padding: 0;\n  list-style: none;\n  border-top: 1px solid var(--ink);}\n.ds-ruler-axis, .ds-ruler button {display: grid;\n  grid-template-columns: minmax(120px, 22%) minmax(0, 1fr) 190px;\n  align-items: center;\n  gap: 0 16px;\n  width: 100%;}\n.ds-ruler-axis {padding-bottom: 2px;\n  font-weight: 700;\n  text-transform: uppercase;\n  letter-spacing: 0.04em;}\n.ds-ruler-axis .ds-axis {font-weight: 400;\n  letter-spacing: 0;\n  text-transform: none;}\n.ds-ruler button {padding: 2px 0;\n  border: 0;\n  background: none;\n  color: var(--ink);\n  font: inherit;\n  text-align: left;\n  cursor: pointer;}\n.ds-ruler button:hover, .ds-ruler button[aria-pressed=\"true\"] {background: var(--sheet);}\n.ds-ruler-name {overflow: hidden;\n  font-weight: 600;\n  letter-spacing: 0.02em;\n  text-overflow: ellipsis;\n  white-space: nowrap;}\n.ds-ruler li {transition: opacity var(--step);}\n.ds-axis {display: flex;\n  justify-content: space-between;\n  font-family: var(--mono);}\n.ds-track {position: relative;\n  display: block;\n  height: 14px;}\n.ds-track b {position: absolute;\n  top: 0;\n  bottom: 0;\n  width: 1px;\n  background: var(--rule);}\n.ds-bar {position: absolute;\n  top: 5px;\n  height: 4px;\n  min-width: 6px;\n  background: var(--c);}\n.ds-bar::before {content: \"\";\n  position: absolute;\n  left: -1px;\n  top: -4px;\n  width: 8px;\n  height: 8px;\n  border: 2px solid var(--c);\n  border-radius: 50%;\n  background: var(--ground);}\n.ds-bar[data-nostart=\"true\"]::before {display: none;}\n.ds-bar::after {content: \"\";\n  position: absolute;\n  right: 0;\n  top: -4px;\n  height: 12px;\n  border-right: 3px solid var(--c);}\n.ds-bar[data-open=\"true\"]::after {top: -3px;\n  right: -1px;\n  height: 0;\n  border: 5px solid transparent;\n  border-right: 0;\n  border-left: 8px solid var(--c);\n  translate: 8px 0;}\n@media (max-width: 899px) {.ds-ruler-axis, .ds-ruler button {grid-template-columns: minmax(0, 38%) minmax(0, 1fr);}\n.ds-ruler-axis > :last-child, .ds-ruler button .ds-date {display: none;}}"
+    },
+    {
+      "name": "Section key",
+      "kind": "chip",
+      "refersTo": "section-key",
+      "description": "Section buttons retain source marks through selection.",
+      "html": "<div class=\"ds-preview\"><ul class=\"ds-key\" aria-label=\"Sections that state the facts\"><li><button type=\"button\" aria-pressed=\"false\" style=\"--c:var(--line-0)\"><i aria-hidden=\"true\"></i>First section<span>1 fact</span></button></li><li><button type=\"button\" aria-pressed=\"true\" style=\"--c:var(--line-1)\"><i aria-hidden=\"true\"></i>Second section<span>2 facts</span></button></li></ul></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-key button {transition: opacity var(--step);}\n.ds-key button[data-dim=\"true\"] {opacity: 0.45;}\n.ds-key {display: flex;\n  flex-wrap: wrap;\n  gap: 6px 8px;\n  margin: 10px 0 0;\n  padding: 0;\n  list-style: none;}\n.ds-key button {display: flex;\n  align-items: center;\n  gap: 7px;\n  padding: 4px 10px 4px 8px;\n  border: 1px solid var(--rule);\n  border-radius: 3px;\n  background: var(--sheet);\n  color: var(--ink);\n  font: 600 0.87rem var(--sans);\n  cursor: pointer;}\n.ds-key button:hover, .ds-key button[aria-pressed=\"true\"] {border-color: var(--ink);}\n.ds-key button[aria-pressed=\"true\"] {background: var(--ink);\n  color: var(--ground);}\n.ds-key i {flex: none;\n  display: inline-block;\n  width: 20px;\n  height: 5px;\n  border-radius: 2px;\n  background: var(--c);}\n.ds-key span {font-weight: 400;\n  color: var(--ink-2);\n  font-variant-numeric: tabular-nums;}\n.ds-key button[aria-pressed=\"true\"] span {color: inherit;}"
+    },
+    {
+      "name": "Fact table",
+      "kind": "custom",
+      "refersTo": "fact-table",
+      "description": "Two rows preserve the fields and sentence of each fact.",
+      "html": "<div class=\"ds-preview\"><div class=\"ds-scroll\"><table class=\"ds-facts\"><thead><tr><th scope=\"col\">Stated in</th><th scope=\"col\">From</th><th scope=\"col\">Relation</th><th scope=\"col\">To</th><th scope=\"col\">Valid from</th><th scope=\"col\">Invalid from</th></tr></thead><tbody style=\"--c:var(--line-0)\" data-pinned=\"false\"><tr><td class=\"ds-line\"><i aria-hidden=\"true\"></i>Source</td><td>Source entity</td><td><button type=\"button\" aria-pressed=\"false\">RELATION</button></td><td>Target entity</td><td class=\"ds-date\">2021-07-23</td><td class=\"ds-date\">none</td></tr><tr class=\"ds-sentence\"><td></td><td colspan=\"5\">The full fact sentence appears here.</td></tr></tbody></table></div></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-facts tbody {transition: opacity var(--step);}\n.ds-date {font-family: var(--mono);\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;}\n.ds-facts .ds-line i {flex: none;\n  display: inline-block;\n  width: 20px;\n  height: 5px;\n  border-radius: 2px;\n  background: var(--c);}\n.ds-scroll {overflow-x: auto;}\n.ds-facts {width: 100%;\n  min-width: 760px;\n  table-layout: fixed;\n  border-collapse: collapse;\n  font-size: 0.87rem;\n  font-variant-numeric: tabular-nums;}\n.ds-facts th {padding: 5px 16px 5px 0;\n  border-bottom: 2px solid var(--ink);\n  text-align: left;\n  text-transform: uppercase;\n  font-size: inherit;\n  font-weight: 700;\n  letter-spacing: 0.04em;\n  white-space: nowrap;\n  vertical-align: bottom;}\n.ds-facts th:nth-child(1) {width: 120px;}\n.ds-facts th:nth-child(2), .ds-facts th:nth-child(4) {width: 24%;}\n.ds-facts th:nth-child(3) {width: auto;}\n.ds-facts th:nth-child(5), .ds-facts th:nth-child(6) {width: 112px;}\n.ds-facts td {overflow-wrap: break-word;\n  padding: 7px 16px 0 0;\n  vertical-align: top;}\n.ds-facts tbody {border-bottom: 1px solid var(--rule);}\n.ds-facts tbody:hover, .ds-facts tbody[data-pinned=\"true\"] {background: var(--sheet);}\n.ds-facts .ds-line {white-space: nowrap;\n  font-weight: 700;}\n.ds-facts .ds-line i {margin-right: 7px;\n  vertical-align: middle;}\n.ds-facts .ds-date {font-family: var(--mono);\n  white-space: nowrap;}\n.ds-facts button {padding: 0;\n  border: 0;\n  background: none;\n  color: inherit;\n  font: inherit;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n  text-align: left;\n  cursor: pointer;\n  text-decoration: underline;\n  text-decoration-color: var(--rule);\n  text-underline-offset: 3px;}\n.ds-facts button[aria-pressed=\"true\"] {text-decoration-color: var(--ink);}\n.ds-facts .ds-sentence td {padding: 2px 10px 8px 0;\n  color: var(--ink-2);\n  max-width: 75ch;}\n@media (max-width: 899px) {.ds-facts {display: block;\n    min-width: 0;}\n.ds-facts thead {display: none;}\n.ds-facts tbody {display: block;\n    padding: 10px 0;}\n.ds-facts tr {display: flex;\n    flex-wrap: wrap;\n    align-items: baseline;\n    gap: 2px 10px;}\n.ds-facts td {padding: 0;}\n.ds-facts tr:first-child td:nth-child(2)::after, .ds-facts tr:first-child td:nth-child(3)::after {content: \" →\";\n    font-weight: 400;}\n.ds-facts td:nth-child(5)::before {content: \"valid from \";\n    font-family: var(--sans);}\n.ds-facts td:nth-child(6)::before {content: \"invalid from \";\n    font-family: var(--sans);}\n.ds-facts .ds-sentence td:first-child {display: none;}\n.ds-facts .ds-sentence td {padding: 2px 0 0;}}"
+    },
+    {
+      "name": "Section texts",
+      "kind": "custom",
+      "refersTo": "section-texts",
+      "description": "Native disclosures retain source text and context.",
+      "html": "<div class=\"ds-preview\"><div class=\"ds-sections\"><details open style=\"--c:var(--line-0)\"><summary><i aria-hidden=\"true\"></i><strong>Source section</strong><span>Act &gt; Chapter &gt; Section</span></summary><p>The returned section text appears here.</p></details><details><summary><i aria-hidden=\"true\" data-plain=\"true\"></i><strong>Text match</strong><span>Act &gt; Section</span><em>found by its text</em></summary><p>The returned section text appears here.</p></details></div></div>",
+      "css": ".ds-preview [data-dim=\"true\"] {opacity:0.16;}\n.ds-preview {font: 15px/1.5 var(--sans); color: var(--ink); background: var(--ground);} :focus-visible {outline: 2px solid var(--ink);\n  outline-offset: 2px;}\n.ds-sections details {transition: opacity var(--step);}\n.ds-sections details[data-dim=\"true\"] {opacity: 0.45;}\n.ds-sections summary i {flex: none;\n  display: inline-block;\n  width: 20px;\n  height: 5px;\n  border-radius: 2px;\n  background: var(--c);}\n.ds-sections details {border-top: 1px solid var(--rule);}\n.ds-sections details:last-child {border-bottom: 1px solid var(--rule);}\n.ds-sections summary {display: flex;\n  flex-wrap: wrap;\n  align-items: baseline;\n  gap: 2px 10px;\n  padding: 9px 0;\n  cursor: pointer;\n  list-style: none;}\n.ds-sections summary::-webkit-details-marker {display: none;}\n.ds-sections summary::after {content: \"Show\";\n  margin-left: auto;\n  font-size: 0.87rem;\n  text-decoration: underline;\n  text-underline-offset: 3px;}\n.ds-sections details[open] summary::after {content: \"Hide\";}\n.ds-sections summary i {align-self: center;}\n.ds-sections summary i[data-plain=\"true\"] {background: none;\n  border: 1px solid var(--ink-2);}\n.ds-sections summary span, .ds-sections summary em {font-size: 0.87rem;\n  color: var(--ink-2);}\n.ds-sections p {margin: 0 0 16px;\n  max-width: 72ch;\n  white-space: pre-wrap;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Working Timetable",
+    "overview": "The page pairs a blue conversation rail with a light result area. Lines connect entities and carry the colors of their source sections.\nDates, rules, and compact rows organize the result. The graph, ruler, table, and section texts share one focus state.",
+    "keyCharacteristics": [
+      "A dark rail beside a light graph workspace.",
+      "Source colors that connect facts to sections.",
+      "Flat surfaces with thin borders.",
+      "Compact data with distinct dates and relation names.",
+      "Shared focus with short step transitions."
+    ],
+    "rules": [
+      {
+        "name": "The Source Color Rule",
+        "body": "Each source section has one line color. These colors have no other job.",
+        "section": "colors"
+      },
+      {
+        "name": "The Table Rank Rule",
+        "body": "The fact table uses one font size. Weight, case, spacing, and rules establish rank.",
+        "section": "typography"
+      },
+      {
+        "name": "The Shared Focus Rule",
+        "body": "Hover takes priority over a pinned selection. Unrelated data dims but remains in the layout.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep each source color consistent across the graph, ruler, key, table, and section texts.",
+      "Do use shape and text to explain validity and progress.",
+      "Do preserve source names, dates, and full fact sentences.",
+      "Do keep the page breakpoint separate from the graph width threshold.",
+      "Do retain the Act attribution and license link."
+    ],
+    "donts": [
+      "Do not use source colors for status, errors, or action emphasis.",
+      "Do not hide unrelated facts during shared focus.",
+      "Do not add shadows to these flat custom surfaces.",
+      "Do not treat palette reuse after ten sections as a unique source key."
+    ]
+  }
+}
