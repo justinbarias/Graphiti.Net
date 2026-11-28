@@ -5,11 +5,18 @@ Finds port TODO markers, stubs, constructs that switch off the compiler's
 checks, and product code that shells out to Python. Exits 1 when anything
 is found, so it can gate a unit or a CI run.
 
-This file is a copy of scripts/scan_port.py of the port-python-to-dotnet skill.
-The copy adds two options, --allow and --write-allow. It also finds the
-null-forgiving operator in each place after a name, a closing parenthesis,
-or a closing square bracket. The skill's scanner finds it only before five
-characters, and it missed one use before a closing square bracket.
+This file started as a copy of scripts/scan_port.py of the
+port-python-to-dotnet skill. It keeps the six checks and the options of the
+skill's scanner, and it differs in three ways:
+
+- It has two more options, --allow and --write-allow.
+- It reads each file with its state: a block comment, a raw string of more
+  than one line, the depth of the braces, and the type and the member that
+  hold a line. The skill's scanner reads each line alone.
+- It finds the null-forgiving operator after a name, a closing parenthesis,
+  or a closing square bracket, when no = follows, and inside the holes of
+  an interpolated string. The skill's scanner finds it only before five
+  characters.
 
 Usage:
     python3 port/tools/scan_port.py CSHARP_DIR [--exclude PART ...] [--allow-todo] [--allow FILE]
@@ -26,18 +33,23 @@ them. Use it while blocked units remain, and check the printed markers
 against the blocked list in port/STATE.md.
 
 --allow names a file of accepted findings. Each line has a path, a label,
-a count, the name of the member that holds the line, and the text of the
-line, with one tab between them. A line that starts with # is a comment.
-The file accepts a finding only in its member and with its text: the count
-is the number of such lines. If a count differs, each such line is reported.
-A line of the file that matches no finding fails the scan too, and so does
-a second line for one key.
---write-allow prints such a file for the present findings.
+a count, the member that holds the line, and the text of the line, with
+one tab between them. A line that starts with # is a comment. The member
+is the name of the type, a colon, and the first line of the declaration
+of the member. The file accepts a finding only in its member and with its
+text: the count is the number of such lines. If a count differs, each such
+line is reported. A line of the file that matches no finding fails the
+scan too, and so does a second line for one key. The file can hold only
+the labels "stub" and "port TODO". Each other label is an error, because
+no port of upstream code needs it.
+--write-allow prints such a file for the present findings of those two
+labels.
 
-The member is the nearest declaration with a modifier at or above the line,
-found by its text and not by a parser. What the allow file cannot see: a
-line that moves inside its member, and a new line with the same text as a
-line that is removed from the same member.
+Limits. The scanner reads text and not syntax. It does not see a line
+that moves inside its member, or a new line with the same text as a line
+that leaves the same member. It does not see the operator after a space
+unless a dot and a name follow. A verbatim string of more than one line
+is read as code.
 """
 
 from __future__ import annotations
@@ -52,48 +64,135 @@ CHECKS: list[tuple[str, re.Pattern[str]]] = [
     ("stub", re.compile(r"\bNotImplementedException\b")),
     ("dynamic type", re.compile(r"\bdynamic\b(?!\s*\()")),
     ("warning switched off", re.compile(r"#pragma\s+warning\s+disable|\[SuppressMessage")),
-    ("null-forgiving operator", re.compile(r"(?<=[\w\)\]])!(?!=)")),
+    ("null-forgiving operator", re.compile(r"(?<=[\w\)\]])!(?!=)|[\w\)\]]\s+!\.(?=[A-Za-z_])")),
     ("calls Python", re.compile(r"Process.*[\"']python|[\"']python3?[\"']|FileName\s*=\s*[\"'](uv|python)")),
 ]
 
 # The TODO marker lives in comments, so it is checked on the raw line.
 RAW_LINE_CHECKS = {"port TODO"}
-COMMENT = re.compile(r"//.*$")
-MEMBER = re.compile(
-    r"^\s*(?:(?:public|internal|private|protected|static|virtual|override|abstract|async|sealed|new|partial|unsafe|extern)\s+)+"
-    r"[^=;(]*?\b([A-Za-z_]\w*)\s*(?:<[^>()]*>)?\s*\("
+# The labels that a port of upstream code can need. Only these can be in an allow file.
+ALLOWABLE = {"stub", "port TODO"}
+
+CHAR = re.compile(r"'(?:\\.|[^'\\])'")
+VERBATIM = re.compile(r'\$?@\$?"(?:""|[^"])*"')
+STRING = re.compile(r'(\$?)"((?:\\.|[^"\\])*)"')
+HOLE = re.compile(r"\{([^{}]+)\}")
+RAW_QUOTES = re.compile(r'"{3,}')
+TYPE = re.compile(
+    r"^\s*(?:(?:public|internal|private|protected|static|sealed|abstract|partial|readonly|ref|unsafe|file|new)\s+)*"
+    r"(?:class|record(?:\s+(?:class|struct))?|struct|interface)\s+([A-Za-z_]\w*)"
 )
-STRING = re.compile(r'"(?:\\.|[^"\\])*"')
-
-
-def member_of(lines: list[str], index: int) -> str:
-    for line in reversed(lines[: index + 1]):
-        match = MEMBER.match(line)
-        if match:
-            return match.group(1)
-    return "-"
-
-
-def scan(path: Path) -> list[tuple[int, str, str, str]]:
-    hits = []
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    for number, line in enumerate(lines, start=1):
-        code = COMMENT.sub("", line)
-        no_strings = STRING.sub('""', code)
-        for label, pattern in CHECKS:
-            if label in RAW_LINE_CHECKS:
-                target = line
-            elif label == "calls Python":
-                target = code
-            else:
-                target = no_strings
-            if pattern.search(target):
-                hits.append((number, label, line.strip(), member_of(lines, number - 1)))
-    return hits
 
 
 def key_text(line: str) -> str:
     return " ".join(line.split())
+
+
+def _string(match: re.Match[str]) -> str:
+    # The holes of an interpolated string are code, so they stay.
+    if not match.group(1):
+        return '""'
+    return '"" ' + " ".join(HOLE.findall(match.group(2).replace("{{", "").replace("}}", "")))
+
+
+class Reader:
+    """Gives the code of each line with no comment and no string text, and the member that holds the line."""
+
+    def __init__(self) -> None:
+        self.in_block = False
+        self.in_raw = False
+        self.depth = 0
+        self.types: list[tuple[str, int]] = []
+        self.pending: tuple[str, int] | None = None
+        self.header = ""
+        self.boundary = True
+
+    def code(self, line: str) -> tuple[str, str]:
+        """Returns the line with its line comment and the line with no comment and no string text."""
+        if self.in_raw:
+            if RAW_QUOTES.search(line):
+                self.in_raw = False
+            return "", ""
+        text = line
+        if self.in_block:
+            end = text.find("*/")
+            if end < 0:
+                return "", ""
+            text = " " * (end + 2) + text[end + 2:]
+            self.in_block = False
+        if len(RAW_QUOTES.findall(text)) % 2 == 1:
+            self.in_raw = True
+            text = text[: RAW_QUOTES.search(text).start()] + '""'
+        text = CHAR.sub("' '", text)
+        text = VERBATIM.sub('""', text)
+        bare = STRING.sub(_string, text)
+        with_strings = text
+        while True:
+            start = bare.find("/*")
+            if start < 0:
+                break
+            end = bare.find("*/", start + 2)
+            if end < 0:
+                self.in_block = True
+                bare = bare[:start]
+                break
+            bare = bare[:start] + " " + bare[end + 2:]
+        comment = bare.find("//")
+        if comment >= 0:
+            bare = bare[:comment]
+        # For the check that looks at string text, cut the line comment only if it starts outside each string.
+        marker = STRING.sub(lambda m: "#" * len(m.group(0)), text).find("//")
+        if marker >= 0:
+            with_strings = with_strings[:marker]
+        return with_strings, bare
+
+    def member(self, bare: str) -> str:
+        """Moves the state over one line of code and returns the member that holds the line."""
+        before = self.depth
+        body = self.types[-1][1] if self.types else None
+        significant = bare.strip() and not bare.strip().startswith("[")
+        declared = TYPE.match(bare)
+        if body is not None and before == body and significant and self.boundary and not declared:
+            self.header = key_text(bare)
+            self.boundary = False
+        if declared and not (bare.rstrip().endswith(";") and "{" not in bare):
+            self.pending = (declared.group(1), before)
+        for char in bare:
+            if char == "{":
+                if self.pending is not None and self.depth == self.pending[1]:
+                    self.types.append((self.pending[0], self.depth + 1))
+                    self.pending = None
+                    self.boundary = True
+                    self.header = ""
+                self.depth += 1
+            elif char == "}":
+                self.depth -= 1
+                if self.types and self.depth < self.types[-1][1]:
+                    self.types.pop()
+                    self.boundary = True
+                    self.header = ""
+        found = f"{self.types[-1][0]}: {self.header}" if self.types and before >= self.types[-1][1] and self.header else "-"
+        if body is not None and self.types and self.types[-1][1] == body and self.depth == body and bare.rstrip().endswith((";", "}")):
+            self.boundary = True
+        return found
+
+
+def scan(path: Path) -> list[tuple[int, str, str, str]]:
+    hits = []
+    reader = Reader()
+    for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+        with_strings, bare = reader.code(line)
+        member = reader.member(bare)
+        for label, pattern in CHECKS:
+            if label in RAW_LINE_CHECKS:
+                target = line
+            elif label == "calls Python":
+                target = with_strings
+            else:
+                target = bare
+            if pattern.search(target):
+                hits.append((number, label, line.strip(), member))
+    return hits
 
 
 def read_allow(path: Path) -> dict[tuple[str, str, str, str], int]:
@@ -104,7 +203,9 @@ def read_allow(path: Path) -> dict[tuple[str, str, str, str], int]:
         parts = line.split("\t")
         if len(parts) != 5 or not parts[2].isdigit() or int(parts[2]) < 1:
             raise SystemExit(f"error: {path}:{number}: expected path, label, count, member, and text with tabs between them")
-        key = (parts[0], parts[1], parts[3], key_text(parts[4]))
+        if parts[1] not in ALLOWABLE:
+            raise SystemExit(f"error: {path}:{number}: the label {parts[1]!r} cannot be in an allow file")
+        key = (parts[0], parts[1], key_text(parts[3]), key_text(parts[4]))
         if key in allowed:
             raise SystemExit(f"error: {path}:{number}: a second line for {parts[0]}, {parts[1]}, {parts[3]}, and this text")
         allowed[key] = int(parts[2])
@@ -117,7 +218,7 @@ def main() -> int:
     parser.add_argument("--exclude", action="append", default=[], help="skip paths containing this text")
     parser.add_argument("--allow-todo", action="store_true", help="report TODO(port) markers without failing")
     parser.add_argument("--allow", type=Path, help="file of accepted findings: path, label, count, member, text")
-    parser.add_argument("--write-allow", action="store_true", help="print an allow file for the present findings")
+    parser.add_argument("--write-allow", action="store_true", help="print an allow file for the present stub and port TODO findings")
     args = parser.parse_args()
 
     if not args.root.is_dir():
@@ -133,17 +234,19 @@ def main() -> int:
             continue
         files += 1
         for number, label, line, member in scan(path):
-            found.setdefault((text, label, member, key_text(line)), []).append((number, line))
+            found.setdefault((text, label, key_text(member), key_text(line)), []).append((number, line))
 
+    ordered = sorted(found.items(), key=lambda item: (item[0][0], item[1][0][0]))
     if args.write_allow:
-        for (text, label, member, line), hits in sorted(found.items(), key=lambda item: (item[0][0], item[1][0][0])):
-            print(f"{text}\t{label}\t{len(hits)}\t{member}\t{line}")
+        for (text, label, member, line), hits in ordered:
+            if label in ALLOWABLE:
+                print(f"{text}\t{label}\t{len(hits)}\t{member}\t{line}")
         return 0
 
     total = 0
     todos = 0
     accepted = 0
-    for (text, label, member, line), hits in sorted(found.items(), key=lambda item: (item[0][0], item[1][0][0])):
+    for (text, label, member, line), hits in ordered:
         if allowed.get((text, label, member, line)) == len(hits):
             accepted += len(hits)
             continue
