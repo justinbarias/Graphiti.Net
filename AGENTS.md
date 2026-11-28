@@ -14,6 +14,7 @@ Gate 2 closed on 2026-11-25, so the judge in `port/judge/` is read-only. Gate 3 
 | Python constructs with no direct C# form, and upstream defects | [port/GAPS.md](port/GAPS.md) |
 | How each Python pattern becomes C#. Only the lead changes it. | [port/RULES.md](port/RULES.md) |
 | The judge: commands, protocol, noise rules | [port/judge/README.md](port/judge/README.md) |
+| The work for a new upstream release | [port/UPSTREAM.md](port/UPSTREAM.md) |
 | Current work | [docs/PLANS.md](docs/PLANS.md) |
 | System layout and boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Test layers and the mutation rule | [docs/TESTING.md](docs/TESTING.md) |

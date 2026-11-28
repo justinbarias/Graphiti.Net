@@ -1,0 +1,100 @@
+diff --git a/port/judge/README.md b/port/judge/README.md
+index f2d23e2..3fd70fa 100644
+--- a/port/judge/README.md
++++ b/port/judge/README.md
+@@ -12,7 +12,7 @@ python3 port/judge/run.py --build python            # every case must pass
+ ```
+ 
+ ```bash
+-python3 port/judge/run.py --build dotnet            # the failing set must equal expected-failures.txt
++python3 port/judge/run.py --build dotnet            # the failing set must equal expected-failures.txt and stale-after-pin.txt together
+ ```
+ 
+ ```bash
+@@ -43,6 +43,7 @@ Requirements:
+ | `embedder-vectors.json` | Vectors from the Python judge embedder. The .NET host must reproduce them bit for bit. |
+ | `count.txt` | The lowest allowed case count. |
+ | `expected-failures.txt` | The .NET cases that still fail. Empty at M1. |
++| `stale-after-pin.txt` | The .NET cases that a pin move made wrong. Empty outside a sync. Each line is `<case id> <unit> <target version>`. |
+ | `host-python/` | The Python host. |
+ 
+ The .NET host is `tests/Graphiti.Net.JudgeHost`. It is outside this folder because each ported unit adds a binding to it.
+@@ -204,6 +205,8 @@ The .NET host answers `JudgeTypeRejected` if a C# parameter cannot hold an argum
+ If the golden result is `TypeError` or `AttributeError`, the case passes, because Python refused the same argument for its type.
+ If the golden result is another error or a value, the case fails. It can stay in `expected-failures.txt` only if the maintainer accepts the difference by name.
+ 
++A case in `stale-after-pin.txt` can be bound and give a wrong result. If such a case passes, the runner fails until its line is removed. An id cannot be in both lists, and each id must name a case.
++
+ ## Cases mined from upstream pytest files
+ 
+ | Upstream pytest file | Case file | Cases |
+@@ -237,3 +240,5 @@ If all of these hold, you can add cases without a new gate:
+ - `count.txt` goes up.
+ 
+ Write what was added and why in `port/DECISIONS.md`. Any other change needs the maintainer.
++
++A pin move is the one case where golden output changes for an old case. In a pin pull request, the lead records all golden files again from the new pinned source (port/UPSTREAM.md, step 1). A case or `count.txt` changes in that pull request only through a patch that the maintainer applied on its branch.
+diff --git a/port/judge/run.py b/port/judge/run.py
+index 40c9c2f..740547b 100644
+--- a/port/judge/run.py
++++ b/port/judge/run.py
+@@ -4,6 +4,7 @@
+     python3 port/judge/run.py --build python            every case must pass
+     python3 port/judge/run.py --build python --record   write golden files (needs the upstream venv)
+     python3 port/judge/run.py --build dotnet            the failing set must equal expected-failures.txt
++                                                        and stale-after-pin.txt together
+ 
+ Options: --layer pure|flow, --filter TEXT (case id substring), --verbose.
+ 
+@@ -30,6 +31,7 @@ CASES = JUDGE / "cases"
+ GOLDEN = JUDGE / "golden"
+ COUNT_FILE = JUDGE / "count.txt"
+ EXPECTED_FAILURES = JUDGE / "expected-failures.txt"
++STALE_AFTER_PIN = JUDGE / "stale-after-pin.txt"
+ 
+ HOSTS = {
+     "python": [str(ROOT / ".upstream/graphiti/.venv/bin/python"), str(JUDGE / "host-python/host.py")],
+@@ -652,10 +654,27 @@ def main() -> int:
+         expected = set()
+         if EXPECTED_FAILURES.exists():
+             expected = {l.strip() for l in EXPECTED_FAILURES.read_text().split("\n") if l.strip() and not l.startswith("#")}
++        # A pin move makes ported units wrong until they are ported again (port/UPSTREAM.md). A case in
++        # stale-after-pin.txt can fail for any reason, also if it is bound. The first word of a line is
++        # the case id. The rest of the line names the unit and the target version.
++        stale = set()
++        if STALE_AFTER_PIN.exists():
++            stale = {l.split()[0] for l in STALE_AFTER_PIN.read_text(encoding="utf-8").split("\n") if l.strip() and not l.lstrip().startswith("#")}
++        # These two checks read the whole lists, also in a run with --layer or --filter.
++        in_both = sorted(stale & expected)
++        no_case = sorted(stale - {c["id"] for c in load_cases(None, None)}) if stale else []
++        for case_id in in_both:
++            print(f"FAIL {case_id} is in both lists.", file=sys.stderr)
++        for case_id in no_case:
++            print(f"FAIL {case_id} names no case.", file=sys.stderr)
++        stale -= expected | set(no_case)
+         if partial:
+-            expected &= {c["id"] for c in cases}
+-        surprise = sorted(set(failed) - expected)
++            selected = {c["id"] for c in cases}
++            expected &= selected
++            stale &= selected
++        surprise = sorted(set(failed) - expected - stale)
+         fixed = sorted(expected - set(failed))
++        stale_fixed = sorted(stale - set(failed))
+         # A listed case can fail for two reasons only. Its unit is not bound yet, or the C# parameter
+         # cannot hold the argument and Python gives a result that is not a type error. The maintainer
+         # accepts such a case by name: its id stays in the list. A case that is bound, runs, and
+@@ -673,9 +692,11 @@ def main() -> int:
+                 print(f"     {line}", file=sys.stderr)
+         for case_id in fixed:
+             print(f"FAIL {case_id} passes now. Remove it from expected-failures.txt.", file=sys.stderr)
+-        if surprise or fixed:
++        for case_id in stale_fixed:
++            print(f"FAIL {case_id} passes now. Remove it from stale-after-pin.txt.", file=sys.stderr)
++        if surprise or fixed or stale_fixed or in_both or no_case:
+             status = 1
+-        print(f"judge: expected failures={len(expected)} unexpected={len(surprise)} fixed={len(fixed)} bound_wrong={len(bound_wrong)}")
++        print(f"judge: expected failures={len(expected)} unexpected={len(surprise)} fixed={len(fixed)} bound_wrong={len(bound_wrong)} stale={len(stale)}")
+ 
+     print("judge: passed" if status == 0 else "judge: FAILED")
+     return status
