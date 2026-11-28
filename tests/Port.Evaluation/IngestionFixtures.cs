@@ -126,6 +126,49 @@ internal static class IngestionFixtures
         }.Validate();
 }
 
+/// <summary>
+/// Runs the body of a test on the virtual clock: `asyncio.sleep`, each time limit, and the store read one clock that
+/// moves only when the loop has no work.
+/// </summary>
+// PORT: the upstream tests with a lease or a sleep of less than a second run alone on their loop in real time. In the
+// port each test class runs its work on the one exclusive scheduler of PyCompat, and in a parallel run another class can
+// hold that thread for longer than a lease, so a heartbeat comes too late. Here the body runs as a task on VirtualTime
+// (PortServices.Time) and the FakeClock of the store (`clock`). After each pass of 100 yields, the runner moves the two
+// clocks by `step` seconds. A wait of real time on the scheduler thus moves no clock.
+internal static class VirtualLoop
+{
+    internal static Task RunAsync(Func<FakeClock, Task> body, double step = 0.01, double limit = 60.0) =>
+        LoopGuard.RunAsync(async () =>
+        {
+            var time = new VirtualTime();
+            var clock = new FakeClock();
+            using (PortServices.Use(time: time))
+            {
+                var task = Asyncio.CreateTask(_ => body(clock), out _);
+                var moved = 0.0;
+                while (true)
+                {
+                    for (var i = 0; i < 100 && !task.IsCompleted; i++)
+                    {
+                        await Task.Yield();
+                    }
+
+                    if (task.IsCompleted)
+                    {
+                        break;
+                    }
+
+                    Assert.True(moved < limit, $"the body did not end in {limit} seconds of the virtual clock");
+                    time.Advance(step);
+                    clock.Advance(step);
+                    moved += step;
+                }
+
+                await task;
+            }
+        });
+}
+
 /// <summary>The fake clock of the fixtures.</summary>
 internal sealed class FakeClock(double now = 1000.0)
 {

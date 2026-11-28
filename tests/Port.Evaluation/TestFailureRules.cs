@@ -36,6 +36,16 @@ using Graphiti.Internal;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.IngestionFixtures;
 
+// PORT: test_analysis_failure_releases_the_position asserts `turn_wait_ms < 1000`, and the commit measures it with
+// `time.time` (Py.TimeSeconds, the system clock, R8), which no test clock replaces. The class runs alone, so no other
+// class holds the scheduler thread during that measure. The tests with a lease or a sleep run on the virtual clock
+// (VirtualLoop).
+[CollectionDefinition(nameof(TestFailureRules), DisableParallelization = true)]
+public class TestFailureRulesIsolation
+{
+}
+
+[Collection(nameof(TestFailureRules))]
 public class TestFailureRules
 {
     // `GROUP`. The record Group of the in-memory store has the same name.
@@ -296,7 +306,9 @@ public class TestFailureRules
         var tmpPath = Directory.CreateTempSubdirectory("p9g-").FullName;
         try
         {
-            await Loop(async () =>
+            // PORT: the sleep of 0.05 seconds in begin_admit runs on the virtual clock (VirtualLoop), so the
+            // cancellation reaches the caller before the sleep ends, as on the loop of the upstream test.
+            await VirtualLoop.RunAsync(async clock =>
             {
                 var h = new Harness();
                 if (storeKind == "sqlite")
@@ -330,7 +342,7 @@ public class TestFailureRules
                 await Assert.ThrowsAsync<UnitExpiredException>(() => h.Store.EndAdmitAsync(Group, 1, Token));
                 Assert.Empty(h.Graph.Episodes);
                 await h.Store.CloseAsync(Token);
-            }, TestContext.Current.CancellationToken);
+            }).WaitAsync(TestContext.Current.CancellationToken);
         }
         finally
         {
@@ -343,9 +355,12 @@ public class TestFailureRules
     [InlineData(true)]
     public async Task test_admission_renews_its_lease_while_it_writes(bool bulk)
     {
-        await Loop(async () =>
+        // PORT: the lease of 0.15 seconds, the sleep of 0.4 seconds in the write, and the heartbeat every 0.05 seconds run
+        // on the virtual clock (VirtualLoop). The store reads the FakeClock of that runner, where upstream it reads
+        // `time.time`. In real time a parallel class could hold the scheduler thread for longer than the lease.
+        await VirtualLoop.RunAsync(async clock =>
         {
-            var h = new Harness(leaseSeconds: 0.15, writeMarginSeconds: 0.01);
+            var h = new Harness(clock, leaseSeconds: 0.15, writeMarginSeconds: 0.01);
 
             // PORT: the replaced add_nodes_and_edges_bulk sleeps before the write of FakeGraph. FakeGraph.BulkWrite sleeps
             // before the same write. The test also replaces phases.retrieve_previous_episodes_bulk (see
@@ -378,13 +393,14 @@ public class TestFailureRules
 
             Assert.Equal(StateStore.StatusAdmitted, Status(h, unit.Seq));
             Assert.Single(h.Graph.Episodes);
-        }, TestContext.Current.CancellationToken);
+        }).WaitAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact(Timeout = 10000)]
     public async Task test_commit_waits_for_the_earlier_unit()
     {
-        await Loop(async () =>
+        // PORT: the sleep of 0.02 seconds and the polls of the commit wait run on the virtual clock (VirtualLoop).
+        await VirtualLoop.RunAsync(async clock =>
         {
             var h = new Harness();
             var unit1 = await h.AdmitAsync("u1");
@@ -404,13 +420,14 @@ public class TestFailureRules
             // The commits are in sequence order, so unit 2 finds the node of unit 1.
             TestCommitRepair.AssertMap(result2.ChangeSet.UuidMap, ("a2", "a1"));
             Assert.True(result2.Report["turn_wait_ms"] > 0);
-        }, TestContext.Current.CancellationToken);
+        }).WaitAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact(Timeout = 10000)]
     public async Task test_cancellation_before_the_final_change_set_releases_the_position()
     {
-        await Loop(async () =>
+        // PORT: the sleep of 0.02 seconds and the polls of the commit wait run on the virtual clock (VirtualLoop).
+        await VirtualLoop.RunAsync(async clock =>
         {
             var h = new Harness();
             var unit1 = await h.AdmitAsync("u1");
@@ -429,7 +446,7 @@ public class TestFailureRules
             await h.CommitAsync(unit1, changeSet1);
             await h.CommitAsync(unit3, changeSet3);
             TestCommitRepair.AssertSet(h.Graph.Nodes.Keys, "a1");
-        }, TestContext.Current.CancellationToken);
+        }).WaitAsync(TestContext.Current.CancellationToken);
     }
 
     // --- failures after the final change set is stored --------------------------------

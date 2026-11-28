@@ -12,6 +12,7 @@ using Graphiti.Core;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Ingestion;
 using Graphiti.Core.Utils;
+using Graphiti.Internal;
 using Graphiti.PyCompat;
 using static Graphiti.Port.Evaluation.IngestionFixtures;
 
@@ -54,7 +55,7 @@ public class TestUpdateQueries
         }
     }
 
-    // A session whose write sleeps for five seconds, as SlowSession of upstream does.
+    // A session whose write sleeps for five seconds, as SlowSession of upstream does (`asyncio.sleep(5)`).
     private sealed class SlowSession : GraphDriverSession
     {
         internal int Closed { get; private set; }
@@ -71,10 +72,10 @@ public class TestUpdateQueries
         }
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, CancellationToken cancellationToken = default) =>
-            Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            Asyncio.SleepAsync(5, PortServices.Time, cancellationToken);
 
         internal override Task ExecuteWriteAsync(Func<Transaction, Task> func, double timeout, CancellationToken cancellationToken = default) =>
-            Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            Asyncio.SleepAsync(5, PortServices.Time, cancellationToken);
     }
 
     private sealed class SlowDriver(SlowSession session) : GraphDriver
@@ -113,14 +114,18 @@ public class TestUpdateQueries
         Assert.Single(run.Events.Select(PhasesValues.Dict), e => (string)e["kind"]! == "close");
     }
 
+    // PORT: the limit of 0.05 seconds and the sleep of the session run on the virtual clock (VirtualLoop in
+    // IngestionFixtures.cs), so a busy scheduler thread in a parallel run does not change which one ends first.
     [Fact(Timeout = 10000)]
     public async Task test_write_is_cancelled_at_the_limit_on_a_driver_with_no_server_limit()
     {
         var session = new SlowSession();
         var driver = new SlowDriver(session) { Provider = GraphProvider.Neptune };
 
-        await Assert.ThrowsAsync<TimeoutException>(() => LoopGuard.RunAsync(
-            () => BulkUtils.ExecuteWriteWithTimeoutAsync(driver, 0.05, (tx, token) => Task.CompletedTask, TestContext.Current.CancellationToken)));
+        await VirtualLoop.RunAsync(async _ =>
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => BulkUtils.ExecuteWriteWithTimeoutAsync(driver, 0.05, (tx, token) => Task.CompletedTask, TestContext.Current.CancellationToken)))
+            .WaitAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, session.Closed);
     }
 
