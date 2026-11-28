@@ -232,21 +232,21 @@ internal sealed class FakeSession(FakeCalls calls) : IAsyncSession
     {
         await Slow.Pause();
         calls.Names.Add("run");
-        return null!;
+        return new FakeCursor();
     }
 
     public async Task<IResultCursor> RunAsync(string query, object parameters, Action<TransactionConfigBuilder>? action = null)
     {
         await Slow.Pause();
         calls.Names.Add("run");
-        return null!;
+        return new FakeCursor();
     }
 
     public async Task<IResultCursor> RunAsync(string query, IDictionary<string, object> parameters, Action<TransactionConfigBuilder>? action = null)
     {
         await Slow.Pause();
         calls.Names.Add("run");
-        return null!;
+        return new FakeCursor();
     }
 
     public Task<IResultCursor> RunAsync(Query query, Action<TransactionConfigBuilder>? action = null) => throw new NotSupportedException();
@@ -284,21 +284,21 @@ internal sealed class FakeTransaction(FakeCalls calls) : IAsyncTransaction
     {
         await Slow.Pause();
         calls.Names.Add("run");
-        return null!;
+        return new FakeCursor();
     }
 
     public async Task<IResultCursor> RunAsync(string query, object parameters)
     {
         await Slow.Pause();
         calls.Names.Add("run");
-        return null!;
+        return new FakeCursor();
     }
 
     public async Task<IResultCursor> RunAsync(string query, IDictionary<string, object> parameters)
     {
         await Slow.Pause();
         calls.Names.Add("run");
-        return null!;
+        return new FakeCursor();
     }
 
     public Task<IResultCursor> RunAsync(Query query) => throw new NotSupportedException();
@@ -308,6 +308,27 @@ internal sealed class FakeTransaction(FakeCalls calls) : IAsyncTransaction
     public void Dispose()
     {
     }
+}
+
+/// <summary>
+/// The result of a fake run: no keys and no rows, as the answer to a statement with no RETURN. The Python fake run
+/// returns None, so the reads of the port record no name.
+/// </summary>
+internal sealed class FakeCursor : IResultCursor
+{
+    public IRecord Current => throw new NotSupportedException();
+
+    public bool IsOpen => true;
+
+    public Task<string[]> KeysAsync() => Task.FromResult(Array.Empty<string>());
+
+    public Task<IResultSummary> ConsumeAsync() => Task.FromResult<IResultSummary>(null!);
+
+    public Task<IRecord> PeekAsync() => throw new NotSupportedException();
+
+    public Task<bool> FetchAsync() => throw new NotSupportedException();
+
+    public IAsyncEnumerator<IRecord> GetAsyncEnumerator(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 /// <summary>A logger factory that keeps the lines of the module of the driver, with their level.</summary>

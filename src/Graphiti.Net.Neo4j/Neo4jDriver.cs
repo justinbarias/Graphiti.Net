@@ -496,6 +496,9 @@ internal sealed class Neo4jTransaction : Transaction
 {
     private readonly IAsyncQueryRunner tx;
 
+    // The result of the last run whose rows the server can still send. Its failure arrives at the next run.
+    private IResultCursor? pending;
+
     internal Neo4jTransaction(IAsyncQueryRunner tx)
     {
         this.tx = tx;
@@ -504,13 +507,45 @@ internal sealed class Neo4jTransaction : Transaction
     // PORT: Python returns the result of the driver. No upstream site reads it, so it is a Task (R9).
     // PORT: IAsyncQueryRunner.RunAsync takes no CancellationToken (R9, open item O9). The port checks the token
     // before the driver call.
+    // PORT: AsyncTransaction.run of the Python driver (neo4j 6.1.0, neo4j/_async/work/transaction.py:201) sends the
+    // statement and then reads the answers of the server up to the answer to this statement. So a failure of this
+    // statement raises here, and a failure that the server sends with the rows of an earlier statement raises here
+    // too, after this statement was sent. A run after a failure raises with no send, and the rollback after it
+    // returns. Neo4j.Driver 6.5.1 waits for no answer in RunAsync, so the port reads the keys of this result, which
+    // waits for the same answers (R9). A statement with no keys failed, was ignored after an earlier failure, or
+    // returns no rows, so the port consumes it at once, and that throws the error of the server. The driver can read
+    // the failure of an earlier result together with the keys of that result. It then refuses the next statement
+    // with TransactionTerminatedException, and the port consumes the earlier result, which throws the error of the
+    // server as Python does.
     internal override async Task RunAsync(
         string query,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await tx.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
+        IResultCursor cursor;
+        try
+        {
+            cursor = await tx.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
+        }
+        catch (TransactionTerminatedException) when (pending is not null)
+        {
+            var failed = pending;
+            pending = null;
+            await failed.ConsumeAsync();
+            throw;
+        }
+
+        pending = null;
+        var keys = await cursor.KeysAsync();
+        if (keys.Length == 0)
+        {
+            await cursor.ConsumeAsync();
+        }
+        else
+        {
+            pending = cursor;
+        }
     }
 }
 
@@ -540,14 +575,24 @@ internal sealed class Neo4jSession : GraphDriverSession
         }
     }
 
-    // PORT: AsyncSession.run. A run call does not consume its result cursor, as in Python (R9).
+    // PORT: AsyncSession.run (neo4j 6.1.0, neo4j/_async/work/session.py:300). Python first reads the rest of the
+    // earlier result, so its failure raises here before this statement is sent, and the session stays usable.
+    // IAsyncSession.RunAsync of Neo4j.Driver 6.5.1 does the same. Python then waits for the answer to this
+    // statement, so a statement that fails at once raises here. The driver keeps that failure in the result, so the
+    // port reads the keys: a statement with no keys failed or returns no rows, and the port consumes it at once. A
+    // statement with keys keeps its result open, as in Python (R9).
     internal override async Task RunAsync(
         string query,
         OrderedDictionary<string, object?> parameters,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await session.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
+        var cursor = await session.RunAsync(query, Neo4jDriver.ToDriverParameters(parameters));
+        var keys = await cursor.KeysAsync();
+        if (keys.Length == 0)
+        {
+            await cursor.ConsumeAsync();
+        }
     }
 
     // PORT: AsyncSession.close. It drops the error of the result that the session did not consume. No token check,
