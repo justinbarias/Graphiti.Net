@@ -7,9 +7,9 @@ using System.Xml.Linq;
 
 /// <summary>One episode of the split: the place in the Act, and the text to ingest.</summary>
 /// <param name="Ref">The place of the episode in the Act.</param>
-/// <param name="Content">The content of the episode: the chain with headings, the section line, and the text.</param>
+/// <param name="Content">The content of the episode: the topic line, the heading of the section, and the text. It has no chain and no section number.</param>
 /// <param name="SourceDescription">The chain in one line, for the field of the same name.</param>
-/// <param name="WordCount">The number of words of the text of the section, without the chain lines.</param>
+/// <param name="WordCount">The number of words of the text of the section, without the heading.</param>
 internal sealed record ActEpisode(ProvisionRef Ref, string Content, string SourceDescription, int WordCount);
 
 /// <summary>
@@ -137,8 +137,12 @@ internal static partial class ActSplitter
             var name = $"{SectionIdOf(number)}{(groups.Count > 1 ? $" (part {i + 1} of {groups.Count})" : string.Empty)}";
             var reference = new ProvisionRef(ActName, null, part, division, subdivision, number, heading, name, null);
             var text = new StringBuilder();
-            text.Append(reference.ChainWithHeadings).Append('\n');
-            text.Append($"Section {number} {heading}").Append("\n\n");
+            // The content holds the topic, the heading, and the text. The topic is the heading text of the Part and the
+            // Division with no number, so the model knows the scheme of the section. The place of the section (the section
+            // id and the chain) is provenance: the episode holds it in Name and in SourceDescription, and the model never
+            // reads it.
+            text.Append("Topic: ").Append(reference.Topic).Append('\n');
+            text.Append(heading).Append("\n\n");
             text.Append(string.Join('\n', groups[i].Select(p => p.Text)));
             yield return new ActEpisode(reference, text.ToString(), reference.Chain, groups[i].Sum(p => WordCount(p.Text)));
         }

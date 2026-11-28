@@ -70,15 +70,27 @@ internal static class Commands
     /// <param name="limit">The count of sections to ingest, or null for all.</param>
     /// <param name="resume">True to skip each section whose episode exists in the group.</param>
     /// <param name="window">The count of episodes that Graphiti works on at the same time. 0 or 1 gives serial ingestion.</param>
+    /// <param name="sections">The section numbers to ingest, or null for all.</param>
     /// <returns>A task that ends when the ingestion ends.</returns>
-    public static async Task IngestAsync(Settings settings, string file, int? limit, bool resume, int window = DefaultWindow)
+    public static async Task IngestAsync(
+        Settings settings, string file, int? limit, bool resume, int window = DefaultWindow, IReadOnlyList<string>? sections = null)
     {
         var fullList = ActSplitter.Split(file);
         var all = fullList;
         var sectionNumbers = all.Select(e => e.Ref.Section).Distinct().ToList();
+        if (sections is not null)
+        {
+            if (sections.FirstOrDefault(s => !sectionNumbers.Contains(s, StringComparer.Ordinal)) is { } missing)
+            {
+                throw new QuickstartException($"The Act has no section '{missing}'.");
+            }
+
+            all = [.. all.Where(e => sections.Contains(e.Ref.Section, StringComparer.Ordinal))];
+        }
+
         if (limit is { } n)
         {
-            var keep = sectionNumbers.Take(n).ToHashSet(StringComparer.Ordinal);
+            var keep = all.Select(e => e.Ref.Section).Distinct().Take(n).ToHashSet(StringComparer.Ordinal);
             all = [.. all.Where(e => keep.Contains(e.Ref.Section))];
         }
 
@@ -99,12 +111,16 @@ internal static class Commands
         if (resume)
         {
             // Graphiti saves an episode when it starts the work, so an episode in the graph can be unfinished. A
-            // finished episode has at least one entity that it mentions. Graphiti processes an unfinished episode again
+            // finished episode has a record with its uuid in the sections file, which the command writes only after the
+            // call returns, or it has at least one entity that it mentions. A section with no entity of the ontology
+            // (for example the short title) is finished by its record. Graphiti processes an unfinished episode again
             // if the call gives its uuid.
-            foreach (var episode in await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId]))
+            var recorded = ReadSections(settings).Where(r => r.EpisodeUuid is not null).Select(r => r.EpisodeUuid!).ToHashSet(StringComparer.Ordinal);
+            var selected = all.Select(e => e.Ref.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var episode in (await graphiti.Nodes.Episode.GetByGroupIdsAsync([settings.GroupId])).Where(e => selected.Contains(e.Name)))
             {
-                var linked = await graphiti.GetNodesAndEdgesByEpisodeAsync([episode.Uuid], settings.GroupId);
-                if (linked.Nodes.Count > 0)
+                if (recorded.Contains(episode.Uuid)
+                    || (await graphiti.GetNodesAndEdgesByEpisodeAsync([episode.Uuid], settings.GroupId)).Nodes.Count > 0)
                 {
                     existing[episode.Name] = episode.Uuid;
                 }
@@ -160,7 +176,7 @@ internal static class Commands
                             Source = EpisodeType.Text,
                             Uuid = unfinished.GetValueOrDefault(episode.Ref.Name),
                         },
-                        new AddEpisodeOptions { GroupId = settings.GroupId },
+                        Ontology.Options(settings.GroupId),
                         cancel.Token);
                     lock (writeLock)
                     {

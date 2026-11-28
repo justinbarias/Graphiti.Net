@@ -31,15 +31,26 @@ internal sealed record ProvisionRef(
     /// Gets the chain in one line, with the label of each level: Act, Chapter, Part, Division, Subdivision, Section. A
     /// level that does not exist is left out.
     /// </summary>
-    public string Chain => string.Join(" > ", Levels(headingText: false));
+    public string Chain => string.Join(" > ", Levels());
 
-    /// <summary>Gets the chain down to the Subdivision in one line, with the heading text of each level. It has no Section level.</summary>
-    public string ChainWithHeadings => string.Join(" > ", Levels(headingText: true).SkipLast(1));
+    /// <summary>
+    /// Gets the topic of the section: the heading text of the Part, the Division, and the Subdivision, without the label
+    /// of each level. For example "Cyber-abuse material targeted at an Australian adult". It says what the section is
+    /// about, and it holds no number.
+    /// </summary>
+    public string Topic => string.Join(", ", new[] { Part, Division, Subdivision }.Where(l => l is not null).Select(l => Title(l!)));
 
     private static string ActShortName(string act)
     {
         var bracket = act.IndexOf(" (", StringComparison.Ordinal);
         return bracket < 0 ? act : act[..bracket];
+    }
+
+    private static string Title(string heading)
+    {
+        // "Part 3—Complaints, objections and investigations" has the title "Complaints, objections and investigations".
+        var dash = heading.IndexOf('—', StringComparison.Ordinal);
+        return dash < 0 ? heading : heading[(dash + 1)..];
     }
 
     private static string Label(string heading)
@@ -49,17 +60,17 @@ internal sealed record ProvisionRef(
         return dash < 0 ? heading : heading[..dash];
     }
 
-    private IEnumerable<string> Levels(bool headingText)
+    private IEnumerable<string> Levels()
     {
         yield return Act;
         foreach (var level in new[] { Chapter, Part, Division, Subdivision })
         {
             if (level is not null)
             {
-                yield return headingText ? level : Label(level);
+                yield return Label(level);
             }
         }
 
-        yield return headingText ? $"Section {Section} {Heading}" : $"Section {Section}";
+        yield return $"Section {Section}";
     }
 }
