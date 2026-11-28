@@ -272,7 +272,7 @@ The rail stacks its header, flexible chat, and footer. The result area scrolls v
 | Graph and ruler | `12px` top margin |
 | Section key | `6px 8px` gap and `10px` top margin |
 | Section headings | `36px 0 8px` margin |
-| Fact detail | `2px 14px` gap |
+| Fact detail | Two rows of `1.5em` and one row of `3em` |
 | Section summary | `2px 10px` gap and `9px 0` padding |
 
 The spacing entries record literal stylesheet values. The page has no CSS spacing variables or uniform spacing formula.
@@ -334,6 +334,7 @@ The rail holds the conversation in a blue column. Its footer retains the Act att
 CopilotKit surfaces inherit the rail palette. The welcome screen aligns content left and places it at the bottom with `0 24px 8px` padding.
 Its heading uses `1.15rem`, weight 600, a `1.3` line height, and a `16px` bottom margin.
 Example questions form open rows without boxes. Thin translucent rules separate them, and each row ends with an arrow.
+A hover underlines the question and brightens the arrow. It does not change the padding.
 Each question uses `11px 26px 11px 2px` padding, the data type size, and a `1.4` line height.
 Hover moves the left padding to `8px` and brightens the arrow. The rows keep a clear background.
 The input uses the secondary rail surface and a capsule shape. Its transparent border becomes secondary rail ink on focus.
@@ -383,11 +384,15 @@ The graph dims unrelated entities and edges. It does not remove them.
 
 ### Fact detail
 
-The detail area sits directly beneath the graph. It has a minimum height of `3.4em`.
+The detail area sits directly beneath the graph. It has a fixed height of `calc(6em + 18px)`.
+The height never changes, so a new fact does not move the ruler or the table under the pointer.
 Without a fact focus, it shows a short instruction in secondary ink.
-A fact focus shows the source, relation, target, dates, sections, and full sentence.
-The source mark carries the line color. Dates use the mono stack.
-The fact sentence fills a new row. A polite live region announces the selected fact text.
+A fact focus shows three rows: the fact, then its dates and sections, then its sentence.
+The first two rows stay on one line and end with an ellipsis. The sentence shows two lines at most.
+The fact table holds the full text. The source mark carries the line color, and dates use the mono stack.
+A polite live region announces the selected fact text.
+
+**The Still Hover Rule.** A hover never changes the size of an element. It changes color, opacity, or decoration only.
 
 ### Validity ruler
 
@@ -413,8 +418,8 @@ Hover or keyboard focus highlights matching facts. A click toggles the pinned se
 
 Each fact uses two rows inside one table body. The first row shows sources, entities, relation, and validity dates.
 The second row shows the full fact sentence in secondary ink.
-The desktop table uses fixed layout, full width, and a `760px` minimum width. Its wrapper permits horizontal scrolling.
-The source column measures `120px`. Entity columns each take `24%`, date columns measure `112px`, and the relation takes the remaining width.
+The desktop table uses fixed layout, full width, and an `880px` minimum width. Its wrapper permits horizontal scrolling.
+The source column measures `120px`. The relation column takes `24%`, and date columns measure `112px`. The two entity columns share the remaining width.
 Header padding is `5px 16px 5px 0`. Cell padding is `7px 16px 0 0`.
 Sentence padding is `2px 10px 8px 0`. Thin rules separate facts.
 

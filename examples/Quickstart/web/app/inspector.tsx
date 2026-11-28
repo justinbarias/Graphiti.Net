@@ -185,15 +185,21 @@ function Detail({ result, lines, focus }: { result: SearchResult; lines: string[
     );
   }
 
+  // The box has a fixed height, so a new fact never moves the ruler or the table under the pointer. A long name or a
+  // long fact text is cut here. The fact table below has the full text.
+  const title = `${fact.source.name} → ${fact.name} → ${fact.target.name}`;
   return (
     <p className="detail" style={lineStyle(lines, lineOf(fact))} aria-live="polite">
-      <i aria-hidden="true" />
-      <strong>
-        {fact.source.name} → {fact.name} → {fact.target.name}
+      <strong title={title}>
+        <i aria-hidden="true" />
+        {title}
       </strong>
-      <span className="date">{validity(fact.valid_at, fact.invalid_at)}</span>
-      <span>Stated in {sectionsOf(fact)}</span>
-      <span className="detail-text">{fact.fact}</span>
+      <span className="detail-meta">
+        <span className="date">{validity(fact.valid_at, fact.invalid_at)}</span> Stated in {sectionsOf(fact)}
+      </span>
+      <span className="detail-text" title={fact.fact}>
+        {fact.fact}
+      </span>
     </p>
   );
 }

@@ -455,34 +455,54 @@ pre {
 
 /* The fact that the reader points at. */
 
+/* The box has one fixed height: one line for the fact, one line for its dates and sections, and two lines for its
+   text. A change of the fact then never moves the ruler or the table under the pointer. */
 .detail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 14px;
-  min-height: 3.4em;
+  display: grid;
+  grid-template-rows: repeat(2, 1.5em) 3em;
+  box-sizing: border-box;
+  height: calc(6em + 18px);
   margin: 0;
   padding: 8px 12px;
   border: 1px solid var(--rule);
   border-top: 0;
   background: var(--sheet);
   font-size: 0.87rem;
+  line-height: 1.5;
+  overflow: hidden;
 }
 
 .detail[data-empty="true"] {
   color: var(--ink-2);
 }
 
+.detail strong,
+.detail-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .detail i {
-  align-self: center;
+  display: inline-block;
   width: 20px;
   height: 5px;
+  margin-right: 8px;
   border-radius: 2px;
   background: var(--c);
+  vertical-align: middle;
+}
+
+.detail-meta .date {
+  margin-right: 12px;
 }
 
 .detail-text {
-  flex-basis: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   color: var(--ink-2);
 }
 
@@ -618,7 +638,7 @@ pre {
 
 .facts {
   width: 100%;
-  min-width: 760px;
+  min-width: 880px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.87rem;
@@ -643,11 +663,11 @@ pre {
 
 .facts th:nth-child(2),
 .facts th:nth-child(4) {
-  width: 24%;
+  width: auto;
 }
 
 .facts th:nth-child(3) {
-  width: auto;
+  width: 24%;
 }
 
 .facts th:nth-child(5),
@@ -1034,7 +1054,7 @@ pre {
   justify-content: flex-start;
   font-size: 0.87rem;
   line-height: 1.4;
-  transition: padding var(--step), color var(--step);
+  transition: color var(--step);
 }
 
 .rail [data-testid="copilot-suggestion"]:first-child {
@@ -1059,9 +1079,11 @@ pre {
   translate: 0 -50%;
 }
 
+/* The hover changes no size, so the rows do not move under the pointer. */
 .rail [data-testid="copilot-suggestion"]:hover {
-  padding-left: 8px;
   background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .rail [data-testid="copilot-suggestion"]:hover::after {
