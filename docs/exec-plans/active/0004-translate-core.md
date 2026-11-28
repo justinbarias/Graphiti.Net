@@ -18,7 +18,7 @@ A stack of pull requests, built with `gh stack`. Each layer depends on the layer
 | 6 | `port/search` | Done 2026-11-27. `search` | 7 | 3,456 | Opus 5.5, medium |
 | 7 | `port/maintenance` | Done 2026-11-27. `utils.maintenance` | 10 | 4,458 | Opus 5.5, medium |
 | 8 | `port/ingestion` | Done 2026-11-28. `ingestion` | 9 | 4,159 | Opus 5.5, medium |
-| 9 | `port/graphiti-core`, then `port/public-surface` | In progress. The core is done 2026-11-28: `graphiti` (2,782 lines), the package root, `migrations`, and the flow cases. The public .NET surface is the second pull request. | 3 | 2,787 | Opus 5.5, high |
+| 9 | `port/graphiti-core`, then `port/public-surface` | Done 2026-11-28. `graphiti` (2,782 lines), the package root, `migrations`, the flow cases, and the public .NET surface | 3 | 2,787 | Opus 5.5, high |
 
 Layer 0 is the skeleton that the porting skill requires, so every later layer compiles against fixed shapes.
 A skeleton member throws `NotSupportedException` with a `TODO(port)` marker, and the scanner counts the markers down to zero.
@@ -55,7 +55,7 @@ Each subagent start needs the maintainer's approval first.
 | --- | --- |
 | 5 | Done 2026-11-27. Save and load each node and edge type on Neo4j. Build indexes twice and get the same result. |
 | 6 | Done 2026-11-27. Seed a graph, then run each search recipe and compare the ranked ids with the golden result. |
-| 8 | Ingest episodes in parallel into one group, and find no lost update. This test moved to layer 9, because it needs the `Graphiti` object. |
+| 8 | Ingest episodes in parallel into one group, and find no lost update. This test moved to layer 9, because it needs the `Graphiti` object. It is `GraphitiE8Tests.cs`. |
 | 9 | `AddEpisodeAsync`, then `SearchAsync`. A contradicting episode closes the old fact's validity window and deletes nothing. |
 
 After layers 5, 7, and 9, run `scripts/mutate.sh` and apply the pruning rule.
@@ -755,3 +755,100 @@ What is not checked:
 - After a failed statement, the port throws `TransactionTerminatedException` for the next run, where Python raises `TransactionError` (GAPS F37).
 - No test runs two processes that write to one SQLite file at one time.
 - The mutation run of plan 0003, task 5 is still owed.
+
+### Layer 9, the public surface, 2026-11-28
+
+This section is the second pull request of layer 9: the public .NET surface of `docs/design-docs/public-surface-design.md`. It adds no ported unit, so the queue does not change.
+
+| Step | Work | Result |
+| --- | --- | --- |
+| Build | The public records and their mapping, the options and the registration, and `IGraphiti` with its facade | 99 public types. `tests/Graphiti.Net.E2E.Tests/PublicSurface.txt` lists each public member, and a test fails for a change. |
+| Review | Two Opus 5.5 high reviewers | 8 and 12 findings. 95 of 147 seeded defects passed each test. |
+| Fix round | 6 decisions on the code and 8 on the evidence | 7 new test classes, and one recorder, `port/tools/record_public_surface.py`. |
+| Follow-up | The error of a call (upstream defect U19) | One more test class. |
+| Adversarial pass | One Opus 5.5 high reviewer over the whole diff | 9 findings, 1 of them important. 8 of its 24 seeded defects passed each test. One more commit and one more test class resolved them. |
+
+After the fix round and the follow-up, 150 of 154 seeded defects of the reviews fail a test. Of the 8 seeded defects of the adversarial pass that passed, 7 fail a test now, and the eighth is in the list at the end of this section. The lead accepts the other four as changes with no effect: the labels of an episode (no query returns them), the metadata of an episode (no query stores it), a vector cut to 32 bits (Neo4j stores 32 bits), and the index build (a test must not drop the shared indexes).
+
+What the reviews changed in the product code:
+
+| Finding | Result |
+| --- | --- |
+| A disposed container took the logger, the clock, and the failure classifier away from each other `Graphiti` of the process. | The facade keeps a list of the live facades. A dispose gives the process-wide services to the latest live facade, or it restores the defaults. |
+| The core compiled against two packages that it did not reference. | Direct references to `Microsoft.Extensions.DependencyInjection.Abstractions` and `Microsoft.Extensions.Options` 11.0.0, as the library table of `port/DECISIONS.md` says. `Microsoft.Extensions.Primitives` moves from 10.0.15 to 11.0.0 in each project. |
+| `AddNeo4j` with a driver factory did not read the database name. | It reads `Neo4jOptions.Database`, and an empty value gives `neo4j`. |
+| Three `!` operators in product code. | Each one is a pattern or a `throw` now (rule R24). |
+| A sync `Dispose` on the scheduler thread blocked for good, and a failed close hid the first error of a failed build. | The sync `Dispose` throws there and names `DisposeAsync`. The cleanup logs a failed close and throws the first error. On the scheduler thread, the cleanup starts the close and does not wait for it. |
+| A dispose of one container during the first resolution of another left the default logger, clock, and failure classifier for the process. | The facade applies its services again in the lock section that adds it to the list of live facades. |
+| Each error inside a span reached the host as `InvalidOperationException: generator didn't stop after throw()`, because the facade always passes a tracer and the ported tracer keeps upstream defect U19. The span sites are `add_episode`, `add_episode_bulk`, `search`, the model call, and the ingestion phases. A namespace call starts no span. | The two `RunAsync` helpers of the facade give the host the error of the call, as the exception table of the design says. The ported tracer does not change. |
+| The comments of the embedding properties said that a save keeps 64-bit values. | Neo4j stores 32-bit values, and the comments and the design say so. |
+
+The evidence:
+
+- `PublicSurfaceUpstreamTests` compares each public name and each default with a recording of upstream: the 12 public methods of `Graphiti`, the 75 methods of the 9 namespace classes, the fields of 25 models, and the 16 recipes. A table holds 41 differences, each with its clause of the design. The test checks one direction: each upstream name has a public member with the same default, or a row of the table. It does not check a parameter type, the order of the parameters, or a public member with no upstream name. `PublicSurface.txt` guards those.
+- End-to-end test E9 (`GraphitiE9Tests.cs`): `AddEpisodeAsync`, then `SearchAsync`, on Neo4j. A contradicting episode closes the validity window of the old fact. The test counts the nodes, the episodes, the entities, the `MENTIONS` edges, and the facts after each episode, and each node and edge of episode 1 still exists after episode 2.
+- End-to-end test E8 (`GraphitiE8Tests.cs`): 6 concurrent `AddEpisodeAsync` calls into one group with a window of 3, with the in-memory state store and with the SQLite state store. Each episode and each entity exists one time, and each unit of the SQLite store has the state `committed`. It passed 20 runs in a row.
+- `GraphitiNamespaceMembersTests` runs each of the 75 namespace members and reads Neo4j as the proof.
+- `GraphitiArgumentsTests` and `GraphitiSearchArgumentsTests` cover each argument of the 12 calls, and the 10 kinds of search filter.
+- `GraphitiModelOptionsTests` covers the model by size, the token limit, the temperature, the routes, the overrides, and the default reranker over a scripted log probability client.
+- `GraphitiOptionEffectsTests` covers five options that no test reached before the adversarial pass: the trace span prefix, `MaxCoroutines`, the embedding model, the embedding dimensions (by the length of a stored vector), and the group selector of concurrent ingestion.
+- `GraphitiCallErrorTests` runs four failing calls, each with and with no listener on the activity source `Graphiti.Net`. Three give the real error type of the call, and the fourth shows that an `InvalidOperationException` of the host arrives as it is.
+
+Commands at the tip of the branch, 2026-11-28:
+
+| Command | Result |
+| --- | --- |
+| `scripts/check.sh --test` on a Neo4j with an empty graph | `check: passed` |
+| `dotnet test --project tests/Port.Evaluation` | 18,664 tests, 0 failed, 0 skipped |
+| `dotnet test --project tests/Graphiti.Net.E2E.Tests` | 346 tests, 0 failed, 0 skipped |
+| `python3 -B port/judge/run.py --build dotnet` | 1,999 cases, 1,933 passed, 66 expected failures, 0 unexpected, 0 fixed, 0 bound and wrong, `judge: passed` |
+| `record_public_surface.py --check` | Current |
+
+The 21 choices of the builder, where the approved design gives no form. Two reviewers read them. The fix round corrected choice 11 (the database of a driver factory) and one false statement about choice 16. The maintainer reads the list at gate 4:
+
+1. The four option classes `LlmOptions`, `EmbeddingOptions`, `RerankerOptions`, and `PromptOptions` are top-level classes, and the properties of `GraphitiOptions` that hold them are read-only.
+2. Each `options` parameter of `IGraphiti` defaults to null, and so do `groupId` and `groupIds`. The token is the last parameter.
+3. The 9 namespace interfaces have the names of the upstream classes.
+4. `BuildCommunitiesResult` has `Communities` and `CommunityEdges`.
+5. A Python `int` is an `int` for a parameter, a limit, and a config field. A token count is a `long`.
+6. `identity_properties` is a read-only dictionary of read-only lists, in the order of the dictionary.
+7. For two `GraphTypeDefinition` values with one name, or two `EdgeTypeRule` values for one pair, the second keeps the place of the first and replaces its value.
+8. `PropertyFilter.PropertyValue` is an `object?` that holds null, a string, a `long`, or a `double`.
+9. The value model is exact on input: an `int`, a `float`, or a typed array throws `InvalidCastException`. A reviewer proposes to widen the small integer types on input, which changes a clause of the design.
+10. `Neo4jOptions` is in the namespace `Graphiti`, and a missing `Uri` fails the validation of the options.
+11. `AddNeo4j` with a driver factory reads the database name from `Neo4jOptions`.
+12. The log probability client and a custom cross-encoder come only from the builder, not from the container.
+13. With routes, `Prompts.Overrides` reaches the runtime as prompt overrides, not as a library.
+14. The first resolution sets the failure classifier of the process from `Llm.ClassifyFailure`.
+15. `PromptContext.Values` is a lazy view, and a value with no public form throws on its read.
+16. `Node` and `Edge` have a `private protected` constructor. A host can still derive a record through the copy constructor.
+17. The totals and the averages of the token usage records are computed.
+18. The validator also checks each route and each null builder.
+19. A null argument throws `ArgumentNullException` at the call, and a canceled token throws before the call enters the scheduler.
+20. If the core constructor throws after the driver exists, the facade closes the driver and the state store.
+21. `Nodes.Episode.RetrieveEpisodesAsync` takes the source as a `string?`.
+
+Decisions of the lead under D49, for the maintainer at gate 4:
+
+- A public call gives the host the error of the call (upstream defect U19 at the facade).
+- The reason of lead choice L3 is corrected. The public embedding type stays `ReadOnlyMemory<double>`.
+- The two direct package references, and the move of `Microsoft.Extensions.Primitives` to 11.0.0.
+- In a process with two containers, the latest live facade owns the process-wide services.
+- Rule R24 has one exception: the sync `Dispose` and the cleanup after a failed build block on the close of the core, and only off the scheduler.
+- The facade reads the arguments of a call on its scheduler and makes no copy first. A host must not change a collection that it passed before the task of the call completes. The summaries of `IGraphiti` and of the two namespace roots say so. Python shares the list in the same way, on one thread.
+- The reason of lead choice L9 is corrected: with no listener, the ported tracer still wraps an error of a span body, and the facade removes the wrap.
+
+Two points wait for the maintainer and block nothing:
+
+- The end-to-end test project takes the service container from the framework reference `Microsoft.AspNetCore.App`. The other choice is a package row for `Microsoft.Extensions.DependencyInjection` 11.0.0, for the tests only.
+- An attribute value of type `int` throws on input (choice 9).
+
+Differences from Python that the tests showed, each one upstream behavior: GAPS U23 (`property_filters` has no effect) and U24 (the namespace save of an entity edge writes no `reference_time`). `add_episode` with a `uuid` processes the stored episode of that uuid and saves no second episode. An excluded entity that an edge names is saved as a plain `Entity`.
+
+What is not checked:
+
+- No test seeds the removal of the guard of the sync `Dispose`, because that seed blocks the scheduler.
+- The bulk call has no test for an excluded entity type.
+- No test shows that the cleanup of a failed build closes the state store (choice 20). With the Neo4j driver, no path makes the core constructor throw after the store exists.
+- No test runs the surface in a generic host with a second process.
+- The attribute-based form of custom entity types and edge types that the maintainer asked for on 2026-11-28 is the work of another session. This pull request has the builder form only.
