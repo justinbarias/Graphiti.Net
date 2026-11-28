@@ -165,6 +165,67 @@ public class SmallTests
         }
     });
 
+    // functools.lru_cache is safe for threads: CPython holds a lock while it reads and changes the cache. The ported
+    // code runs on one scheduler, but a test thread can call a cached function at the same time as another test class.
+    [Theory]
+    [InlineData(8)]
+    [InlineData(512)]
+    public async Task LruCache_is_safe_for_four_threads_that_call_it_at_one_time(int maxSize)
+    {
+        var cache = new PyLruCache<int, int>(maxSize);
+        const int calls = 200_000;
+        Task Work(int seed) => Task.Run(() =>
+        {
+            var state = (uint)seed;
+            for (var i = 0; i < calls; i++)
+            {
+                state = (state * 1664525) + 1013904223;
+                var key = (int)(state >> 16) % (maxSize * 3);
+                Assert.Equal((key * key) + 1, cache.GetOrAdd(key, k => (k * k) + 1));
+            }
+        });
+
+        await Task.WhenAll(Work(1), Work(2), Work(3), Work(4));
+
+        Assert.True(cache.Count <= maxSize, $"{cache.Count} entries in a cache of {maxSize}");
+        Assert.Equal(4L * calls, cache.Hits + cache.Misses);
+    }
+
+    // The cached function runs outside the lock, as in CPython: a second thread computes a key while the first thread
+    // is still in the function for that key. Thread A waits in f(1). The test thread calls f(1) and f(2), lets A end,
+    // and calls f(3), f(1), f(2). The expected values are the results of functools.lru_cache in CPython 3.12.
+    [Theory]
+    [InlineData(2, new[] { "M1", "M2", "A1", "M3", "M1", "M2" }, 0L, 6L, 2)]
+    [InlineData(null, new[] { "M1", "M2", "A1", "M3", "A1", "M2" }, 2L, 4L, 3)]
+    [InlineData(0, new[] { "M1", "M2", "A1", "M3", "M1", "M2" }, 0L, 6L, 0)]
+    public async Task LruCache_runs_the_function_outside_its_lock_as_Python_does(int? maxSize, string[] expected, long hits, long misses, int size)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var cache = new PyLruCache<int, string>(maxSize);
+        using var entered = new ManualResetEventSlim();
+        using var gate = new ManualResetEventSlim();
+        var threadA = Task.Run(() => cache.GetOrAdd(1, k =>
+        {
+            entered.Set();
+            gate.Wait(token);
+            return $"A{k}";
+        }));
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(30), token));
+
+        // If the function ran inside the lock, these two calls waited for thread A, and the limit ends the test.
+        var first = await Task.Run(() => new[] { cache.GetOrAdd(1, k => $"M{k}"), cache.GetOrAdd(2, k => $"M{k}") })
+            .WaitAsync(TimeSpan.FromSeconds(30), token);
+        gate.Set();
+        var fromA = await threadA;
+        string[] last = [cache.GetOrAdd(3, k => $"M{k}"), cache.GetOrAdd(1, k => $"M{k}"), cache.GetOrAdd(2, k => $"M{k}")];
+
+        string[] actual = [.. first, fromA, .. last];
+        Assert.Equal(expected, actual);
+        Assert.Equal(hits, cache.Hits);
+        Assert.Equal(misses, cache.Misses);
+        Assert.Equal(size, cache.Count);
+    }
+
     // ---- PyRandom ----
 
     [Fact]
