@@ -191,7 +191,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/DatetimeUtils.cs",
       "status": "reviewed",
-      "notes": "Layer 1. Two reviews and one fix round. No covering case is listed. pure.datetime.ensure_utc.wrong_type_date_only passes since plan 0005, task 2: the judge host registers the class datetime:date."
+      "notes": "Layer 1. Two reviews and one fix round. No covering case is listed. pure.datetime.ensure_utc.wrong_type_date_only passes since plan 0005, task 2: the judge host registers the class datetime:date. The typed read rejects the class before product code runs, and the golden result is AttributeError, so the runner accepts the rejection (decision D20)."
     },
     {
       "order": 9,
@@ -505,7 +505,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Helpers.cs",
       "status": "reviewed",
-      "notes": "Layer 1. Two reviews and one fix round. 12 covering cases stay listed (open item O4), each with the answer JudgeTypeRejected. Four cases pass since plan 0005, task 2: pure.datetime.parse_db_date.neo4j_datetime_naive, pure.text.validate_group_ids.contains_none, and the two cases of validate_excluded_entity_types with a custom type. pure.datetime.parse_db_date.neo4j_datetime_naive needs the decoder of neo4j.time:DateTime, which comes with the Neo4j conversion of layer 5. The numpy sum is PyNumpy.AddReduce."
+      "notes": "Layer 1. Two reviews and one fix round. 12 covering cases stay listed (open item O4), each with the answer JudgeTypeRejected. Four cases pass since plan 0005, task 2: pure.datetime.parse_db_date.neo4j_datetime_naive, pure.text.validate_group_ids.contains_none, and the two cases of validate_excluded_entity_types with a custom type. For the neo4j date case, the judge host builds a LocalDateTime and passes it through Neo4jDriver.FromDriverValue of the product. The numpy sum is PyNumpy.AddReduce."
     },
     {
       "order": 24,
@@ -1273,7 +1273,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Search/SearchUtils.cs",
       "status": "tests_pass",
-      "notes": "Layer 6. Two reviews and one fix round. One covering case stays listed: pure.ranking.rrf.inner_not_list_string (open item O4). pure.ranking.rrf.rank_const_fraction passes since plan 0005, task 2: rank_const is a double. tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune. Two tests of tests/test_neptune_search_isolation.py call those Neptune branches, so they have no port (rule R24)."
+      "notes": "Layer 6. Two reviews and one fix round. Two covering cases stay listed: pure.ranking.rrf.inner_not_list_string and pure.ranking.rrf.rank_const_fraction (open item O4). tests/Port.Evaluation/SearchUtilsValuesTests.cs compares the 1,322 recorded cases of port/tools/record_search_utils.py. Four TODO(port) markers stay: the Neptune branch of the four full-text searches calls driver.run_aoss_query, and the Neptune driver is out of the MVP (decision D10). port/STATE.md lists them. GAPS F32 names one more difference on Neptune. Two tests of tests/test_neptune_search_isolation.py call those Neptune branches, so they have no port (rule R24)."
     },
     {
       "order": 61,

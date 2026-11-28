@@ -45,28 +45,35 @@ No group of build errors exists. Each layer of plan 0004 merged with a green gat
 
 ### Task 2, the listed judge cases, 2026-11-28
 
-After layer 9, `expected-failures.txt` held 66 pure ids and no flow id. A reader classified each one, and a Sonnet 5.5 fixer at high effort closed the 22 ids that need no decision of the maintainer. 44 ids stay listed.
+After layer 9, `expected-failures.txt` held 66 pure ids and no flow id. A reader classified each one, and a Sonnet 5.5 fixer at high effort closed 21 ids that need no decision of the maintainer. 45 ids stay listed.
 
 | Group | Ids | What closed it |
 | --- | --- | --- |
 | A tuple for an `Iterable[int]` parameter | 1 | The judge host lets a parameter of the exact type `IEnumerable<T>` take a tuple. This change has its own pull request. |
-| `None` in a list of group ids | 1 | `validate_group_ids` takes an `IEnumerable<string?>?`. Python declares `str | None` for the item. |
-| A class and a model that the host did not know | 2 | The host registers `datetime:date` and `neo4j.time:DateTime`. |
+| `None` in a list of group ids | 1 | `validate_group_ids` takes an `IEnumerable<string?>?`. Python passes each item to `validate_group_id`, which declares `str | None`. |
+| A class and a model that the host did not know | 2 | The host registers `datetime:date` as a class. For `neo4j.time:DateTime` it builds a `LocalDateTime` and passes it through `Neo4jDriver.FromDriverValue` of the product. |
 | The schema of three result records | 3 | `AddEpisodeResults`, `AddBulkEpisodeResults`, and `AddTripletResults` have a `ModelJsonSchema` member. |
 | A label list for `get_entity_node_save_query` | 3 | The parameter is an `object?`, as its helper declares `str | list[str]`. |
-| A fraction for `rank_const` of `rrf` | 1 | The parameter is a `double`. Python gives it no annotation. |
 | `ExtractedEntities` as a custom type | 10 | The host gives the class a descriptor that its binding file writes by hand. |
-| A dict as a prompt library | 1 | The host decodes a dict as a library with no group. |
+| A dict as a prompt library | 1 | The host decodes a value that is not a namespace as a library with no group. |
 
-Each of the six seeded defects of the fixer fails a judge case.
+Each seeded defect of the fixer fails a judge case.
+
+One Opus 5.5 high reviewer then read both pull requests with the task to refute them: 13 findings, 3 of them important. Each one is resolved:
+
+- The neo4j date case passed because the host did the conversion. The host now runs the conversion of the product, and a seeded defect in it fails the case.
+- A `double` for `rank_const` of `rrf` gave another result than Python for a whole number of 2 to the power of 53 or more. The change is taken back, and `pure.ranking.rrf.rank_const_fraction` stays listed.
+- The lead had edited `port/TYPE_HINTS.md` by hand, which is a generated file. The edit is undone.
+- `IEnumerable<string?>?` for `validate_group_ids` is an exception of the list rule. The rulebook names it now.
+- Nine sentences of the records were false or stale. Each one is corrected.
 
 Decisions of the lead under D49, for the maintainer at gate 4:
 
 - A parameter of the exact type `IEnumerable<T>` takes a tuple in the judge host. A `List<T>` does not (rule R22).
-- `rank_const` of `rrf` is a `double`. `port/TYPE_HINTS.md` gave `int` before.
+- `validate_group_ids` takes an `IEnumerable<string?>?`, where the rule for a Python list gives a `List<T>`. A `List<string?>` parameter refuses the `List<string>` of each caller.
 - A parameter that goes unchanged to a helper with a wider declared type takes the type of the helper. `GetEntityNodeSaveQuery` takes an `object?` for `labels`.
 
-The 44 ids that stay are the cases of open item O4 in `port/RULES.md`. In each one, Python gets its result by accident: a value of a wrong type passes a falsy test, falls into a default branch, or is read one character at a time. The C# type cannot hold the value, and each real caller passes the right type. The rows of O4 name each id with the proposed answer. The maintainer accepts each one by name at gate 4, or extends decision D20.
+The 45 ids that stay are the cases of open item O4 in `port/RULES.md`. In each one, the C# type cannot hold the value, and each real caller passes the right type. In most of them, Python gets its result by accident: a value of a wrong type passes a falsy test, falls into a default branch, or is read one character at a time. In eight, Python acts on purpose: three cases of `create_prompt_library` and one of `LLMModel` raise `ValueError` for a name before they read the value, `model_copy` stores a value with no check, and three cases raise for the shape of the value. The rows of O4 name each id with the proposed answer. The maintainer accepts each one by name at gate 4, or extends decision D20.
 
 | Area | Ids that stay |
 | --- | --- |
@@ -75,7 +82,7 @@ The 44 ids that stay are the cases of open item O4 in `port/RULES.md`. In each o
 | `filters` | 2 |
 | `prompts` | 4 |
 | `queries` | 10 |
-| `ranking` | 3 |
+| `ranking` | 4 |
 | `text` | 16 |
 
-The evidence of task 2 in the plan table says that `expected-failures.txt` is empty. It is not empty, and it holds these 44 ids until the maintainer decides at gate 4.
+The evidence of task 2 in the plan table says that `expected-failures.txt` is empty. It is not empty, and it holds these 45 ids until the maintainer decides at gate 4.
