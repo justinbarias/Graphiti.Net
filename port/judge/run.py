@@ -4,6 +4,7 @@
     python3 port/judge/run.py --build python            every case must pass
     python3 port/judge/run.py --build python --record   write golden files (needs the upstream venv)
     python3 port/judge/run.py --build dotnet            the failing set must equal expected-failures.txt
+                                                        and stale-after-pin.txt together
 
 Options: --layer pure|flow, --filter TEXT (case id substring), --verbose.
 
@@ -31,6 +32,7 @@ GOLDEN = JUDGE / "golden"
 COUNT_FILE = JUDGE / "count.txt"
 EXPECTED_FAILURES = JUDGE / "expected-failures.txt"
 ACCEPTED_DIFFERENCES = JUDGE / "accepted-differences.txt"
+STALE_AFTER_PIN = JUDGE / "stale-after-pin.txt"
 
 HOSTS = {
     "python": [str(ROOT / ".upstream/graphiti/.venv/bin/python"), str(JUDGE / "host-python/host.py")],
@@ -685,10 +687,36 @@ def main() -> int:
             print(f"FAIL {case_id} is in expected-failures.txt and in accepted-differences.txt. Keep it in one list only.", file=sys.stderr)
         if both:
             status = 1
+        # A pin move makes ported units wrong until they are ported again (port/UPSTREAM.md). A case in
+        # stale-after-pin.txt can fail for any reason, also if it is bound. The first word of a line is
+        # the case id. The rest of the line names the unit and the target version.
+        stale = set()
+        if STALE_AFTER_PIN.exists():
+            try:
+                stale_text = STALE_AFTER_PIN.read_text(encoding="utf-8-sig")
+            except UnicodeDecodeError:
+                print("FAIL stale-after-pin.txt is not UTF-8 text.", file=sys.stderr)
+                status = 1
+                stale_text = ""
+            stale = {l.split()[0] for l in stale_text.split("\n") if l.strip() and not l.lstrip().startswith("#")}
+        # These two checks read the whole lists, also in a run with --layer or --filter.
+        stale_in_two = sorted(stale & (expected | accepted))
+        stale_no_case = sorted(stale - {c["id"] for c in load_cases(None, None)}) if stale else []
+        for case_id in stale_in_two:
+            print(f"FAIL {case_id} is in stale-after-pin.txt and in another list. Keep it in one list only.", file=sys.stderr)
+        for case_id in stale_no_case:
+            print(f"FAIL {case_id} is in stale-after-pin.txt, and no case has this id.", file=sys.stderr)
+        stale -= expected | accepted | set(stale_no_case)
         if partial:
-            expected &= {c["id"] for c in cases}
-        surprise = sorted(set(failed) - expected)
+            selected = {c["id"] for c in cases}
+            expected &= selected
+            stale &= selected
+        surprise = sorted(set(failed) - expected - stale)
         fixed = sorted(expected - set(failed))
+        stale_fixed = sorted(stale - set(failed))
+        # A port cannot change a type rejection: the C# parameter cannot hold the argument. Such a
+        # case is not stale. The maintainer decides it by name (decision D55).
+        stale_rejected = sorted(i for i in stale & set(failed) if _type_rejected(raws.get(i)))
         # A listed case can fail for two reasons only. Its unit is not bound yet, or the C# parameter
         # cannot hold the argument and Python gives a result that is not a type error. The maintainer
         # accepts such a case by name: its id stays in the list. A case that is bound, runs, and
@@ -706,10 +734,15 @@ def main() -> int:
                 print(f"     {line}", file=sys.stderr)
         for case_id in fixed:
             print(f"FAIL {case_id} passes now. Remove it from expected-failures.txt.", file=sys.stderr)
-        if surprise or fixed:
+        for case_id in stale_fixed:
+            print(f"FAIL {case_id} passes now. Remove it from stale-after-pin.txt.", file=sys.stderr)
+        for case_id in stale_rejected:
+            print(f"FAIL {case_id} is in stale-after-pin.txt and answers {TYPE_REJECTED}. A port cannot change that answer. The maintainer decides the case by name.", file=sys.stderr)
+        if surprise or fixed or stale_fixed or stale_rejected or stale_in_two or stale_no_case:
             status = 1
         print(f"judge: expected failures={len(expected)} unexpected={len(surprise)} fixed={len(fixed)} bound_wrong={len(bound_wrong)}")
         print(f"judge: accepted differences={len(accepted_used)} of {len(accepted & {c['id'] for c in cases})} in this run")
+        print(f"judge: stale after a pin move={len(stale)}")
 
     print("judge: passed" if status == 0 else "judge: FAILED")
     return status
