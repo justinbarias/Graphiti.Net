@@ -6,11 +6,16 @@ The lead writes the patch on a copy outside `port/judge/`. The maintainer reads 
 | Patch | Purpose | State |
 | --- | --- | --- |
 | `judge-readme-units.patch` | The judge README names the folder `tests/Graphiti.Net.JudgeHost/Units/` as the place of each binding. One line of text changes, and no code. | Not applied |
+| `judge-stale-after-pin.patch` | The runner reads a second list, `port/judge/stale-after-pin.txt`. A case in it can be bound and give a wrong result after a pin move. The judge README gets three pieces of text. [The sync design](../../docs/design-docs/upstream-sync-design.md) gives the specification and the test runs. | Not applied |
 
-To apply a patch, run this command on a branch from `main`:
+To apply a patch, run its command on a branch from `main`:
 
 ```bash
 git apply port/patches/judge-readme-units.patch
+```
+
+```bash
+git apply port/patches/judge-stale-after-pin.patch
 ```
 
 A patch for the judge goes in its own pull request. After the merge, the maintainer or the lead deletes the patch file and its row.
