@@ -778,18 +778,18 @@ What the reviews changed in the product code:
 | `AddNeo4j` with a driver factory did not read the database name. | It reads `Neo4jOptions.Database`, and an empty value gives `neo4j`. |
 | Three `!` operators in product code. | Each one is a pattern or a `throw` now (rule R24). |
 | A sync `Dispose` on the scheduler thread blocked for good, and a failed close hid the first error of a failed build. | The sync `Dispose` throws there and names `DisposeAsync`. The cleanup logs a failed close and throws the first error. |
-| Each error inside a span reached the host as `InvalidOperationException: generator didn't stop after throw()`, because the facade always passes a tracer and the ported tracer keeps upstream defect U19. | The two `RunAsync` helpers of the facade give the host the error of the call, as the exception table of the design says. The ported tracer does not change. |
+| Each error inside a span reached the host as `InvalidOperationException: generator didn't stop after throw()`, because the facade always passes a tracer and the ported tracer keeps upstream defect U19. The span sites are `add_episode`, `add_episode_bulk`, `search`, the model call, and the ingestion phases. A namespace call starts no span. | The two `RunAsync` helpers of the facade give the host the error of the call, as the exception table of the design says. The ported tracer does not change. |
 | The comments of the embedding properties said that a save keeps 64-bit values. | Neo4j stores 32-bit values, and the comments and the design say so. |
 
 The evidence:
 
-- `PublicSurfaceUpstreamTests` compares each public name and each default with a recording of upstream: the 12 public methods of `Graphiti`, the 75 methods of the 9 namespace classes, the fields of 25 models, and the 16 recipes. A table holds 42 differences, each with its clause of the design. A difference that the table does not name fails the test.
+- `PublicSurfaceUpstreamTests` compares each public name and each default with a recording of upstream: the 12 public methods of `Graphiti`, the 75 methods of the 9 namespace classes, the fields of 25 models, and the 16 recipes. A table holds 41 differences, each with its clause of the design. The test checks one direction: each upstream name has a public member with the same default, or a row of the table. It does not check a parameter type, the order of the parameters, or a public member with no upstream name. `PublicSurface.txt` guards those.
 - End-to-end test E9 (`GraphitiE9Tests.cs`): `AddEpisodeAsync`, then `SearchAsync`, on Neo4j. A contradicting episode closes the validity window of the old fact. The test counts the nodes, the episodes, the entities, the `MENTIONS` edges, and the facts after each episode, and each node and edge of episode 1 still exists after episode 2.
 - End-to-end test E8 (`GraphitiE8Tests.cs`): 6 concurrent `AddEpisodeAsync` calls into one group with a window of 3, with the in-memory state store and with the SQLite state store. Each episode and each entity exists one time, and each unit of the SQLite store has the state `committed`. It passed 20 runs in a row.
 - `GraphitiNamespaceMembersTests` runs each of the 75 namespace members and reads Neo4j as the proof.
 - `GraphitiArgumentsTests` and `GraphitiSearchArgumentsTests` cover each argument of the 12 calls, and the 10 kinds of search filter.
 - `GraphitiModelOptionsTests` covers the model by size, the token limit, the temperature, the routes, the overrides, and the default reranker over a scripted log probability client.
-- `GraphitiCallErrorTests` runs three failing calls with and with no listener on the activity source `Graphiti.Net`, and each one gives the real error type.
+- `GraphitiCallErrorTests` runs four failing calls, each with and with no listener on the activity source `Graphiti.Net`. Three give the real error type of the call, and the fourth shows that an `InvalidOperationException` of the host arrives as it is.
 
 Commands at the tip of the branch, 2026-11-28:
 
@@ -832,6 +832,8 @@ Decisions of the lead under D49, for the maintainer at gate 4:
 - The two direct package references, and the move of `Microsoft.Extensions.Primitives` to 11.0.0.
 - In a process with two containers, the latest live facade owns the process-wide services.
 - Rule R24 has one exception: the sync `Dispose` and the cleanup after a failed build block on the close of the core, off the scheduler.
+- The facade reads the arguments of a call on its scheduler and makes no copy first. A host must not change a collection that it passed before the task of the call completes. The summaries of `IGraphiti` and of the two namespace roots say so. Python shares the list in the same way, on one thread.
+- The reason of lead choice L9 is corrected: with no listener, the ported tracer still wraps an error of a span body, and the facade removes the wrap.
 
 Two points wait for the maintainer and block nothing:
 
@@ -844,5 +846,6 @@ What is not checked:
 
 - No test seeds the removal of the guard of the sync `Dispose`, because that seed blocks the scheduler.
 - The bulk call has no test for an excluded entity type.
+- No test shows that the cleanup of a failed build closes the state store (choice 20). With the Neo4j driver, no path makes the core constructor throw after the store exists.
 - No test runs the surface in a generic host with a second process.
 - The attribute-based form of custom entity types and edge types that the maintainer asked for on 2026-11-28 is the work of another session. This pull request has the builder form only.
