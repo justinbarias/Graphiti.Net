@@ -124,6 +124,12 @@ About a quarter of the facts in the graph (140 of 606 in the last full run) stat
 dotnet run --project examples/Quickstart/Quickstart.Server -- reset
 ```
 
+## Security
+
+The server and the page listen on the loopback address only. The server has no authentication, and it holds your OpenAI key. It rejects a request that names another host. Do not put the server or the page on a network.
+
+The tool puts stored text of the Act into the prompt of the agent. The agent treats that text as data. Its one tool only reads the graph.
+
 ## Privacy
 
 - Graphiti.Net sends no usage telemetry.

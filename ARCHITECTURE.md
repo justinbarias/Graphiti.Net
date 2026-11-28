@@ -14,6 +14,7 @@ Update it in the same change that makes it stale.
 | `tests/Graphiti.Net.E2E.Tests` | End-to-end tests on xUnit v3 and Microsoft.Testing.Platform. | The environment test, the tests of the Neo4j driver, and the test that saves and loads each node and edge type on Neo4j and compares the result with Python. |
 | `docker-compose.yml` | Neo4j 5.26.2 sidecar on `localhost:7687`. | Works on a local machine. |
 | `tests/Graphiti.Net.JudgeHost` | The .NET judge host: protocol loop, codec, judge embedder, and the binding table. | Works. `Units/` holds one binding file for each ported module that has a judge case. |
+| `examples/Quickstart` | The interactive quickstart: a .NET server with one agent that has the graph search as a tool, and a Next.js page. Not a part of the product packages. | Works against Neo4j and a real model (plan 0005, task 4). Its libraries are dependencies of the example only. |
 | `port/` | Port state, decisions, the module queue, the upstream pin, the gap list, the rulebook, and the judge. | Phase 4. The judge is read-only. The rulebook waits for gate 3. |
 | `scripts/` | Setup, the gate, the mutation run, the upstream fetch, the docs check. | Works on a local machine. |
 | `.devcontainer/`, `.claude/` | Devcontainer definition, Claude Code configuration, the `verify` skill. | Written, not started. See [docs/RELIABILITY.md](docs/RELIABILITY.md). |
