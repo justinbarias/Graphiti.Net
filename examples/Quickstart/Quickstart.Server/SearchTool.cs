@@ -63,6 +63,7 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
                 source = Entity(entities, edge.SourceNodeUuid),
                 target = Entity(entities, edge.TargetNodeUuid),
                 fact = edge.Fact,
+                attributes = edge.Attributes.Where(a => a.Value is not null).ToDictionary(a => a.Key, a => a.Value),
                 valid_at = Date(edge.ValidAt),
                 invalid_at = Date(edge.InvalidAt),
                 sources,
@@ -115,9 +116,7 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
             var (sectionId, chain) = _sections.TryGetValue(uuid, out var reference)
                 ? (reference.SectionId, reference.Chain)
                 : (episode.Name, episode.SourceDescription);
-            // The first line of the content is the chain, which the result gives in the field chain. The cut counts the rest.
-            var body = episode.Content.Contains('\n', StringComparison.Ordinal) ? episode.Content[(episode.Content.IndexOf('\n', StringComparison.Ordinal) + 1)..] : episode.Content;
-            sections.Add(new { section_id = sectionId, chain, text = Cut(body) });
+            sections.Add(new { section_id = sectionId, chain, text = Cut(episode.Content) });
         }
 
         return sections;

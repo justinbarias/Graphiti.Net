@@ -33,7 +33,7 @@ The maintainer decided the split and the metadata on 2026-11-28:
 
 - The example splits the Act by section: one episode for each section. A section with many definitions (section 5) becomes several episodes of about 400 words, each with the same chain.
 - Each episode carries at minimum the section id and the chain Act > Chapter > Part > Division > Subdivision > Section. A level that does not exist is left out.
-- Upstream 0.32.0 declares `episode_metadata` on an episode, but no save query writes it and `add_episode` has no parameter for it. So the port stores no free metadata, and the example keeps the metadata in three stored places: `Name` holds the section id, `SourceDescription` holds the chain in one line, and the first lines of `Content` hold the chain with the heading text of each level. The example also writes `sections.json`, a typed record of each episode, for the search tool.
+- Upstream 0.32.0 declares `episode_metadata` on an episode, but no save query writes it and `add_episode` has no parameter for it. So the port stores no free metadata, and the example keeps the metadata in three stored places: `Name` holds the section id, `SourceDescription` holds the chain in one line, and the first lines of `Content` hold the chain with the heading text of each level. The domain ontology of 2026-11-28 took the chain out of `Content` (see the results of task 4). The example also writes `sections.json`, a typed record of each episode, for the search tool.
 
 ## Gate 4
 
@@ -186,9 +186,19 @@ What the run found about the product:
 
 One Opus 5.5 high review read the example with the task to refute it: 14 findings. Each one is resolved in the code or stated in the README. The fix round had no second review. The lead read its diff, ran `split`, tested the host filter (400 for another host), and asked one new question in the browser. The lead then found that the page listened on each network address, and bound it to the loopback address.
 
+The domain ontology, 2026-11-28. The maintainer asked for an ontology of the domain in place of the structure of the document, after the post <https://justinbarias.io/blog/holodeck-temporal-memory-part1/>. The maintainer approved 7 entity types and 12 relationship types, and the exclusion of the default type `Entity`. The option `StrictEdgeTypes` is not set, because `AddEpisodeOptions` does not have it. The file `examples/Quickstart/Quickstart.Server/Ontology.cs` holds the types, and the README of the example describes them. The content of an episode now has no chain line and no section number. The section id and the chain stay in `Name` and `SourceDescription`.
+
+- One Opus 5.5 high review read the change with the task to refute it: 14 findings. The README and the code resolve 12. The maintainer decided the other two. The instructions now name an instrument with its scheme, and each episode starts with a topic line from the heading text of the Part and the Division. `HAS_DUTY` also joins an authority to a duty, and a 13th type `APPLIES_TO` joins an enforcement measure to a party.
+- Command, after these changes: `ingest --sections 6,13,30,88,91,92,163,167` with `QUICKSTART_GROUP_ID=osa-2021-ontology`. Its last lines: `Episodes ingested: 8. Entities returned: 55. Facts returned: 48. Time: 00:01:35.` Token use: 286,734 input and 28,852 output, about 0.02 USD. The run before the review cost the same.
+- The group holds 35 entities, each with one of the 7 types, and 48 facts. No fact only states the place of a provision. 39 facts use one of the 13 relationship types, one has the name `RELATES_TO`, and 8 have a name that the model made.
+- The two removal notices of the sample (cyber-bullying material, cyber-abuse material) are two entities.
+- Two questions went through the AG-UI endpoint on port 8002. The second: who can complain about cyber-bullying material, what a provider must do after a removal notice for cyber-abuse material, and the penalty. The answer cited sections 30, 88, and 91. Each id was in the tool results, and the text of the Act supports each statement.
+- `scripts/check.sh` passed.
+- Not done: a full ingestion with the ontology, and a second version of the Act. The numbers of the full run above are from the graph before the ontology. The fix round had no second review.
+
 Not done:
 
-- Task 9 is paused by the maintainer (2026-11-28), so the example does not show the typed entity types.
+- Task 9 is paused by the maintainer (2026-11-28), so the example does not show the typed C# classes. It builds its types with `GraphTypeDefinition`.
 - The example has no test of its own, and the scanner does not read it.
 - Other models, and strict mode with changed schemas, were not tried.
 
