@@ -72,8 +72,17 @@ public sealed class DecodeFromJsonTests
         // Mutant M12: a $tuple that decodes as a list would pass for a list parameter.
         var p = Call("[{\"$tuple\": [\"a\"]}]").Signature("xs");
         Assert.Throws<JudgeTypeRejectedException>(() => p.List<string>("xs"));
-        Assert.Throws<JudgeTypeRejectedException>(() => p.Get<IEnumerable<string>>("xs"));
+        Assert.Throws<JudgeTypeRejectedException>(() => p.Get<IReadOnlyCollection<string>>("xs"));
+        Assert.Throws<JudgeTypeRejectedException>(() => p.Get<IReadOnlyList<string>>("xs"));
         Assert.IsType<PyTuple>(p.Get<PyTuple>("xs"));
+    }
+
+    [Fact]
+    public void AnIEnumerableTakesATupleAsAnIterable()
+    {
+        // Iterable[T] is ported as the exact type IEnumerable<T>, and a tuple is an iterable.
+        var p = Call("[{\"$tuple\": [\"a\", \"b\"]}]").Signature("xs");
+        Assert.Equal(["a", "b"], p.Get<IEnumerable<string>>("xs"));
     }
 
     [Fact]
