@@ -25,3 +25,10 @@ StrykerOutput/
 # Command center output (scripts/command_center.sh)
 docs/generated/command-center.html
 docs/generated/command-center.data.json
+
+# The interactive quickstart (examples/Quickstart): the downloaded Act, sections.json, and the web build
+examples/Quickstart/data/
+examples/Quickstart/web/node_modules/
+examples/Quickstart/web/.next/
+examples/Quickstart/web/next-env.d.ts
+examples/Quickstart/web/*.tsbuildinfo

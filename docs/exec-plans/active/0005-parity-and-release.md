@@ -28,6 +28,12 @@ The maintainer asked for this form on 2026-11-28:
 
 These libraries are dependencies of the example only. The two packages of the product do not reference them.
 
+The maintainer decided the split and the metadata on 2026-11-28:
+
+- The example splits the Act by section: one episode for each section. A section with many definitions (section 5) becomes several episodes of about 400 words, each with the same chain.
+- Each episode carries at minimum the section id and the chain Act > Chapter > Part > Division > Subdivision > Section. A level that does not exist is left out.
+- Upstream 0.32.0 declares `episode_metadata` on an episode, but no save query writes it and `add_episode` has no parameter for it. So the port stores no free metadata, and the example keeps the metadata in three stored places: `Name` holds the section id, `SourceDescription` holds the chain in one line, and the first lines of `Content` hold the chain with the heading text of each level. The example also writes `sections.json`, a typed record of each episode, for the search tool.
+
 ## Gate 4
 
 The maintainer sees the full judge pass and the scan result, and accepts or rejects each remaining `TODO(port)` marker by name.
