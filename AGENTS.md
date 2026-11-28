@@ -32,7 +32,7 @@ Gate 2 closed on 2026-11-25, so the judge in `port/judge/` is read-only. Gate 3 
 scripts/setup-env.sh              # install the pinned .NET SDK, restore tools and packages
 scripts/fetch-upstream.sh         # clone upstream at the pinned commit into .upstream/
 docker compose up -d --wait neo4j # start the graph database
-scripts/check.sh                  # docs, build, format
+scripts/check.sh                  # docs, build, format, scan
 scripts/check.sh --test           # the same, then the tests against Neo4j
 scripts/mutate.sh                 # mutation run on PyCompat in observe mode
 python3 scripts/mutation_survivors.py  # list the tests that the pruning rule deletes

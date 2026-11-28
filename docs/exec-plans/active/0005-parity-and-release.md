@@ -86,3 +86,25 @@ The 45 ids that stay are the cases of open item O4 in `port/RULES.md`. In each o
 | `text` | 16 |
 
 The evidence of task 2 in the plan table says that `expected-failures.txt` is empty. It is not empty, and it holds these 45 ids until the maintainer decides at gate 4.
+
+### Task 3, the scanner and the merge checks, 2026-11-28
+
+`port/tools/scan_port.py` is a copy of the scanner of the port skill, with one more option: `--allow FILE`. `scripts/check.sh` runs it on `src/` after the format step, so each local gate and the CI job `check` run it.
+
+| Finding of the scanner on `src/` | Lines | Why the allow file accepts it |
+| --- | --- | --- |
+| `stub` | 186 | 115 lines throw `NotImplementedException` where upstream raises `NotImplementedError`. 71 lines catch it where upstream catches `NotImplementedError`. |
+| `port TODO` | 14 | 7 `TODO(port)` markers of 2 lines each. `port/STATE.md` lists them under "Blocked units". |
+| `dynamic type`, `warning switched off`, `null-forgiving operator`, `calls Python` | 0 | Nothing to accept. |
+
+The evidence of task 3 in the plan table is "No finding". The scanner reports 200 findings with no allow file. With `port/tools/scan_port_allow.txt` it reports 0 findings and accepts 200 by path, label, and count. A count that differs fails the scan, so a new site and a removed site both need a change of the allow file. The maintainer accepts or rejects each `TODO(port)` marker at gate 4.
+
+Seeds, each one undone: a `dynamic` field, a `!` operator, a new `TODO(port)` line, and a `#pragma warning disable` in `Helpers.cs` gave 4 findings and exit code 1. One removed stub line in `Embedder/Client.cs` gave exit code 1.
+
+The judge was a merge check before this task: `scripts/check.sh --test` runs it, and the CI job `check` runs that command for each pull request. Two things changed here:
+
+- The judge call of `scripts/check.sh` has `--verbose`. A case that fails and is not listed then prints 20 difference lines, where it printed 3 (debt T32).
+- The count of judge cases cannot go down: the judge fails if it runs fewer cases than `port/judge/count.txt` says. This check existed before.
+
+One thing is not done. The branch `main` has no protection rule on GitHub, so GitHub does not require the job `check` for a merge. The lead merges only after the job passes. A protection rule is a repository setting, which the maintainer decides.
+

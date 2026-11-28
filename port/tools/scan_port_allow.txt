@@ -1,0 +1,25 @@
+# The findings of port/tools/scan_port.py that the port accepts. scripts/check.sh reads this file.
+# Each line has a path, a label, and a count, with one tab between them.
+# A count that differs fails the scan, so a new site and a removed site both need a change of this file.
+#
+# stub: each line is a port of upstream code. 115 lines throw NotImplementedException where upstream raises
+# NotImplementedError, and 71 lines catch it where upstream catches NotImplementedError.
+# port TODO: 14 lines at 7 TODO(port) markers. port/STATE.md lists them under "Blocked units".
+# The maintainer accepts or rejects each marker at gate 4.
+src/Graphiti.Net/Core/Driver/Driver.cs	stub	1
+src/Graphiti.Net/Core/Driver/GraphOperations/GraphOperations.cs	stub	87
+src/Graphiti.Net/Core/Driver/SearchInterface/SearchInterface.cs	stub	14
+src/Graphiti.Net/Core/Edges.cs	stub	27
+src/Graphiti.Net/Core/Embedder/Client.cs	stub	1
+src/Graphiti.Net/Core/Graphiti.cs	stub	3
+src/Graphiti.Net/Core/LlmClient/OpenaiDecisionsClient.cs	stub	1
+src/Graphiti.Net/Core/Namespaces/Edges.cs	stub	5
+src/Graphiti.Net/Core/Namespaces/Nodes.cs	stub	4
+src/Graphiti.Net/Core/Nodes.cs	port TODO	2
+src/Graphiti.Net/Core/Nodes.cs	stub	27
+src/Graphiti.Net/Core/Search/SearchUtils.cs	port TODO	8
+src/Graphiti.Net/Core/Search/SearchUtils.cs	stub	9
+src/Graphiti.Net/Core/Utils/BulkUtils.cs	port TODO	4
+src/Graphiti.Net/Core/Utils/Maintenance/CommunityOperations.cs	stub	3
+src/Graphiti.Net/Core/Utils/Maintenance/GraphDataOperations.cs	stub	2
+src/Graphiti.Net/Core/Utils/Maintenance/NodeOperations.cs	stub	2
