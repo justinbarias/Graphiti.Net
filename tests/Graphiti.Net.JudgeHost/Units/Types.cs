@@ -3,6 +3,7 @@ namespace Graphiti.JudgeHost.Units;
 using Graphiti.Core.Driver;
 using Graphiti.Core.Prompts;
 using Graphiti.JudgeHost.Core;
+using Graphiti.PyCompat;
 
 /// <summary>
 /// The path <c>types:SimpleNamespace</c>, which judge cases pass as a duck-typed object. This file is lead code,
@@ -16,6 +17,17 @@ internal static class TypesBindings
     {
         table.Registry.AddModel("types:SimpleNamespace", data => new Namespace(data));
     }
+
+    /// <summary>
+    /// The <c>library</c> argument of <c>validate_prompt_library</c>. A dict is a library that has no attribute: Python reads
+    /// the groups with <c>hasattr</c>, and a dict has the attributes of the class <c>dict</c> only, none of which is the
+    /// name of a prompt group (<c>PROMPT_GROUPS</c>). Python raises <c>ValueError</c> for the first group, as it does for an
+    /// empty namespace. Any other value is read as an <see cref="IPromptLibrary"/>.
+    /// </summary>
+    internal static IPromptLibrary AsPromptLibrary(object? value) =>
+        value is OrderedDictionary<string, object?> or PyDict
+            ? new Namespace([])
+            : (IPromptLibrary)JudgeTypes.Convert(typeof(IPromptLibrary), value, "argument 'library'")!;
 
     /// <summary>
     /// A <c>SimpleNamespace</c>: one attribute for each key of the data. <c>hasattr</c> is the result of a

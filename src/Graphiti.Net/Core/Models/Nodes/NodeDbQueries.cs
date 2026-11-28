@@ -115,7 +115,9 @@ internal static class NodeDbQueries
     split(e.entity_edges, ",") AS entity_edges
 """ + "\n";
 
-    internal static string GetEntityNodeSaveQuery(GraphProvider provider, string labels, bool hasAoss = false)
+    // PORT: `labels` is `object?` and not `string`. The function passes it unchanged to `_validate_entity_labels`, which declares
+    // `str | list[str]`, and then replaces it with the joined text.
+    internal static string GetEntityNodeSaveQuery(GraphProvider provider, object? labels, bool hasAoss = false)
     {
         var validatedLabels = ValidateEntityLabels(labels);
         labels = string.Join(":", validatedLabels);
