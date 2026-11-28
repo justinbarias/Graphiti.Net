@@ -64,7 +64,6 @@ public class GraphitiValuesTests
         ["add_episode_bulk:one:25"] = "logs",
         ["add_episode_bulk:one:26"] = "attempts+2",
         ["add_episode_bulk:one:31"] = "result",
-        ["add_episode_bulk:several:6"] = "attempts+1",
         ["add_episode_bulk:several:10"] = "logs",
         ["add_episode_bulk:several:11"] = "logs",
         ["add_episode_bulk:several:18"] = "logs",
