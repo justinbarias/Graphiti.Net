@@ -54,10 +54,46 @@ export function parseResult(text: string | undefined): SearchResult | null {
   }
 }
 
-/** "Online Safety Act 2021 s 13" becomes "s 13". Another form stays as it is. */
+/**
+ * "Online Safety Act 2021 s 13" becomes "s 13". The id of a provision that the Bill changes keeps its note without the
+ * name of the Bill: "s 26 (inserted by Sch 2 item 8)". Another form stays as it is.
+ */
 export function shortSection(sectionId: string): string {
-  const at = sectionId.lastIndexOf(" s ");
-  return at >= 0 ? sectionId.slice(at + 1) : sectionId;
+  const at = sectionId.indexOf(" s ");
+  const short = at >= 0 ? sectionId.slice(at + 1) : sectionId;
+  return short.replace("the Digital Duty of Care Bill 2026, ", "").replace("Digital Duty of Care Bill 2026, ", "");
+}
+
+/** One section among the sources of a fact, with the notes of the Bill for it: "s 52" and "repealed by Sch 2 item 13". */
+export type SourcePart = { section: string; notes: string[] };
+
+/**
+ * The sources of a fact as sections. A fact that the Act states and the Bill repeals has two sources with the same
+ * section. They become one part: the section one time, and the change of the Bill as its note.
+ */
+export function sourceParts(sectionIds: string[]): SourcePart[] {
+  const parts: SourcePart[] = [];
+  for (const id of sectionIds) {
+    const short = shortSection(id);
+    const match = /^(s \d+[A-Z]*) \((.+)\)$/.exec(short);
+    const section = match ? match[1] : short;
+    let part = parts.find((p) => p.section === section);
+    if (!part) {
+      part = { section, notes: [] };
+      parts.push(part);
+    }
+
+    if (match && !part.notes.includes(match[2])) {
+      part.notes.push(match[2]);
+    }
+  }
+
+  return parts;
+}
+
+/** The sources of a fact in one line of text: "s 52, repealed by Sch 2 item 13; s 44". */
+export function sourceText(sectionIds: string[]): string {
+  return sourceParts(sectionIds).map((part) => [part.section, ...part.notes].join(", ")).join("; ") || "unknown";
 }
 
 /** The first source of a fact is the line of the fact: the section that states it. */

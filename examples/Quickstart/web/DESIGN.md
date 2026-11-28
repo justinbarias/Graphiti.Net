@@ -287,7 +287,8 @@ The rail comes first and has an `88dvh` height. The result follows with `20px 16
 Result headings use the narrow title size. The empty area loses its top padding.
 A click on a rail tool row scrolls to the result and moves keyboard focus there.
 
-The ruler uses `minmax(0, 38%) minmax(0, 1fr)` columns. It hides the separate date column and keeps the time axis.
+The ruler uses `minmax(0, 42%) minmax(0, 1fr)` columns. It hides the separate date column and keeps the time axis.
+The names of a fact can take two lines there. The axis shows the label of today and the first date only.
 The table loses its minimum width and header row. Each fact becomes a block with `10px 0` padding.
 Cells wrap into rows with a `2px 10px` gap. Arrows separate the source, relation, and target.
 Dates gain the labels `valid from` and `invalid from`. The fact sentence loses its empty first cell.
@@ -397,15 +398,29 @@ A polite live region announces the selected fact text.
 ### Validity ruler
 
 Each fact has one button row on a shared time axis.
-Desktop columns use `minmax(120px, 22%) minmax(0, 1fr) 190px`, with `16px` gaps.
-The axis starts at the earlier of assent or the earliest fact date.
-It ends at today or the latest future date. Thin marks show calendar years.
+Desktop columns use `minmax(190px, 34%) minmax(0, 1fr) 176px`, with `16px` gaps. Thin rules separate the rows.
 
-The track measures `14px` high. The source-colored bar measures `4px` high and at least `6px` wide.
-A known start has an `8px` circular stop with a `2px` border. An unknown start has no stop.
-A closed interval ends with a `12px` vertical mark and a `3px` border.
-An open interval ends with an arrow. Shape carries the difference between open and closed intervals.
+The first column names the fact. Its first line holds the source entity, an arrow, and the target entity, in weight 600.
+Its second line holds the relation name in secondary ink. A relation name alone never names a row.
+Each line stays on one line and ends with an ellipsis. The full text is the title of the cell.
+The third column holds the dates in the mono stack, and under them the state today: `valid now`, `ended`, or `starts later`.
+
+The axis starts at the earlier of assent or the earliest fact date.
+It ends after the later of today or the latest fact date: `12%` of the axis stays free after that date.
+So a fact that starts at the last date has room for its line. Thin marks show calendar years.
+The axis header has two rows. The upper row holds the label `NOW` at the date of today, in ink and weight 700.
+The lower row holds the first date and each other date of the result that has room. A label near the right end hangs to the left of its date.
+A `1px` ink line runs through each row at the date of today. It sits over the rows and takes no pointer.
+
+The track measures `14px` high. The bar measures `6px` high and at least `6px` wide.
+The part of a bar before today is solid in the source color. The part after today is hollow, with a `1.5px` outline in the source color.
+A known start has a `10px` circular stop with a `2px` border. An unknown start has no stop.
+A closed interval ends with a `14px` vertical mark and a `3px` border.
+An open interval runs to the edge of the track and ends with an arrow.
+Shape carries each difference: solid and hollow for before and after today, the mark and the arrow for an end date and no end date.
+A note under the rows shows these four shapes in secondary ink with their words.
 Hover and pinned rows use the sheet background. Hover, focus, and clicks share the graph selection behavior.
+A row never changes its height on hover.
 
 ### Section key
 
@@ -419,7 +434,7 @@ Hover or keyboard focus highlights matching facts. A click toggles the pinned se
 Each fact uses two rows inside one table body. The first row shows sources, entities, relation, and validity dates.
 The second row shows the full fact sentence in secondary ink.
 The desktop table uses fixed layout, full width, and an `880px` minimum width. Its wrapper permits horizontal scrolling.
-The source column measures `120px`. The relation column takes `24%`, and date columns measure `112px`. The two entity columns share the remaining width.
+The source column measures `168px`, and a source label wraps inside it. A change that the Bill makes to a section is a note under the section, in secondary ink. The relation column takes `24%`, and date columns measure `112px`. The two entity columns share the remaining width.
 Header padding is `5px 16px 5px 0`. Cell padding is `7px 16px 0 0`.
 Sentence padding is `2px 10px 8px 0`. Thin rules separate facts.
 

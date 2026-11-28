@@ -27,7 +27,7 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
     /// <param name="query">What to look for, in plain words.</param>
     /// <param name="cancellationToken">The token that cancels the call.</param>
     /// <returns>A JSON text with the facts.</returns>
-    [Description("Search the knowledge graph of the Online Safety Act 2021 (Cth). Returns facts from the Act, each with its validity dates and the section id and chain where the Act states it. The result also has the text of the sections that state these facts, and of sections whose own text matches the query.")]
+    [Description("Search the knowledge graph of the Online Safety Act 2021 (Cth) and of the Digital Duty of Care Bill 2026, which amends the Act. Returns facts, each with its validity dates (a fact with invalid_at is no longer law from that date) and the section id and chain of each source. The result also has the text of the sections that state these facts, and of sections whose own text matches the query.")]
     public async Task<string> SearchLegislationAsync(
         [Description("What to look for, in plain words. For example: 'powers of the eSafety Commissioner to issue a removal notice'.")] string query,
         CancellationToken cancellationToken = default)
@@ -45,7 +45,12 @@ internal sealed class SearchTool(IGraphiti graphiti, Settings settings)
         foreach (var edge in edges)
         {
             var sources = new List<object>();
-            foreach (var uuid in edge.Episodes.Take(SectionsPerFact))
+            // The first sources state the fact. A repeal adds its episode at the end of the list, so the last source stays
+            // in the result: it is the reason for the end date.
+            var shown = edge.Episodes.Count <= SectionsPerFact
+                ? edge.Episodes
+                : [.. edge.Episodes.Take(SectionsPerFact - 1), edge.Episodes[^1]];
+            foreach (var uuid in shown)
             {
                 if (!episodeOrder.Contains(uuid))
                 {

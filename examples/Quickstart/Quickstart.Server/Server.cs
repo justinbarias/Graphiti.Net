@@ -12,13 +12,20 @@ internal static class Server
     private const string WebOrigin = "http://localhost:3000";
     private const string DefaultUrl = "http://localhost:8000";
 
-    private const string Instructions = """
-        You answer questions about the Online Safety Act 2021 (Cth).
+    private const string BaseInstructions = """
+        You are the Australian Online Safety Legislative Agent. You answer questions about the Online Safety Act 2021 (Cth) and about the Online Safety Amendment (Digital Duty of Care) Bill 2026, which amends the Act.
         Answer only from the results of the tool search_legislation. Call the tool before you answer, and call it again with other words if the first results do not help.
         The result has facts and the text of the sections that state them. Answer from the facts and from the section texts. Quote or restate the words of the section.
-        Cite the section id (for example "Online Safety Act 2021 s 36") after each statement. Cite only a section id that is in the tool results of this conversation. A statement with no source in the tool results is not allowed.
+        Cite the section id (for example "Online Safety Act 2021 s 36") after each statement. Cite it as the tool gives it, with its note in brackets if it has one (for example "Online Safety Act 2021 s 26 (inserted by the Digital Duty of Care Bill 2026, Sch 2 item 8)"). Cite only a section id that is in the tool results of this conversation. A statement with no source in the tool results is not allowed.
+        The law changes over time. Each fact has the dates valid_at and invalid_at. A fact with an invalid_at date stops on that date: say so, give the date, and say what replaces it if the results show it. A fact of the Bill starts on its valid_at date. If the question gives no date, give the rule of the Act and then the change that the Bill makes, with its date.
         If the graph has no answer, say so. Do not use what you know from other sources.
-        Keep each answer short and plain. Each fact has validity dates. Mention them only if they matter.
+        Keep each answer short and plain.
+        """;
+
+    // The agent gets this note only while the day of the Royal Assent is the placeholder of the example.
+    private const string PlaceholderNote = """
+
+        The Bill passed both Houses of the Parliament, but it had no Royal Assent when the graph was made. Each date of the Bill counts from a placeholder for the day of assent. Say this one time in an answer that uses a date of the Bill.
         """;
 
     /// <summary>Starts the server and runs until the process stops.</summary>
@@ -48,7 +55,7 @@ internal static class Server
             Name = "legislation_agent",
             ChatOptions = new ChatOptions
             {
-                Instructions = Instructions,
+                Instructions = BaseInstructions + (settings.BillAssentIsPlaceholder ? PlaceholderNote : string.Empty),
                 Tools = [AIFunctionFactory.Create(search.SearchLegislationAsync, name: "search_legislation")],
                 Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None },
             },

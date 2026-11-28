@@ -10,7 +10,7 @@ import { ToolCallRow } from "./tool-call";
 const questions = [
   "What can the eSafety Commissioner do about cyberbullying material that targets a child?",
   "What is a social media service under the Act?",
-  "Which section lets the Commissioner give a removal notice for an intimate image, and who must obey it?",
+  "What happens to the basic online safety expectations under the Digital Duty of Care Bill, and from which date?",
 ];
 
 function Workspace() {
@@ -50,14 +50,15 @@ function Workspace() {
     <div className="shell">
       <aside className="rail dark">
         <header>
-          <h1>Ask the Online Safety Act 2021</h1>
-          <p>An agent answers from a temporal graph of the Act. Each search of the graph shows as a row in the conversation.</p>
+          <h1>Australian Online Safety Legislative Agent</h1>
+          <p>An agent answers from a temporal graph of the Online Safety Act 2021 and the Digital Duty of Care Bill 2026. Each search of the graph shows as a row in the conversation.</p>
         </header>
         <div className="chat">
-          <CopilotChat labels={{ chatInputPlaceholder: "Ask about the Act", welcomeMessageText: "Ask a question, or start with one of these." }} />
+          <CopilotChat labels={{ chatInputPlaceholder: "Ask about the Act or the Bill", welcomeMessageText: "Ask a question, or start with one of these." }} />
         </div>
         <footer>
-          Text of the Act: Federal Register of Legislation, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+          Text of the Act: Federal Register of Legislation, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Text of the
+          Bill: Parliament of Australia, as passed by both Houses. Each date of the Bill counts from its day of Royal Assent, which is a setting.
         </footer>
       </aside>
       <main id="result" className="result" tabIndex={-1}>

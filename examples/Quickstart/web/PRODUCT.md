@@ -14,7 +14,7 @@ The main reader is a .NET developer who evaluates Graphiti.Net. The developer ru
 
 ## Product Purpose
 
-The page is the front of the interactive quickstart. The reader asks a question about the Online Safety Act 2021 (Cth). An agent searches a Graphiti.Net knowledge graph and answers from the result.
+The page is the front of the interactive quickstart. The page has the name "Australian Online Safety Legislative Agent". The reader asks a question about the Online Safety Act 2021 (Cth) or about the Online Safety Amendment (Digital Duty of Care) Bill 2026, which amends the Act. An agent searches a Graphiti.Net knowledge graph and answers from the result.
 
 The page is a success if, after one question, the reader sees that each fact is an edge between two entities, with validity dates and a source section. The temporal graph is the product. The answer text is the smaller part.
 
@@ -39,7 +39,8 @@ Each fact in the graph has a time range and a source. The page shows the result 
 
 ## Evidence on Hand
 
-- Real data: the graph of the Online Safety Act 2021 in the local Neo4j.
+- Real data: the graph of the Online Safety Act 2021 and of the Digital Duty of Care Bill 2026 in the local Neo4j.
+- The text of the Bill comes from the Parliament of Australia, as passed by both Houses. Its licence was not checked, and the repository holds none of its text. The Bill has no Royal Assent, so each date of the Bill is a placeholder.
 - The text of the Act comes from the Federal Register of Legislation, licence CC BY 4.0. The page must keep this attribution.
 - The page has no logo and no brand assets. Do not invent them. The Commonwealth Coat of Arms is not part of the licence, and the page must not use it.
 

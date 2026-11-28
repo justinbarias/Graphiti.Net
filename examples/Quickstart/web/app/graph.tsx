@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { layoutGraph, shortSection, statedIn, type GraphEdge, type SearchResult } from "./result";
+import { layoutGraph, sourceText, statedIn, type GraphEdge, type SearchResult } from "./result";
 import type { Focus } from "./store";
 
 type Props = {
@@ -93,7 +93,7 @@ export function TemporalGraph({ result, lines, focus, pinned, onHover, onPin }: 
             const g = geometry(edge);
             const on = lit(edge);
             const target: Focus = { kind: "fact", id: edge.fact.uuid };
-            const label = `${edge.from.name}, ${edge.fact.name}, ${edge.to.name}. ${validity(edge.fact.valid_at, edge.fact.invalid_at)}. Stated in ${shortSection(edge.line)}.`;
+            const label = `${edge.from.name}, ${edge.fact.name}, ${edge.to.name}. ${validity(edge.fact.valid_at, edge.fact.invalid_at)}. Stated in ${sourceText(edge.fact.sources.map((source) => source.section_id))}.`;
             return (
               <g
                 key={edge.fact.uuid}
