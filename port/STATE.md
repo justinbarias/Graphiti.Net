@@ -9,8 +9,8 @@ The porting skill is `port-python-to-dotnet`. Its standing rules apply in every 
 | --- | --- |
 | Phase | 6. Plan 0003 is done except task 5 (the pruning rule), which runs now. The pilot ported five units from the rulebook alone: `errors`, `search.search_filters`, `prompts.dedupe_nodes`, `utils.content_chunking`, and `driver.neo4j.operations.entity_node_ops`. Plan 0004 is active. Layer 0 is done for layers 1 to 6: the skeleton has 571 members that throw `NotSupportedException` with a `TODO(port)` marker. Layer 1 is done: 11 modules, each with two reviews and one fix round. Layers 2 to 6 are done, with the end-to-end tests after layers 5 and 6. |
 | Gate | Gate 1 passed on 2026-11-24. Gate 2 passed on 2026-11-25. `port/judge/` is read-only, and `.claude/settings.json` denies edits to each file in it except `expected-failures.txt` (decision D38). Gate 3 passed on 2026-11-26: the lead passed it under decision D39, and the maintainer reads `port/RULES.md` at the end of the run. Gate 4 is next, after plan 0004. |
-| Last action | 2026-11-28: plan 0004 is complete, and tasks 1 to 4 of plan 0005 are done. Task 2 closed 21 listed judge cases, so `expected-failures.txt` holds 45 pure ids that wait for gate 4. Task 3 put the scanner of the port into the gate (decision D54), with an allow file that the maintainer reads at gate 4. Task 4 added the interactive quickstart in `examples/Quickstart` and ran it against Neo4j with a real model. The results of each task are in plan 0005. |
-| Next action | Gate 4, for the maintainer: the 45 listed judge cases, the allow file of the scanner, each `TODO(port)` marker, and the gate log rows of layers 1 to 9. Then plan 0005, tasks 5 to 9. Task 9 (the typed entity types) is paused by the maintainer. Plan 0003, task 5: one more mutation run, and the pruning rule. Debt T33 needs a decision about the chat adapter before the release. |
+| Last action | 2026-11-28: plan 0004 is complete, and tasks 1 to 4 of plan 0005 are done. Task 2 closed 21 listed judge cases, and the maintainer accepted the other 45 by name (decision D55), so `expected-failures.txt` is empty and the whole judge passes with 45 accepted differences. Task 3 put the scanner of the port into the gate (decision D54), with an allow file that the maintainer reads at gate 4. Task 4 added the interactive quickstart in `examples/Quickstart` and ran it against Neo4j with a real model. The results of each task are in plan 0005. |
+| Next action | Gate 4, for the maintainer: the allow file of the scanner, each `TODO(port)` marker, and the gate log rows of layers 1 to 9. Then plan 0005, tasks 5 to 9. Task 9 (the typed entity types) is paused by the maintainer. Plan 0003, task 5: one more mutation run, and the pruning rule. Debt T33 needs a decision about the chat adapter before the release. |
 
 ## Queue counts
 
@@ -145,7 +145,7 @@ Seven `TODO(port)` markers stay in ported units. Five are calls of a member that
 For the maintainer, before gate 4:
 
 1. Accept or reject the open surfaces by name: GAPS.md J13 and J14.
-2. Accept or reject by name the 23 wrong-type cases that decision D20 does not settle: RULES.md, open item O4.
+2. Decided on 2026-11-28 (D55): the maintainer accepted the 45 listed judge cases by name. The maintainer applied the judge change, and pull request 70 merged it: the ids are in `port/judge/accepted-differences.txt`, and `expected-failures.txt` is empty.
 
 For the maintainer, from the public surface design (the page lists all 12 open questions):
 

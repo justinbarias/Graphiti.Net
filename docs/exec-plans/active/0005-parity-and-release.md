@@ -7,7 +7,7 @@ Port phases 7 and 8. Starts after plan 0004. Ends with M1.
 | # | Task | Owner, model, effort | Acceptance evidence |
 | --- | --- | --- | --- |
 | 1 | Done 2026-11-28. Fix build errors in groups that share a cause. | Fixer, Sonnet 5.5, medium | `scripts/check.sh` passes. |
-| 2 | In progress. 45 listed ids wait for gate 4. Run the whole judge. Work the failing list down to zero. | Lead, Fable 5.2, medium, with Sonnet 5.5 fixers | `expected-failures.txt` is empty. The case count did not go down. |
+| 2 | Done 2026-11-28. Run the whole judge. Work the failing list down to zero. | Lead, Fable 5.2, medium, with Sonnet 5.5 fixers | `expected-failures.txt` is empty. The case count did not go down. |
 | 3 | Done 2026-11-28. Copy the skill's `scan_port.py` into `port/tools/`. Run it on `src/` with `--exclude /obj/ --exclude /bin/`. Add it and the judge to CI as merge checks. | Lead, Fable 5.2, medium | No finding. |
 | 4 | Done 2026-11-28. Write the C# quickstart in `examples/Quickstart`. Run it against Neo4j with a real LLM. The quickstart is interactive (see below). | Workhorse, Sonnet 5.5, medium | The run output, and the text of one chat session. The maintainer supplies the key. |
 | 5 | Close debt T1, T2, and T3: run the gate in the devcontainer, in a cloud session, and in CI. | Lead, Fable 5.2, medium | The output from each environment. |
@@ -191,3 +191,19 @@ Not done:
 - Task 9 is paused by the maintainer (2026-11-28), so the example does not show the typed entity types.
 - The example has no test of its own, and the scanner does not read it.
 - Other models, and strict mode with changed schemas, were not tried.
+
+### Task 2, the decision of the maintainer, 2026-11-28
+
+The maintainer accepted all 45 listed cases by name (decision D55). The lead ran the .NET judge host on each case first: each one answers `JudgeTypeRejected`, so no listed case runs and gives a wrong result.
+
+The maintainer applied the judge change by hand, and pull request 70 merged it. `expected-failures.txt` is empty, and the 45 ids are in `port/judge/accepted-differences.txt`. A case there passes only while the .NET host answers `JudgeTypeRejected`. One Codex review (gpt-6-astra, high effort) found three faults in the first form of the change, and a second patch fixed them. The lead ran the final judge on a copy outside the repository:
+
+- The whole judge: 1,999 cases, 1,999 passed, 0 expected failures, 45 accepted differences.
+- An accepted id that the lead removed from the list fails as a case that is not listed.
+- A passing case that the lead added to the list fails, because the host did not answer `JudgeTypeRejected`.
+- An id in the list that no case has fails the run.
+- An id that is in both lists fails the run.
+
+Not explained: in one full run of the copy, the flow cases `flow.hand.guard_empty_episode` and `flow.hand.guard_invisible_chars` failed, and the next full run passed. Another session ran a gate on the shared judge database at that time (debt T32).
+
+Not checked: one accepted case, `pure.prompts.prompt_config.LLMModel.blank_id_raises`, mixes a blank id with a wrong-type field. So the judge has no case that shows a blank id alone.
