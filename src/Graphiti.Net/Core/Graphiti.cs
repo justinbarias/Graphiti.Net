@@ -1857,7 +1857,7 @@ internal sealed class GraphitiCore
                 foreach (var (episodeUuids, nodes) in identityNodesByEpisodeUuids)
                 {
                     // PORT: a sort with a tuple key that holds a datetime is Py.SortInPlace on a new list (R14).
-                    List<EpisodicNode> mentioningEpisodes = [.. episodeUuids.Select(episodeUuid => episodesByUuid[(string)episodeUuid!])];
+                    List<EpisodicNode> mentioningEpisodes = [.. episodeUuids.Cast<string>().Select(episodeUuid => episodesByUuid[episodeUuid])];
                     Py.SortInPlace(
                         mentioningEpisodes,
                         episode => new PyTuple(DatetimeUtils.EnsureUtc(episode.ValidAt), episodeContextIndices[episode.Uuid]));
