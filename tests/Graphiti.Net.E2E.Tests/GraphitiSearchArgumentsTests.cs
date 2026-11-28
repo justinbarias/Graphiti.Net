@@ -7,6 +7,10 @@ using Graphiti.Internal;
 using Graphiti.PyCompat;
 using CoreSearch = Graphiti.Core.Search;
 
+// SearchAsync with NumResults writes the limit into a recipe object that the whole process shares (upstream defect U8).
+// Another class that searches or ingests at the same time then reads that limit. So this class runs alone, and the
+// test of NumResults puts the two limits back.
+[Collection(SharedSearchRecipesGroup.Name)]
 public sealed class GraphitiSearchArgumentsTests
 {
     private const int TimeLimit = 180_000;
@@ -62,8 +66,17 @@ public sealed class GraphitiSearchArgumentsTests
         await using var scope = new GraphitiScope(GraphitiMembersTests.Ana);
         var seed = await SeedAsync(scope, ct);
 
-        Assert.Single(await scope.Graphiti.SearchAsync("Ana", new SearchOptions { GroupIds = [scope.Group], NumResults = 1 }, ct));
-        Assert.Equal(2, (await scope.Graphiti.SearchAsync("Ana", new SearchOptions { GroupIds = [scope.Group], NumResults = 2 }, ct)).Count);
+        var limits = (CoreSearch.SearchConfigRecipes.EdgeHybridSearchRrf.Limit, CoreSearch.SearchConfigRecipes.EdgeHybridSearchNodeDistance.Limit);
+        try
+        {
+            Assert.Single(await scope.Graphiti.SearchAsync("Ana", new SearchOptions { GroupIds = [scope.Group], NumResults = 1 }, ct));
+            Assert.Equal(2, (await scope.Graphiti.SearchAsync("Ana", new SearchOptions { GroupIds = [scope.Group], NumResults = 2 }, ct)).Count);
+        }
+        finally
+        {
+            (CoreSearch.SearchConfigRecipes.EdgeHybridSearchRrf.Limit, CoreSearch.SearchConfigRecipes.EdgeHybridSearchNodeDistance.Limit) = limits;
+        }
+
         Assert.Empty(await scope.Graphiti.SearchAsync("Ana", new SearchOptions { GroupIds = [Neo4jSidecar.NewGroupId()] }, ct));
 
         // With a center node, search reranks by the distance from the center node: the fact of the center comes first.
@@ -211,4 +224,14 @@ public sealed class GraphitiSearchArgumentsTests
     }
 
     internal sealed record Seed(EntityNode Ana, EntityNode Bo, EntityNode Lisbon, EntityEdge Works, EntityEdge Home);
+}
+
+/// <summary>
+/// The tests that write a limit into the recipe objects that <c>Graphiti.search</c> shares in the process (upstream
+/// defect U8). A search or an ingestion of another class reads those objects, so this collection runs alone.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class SharedSearchRecipesGroup
+{
+    public const string Name = "Shared search recipes";
 }
