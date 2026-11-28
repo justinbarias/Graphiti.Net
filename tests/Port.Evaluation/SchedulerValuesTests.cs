@@ -28,10 +28,11 @@ public class SchedulerValuesTests
 
     // The cancel points where the port and Python differ: the late cancel of GAPS F33. At each one the cancel arrives
     // inside the store call of _fail_unit, after the analysis raised an error that is not a cancel. The fake call yields,
-    // records, and returns without a second read of the token. Python delivers task.cancel() at the next suspension of the
-    // task, the await of that store call, so the main call ends with CancelledError. The port ends with the error of the
-    // analysis. The count of attempts and the events after call k are the same. The value is the result of the port at
-    // that point. A listed point that agrees with Python fails the test.
+    // records, and then cancels, and the in-memory store method has no await, so the store call ends with no suspension.
+    // Python delivers task.cancel() at the next suspension of the task, the gather of the heartbeat task in the `finally`
+    // of _run_unit, so the main call ends with CancelledError. The gather of the port takes no token, so the port ends with
+    // the error of the analysis. The count of attempts and the events after call k are the same. The value is the result
+    // of the port at that point. A listed point that agrees with Python fails the test.
     private static readonly Dictionary<string, string> LateCancel = new(StringComparer.Ordinal)
     {
         ["analysis_fails:2"] = """{"k": 2, "attempts": 3, "count": 3, "error": "RuntimeError", "after": []}""",

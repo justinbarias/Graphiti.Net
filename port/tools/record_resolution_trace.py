@@ -258,7 +258,7 @@ def run_edge_case(case: dict, mods, traced: bool) -> dict:
     CURRENT['mode'] = 'edge'
     CURRENT['trace'] = mods[-1]() if traced else None
     reo.events.clear()
-    reo.state.update(in_flight=0, max_in_flight=0)
+    reo.state.update(in_flight=0, max_in_flight=0, attempts=0, count=0, main=None, events_at_cancel=None)
     try:
         output = {'ok': asyncio.run(reo.run_case(case, mods[:-1]))}
     except Exception as error:  # noqa: BLE001 - the recording keeps each exception
@@ -302,7 +302,7 @@ def run_bulk_case(case: dict, mods, traced: bool) -> dict:
     CURRENT['mode'] = 'bulk'
     CURRENT['trace'] = mods[-1]() if traced else None
     rbu.events.clear()
-    rbu.state.update(in_flight=0, max_in_flight=0, count=0)
+    rbu.state.update(in_flight=0, max_in_flight=0, attempts=0, count=0, main=None, events_at_cancel=None)
     try:
         output = {'ok': asyncio.run(rbu.run_case(case, mods[:-1]))}
     except Exception as error:  # noqa: BLE001 - the recording keeps each exception

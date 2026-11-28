@@ -490,6 +490,28 @@ def lock_scripts() -> list[dict]:
             [*make, *start(1), ['yield'], ['release', 's'], ['cancel', 'h1'], ['yield'], ['yield'], lk,
              *finish(1), ['acquire', 's'], lk],
             'the slot of a woken and canceled waiter goes back'))
+    # The pass over layer 8, finding F2: a waiter that takes a slot while one more slot is free wakes the next waiter
+    # (`if self._value > 0: self._wake_up_next()` at the end of acquire). Two releases in one step, with the cancel of
+    # the second waiter between them, leave a slot that only that wake-up hands on.
+    # The acquire of the main task runs in wait_for with a limit of 1 s, so a port that never hands the slot on fails
+    # at once with TimeoutError, and not at the guard of the test.
+    grab = [['acquire', 's'], ['return', 1]]
+    out.append(s('sem_woken_waiter_wakes_the_next_one', {**waiters('s', 2), 'grab': grab},
+        [['sem', 's', 0], *start(2), ['yield'], ['release', 's'], ['cancel', 'h2'], ['release', 's'], lk,
+         ['try', [['wait_for', 'grab', 1.0]], 'swallow'], lk, *finish(2), lk],
+        'a woken waiter with one more free slot wakes the next waiter, here the main task'))
+    out.append(s('lock_woken_waiter_and_a_canceled_waiter', {
+        'grab': grab, **{f'w{i}': [['try', [['acquire', 's'], ['log', 'got'], ['release', 's']], 'reraise']]
+                         for i in (1, 2)}},
+        [['lock', 's'], ['acquire', 's'], *start(2), ['yield'], ['release', 's'], ['cancel', 'h2'], lk,
+         ['try', [['wait_for', 'grab', 1.0]], 'swallow'], lk, ['release', 's'], *finish(2), lk],
+        'the lock form: a release, a cancel of the second waiter, and an acquire of the main task'))
+    # A waiter that is canceled while the lock is held wakes no other waiter (`if not self._locked` of the
+    # cancellation branch of Lock.acquire).
+    out.append(s('lock_cancel_a_waiter_while_the_lock_is_held', waiters('s', 2),
+        [['lock', 's'], ['acquire', 's'], *start(2), ['yield'], ['cancel', 'h1'], ['yield'], ['yield'], lk,
+         ['log', 'release'], ['release', 's'], ['yield'], ['yield'], lk, *finish(2), lk],
+        'the cancel of a waiter while the lock is held leaves the next waiter waiting'))
     out.append(s('sem_release_with_no_waiter', {},
         [['sem', 's', 1], lk, ['release', 's'], lk, ['acquire', 's'], lk, ['acquire', 's'], lk,
          ['release', 's'], lk], 'a release with no waiter adds a slot, as Semaphore is not bounded'))

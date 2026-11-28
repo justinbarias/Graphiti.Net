@@ -6990,6 +6990,420 @@
    ]
   },
   {
+   "id": "sem_woken_waiter_wakes_the_next_one",
+   "note": "a woken waiter with one more free slot wakes the next waiter, here the main task",
+   "coros": {
+    "w1": [
+     [
+      "try",
+      [
+       [
+        "acquire",
+        "s"
+       ],
+       [
+        "log",
+        "got"
+       ]
+      ],
+      "reraise"
+     ]
+    ],
+    "w2": [
+     [
+      "try",
+      [
+       [
+        "acquire",
+        "s"
+       ],
+       [
+        "log",
+        "got"
+       ]
+      ],
+      "reraise"
+     ]
+    ],
+    "grab": [
+     [
+      "acquire",
+      "s"
+     ],
+     [
+      "return",
+      1
+     ]
+    ]
+   },
+   "main": [
+    [
+     "sem",
+     "s",
+     0
+    ],
+    [
+     "create_task",
+     "w1",
+     "h1"
+    ],
+    [
+     "create_task",
+     "w2",
+     "h2"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "release",
+     "s"
+    ],
+    [
+     "cancel",
+     "h2"
+    ],
+    [
+     "release",
+     "s"
+    ],
+    [
+     "locked",
+     "s"
+    ],
+    [
+     "try",
+     [
+      [
+       "wait_for",
+       "grab",
+       1.0
+      ]
+     ],
+     "swallow"
+    ],
+    [
+     "locked",
+     "s"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h1"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h2"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "locked",
+     "s"
+    ]
+   ],
+   "trace": [
+    "main:locked s -> True",
+    "w1:acquired s",
+    "w1:got",
+    "w2:caught CancelledError",
+    "grab:acquired s",
+    "main:wait_for grab -> 1",
+    "main:locked s -> True",
+    "main:await h1 -> None",
+    "main:caught CancelledError",
+    "main:locked s -> True",
+    "main:-> None"
+   ]
+  },
+  {
+   "id": "lock_woken_waiter_and_a_canceled_waiter",
+   "note": "the lock form: a release, a cancel of the second waiter, and an acquire of the main task",
+   "coros": {
+    "grab": [
+     [
+      "acquire",
+      "s"
+     ],
+     [
+      "return",
+      1
+     ]
+    ],
+    "w1": [
+     [
+      "try",
+      [
+       [
+        "acquire",
+        "s"
+       ],
+       [
+        "log",
+        "got"
+       ],
+       [
+        "release",
+        "s"
+       ]
+      ],
+      "reraise"
+     ]
+    ],
+    "w2": [
+     [
+      "try",
+      [
+       [
+        "acquire",
+        "s"
+       ],
+       [
+        "log",
+        "got"
+       ],
+       [
+        "release",
+        "s"
+       ]
+      ],
+      "reraise"
+     ]
+    ]
+   },
+   "main": [
+    [
+     "lock",
+     "s"
+    ],
+    [
+     "acquire",
+     "s"
+    ],
+    [
+     "create_task",
+     "w1",
+     "h1"
+    ],
+    [
+     "create_task",
+     "w2",
+     "h2"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "release",
+     "s"
+    ],
+    [
+     "cancel",
+     "h2"
+    ],
+    [
+     "locked",
+     "s"
+    ],
+    [
+     "try",
+     [
+      [
+       "wait_for",
+       "grab",
+       1.0
+      ]
+     ],
+     "swallow"
+    ],
+    [
+     "locked",
+     "s"
+    ],
+    [
+     "release",
+     "s"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h1"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h2"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "locked",
+     "s"
+    ]
+   ],
+   "trace": [
+    "main:acquired s",
+    "main:locked s -> False",
+    "w1:acquired s",
+    "w1:got",
+    "w2:caught CancelledError",
+    "grab:acquired s",
+    "main:wait_for grab -> 1",
+    "main:locked s -> True",
+    "main:await h1 -> None",
+    "main:caught CancelledError",
+    "main:locked s -> False",
+    "main:-> None"
+   ]
+  },
+  {
+   "id": "lock_cancel_a_waiter_while_the_lock_is_held",
+   "note": "the cancel of a waiter while the lock is held leaves the next waiter waiting",
+   "coros": {
+    "w1": [
+     [
+      "try",
+      [
+       [
+        "acquire",
+        "s"
+       ],
+       [
+        "log",
+        "got"
+       ]
+      ],
+      "reraise"
+     ]
+    ],
+    "w2": [
+     [
+      "try",
+      [
+       [
+        "acquire",
+        "s"
+       ],
+       [
+        "log",
+        "got"
+       ]
+      ],
+      "reraise"
+     ]
+    ]
+   },
+   "main": [
+    [
+     "lock",
+     "s"
+    ],
+    [
+     "acquire",
+     "s"
+    ],
+    [
+     "create_task",
+     "w1",
+     "h1"
+    ],
+    [
+     "create_task",
+     "w2",
+     "h2"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "cancel",
+     "h1"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "locked",
+     "s"
+    ],
+    [
+     "log",
+     "release"
+    ],
+    [
+     "release",
+     "s"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "yield"
+    ],
+    [
+     "locked",
+     "s"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h1"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "try",
+     [
+      [
+       "await",
+       "h2"
+      ]
+     ],
+     "all"
+    ],
+    [
+     "locked",
+     "s"
+    ]
+   ],
+   "trace": [
+    "main:acquired s",
+    "w1:caught CancelledError",
+    "main:locked s -> True",
+    "main:release",
+    "w2:acquired s",
+    "w2:got",
+    "main:locked s -> True",
+    "main:caught CancelledError",
+    "main:await h2 -> None",
+    "main:locked s -> True",
+    "main:-> None"
+   ]
+  },
+  {
    "id": "sem_release_with_no_waiter",
    "note": "a release with no waiter adds a slot, as Semaphore is not bounded",
    "coros": {},

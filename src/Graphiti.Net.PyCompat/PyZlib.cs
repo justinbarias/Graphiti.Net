@@ -10,8 +10,11 @@ using System.IO.Compression;
 ///
 /// <see cref="Decompress"/> is a full inflate, because <c>ZLibStream</c> does not report where the stream ends and does not
 /// give the message of zlib. It checks the header, each block, the end of the stream, and the Adler-32 value, in the order
-/// of zlib, and it throws <see cref="InvalidDataException"/> with the text of <c>zlib.error</c> for each input that Python
-/// refuses. Bytes after the end of the stream are ignored, as <c>zlib.decompress</c> ignores them.
+/// of zlib, and it throws <see cref="InvalidDataException"/> for each input that Python refuses, with the text of
+/// <c>zlib.error</c> in most cases. For a small part of the corrupt inputs the text differs (decision D51): the zlib of
+/// the oracle reports <c>invalid literal/length/distance code</c> where this reader reports
+/// <c>invalid literal/length code</c> or <c>invalid distance code</c>. Bytes after the end of the stream are ignored, as
+/// <c>zlib.decompress</c> ignores them.
 /// </summary>
 internal static class PyZlib
 {
@@ -40,9 +43,11 @@ internal static class PyZlib
 
     private static readonly byte[] CodeLengthOrder = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
 
-    private static readonly Huffman FixedLengths = Huffman.Build(FixedLengthCodeLengths(), codeLengths: false)!;
+    private static readonly Huffman FixedLengths = Huffman.Build(FixedLengthCodeLengths(), codeLengths: false)
+        ?? throw new InvalidOperationException("PyZlib: the fixed literal/length code is complete");
 
-    private static readonly Huffman FixedDistances = Huffman.Build(Enumerable.Repeat((byte)5, 32).ToArray(), codeLengths: false)!;
+    private static readonly Huffman FixedDistances = Huffman.Build(Enumerable.Repeat((byte)5, 32).ToArray(), codeLengths: false)
+        ?? throw new InvalidOperationException("PyZlib: the fixed distance code is complete");
 
     /// <summary><c>zlib.compress(data)</c>, with the default level 6.</summary>
     internal static byte[] Compress(byte[] data)
@@ -58,8 +63,9 @@ internal static class PyZlib
 
     /// <summary>
     /// <c>zlib.decompress(data)</c>. Each input for which Python raises <c>zlib.error</c> throws
-    /// <see cref="InvalidDataException"/> with the same text, for example
-    /// <c>Error -5 while decompressing data: incomplete or truncated stream</c>.
+    /// <see cref="InvalidDataException"/>, in most cases with the same text, for example
+    /// <c>Error -5 while decompressing data: incomplete or truncated stream</c>. For a small part of the corrupt inputs
+    /// the text names a different invalid code than the zlib of the oracle (decision D51).
     /// </summary>
     internal static byte[] Decompress(byte[] data) => new Inflater(data).Run();
 
