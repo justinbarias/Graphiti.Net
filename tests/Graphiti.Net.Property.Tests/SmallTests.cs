@@ -165,6 +165,32 @@ public class SmallTests
         }
     });
 
+    // functools.lru_cache is safe for threads: CPython holds a lock while it reads and changes the cache. The ported
+    // code runs on one scheduler, but a test thread can call a cached function at the same time as another test class.
+    [Theory]
+    [InlineData(8)]
+    [InlineData(512)]
+    public async Task LruCache_is_safe_for_two_threads_that_call_it_at_one_time(int maxSize)
+    {
+        var cache = new PyLruCache<int, int>(maxSize);
+        const int calls = 200_000;
+        Task Work(int seed) => Task.Run(() =>
+        {
+            var state = (uint)seed;
+            for (var i = 0; i < calls; i++)
+            {
+                state = (state * 1664525) + 1013904223;
+                var key = (int)(state >> 16) % (maxSize * 3);
+                Assert.Equal((key * key) + 1, cache.GetOrAdd(key, k => (k * k) + 1));
+            }
+        });
+
+        await Task.WhenAll(Work(1), Work(2), Work(3), Work(4));
+
+        Assert.True(cache.Count <= maxSize, $"{cache.Count} entries in a cache of {maxSize}");
+        Assert.Equal(4L * calls, cache.Hits + cache.Misses);
+    }
+
     // ---- PyRandom ----
 
     [Fact]
