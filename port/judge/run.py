@@ -247,11 +247,24 @@ def _wrap_at(value: object, path: list[str]) -> object:
     return value
 
 
+def _wrap_params(unit: object, names: list[str]) -> object:
+    """Wraps the named list parameters of one query, or of each operation of a session, as bags."""
+    if not isinstance(unit, dict):
+        return unit
+    out = dict(unit)
+    if isinstance(out.get("params"), dict):
+        out["params"] = {k: ({BAG: v} if k in names and isinstance(v, list) else v) for k, v in out["params"].items()}
+    if isinstance(out.get("ops"), list):
+        out["ops"] = [_wrap_params(op, names) for op in out["ops"]]
+    return out
+
+
 def _mark_bags(result: object, case: dict | None = None) -> object:
     """Wraps the lists whose order is not a contract. Every other list keeps its order.
 
     Only these are bags: the four capture lists of a step, the node and edge lists of the graph
-    dump, and a list in a return value that the case itself declares as `unordered`.
+    dump, a list in a return value that the case itself declares as `unordered`, and a list
+    parameter of a query that the case itself declares as `unordered_params`.
     """
     if not isinstance(result, dict):
         return result
@@ -268,6 +281,12 @@ def _mark_bags(result: object, case: dict | None = None) -> object:
                 for path in unordered:
                     if "ret" in step:
                         step["ret"] = _wrap_at(step["ret"], [part for part in path.split(".") if part])
+                # A case can declare that a list parameter of the queries of one step has no
+                # order, for a list that upstream builds from the rows of a query with no
+                # ORDER BY: "unordered_params": ["uuids"].
+                names = declared[index].get("unordered_params", []) if index < len(declared) else []
+                if names and isinstance(step.get("queries"), dict) and isinstance(step["queries"].get(BAG), list):
+                    step["queries"] = {BAG: [_wrap_params(unit, names) for unit in step["queries"][BAG]]}
             steps.append(step)
         out["steps"] = steps
     if isinstance(out.get("graph"), dict):
