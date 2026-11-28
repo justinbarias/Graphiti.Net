@@ -377,7 +377,7 @@ Mapping rules:
 | A field | A property with the PascalCase name and `{ get; init; }`. A required Python field is `required`. |
 | `PyDateTime` | `DateTimeOffset`. Input keeps its offset and is cut to microseconds. A naive value on output is read as UTC, as `ensure_utc` does. A save then writes a zoned value (D36). |
 | `list[T]` | `IReadOnlyList<T>` |
-| `list[float]` for an embedding | `ReadOnlyMemory<double>?`. The stored values are 64-bit, so a read and a save change nothing. |
+| `list[float]` for an embedding | `ReadOnlyMemory<double>?`. Neo4j stores a vector with 32-bit values (`db.create.setNodeVectorProperty`), so the first save rounds a 64-bit value to 32 bits. A value that was read changes no more in a later save and read. |
 | `dict[str, Any]` (`attributes`, `episode_metadata`) | `IReadOnlyDictionary<string, object?>`. A value is null, `bool`, `long`, `double`, `string`, `DateTimeOffset`, `DateOnly`, a read-only list, or a read-only dictionary. A tuple becomes a read-only list. Another kind of value throws `InvalidCastException` at the facade. A null `episode_metadata` stays null and does not become an empty dictionary. |
 | An enum | A C# enum with PascalCase members. The facade maps by member, never by text. |
 | `SearchResults` score lists | `IReadOnlyList<double>` next to each item list, in the same order |
@@ -673,7 +673,7 @@ The lead made these choices. The maintainer accepts or changes them with this pa
 | --- | --- | --- |
 | L1 | `AddGraphiti` returns a builder, and `IGraphiti` is a singleton with one instance for each container. | The scheduler and `PortServices` are process-wide (D22, D23). Named instances wait for port phase 9. |
 | L2 | Public dates are `DateTimeOffset`. A naive value on output is read as UTC. | A host cannot build a naive value, and `ensure_utc` gives a naive value the same meaning. |
-| L3 | Embeddings in public records are `ReadOnlyMemory<double>`. | The database holds 64-bit values. A 32-bit public type changes each value on a read and a save. |
+| L3 | Embeddings in public records are `ReadOnlyMemory<double>`. | The ported classes hold an embedding as `list[float]`, which is 64-bit, and each ranking function computes with 64-bit values. The public type keeps that type, so the facade changes no value. The first reason of this row was false: it said that the database holds 64-bit values. Neo4j stores 32-bit values, so the first save rounds each value (corrected on 2026-11-28 after the first review of the surface). |
 | L4 | `Llm.Temperature` defaults to null, and the adapter then sends none. Upstream sends 1. | 1 is the provider default for OpenAI. Some reasoning models reject the parameter, and upstream's OpenAI client leaves it out for them. |
 | L5 | Each chat call asks for `ChatResponseFormat.Json`. | The base path always parses the reply as a JSON object. Upstream's generic client does the same in its `json_object` mode. |
 | L6 | The call facts go through the ambient `GraphitiModelCall.Current`, not through `ChatOptions.AdditionalProperties`. | An ambient value cannot reach a provider request. |

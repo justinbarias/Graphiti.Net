@@ -128,7 +128,7 @@ Seven `TODO(port)` markers stay in ported units. Five are calls of a member that
 | 2026-11-26 | After the reviews of the `PyCompat` helpers. R7 (enum attributes), R8 (cleanup tokens, `WaitForAsync`, gather of tasks), R11, R12, R13, R14 (`Py.SortInPlace` for float, datetime, and open keys), R18, and Part 2 changed. New open item O9. The rulebook lists the changes in its own change table. | None. No unit is ported. |
 | 2026-11-26 | After the pilot: three rounds of rule changes from the reviews of the five units and of the support code. The rulebook lists them in its own change table. | `search_filters`: the member order of its three models, done in pull request 27. `content_chunking`: `.Value` on each `PyPatch<T>` read, done before its merge. No unit waits. |
 
-[GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 22 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
+[GAPS.md](GAPS.md) holds 22 language gaps, 15 surfaces that the judge cannot reach, and 24 upstream defects. [TYPE_HINTS.md](TYPE_HINTS.md) holds the 127 signatures that upstream leaves without hints.
 
 ## Deviations from the porting skill
 
