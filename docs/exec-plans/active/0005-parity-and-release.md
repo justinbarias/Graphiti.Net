@@ -28,6 +28,12 @@ The maintainer asked for this form on 2026-11-28:
 
 These libraries are dependencies of the example only. The two packages of the product do not reference them.
 
+The maintainer decided the split and the metadata on 2026-11-28:
+
+- The example splits the Act by section: one episode for each section. A section with many definitions (section 5) becomes several episodes of about 400 words, each with the same chain.
+- Each episode carries at minimum the section id and the chain Act > Chapter > Part > Division > Subdivision > Section. A level that does not exist is left out.
+- Upstream 0.32.0 declares `episode_metadata` on an episode, but no save query writes it and `add_episode` has no parameter for it. So the port stores no free metadata, and the example keeps the metadata in three stored places: `Name` holds the section id, `SourceDescription` holds the chain in one line, and the first lines of `Content` hold the chain with the heading text of each level. The example also writes `sections.json`, a typed record of each episode, for the search tool.
+
 ## Gate 4
 
 The maintainer sees the full judge pass and the scan result, and accepts or rejects each remaining `TODO(port)` marker by name.
@@ -145,3 +151,40 @@ Three Opus 5.5 high review rounds read this task with the task to refute it: 9 f
 
 One thing is not done. The branch `main` has no protection rule on GitHub, so GitHub does not require the job `check` for a merge. The lead merges only after the job passes. A protection rule is a repository setting, which the maintainer decides.
 
+### Task 4, the interactive quickstart, 2026-11-28
+
+The example is in `examples/Quickstart`, and its README gives each command. The example builds with the solution, so `scripts/check.sh` builds and formats it.
+
+The run output of the second full ingestion, on Neo4j with `gpt-6-luna` and a window of 3 episodes:
+
+- `split` gives 250 episodes from 246 sections (16 Parts, 30 Divisions, 9 Subdivisions). Section 5 becomes 5 episodes. The text keeps its hyphens: `end-user` appears 155 times and `enduser` 0 times.
+- The ingestion used 5.45M input and 0.395M output tokens, about 0.37 USD, in about 30 minutes. Its last line: `Episodes ingested: 47. Entities returned: 173. Facts returned: 113. Time: 00:04:50.`
+- The graph of the group `online-safety-act-2021` holds 250 episodes, 383 entities, and 606 facts. 9 episodes have no fact.
+- The first full ingestion cost about 0.36 USD. The two full runs cost about 0.73 USD.
+
+The text of one chat session, from the page in a browser:
+
+> Question: Who appoints the eSafety Commissioner, and for how long?
+>
+> Answer: The Minister appoints the eSafety Commissioner by written instrument. The appointment lasts for the period specified in that instrument, up to a maximum of five years. (Online Safety Act 2021 ss 167–168)
+
+Sections 167 and 168 of the Act state this. Five more questions went through the AG-UI endpoint. Each cited section id was in the tool results, and each statement was supported by the text of the Act. Two limits: one answer about a removal notice named only the hosting service provider (section 90, not section 88), and one answer held one inference.
+
+What the run found about the product:
+
+| Finding | Evidence | Where it goes |
+| --- | --- | --- |
+| The default chat adapter asks for JSON mode and puts the schema in the prompt text. A small model then returns the wrong shape for some calls. | With `gpt-6-luna`, 6 of 14 trial runs of five sections failed with `ValidationException: EdgeDuplicate`. The example class `StructuredOutputChatClient` sends the schema as native structured output. With it, 1 of 17 trial runs failed, and each full run failed 2 times in about 1,150 `resolve_edge` calls. | Debt T33. |
+| OpenAI rejects the schemas of Graphiti in strict mode. | The schemas have `$defs` and optional properties. `AIJsonUtilities.TransformSchema` closes only the root object. | Debt T33. |
+| `RemoveEpisodeAsync` took about 5 minutes for one episode of the full graph. | Upstream `remove_episode` rebuilds the summary of each entity that stays from all its other episodes. The entity of the Act has 250 episodes. This is upstream behavior, not a difference of the port. | The README of the example. `reset` deletes each node with `DeleteAsync`. |
+| A failed ingestion leaves episodes with no entity. | `AddEpisodeAsync` saves the episode before the extraction. Each failed run left 3 such episodes with a window of 3. `--resume` finds them and ingests them again. | The README of the example. |
+| `gpt-6-luna` rejects function tools together with reasoning in the Chat Completions API. | The provider error. The agent turns the reasoning effort off. | The README of the example. |
+| The batch delete of a group fails on Neo4j. | GAPS U1. | Known before this task. |
+
+One Opus 5.5 high review read the example with the task to refute it: 14 findings. Each one is resolved in the code or stated in the README. The fix round had no second review. The lead read its diff, ran `split`, tested the host filter (400 for another host), and asked one new question in the browser. The lead then found that the page listened on each network address, and bound it to the loopback address.
+
+Not done:
+
+- Task 9 is paused by the maintainer (2026-11-28), so the example does not show the typed entity types.
+- The example has no test of its own, and the scanner does not read it.
+- Other models, and strict mode with changed schemas, were not tried.

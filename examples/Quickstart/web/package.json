@@ -1,0 +1,28 @@
+{
+  "name": "quickstart-web",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true next dev --hostname 127.0.0.1 --port 3000",
+    "build": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true next build",
+    "start": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true next start --hostname 127.0.0.1 --port 3000"
+  },
+  "scarfSettings": {
+    "enabled": false
+  },
+  "dependencies": {
+    "@ag-ui/client": "1.0.5",
+    "@copilotkit/react-core": "1.90.2",
+    "@copilotkit/runtime": "1.90.2",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.11",
+    "@types/react": "19.3.3",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}

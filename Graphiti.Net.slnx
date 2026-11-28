@@ -4,6 +4,9 @@
     <Project Path="src/Graphiti.Net.Neo4j/Graphiti.Net.Neo4j.csproj" />
     <Project Path="src/Graphiti.Net.PyCompat/Graphiti.Net.PyCompat.csproj" />
   </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/Quickstart/Quickstart.Server/Quickstart.Server.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Graphiti.Net.E2E.Tests/Graphiti.Net.E2E.Tests.csproj" />
     <Project Path="tests/Graphiti.Net.JudgeHost/Graphiti.Net.JudgeHost.csproj" />
