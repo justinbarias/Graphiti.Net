@@ -1,8 +1,8 @@
 // Port of .upstream/graphiti/tests/test_graphiti_mock.py (port/RULES.md, R25) on the real Neo4j.
 //
 // Each test of the file uses the graph_driver fixture, which runs for each driver. Only Neo4j is ported (decision D10), so
-// the tests that skip FalkorDB run here. The model, the embedder, and the cross-encoder are the mocks of the upstream file,
-// as fakes at the network boundary (GraphitiClassTestSupport.cs).
+// the tests that skip FalkorDB run here. The model, the embedder, and the cross-encoder are the mocks of the upstream file
+// (GraphitiClassTestSupport.cs). As upstream, the model mock replaces generate_response, which is above the network call.
 //
 // PORT: the upstream test clears the groups `graphiti_test_group` and `graphiti_test_group_2` first and reads the whole
 // graph in two places. The shared Neo4j holds the data of other tests and is never cleared. Each C# test works in two

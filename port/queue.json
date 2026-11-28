@@ -1709,8 +1709,8 @@
         "typing"
       ],
       "target": "src/Graphiti.Net/Core/GraphitiTypes.cs",
-      "status": "tests_pass",
-      "notes": "Layer 1. Two reviews and one fix round. No test reaches complete_prompt, generate_prompt_response, and the runtime and library routes of resolve_prompt_messages: they stop at skeleton members. Layers 3 and 4 add those tests."
+      "status": "reviewed",
+      "notes": "Layer 1. Two reviews and one fix round. It has no pure judge case. The 34 flow cases of the judge ran 41 of the 82 lines of its file on 2026-11-28, and each case passes on the .NET build. They run `generate_prompt_response` and `resolve_prompt_messages`, and no flow case runs `complete_prompt`. tests/Port.Evaluation/LlmClientRuntimeTests.cs, tests/Port.Evaluation/PromptsLibTests.cs, and tests/Graphiti.Net.E2E.Tests/TestGraphitiConfigurablePrompts.cs call `complete_prompt`."
     },
     {
       "order": 79,

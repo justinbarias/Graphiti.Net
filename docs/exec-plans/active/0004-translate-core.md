@@ -686,6 +686,7 @@ A unit with no pure case moves from `tests_pass` to `reviewed` if the flow cases
 | `driver.neo4j.operations.saga_node_ops` | 110 | 128 |
 | `driver.neo4j_driver` | 226 | 332 |
 | `embedder.client` | 2 | 4 |
+| `graphiti_types` | 41 | 82 |
 | `ingestion.graph_reader` | 61 | 73 |
 | `ingestion.state_store` | 195 | 326 |
 | `llm_client.client` | 147 | 234 |
@@ -698,7 +699,7 @@ A unit with no pure case moves from `tests_pass` to `reviewed` if the flow cases
 
 `cross_encoder.client` is an abstract class with no executable line, and the flow cases reach it through `CrossEncoderBridge`. It has the status `reviewed`.
 
-Seven units keep `tests_pass`, because no flow case runs a line of them. Their tests are their only evidence:
+Seven units keep `tests_pass`, because no flow case runs a line of them. Their tests are their only evidence. Four more units keep `tests_pass` for another reason: each one has a pure case that is still listed (`utils.datetime_utils`, `llm_client.prompt_config`, `search.search_config`, and `search.search_utils`).
 
 | Unit | Lines that the flow cases ran | Lines |
 | --- | --- | --- |
@@ -716,7 +717,7 @@ What the packets changed in the evidence:
 
 - The recordings of `phases` and `scheduler` run the real `Graphiti` with the real in-memory state store. They cover 624 of 626 lines of the eight functions of `phases`, and 74 of 74 lines of the scheduler paths after the admit lock.
 - The three seeded defects of `phases` that passed each test at the end of layer 8 fail a test now.
-- The ingestion tests use one fake at the driver boundary (`HarnessDriver`). The oracle ran the upstream tests on the same fake: 98 passed.
+- The ingestion tests keep the fakes of the upstream tests, in four places. `HarnessDriver` is a fake driver. `FakeGraph` derives from the product class `GraphReader` and replaces each read, so the queries of `GraphReader` do not run in these tests (the flow cases run 61 of its 73 lines). `LoggingStore` wraps the state store. `HarnessLlm` replaces `generate_response`, which is above the network call. The mocks of `TestGraphitiMock.cs` and the fake model clients of the `graphiti` tests replace `generate_response` too. Part 3 of `port/RULES.md` allows these forms for a port of an upstream test. Rule 4 of `docs/TESTING.md` names only the network boundary (debt row T31). The oracle ran the upstream ingestion tests on the same driver fake: 98 passed.
 - Four tests of `TestAddTriplet.cs` assert the result of Python 0.32.0, with a `// PORT:` comment. Their upstream assertion fails on Python itself.
 - The lease tests of `TestFailureRules.cs` run on the virtual clock. On the real clock, a stall of 0.3 seconds of the shared scheduler failed them.
 - One cache test of layer 3 measured a wait with a clock that started late. It proves an order now (debt row T30).
@@ -725,6 +726,8 @@ Decisions of the lead under D49, for the maintainer at gate 4:
 
 - Two pull requests for layer 9.
 - The status rule of the measurement above, and the seven units that keep `tests_pass`.
+- GAPS F50: a cancel does not stop the wait of a `run` call for its keys.
+- Debt row T31: rule 4 of `docs/TESTING.md` has no clause for the fakes that a port of an upstream test keeps.
 - Rule R9: a `run` call of the Neo4j adapter reads the keys of its result. It adds one wait and no round trip.
 - Seven cancel points have the kind `cleanup`. After a cancel in a cleanup await, the port does not mark the unit failed, and the deadline of the unit releases its position later.
 
@@ -735,7 +738,8 @@ No `TODO(port)` marker is new in a ported unit. 20 upstream tests keep a `TODO(p
 What is not checked:
 
 - Two lines of `phases` have no recording: line 820 and line 1810.
-- No flow case reaches `Neo4jSession.RunAsync`. Eight end-to-end tests on Neo4j cover the two `RunAsync` forms.
+- The flow cases run `Neo4jSession.RunAsync` with its branch for a result with no keys. In `Neo4jTransaction.RunAsync` they do not run that branch, because each transaction statement of the scenarios returns rows. Eight end-to-end tests on Neo4j cover both forms.
+- A cancel does not stop the new wait of a `run` call. `KeysAsync` and `ConsumeAsync` of Neo4j.Driver take no token, so a statement that returns no rows holds its caller until the server ends it. Python stops that wait at a cancel (GAPS F50).
 - After a failed statement, the port throws `TransactionTerminatedException` for the next run, where Python raises `TransactionError` (GAPS F37).
 - No test runs two processes that write to one SQLite file at one time.
 - The mutation run of plan 0003, task 5 is still owed.
