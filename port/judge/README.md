@@ -42,7 +42,8 @@ Requirements:
 | `add_reply.py` | Adds one hand-written reply to a reply file. |
 | `embedder-vectors.json` | Vectors from the Python judge embedder. The .NET host must reproduce them bit for bit. |
 | `count.txt` | The lowest allowed case count. |
-| `expected-failures.txt` | The .NET cases that still fail. Empty at M1. |
+| `expected-failures.txt` | The .NET cases that still fail. Empty since gate 4. |
+| `accepted-differences.txt` | The cases that the maintainer accepted by name at gate 4 (decision D55). Each one must answer `JudgeTypeRejected`. |
 | `host-python/` | The Python host. |
 
 The .NET host is `tests/Graphiti.Net.JudgeHost`. It is outside this folder because each ported unit adds a binding to it.
@@ -202,7 +203,9 @@ A case in `expected-failures.txt` can fail only with `JudgeNotBound` or `JudgeTy
 
 The .NET host answers `JudgeTypeRejected` if a C# parameter cannot hold an argument of the case (decision D20).
 If the golden result is `TypeError` or `AttributeError`, the case passes, because Python refused the same argument for its type.
-If the golden result is another error or a value, the case fails. It can stay in `expected-failures.txt` only if the maintainer accepts the difference by name.
+If the golden result is another error or a value, the case fails, unless its id is in `accepted-differences.txt`.
+The maintainer accepts such a difference by name, and only then does the id enter that file (decision D55).
+A case in that file fails if the host gives any answer other than `JudgeTypeRejected`, and the runner also fails for an id there that no case has.
 
 ## Cases mined from upstream pytest files
 

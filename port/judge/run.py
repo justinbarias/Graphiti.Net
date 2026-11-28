@@ -30,6 +30,7 @@ CASES = JUDGE / "cases"
 GOLDEN = JUDGE / "golden"
 COUNT_FILE = JUDGE / "count.txt"
 EXPECTED_FAILURES = JUDGE / "expected-failures.txt"
+ACCEPTED_DIFFERENCES = JUDGE / "accepted-differences.txt"
 
 HOSTS = {
     "python": [str(ROOT / ".upstream/graphiti/.venv/bin/python"), str(JUDGE / "host-python/host.py")],
@@ -482,6 +483,17 @@ def _accepts_type_rejection(golden_result: object) -> bool:
     return isinstance(golden_result, dict) and golden_result.get("error") in TYPE_ERRORS and len(golden_result) == 1
 
 
+def _accepted_differences() -> set[str]:
+    """The cases that the maintainer accepted by name at gate 4 (decision D55).
+
+    Each one passes an argument that a C# parameter cannot hold, and Python gives a value or an error
+    that is not a type error. Such a case passes only while the .NET host answers JudgeTypeRejected.
+    """
+    if not ACCEPTED_DIFFERENCES.exists():
+        return set()
+    return {l.strip() for l in ACCEPTED_DIFFERENCES.read_text().split("\n") if l.strip() and not l.startswith("#")}
+
+
 def _errors_in(result: object) -> list[str]:
     """Names the errors inside a recorded result, so that a person reviews each one."""
     found: list[str] = []
@@ -567,6 +579,8 @@ def main() -> int:
     refused: list[str] = []
     raws: dict[str, object] = {}
     failed: dict[str, list[str]] = {}
+    accepted = _accepted_differences() if args.build == "dotnet" else set()
+    accepted_used: set[str] = set()
     try:
         for entry in cases:
             if entry["layer"] == "flow":
@@ -596,6 +610,15 @@ def main() -> int:
                 continue
             if args.build == "dotnet" and _type_rejected(raw) and _accepts_type_rejection(golden[entry["id"]]):
                 # Decision D20: C# refuses the argument at the binding, and Python refuses it with a type error.
+                continue
+            if entry["id"] in accepted:
+                # Decision D55: the maintainer accepted this difference by name. The case passes only
+                # while C# refuses the argument. Each other answer is a failure, also a result that
+                # equals the golden result, because the name must then leave the list.
+                if _type_rejected(raw):
+                    accepted_used.add(entry["id"])
+                else:
+                    failed[entry["id"]] = [f"the case is in accepted-differences.txt, and the host did not answer {TYPE_REJECTED}. Remove the id from the list if the case passes now."]
                 continue
             found = differences(golden[entry["id"]], actual)
             if found:
@@ -632,6 +655,10 @@ def main() -> int:
     if args.list_failures:
         print("\n".join(sorted(failed)))
         return 0
+
+    unknown = sorted(accepted - {c["id"] for c in cases}) if not partial else []
+    for case_id in unknown:
+        failed[case_id] = ["the id is in accepted-differences.txt, and no case has this id."]
 
     minimum = int(COUNT_FILE.read_text().strip()) if COUNT_FILE.exists() else 0
     print(f"judge: build={args.build} cases={len(cases)} passed={len(cases) - len(failed)} failed={len(failed)}")
@@ -676,6 +703,7 @@ def main() -> int:
         if surprise or fixed:
             status = 1
         print(f"judge: expected failures={len(expected)} unexpected={len(surprise)} fixed={len(fixed)} bound_wrong={len(bound_wrong)}")
+        print(f"judge: accepted differences={len(accepted_used)} of {len(accepted & {c['id'] for c in cases})} in this run")
 
     print("judge: passed" if status == 0 else "judge: FAILED")
     return status
