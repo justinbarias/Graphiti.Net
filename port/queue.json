@@ -2007,7 +2007,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/EdgeOperations.cs",
       "status": "reviewed",
-      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7c. R5: the lines at `edge_operations.py:344`, `:743`, `:749`, and `:878` can hold text of the model reply, as in Python. Two upstream tests keep `TODO(port): O10`: `test_resolve_extracted_edges_merges_override_candidates` (async case 16 of `values/edge_operations.json` covers it) and `test_resolve_extracted_edges_forwards_clients_only_for_prompt_routing` (async cases 16 and 13). GAPS F33: 55 cancel points are in the `LateCancel` list. Two ported tests (`test_edge_type_signatures_map_*`) call no product code and go to the pruning rule. No input reaches the `max()` error near line 261. The trace paths are recorded in layer 8."
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7c. R5: the lines at `edge_operations.py:344`, `:743`, `:749`, and `:878` can hold text of the model reply, as in Python. Two upstream tests keep `TODO(port): O10`: `test_resolve_extracted_edges_merges_override_candidates` (async case 16 of `values/edge_operations.json` covers it) and `test_resolve_extracted_edges_forwards_clients_only_for_prompt_routing` (async cases 16 and 13). GAPS F33: 53 cancel points are in the `LateCancel` list. Two ported tests (`test_edge_type_signatures_map_*`) call no product code and go to the pruning rule. No input reaches the `max()` error near line 261. The trace paths are recorded in layer 8."
     },
     {
       "order": 91,
@@ -2064,7 +2064,7 @@
       ],
       "target": "src/Graphiti.Net/Core/Utils/Maintenance/CombinedExtraction.cs",
       "status": "reviewed",
-      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7d. R5: the warning of failed batch timestamps passes the exception, which can hold a value of the model reply. GAPS F33: one cancel point is in the `LateCancel` list."
+      "notes": "Layer 7 of plan 0004. Two reviews and one fix round. Packet P7d. R5: the warning of failed batch timestamps passes the exception, which can hold a value of the model reply. GAPS F33: the `LateCancel` list is empty since the fix round of packet P8d, which gave `semaphore_gather` the semaphore of Python."
     },
     {
       "order": 93,
